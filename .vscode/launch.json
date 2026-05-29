@@ -1,0 +1,14 @@
+{
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Spring Boot-MarcusStoreApiApplication<marcus-store-api>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "mainClass": "com.fpoly.marcusstore.MarcusStoreApiApplication",
+      "projectName": "marcus-store-api",
+      "args": "",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}

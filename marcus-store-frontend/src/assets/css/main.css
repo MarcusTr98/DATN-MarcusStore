@@ -1,0 +1,9 @@
+/* src/assets/css/main.css */
+@import './variables.css';
+@import './components/header.css';
+@import './components/footer.css';
+
+body {
+  font-family: 'Be Vietnam Pro', sans-serif;
+  background-color: #f8f9fa;
+}

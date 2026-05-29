@@ -1,0 +1,9 @@
+/* src/assets/css/variables.css */
+:root {
+  --ms-primary: #e11d1d; /* Màu đỏ chủ đạo mới của bạn */
+  --ms-primary-hover: #c0392b;
+  --ms-accent: #ff6b00; /* Màu cam làm điểm nhấn */
+  --ms-dark: #1a1a2e; /* Nền footer */
+  --ms-white: #ffffff;
+  --ms-gray: #9aa3b5;
+}
