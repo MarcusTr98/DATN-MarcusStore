@@ -1,7 +1,7 @@
 package com.fpoly.marcusstore.security;
 
 import com.fpoly.marcusstore.security.jwt.AuthTokenFilter;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,19 +15,16 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.List;
 
 @Configuration
-@EnableMethodSecurity // Kích hoạt phân quyền @PreAuthorize trên Controller
-@RequiredArgsConstructor
+@EnableMethodSecurity // Cho phép dùng @PreAuthorize trên Controller
 public class SecurityConfig {
 
-    private final CustomUserDetailsService userDetailsService;
-    private final AuthTokenFilter authTokenFilter;
+    @Autowired
+    private CustomUserDetailsService userDetailsService;
+
+    @Autowired
+    private AuthTokenFilter authTokenFilter;
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
@@ -44,41 +41,34 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(); // Dùng BCrypt
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        http.csrf(AbstractHttpConfigurer::disable)
+                .cors(cors -> cors.configure(http))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public APIs (Bất cứ ai cũng truy cập được)
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/public/**").permitAll()
+                        // 1. Nhóm API mở tự do (Không cần Token)
+                        .requestMatchers("/api/auth/**").permitAll() // Ngọc: Đăng nhập, Đăng ký, Quên MK
+                        .requestMatchers("/api/public/**").permitAll() // Đức, Đạt, Huy: Lấy SP Home, Banner, Bài
+                                                                       // viết SEO
 
-                        // Admin APIs (Kiểm tra cứng Role, hoặc dùng @PreAuthorize ở Controller)
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // 2. Nhóm API dành cho Khách hàng đã đăng nhập
+                        .requestMatchers("/api/user/**").authenticated() // Đạt, Đức: Checkout, Giỏ hàng, Wishlist, Đgiá
 
-                        // Các Request còn lại bắt buộc phải có Token hợp lệ
+                        // 3. Nhóm API dành riêng cho Quản trị viên (Phân quyền RBAC)
+                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Ngọc, Huy: Quản lý User,Thống
+                                                                                       // kê
+                        .requestMatchers("/api/admin/roles/**").hasRole("ADMIN") // Chỉ Admin mới được đổi quyền
+
+                        // Khóa mọi request khác đi lạc
                         .anyRequest().authenticated());
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
-    }
-
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173", "http://localhost:5174"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        configuration.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
-        return source;
     }
 }
