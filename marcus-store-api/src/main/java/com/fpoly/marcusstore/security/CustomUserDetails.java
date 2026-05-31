@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.security;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fpoly.marcusstore.entity.auth.User;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -7,27 +8,26 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Getter
 @AllArgsConstructor
 public class CustomUserDetails implements UserDetails {
-    private Integer id;
+
+    private Integer userId;
     private String username;
     private String email;
+
+    @JsonIgnore
     private String password;
-    private Boolean isActive;
+
     private Collection<? extends GrantedAuthority> authorities;
 
     public static CustomUserDetails build(User user) {
-        // Biến toàn bộ Permission của Role thành danh sách quyền hạn
-        List<GrantedAuthority> authorities = user.getRole().getPermissions().stream()
-                .map(permission -> new SimpleGrantedAuthority(permission.getPermissionName()))
-                .collect(Collectors.toList());
-
-        // Có thể add thêm Role name (VD: ROLE_ADMIN) nếu muốn dùng hasRole()
+        // Lấy tên Role (VD: ADMIN, STAFF) ép thành Authority chuẩn của Spring
+        List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getRoleName()));
 
         return new CustomUserDetails(
@@ -35,7 +35,6 @@ public class CustomUserDetails implements UserDetails {
                 user.getUsername(),
                 user.getEmail(),
                 user.getPasswordHash(),
-                user.getIsActive(),
                 authorities);
     }
 
@@ -61,8 +60,8 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return isActive;
-    } // Khóa tài khoản nếu isActive = false
+        return true;
+    }
 
     @Override
     public boolean isCredentialsNonExpired() {
@@ -71,6 +70,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return isActive;
+        return true;
     }
 }

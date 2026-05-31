@@ -2,25 +2,28 @@ package com.fpoly.marcusstore.security;
 
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Transactional; // Bổ sung thư viện này
 
 @Service
-@RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {
 
-    private final UserRepository userRepository;
+    @Autowired
+    private UserRepository userRepository;
 
     @Override
     @Transactional
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsernameAndIsActiveTrue(username)
-                .orElseThrow(
-                        () -> new UsernameNotFoundException("Không tìm thấy user hoặc tài khoản bị khóa: " + username));
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy user: " + username));
+
+        if (!user.getIsActive()) {
+            throw new RuntimeException("Tài khoản đã bị khóa!");
+        }
 
         return CustomUserDetails.build(user);
     }

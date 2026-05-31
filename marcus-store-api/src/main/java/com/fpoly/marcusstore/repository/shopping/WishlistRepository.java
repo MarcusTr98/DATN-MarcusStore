@@ -1,8 +1,10 @@
 package com.fpoly.marcusstore.repository.shopping;
 
-import com.fpoly.marcusstore.entity.shopping.Wishlist;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
+
+import com.fpoly.marcusstore.entity.shopping.Wishlist;
+
 import java.util.List;
 
 @Repository

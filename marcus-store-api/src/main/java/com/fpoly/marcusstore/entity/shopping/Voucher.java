@@ -1,7 +1,9 @@
 package com.fpoly.marcusstore.entity.shopping;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -9,9 +11,8 @@ import java.time.LocalDateTime;
 @Table(name = "Vouchers")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class Voucher {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "voucher_id")
@@ -24,7 +25,10 @@ public class Voucher {
     private BigDecimal discountValue;
 
     @Column(name = "discount_type", nullable = false, length = 10)
-    private String discountType;
+    private String discountType; // 'PERCENT' hoặc 'AMOUNT'
+
+    @Column(name = "max_discount_amount", precision = 18, scale = 2)
+    private BigDecimal maxDiscountAmount;
 
     @Column(name = "min_order_value", precision = 18, scale = 2)
     private BigDecimal minOrderValue = BigDecimal.ZERO;
@@ -35,7 +39,7 @@ public class Voucher {
     @Column(name = "end_date", nullable = false)
     private LocalDateTime endDate;
 
-    @Column(nullable = false)
+    @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
     @Column(name = "is_active")

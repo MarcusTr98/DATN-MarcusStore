@@ -1,29 +1,34 @@
 package com.fpoly.marcusstore.entity.cms;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "Post_Categories")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class PostCategory {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "post_category_id")
     private Integer postCategoryId;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "name", nullable = false, unique = true, length = 100)
     private String name;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "slug", nullable = false, unique = true, length = 100)
     private String slug;
 
+    @Column(name = "status")
     private Boolean status = true;
 
-    @OneToMany(mappedBy = "postCategory")
-    private List<Post> posts;
+    @OneToMany(mappedBy = "postCategory", cascade = CascadeType.ALL)
+    @JsonIgnore
+    private List<Post> posts = new ArrayList<>();
 }

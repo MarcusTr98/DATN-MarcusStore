@@ -1,19 +1,19 @@
 package com.fpoly.marcusstore.entity.auth;
 
-import jakarta.persistence.*;
-import lombok.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import java.util.HashSet;
+import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @Entity
 @Table(name = "Roles")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
 public class Role {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "role_id")
@@ -25,11 +25,9 @@ public class Role {
     @Column(name = "description", length = 255)
     private String description;
 
+    // Xử lý bảng Role_Permissions bằng @ManyToMany
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "Role_Permissions", joinColumns = @JoinColumn(name = "role_id"), inverseJoinColumns = @JoinColumn(name = "permission_id"))
-    private Set<Permission> permissions = new HashSet<>();
-
-    @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
     @JsonIgnore
-    private List<User> users;
+    private List<Permission> permissions = new ArrayList<>();
 }
