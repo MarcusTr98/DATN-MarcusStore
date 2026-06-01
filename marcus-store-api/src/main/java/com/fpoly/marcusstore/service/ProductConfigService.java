@@ -88,4 +88,28 @@ public class ProductConfigService {
         }
         skuRepository.saveAll(skusToUpdate);
     }
+
+    public List<ProductSku> getSkusByProductId(Integer productId) {
+        return skuRepository.findByProductProductIdAndIsActiveTrue(productId);
+    }
+
+    @Transactional
+    public ProductSku updateSingleSku(Integer skuId, BigDecimal price, Integer stockQuantity) {
+        // @EntityGraph thay vì findById mặc định
+        ProductSku sku = skuRepository.findBySkuId(skuId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
+
+        sku.setPrice(price);
+        sku.setStockQuantity(stockQuantity);
+
+        return skuRepository.save(sku);
+    }
+
+    @Transactional
+    public void deleteSku(Integer skuId) {
+        ProductSku sku = skuRepository.findById(skuId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
+        sku.setIsActive(false); // Chuyển trạng thái thay vì xóa cứng để giữ lịch sử hóa đơn
+        skuRepository.save(sku);
+    }
 }
