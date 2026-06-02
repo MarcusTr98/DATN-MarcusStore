@@ -2,8 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ClientLayout from '@/layouts/ClientLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import BlankLayout from '@/layouts/BlankLayout.vue'
-import Login from '@/components/auth/Login.vue'
-import DangKy from '@/components/auth/DangKy.vue'
 
 const routes = [
   // 1. LUỒNG XÁC THỰC
@@ -14,13 +12,13 @@ const routes = [
       { path: 'login', name: 'Login', component: () => import('@/views/auth/Login.vue') },
       { path: 'register', name: 'Register', component: () => import('@/views/auth/Register.vue') },
       {
-        path: 'register',
-        name: 'Register',
+        path: 'forgot-password',
+        name: 'ForgotPassword',
         component: () => import('@/views/auth/ForgotPassword.vue'),
       },
       {
-        path: 'register',
-        name: 'Register',
+        path: 'reset-password',
+        name: 'ResetPassword',
         component: () => import('@/views/auth/ResetPassword.vue'),
       },
     ],
@@ -43,7 +41,6 @@ const routes = [
         name: 'ProductDetail',
         component: () => import('@/views/client/shop/ProductDetail.vue'),
       },
-
       { path: 'cart', name: 'Cart', component: () => import('@/views/client/checkout/Cart.vue') },
       {
         path: 'checkout',
@@ -55,7 +52,6 @@ const routes = [
         name: 'OrderSuccess',
         component: () => import('@/views/client/checkout/OrderSuccess.vue'),
       },
-
       {
         path: 'profile',
         name: 'Profile',
@@ -76,7 +72,6 @@ const routes = [
         name: 'Wishlist',
         component: () => import('@/views/client/account/Wishlist.vue'),
       },
-
       {
         path: 'blog',
         name: 'BlogList',
@@ -105,6 +100,11 @@ const routes = [
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/Dashboard.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'AdminProfile',
+        component: () => import('@/views/admin/auth/Profile.vue'),
       },
       {
         path: 'category',
@@ -168,23 +168,9 @@ const routes = [
       },
     ],
   },
-  // Luồng Đăng nhập 
-  
-      {
-    path: '/',
-    redirect: '/login',
-  },
-  {
-    path: '/login',
-    name: 'login',
-    component: Login,
-  },
-  {
-    path: '/dang-ky',
-    name: 'dang-ky',
-    component: DangKy,
-  }
-  
+
+  // Kích hoạt cơ chế bắt URL rác điều hướng về trang chủ
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({
