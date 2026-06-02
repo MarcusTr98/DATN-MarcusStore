@@ -7,7 +7,7 @@ spring.application.name=MarcusStore
 # CẤU HÌNH KẾT NỐI SQL SERVER
 spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=MarcusStoreDB;encrypt=true;trustServerCertificate=true;
 spring.datasource.username=sa
-spring.datasource.password=123
+spring.datasource.password=your_password_here
 spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
 
 # Cấu hình Pool kết nối (HikariCP) để tối ưu hiệu năng chịu tải

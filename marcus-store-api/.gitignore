@@ -12,3 +12,6 @@ target/
 .vscode/*
 *.iml
 *.iws
+
+
+src/main/resources/application.properties
