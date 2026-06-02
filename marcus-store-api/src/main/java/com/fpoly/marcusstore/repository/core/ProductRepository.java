@@ -11,4 +11,6 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
     // Tìm kiếm cơ bản cho thanh Search
     List<Product> findByProductNameContainingIgnoreCaseAndStatusTrue(String keyword);
+
+    boolean existsProductByProductName(String productName);
 }
