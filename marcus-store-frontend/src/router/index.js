@@ -2,8 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ClientLayout from '@/layouts/ClientLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import BlankLayout from '@/layouts/BlankLayout.vue'
-import Login from '@/components/auth/Login.vue'
-import DangKy from '@/components/auth/DangKy.vue'
 
 const routes = [
   // 1. LUỒNG XÁC THỰC
@@ -168,23 +166,6 @@ const routes = [
       },
     ],
   },
-  // Luồng Đăng nhập 
-  
-      {
-    path: '/',
-    redirect: '/login',
-  },
-  {
-    path: '/login',
-    name: 'login',
-    component: Login,
-  },
-  {
-    path: '/dang-ky',
-    name: 'dang-ky',
-    component: DangKy,
-  }
-  
 ]
 
 const router = createRouter({
