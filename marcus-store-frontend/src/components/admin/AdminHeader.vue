@@ -4,41 +4,59 @@
       <div class="header-logo">
         <img :src="boltIcon" alt="Logo" class="header-logo-img" />
       </div>
-      <h1>MarcusStore</h1>
+      <h1>MarcusStore Admin</h1>
     </div>
 
     <div class="header-right">
-      <button
-        class="header-btn profile-btn"
-        @click="showProfileMenu = !showProfileMenu"
-      >
-        <img :src="personCircleIcon" alt="Profile" class="avatar" />
-        <span>Profile</span>
-      </button>
+      <router-link to="/admin/profile" class="header-btn profile-btn">
+        <img :src="personCircleIcon" alt="" class="avatar" />
+        <span>Admin Profile</span>
+      </router-link>
 
       <button class="header-btn logout-btn" @click="handleLogout">
         <img :src="logoutIcon" alt="Logout" class="logout-icon" />
-        <span>Logout</span>
+        <span>Đăng xuất</span>
       </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import boltIcon from '/src/assets/icons/lightning.svg'
 import personCircleIcon from '/src/assets/icons/person-circle.svg'
 import logoutIcon from '/src/assets/icons/logout.svg'
 
-const showProfileMenu = ref(false)
+const router = useRouter()
 
 const handleLogout = () => {
-  alert('Logging out...')
+  // Thực hiện xóa Token bảo mật
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  router.push('/auth/login')
 }
 </script>
 
 <style scoped>
+.profile-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: #5e4a54;
+  font-size: 14px;
+  font-weight: 500;
+}
+.logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.logout-icon {
+  width: 18px;
+  height: 18px;
+}
 .header {
   background: white;
   padding: 20px 30px;
