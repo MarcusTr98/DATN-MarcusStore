@@ -170,18 +170,19 @@ defineProps({
 defineEmits(['changePage'])
 
 /* ICONS */
-import boltIcon from '/src/assets/vendors/bootstrap-icons/lightning.svg'
-import pieChartIcon from '/src/assets/vendors/bootstrap-icons/pie-chart.svg'
-import layersIcon from '/src/assets/vendors/bootstrap-icons/layers.svg'
-import boxIcon from '/src/assets/vendors/bootstrap-icons/box.svg'
-import cartIcon from '/src/assets/vendors/bootstrap-icons/cart.svg'
-import peopleIcon from '/src/assets/vendors/bootstrap-icons/people.svg'
-import tagsIcon from '/src/assets/vendors/bootstrap-icons/tags.svg'
-import newspaperIcon from '/src/assets/vendors/bootstrap-icons/newspaper.svg'
-import barChartIcon from '/src/assets/vendors/bootstrap-icons/bar-chart-line.svg'
-import chevronDownIcon from '/src/assets/vendors/bootstrap-icons/chevron-down.svg'
-import clockHistoryIcon from '/src/assets/vendors/bootstrap-icons/clock-history.svg'
-import gearIcon from '/src/assets/vendors/bootstrap-icons/gear.svg'
+import boltIcon from '/src/assets/icons/lightning.svg'
+import pieChartIcon from '/src/assets/icons/pie-chart.svg'
+import layersIcon from '/src/assets/icons/layers.svg'
+import boxIcon from '/src/assets/icons/box.svg'
+import cartIcon from '/src/assets/icons/cart.svg'
+import peopleIcon from '/src/assets/icons/people.svg'
+import tagsIcon from '/src/assets/icons/tags.svg'
+import newspaperIcon from '/src/assets/icons/newspaper.svg'
+import barChartIcon from '/src/assets/icons/bar-chart-line.svg'
+import chevronDownIcon from '/src/assets/icons/chevron-down.svg'
+import clockHistoryIcon from '/src/assets/icons/clock-history.svg'
+import gearIcon from '/src/assets/icons/gear.svg'
+
 
 /* PRODUCT MENU */
 const isProductMenuOpen = ref(false)

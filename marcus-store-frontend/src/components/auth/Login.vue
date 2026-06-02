@@ -309,23 +309,35 @@ const showLoginPassword = ref(false)
   background: white;
   border-radius: 12px;
   cursor: pointer;
+  color: #273044;
+  font-size: 15px;
   font-weight: 600;
+  line-height: 1;
   transition: 0.3s;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
 }
 
 .social-btn:hover {
   background: #fff3f8;
+  color: #111827;
 }
 
 .social-icon {
-  width: 20px;
-  height: 20px;
-  display: inline-block;
-  vertical-align: middle;
-  margin-right: 8px;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+}
+
+.social-icon svg {
+  width: 24px;
+  height: 24px;
+  display: block;
 }
 
 .divider {

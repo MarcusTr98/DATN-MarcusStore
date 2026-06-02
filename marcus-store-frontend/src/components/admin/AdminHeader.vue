@@ -17,7 +17,7 @@
       </button>
 
       <button class="header-btn logout-btn" @click="handleLogout">
-        <span>🚪</span>
+        <img :src="logoutIcon" alt="Logout" class="logout-icon" />
         <span>Logout</span>
       </button>
     </div>
@@ -27,8 +27,9 @@
 <script setup>
 import { ref } from 'vue'
 
-import boltIcon from '/src/assets/vendors/bootstrap-icons/lightning.svg'
-import personCircleIcon from '/src/assets/vendors/bootstrap-icons/person-circle.svg'
+import boltIcon from '/src/assets/icons/lightning.svg'
+import personCircleIcon from '/src/assets/icons/person-circle.svg'
+import logoutIcon from '/src/assets/icons/logout.svg'
 
 const showProfileMenu = ref(false)
 
