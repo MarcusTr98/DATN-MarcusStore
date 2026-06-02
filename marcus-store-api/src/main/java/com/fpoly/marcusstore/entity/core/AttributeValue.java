@@ -10,16 +10,17 @@ import lombok.Setter;
 @Getter
 @Setter
 public class AttributeValue {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "value_id")
     private Integer valueId;
 
-    @Column(name = "value_string", nullable = false, length = 100)
-    private String valueString;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "attribute_id", nullable = false)
     @JsonIgnore
     private Attribute attribute;
+
+    @Column(name = "value_string", nullable = false, length = 100)
+    private String valueString;
 }
