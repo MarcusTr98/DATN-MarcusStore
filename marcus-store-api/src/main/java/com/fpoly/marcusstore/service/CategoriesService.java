@@ -1,21 +1,22 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.CreateCategory;
+import com.fpoly.marcusstore.dto.request.UpdateCategory;
+import com.fpoly.marcusstore.dto.response.CategoryResponse;
 import com.fpoly.marcusstore.entity.core.Category;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-
-import java.util.Map;
 import java.util.Optional;
 
 public interface CategoriesService {
 
-    Page<Map<String, Object>> findAllCategory(Pageable pageable);
+    Page<CategoryResponse> findAllCategory(Pageable pageable);
 
-    Category createCategory(Category category);
+    CategoryResponse createCategory (CreateCategory createCategory);
 
-    Optional<Map<String, Object>> getCategoryById(Integer id);
+    Optional<CategoryResponse> getCategoryById(Integer id);
 
-    Category updateCategory(Integer id ,Category category);
+    CategoryResponse updateCategory(Integer id ,UpdateCategory updateCategory);
 
     Category hiddenCategory(Integer id);
 }
