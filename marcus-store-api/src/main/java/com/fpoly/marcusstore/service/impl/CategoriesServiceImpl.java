@@ -6,6 +6,8 @@ import com.fpoly.marcusstore.dto.response.CategoryResponse;
 import com.fpoly.marcusstore.entity.core.Category;
 import com.fpoly.marcusstore.repository.core.CategoryRepository;
 import com.fpoly.marcusstore.service.CategoriesService;
+import com.github.slugify.Slugify;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -39,9 +41,16 @@ public class CategoriesServiceImpl implements CategoriesService {
             throw new RuntimeException("Tên danh mục đã tồn tại");
         }
 
+        final Slugify slg = Slugify.builder().build();
+        String slug = slg.slugify(createCategory.getCategoryName());
+
+        if(categoryRepository.existsBySlug(slug)){
+            throw new RuntimeException("slug đã tồn tại");
+        }
+
         Category category = new Category();
         category.setCategoryName(createCategory.getCategoryName());
-        category.setSlug(createCategory.getSlug());
+        category.setSlug(slug);
         category.setStatus(true);
         if(createCategory.getParentId() != null ){
             Category parent = categoryRepository.findById(createCategory.getParentId())
@@ -62,9 +71,15 @@ public class CategoriesServiceImpl implements CategoriesService {
         Category category = categoryRepository.findById(id)
         .orElseThrow(() -> new RuntimeException("Id ko tồn tại"));
 
+        final Slugify slg = Slugify.builder().build();
+        String slug = slg.slugify(updateCategory.getCategoryName());
+
+        if(categoryRepository.existsBySlug(slug)){
+            throw new RuntimeException("slug đã tồn tại");
+        }
         category.setCategoryName(updateCategory.getCategoryName());
         category.setStatus(updateCategory.getStatus());
-        category.setSlug(updateCategory.getSlug());
+        category.setSlug(slug);
 
         if(updateCategory.getParentId() != null ){
             Category parent = categoryRepository.findById(updateCategory.getParentId())
