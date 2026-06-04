@@ -1,125 +1,110 @@
 package com.fpoly.marcusstore.service;
-
-import java.util.*;
-import java.util.stream.Collectors;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import com.fpoly.marcusstore.dto.request.BannerRequestDTO;
+import com.fpoly.marcusstore.dto.response.BannerResponseDTO;
 import com.fpoly.marcusstore.entity.cms.Banner;
 import com.fpoly.marcusstore.entity.cms.BannerPosition;
 import com.fpoly.marcusstore.repository.cms.BannerPositionRepository;
 import com.fpoly.marcusstore.repository.cms.BannerRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class BannerService {
 
-    @Autowired
-    BannerRepository repo;
+@Autowired
+private BannerRepository bannerRepository;
 
     @Autowired
-    BannerPositionRepository positionRepository;
+    private BannerPositionRepository positionRepository;
+    private BannerResponseDTO toResponse(Banner banner) {
+        BannerResponseDTO.BannerResponseDTOBuilder builder = BannerResponseDTO.builder()
+                .id(banner.getBannerId())
+                .title(banner.getTitle())
+                .imageUrl(banner.getImageUrl())
+                .targetUrl(banner.getTargetUrl())
+                .displayOrder(banner.getDisplayOrder())
+                .isActive(banner.getIsActive())
+                .startDate(banner.getStartDate())
+                .endDate(banner.getEndDate());
 
-    // GET ALL
+        // Gắn thêm thông tin position nếu có
+        if (banner.getBannerPosition() != null) {
+            builder.positionId(banner.getBannerPosition().getPositionId())
+                   .positionCode(banner.getBannerPosition().getPositionCode())
+                   .positionDescription(banner.getBannerPosition().getDescription());
+        }
+
+        return builder.build();
+    }
+
+    // Lấy tất cả banner
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getAll() {
-        return repo.findAll().stream().map(banner -> {
-            Map<String, Object> map = new HashMap<>();
-
-            map.put("id", banner.getBannerId());
-            map.put("title", banner.getTitle());
-            map.put("imageUrl", banner.getImageUrl());
-            map.put("targetUrl", banner.getTargetUrl());
-            map.put("displayOrder", banner.getDisplayOrder());
-            map.put("isActive", banner.getIsActive());
-            map.put("startDate", banner.getStartDate());
-            map.put("endDate", banner.getEndDate());
-
-            if (banner.getBannerPosition() != null) {
-                map.put("positionId", banner.getBannerPosition().getPositionId());
-                map.put("positionCode", banner.getBannerPosition().getPositionCode());
-                map.put("description", banner.getBannerPosition().getDescription());
-            }
-
-            return map;
-        }).collect(Collectors.toList());
+    public List<BannerResponseDTO> getAll() {
+        return bannerRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    // GET ONE
-    public Optional<Map<String, Object>> getOne(Integer id) {
-        return repo.findById(id).map(banner -> {
-            Map<String, Object> map = new HashMap<>();
-
-            map.put("id", banner.getBannerId());
-            map.put("title", banner.getTitle());
-            map.put("imageUrl", banner.getImageUrl());
-            map.put("targetUrl", banner.getTargetUrl());
-            map.put("displayOrder", banner.getDisplayOrder());
-            map.put("isActive", banner.getIsActive());
-            map.put("startDate", banner.getStartDate());
-            map.put("endDate", banner.getEndDate());
-
-            if (banner.getBannerPosition() != null) {
-                map.put("positionId", banner.getBannerPosition().getPositionId());
-                map.put("positionCode", banner.getBannerPosition().getPositionCode());
-                map.put("description", banner.getBannerPosition().getDescription());
-            }
-
-            return map;
-        });
+    // Lấy chi tiết 1 banner theo ID
+    @Transactional(readOnly = true)
+    public BannerResponseDTO getOne(Integer id) {
+        Banner banner = bannerRepository.findById(id)
+        // GlobalExceptionHandler bắt RuntimeException → trả 400 + message
+        .orElseThrow(() -> new RuntimeException("Không tìm thấy banner với id: " + id));
+        return toResponse(banner);
     }
 
-    // thêm banner
-    public Banner add(Map<String, Object> req) {
+    // Thêm banner mới
+    @Transactional
+    public BannerResponseDTO add(BannerRequestDTO req) {
+        // Kiểm tra position có tồn tại không
+        BannerPosition pos = positionRepository.findById(req.getPositionId())
+        .orElseThrow(() -> new RuntimeException("Không tìm thấy position với id: " + req.getPositionId()));
 
         Banner banner = new Banner();
-
-        banner.setTitle((String) req.get("title"));
-        banner.setImageUrl((String) req.get("imageUrl"));
-        banner.setTargetUrl((String) req.get("targetUrl"));
-        banner.setDisplayOrder(req.get("displayOrder") != null ? (Integer) req.get("displayOrder") : 0);
-        banner.setIsActive(req.get("isActive") != null ? (Boolean) req.get("isActive") : true);
-
-        Integer positionId = (Integer) req.get("positionId");
-
-        BannerPosition pos = positionRepository.findById(positionId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy position"));
-
+        banner.setTitle(req.getTitle());
+        banner.setImageUrl(req.getImageUrl());
+        banner.setTargetUrl(req.getTargetUrl());
+        banner.setDisplayOrder(req.getDisplayOrder());
+        banner.setIsActive(req.getIsActive());
+        banner.setStartDate(req.getStartDate());
+        banner.setEndDate(req.getEndDate());
         banner.setBannerPosition(pos);
 
-        return repo.save(banner);
+        return toResponse(bannerRepository.save(banner));
     }
 
-    // sửa banner
-    public Banner update(Integer id, Map<String, Object> req) {
+    // Sửa banner theo ID
+    @Transactional
+    public BannerResponseDTO update(Integer id, BannerRequestDTO req) {
+        // Kiểm tra banner tồn tại
+        Banner banner = bannerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy banner với id: " + id));
 
-        Banner banner = repo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy banner"));
+        // Kiểm tra position tồn tại
+        BannerPosition pos = positionRepository.findById(req.getPositionId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy position với id: " + req.getPositionId()));
 
-        banner.setTitle((String) req.get("title"));
-        banner.setImageUrl((String) req.get("imageUrl"));
-        banner.setTargetUrl((String) req.get("targetUrl"));
-        banner.setDisplayOrder((Integer) req.get("displayOrder"));
-        banner.setIsActive((Boolean) req.get("isActive"));
-
-        Integer positionId = (Integer) req.get("positionId");
-
-        BannerPosition pos = positionRepository.findById(positionId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy position"));
-
+        banner.setTitle(req.getTitle());
+        banner.setImageUrl(req.getImageUrl());
+        banner.setTargetUrl(req.getTargetUrl());
+        banner.setDisplayOrder(req.getDisplayOrder());
+        banner.setIsActive(req.getIsActive());
+        banner.setStartDate(req.getStartDate());
+        banner.setEndDate(req.getEndDate());
         banner.setBannerPosition(pos);
 
-        return repo.save(banner);
+        return toResponse(bannerRepository.save(banner));
     }
 
-    // xóa mềm
+    // Xóa mềm: chỉ set isActive = false, không xóa khỏi DB
+    @Transactional
     public void remove(Integer id) {
-        Banner banner = repo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy banner"));
-
+        Banner banner = bannerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy banner với id: " + id));
         banner.setIsActive(false);
-        repo.save(banner);
+        bannerRepository.save(banner);
     }
 }

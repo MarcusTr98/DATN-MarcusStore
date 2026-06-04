@@ -1,52 +1,52 @@
 package com.fpoly.marcusstore.controller.admin;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-
+import com.fpoly.marcusstore.dto.request.BannerRequestDTO;
+import com.fpoly.marcusstore.dto.response.BannerResponseDTO;
+import com.fpoly.marcusstore.service.BannerService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.util.Map;
 
-import com.fpoly.marcusstore.entity.cms.Banner;
-import com.fpoly.marcusstore.service.BannerService;
-
-@RequestMapping("/banners")
 @RestController
+@RequestMapping("/api/admin/banners")
 public class AdminBannerController {
 
     @Autowired
-    BannerService ser;
+    private BannerService bannerService;
 
-    // xem tất cả banner
-    @GetMapping("/all")
-    public List<Map<String, Object>> getAll() {
-        return ser.getAll();
+    //lấy tất cả banner
+    @GetMapping
+    public ResponseEntity<List<BannerResponseDTO>> getAll() {
+        return ResponseEntity.ok(bannerService.getAll());
     }
 
-    // xem chi tiết banner
+    //lấy chi tiết 1 banner
     @GetMapping("/{id}")
-    public Optional<Map<String, Object>> getOne(@PathVariable Integer id) {
-        return ser.getOne(id);
+    public ResponseEntity<BannerResponseDTO> getOne(@PathVariable Integer id) {
+        return ResponseEntity.ok(bannerService.getOne(id));
     }
 
-    // thêm
+    // thêm banner mới
     @PostMapping
-    public Banner add(@RequestBody Map<String, Object> req) {
-        return ser.add(req);
+    public ResponseEntity<BannerResponseDTO> add(@Valid @RequestBody BannerRequestDTO req) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(bannerService.add(req));
     }
 
-    // sửa
+    // sửa banner
     @PutMapping("/{id}")
-    public Banner update(@PathVariable Integer id,
-                         @RequestBody Map<String, Object> req) {
-        return ser.update(id, req);
+    public ResponseEntity<BannerResponseDTO> update( @PathVariable Integer id, @Valid @RequestBody BannerRequestDTO req) {
+        return ResponseEntity.ok(bannerService.update(id, req));
     }
 
-    // xóa mềm
+    //xóa mềm banner
     @DeleteMapping("/{id}")
-    public Map<String, Object> remove(@PathVariable Integer id) {
-        ser.remove(id);
-        return Map.of("message", "remove oke");
+    public ResponseEntity<Map<String, String>> remove(@PathVariable Integer id) {
+        bannerService.remove(id);
+        return ResponseEntity.ok(Map.of("message", "Xóa banner thành công"));
     }
 }
