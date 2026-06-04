@@ -10,6 +10,13 @@ import java.util.Optional;
 @Repository
 public interface CartItemRepository extends JpaRepository<CartItem, Integer> {
     List<CartItem> findByCart_CartId(Integer CartId);
+
     Optional<CartItem> findByCart_CartIdAndSku_SkuId(Integer cartId, Integer skuId);
+
+    void deleteByCart_CartIdAndSku_SkuId(Integer cartId, Integer skuId);
+
+    void deleteByCart_CartId(Integer cartId);
+
+    void deleteByCart_CartIdAndSku_SkuIdIn(Integer cartId, List<Integer> skuIds);
 
 }

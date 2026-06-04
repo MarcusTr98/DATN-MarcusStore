@@ -22,6 +22,7 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductSkuRepository productSkuRepository;
+
     @Transactional(readOnly = true)
     public CartResponse getCartDetailByUserId(Integer userId) {
         Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(() -> new RuntimeException("không tìm thấy giỏ hàng của người dùng" + userId));
@@ -63,29 +64,54 @@ public class CartService {
                 .build();
 
     }
+
     @Transactional
-    public  CartResponse addItemToCart(Integer userId, AddCartItemRequest request){
-        System.out.println("POST add cart called");
-        System.out.println("userId = " + userId);
-        System.out.println("skuId = " + request.getSkuId());
-        System.out.println("quantity = " + request.getQuantity());
-        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()->
+    public CartResponse addItemToCart(Integer userId, AddCartItemRequest request) {
+        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(() ->
                 new RuntimeException("không tìm được giỏ hàng của người dùng: " + userId));
-
-        ProductSku sku = productSkuRepository.findBySkuId(request.getSkuId()).orElseThrow(()->
+        ProductSku sku = productSkuRepository.findBySkuId(request.getSkuId()).orElseThrow(() ->
                 new RuntimeException("không tìm thy SKU phù hợp: " + request.getSkuId()));
-         Integer quantity = request.getQuantity() == null || request.getQuantity() <= 0 ? 1 : request.getQuantity();
-         CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), sku.getSkuId()).orElse(null);
-    if(cartItem == null){
-        cartItem = new CartItem();
-        cartItem.setCart(cart);
-        cartItem.setSku(sku);
-        cartItem.setQuantity(quantity);
+        Integer quantity = request.getQuantity() == null || request.getQuantity() <= 0 ? 1 : request.getQuantity();
+        CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), sku.getSkuId()).orElse(null);
+        if (cartItem == null) {
+            cartItem = new CartItem();
+            cartItem.setCart(cart);
+            cartItem.setSku(sku);
+            cartItem.setQuantity(quantity);
 
-    }else {
-        cartItem.setQuantity(cartItem.getQuantity() + quantity);
-    }
+        } else {
+            cartItem.setQuantity(cartItem.getQuantity() + quantity);
+        }
         cartItemRepository.save(cartItem);
+        return getCartDetailByUserId(userId);
+    }
+
+    @Transactional
+    public CartResponse removeItemFromCart(Integer userId, Integer skuId) {
+        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()
+                -> new RuntimeException("không tìm thấy giỏ hàng của người dùng"));
+        CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), skuId).orElseThrow(()
+                -> new RuntimeException("không tìm thấy sảm phẩm cần xóa"));
+        cartItemRepository.deleteByCart_CartIdAndSku_SkuId(cart.getCartId(), cartItem.getSku().getSkuId());
+        return getCartDetailByUserId(userId);
+    }
+
+    @Transactional
+    public CartResponse removeItemsFromCart(Integer userId, List<Integer> skuIds) {
+        if (skuIds == null || skuIds.isEmpty()) {
+            throw new RuntimeException("vui lòng chọn ít nhất một sản phẩm để xóa");
+        }
+        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()
+                -> new RuntimeException("không tìm thấy giỏ hàng phù hợp"));
+        cartItemRepository.deleteByCart_CartIdAndSku_SkuIdIn(cart.getCartId(), skuIds);
+        return getCartDetailByUserId(userId);
+    }
+
+    @Transactional
+    public CartResponse removeCartItems(Integer userId) {
+        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()
+                -> new RuntimeException("không tìm thấy giỏ hàng"));
+        cartItemRepository.deleteByCart_CartId(cart.getCartId());
         return getCartDetailByUserId(userId);
     }
 }
