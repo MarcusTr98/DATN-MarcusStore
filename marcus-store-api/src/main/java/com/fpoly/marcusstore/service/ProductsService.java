@@ -1,21 +1,23 @@
 package com.fpoly.marcusstore.service;
 
 
+import com.fpoly.marcusstore.dto.request.CreateProduct;
+import com.fpoly.marcusstore.dto.request.UpdateProduct;
+import com.fpoly.marcusstore.dto.response.ProductResponse;
 import com.fpoly.marcusstore.entity.core.Product;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.Map;
 import java.util.Optional;
 
 public interface ProductsService {
-    Page<Map<String, Object>> findAllProducts(Pageable pageable);
+    Page<ProductResponse> findAllProducts(Pageable pageable);
 
-    Product createProduct(Product product);
+    ProductResponse createProduct(CreateProduct createProduct);
 
-    Optional<Map<String, Object>> getProductsById(Integer id);
+    Optional<ProductResponse> getProductsById(Integer id);
 
-    Product updateProduct (Integer id ,Product product);
+    ProductResponse updateProduct (Integer id ,UpdateProduct updateProduct);
 
     Product hiddenProduct (Integer id);
 }
