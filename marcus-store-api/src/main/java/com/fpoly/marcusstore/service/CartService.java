@@ -1,9 +1,12 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.AddCartItemRequest;
 import com.fpoly.marcusstore.dto.response.CartItemResponse;
 import com.fpoly.marcusstore.dto.response.CartResponse;
+import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Cart;
 import com.fpoly.marcusstore.entity.shopping.CartItem;
+import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,7 @@ import java.util.List;
 public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final ProductSkuRepository productSkuRepository;
     @Transactional(readOnly = true)
     public CartResponse getCartDetailByUserId(Integer userId) {
         Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(() -> new RuntimeException("không tìm thấy giỏ hàng của người dùng" + userId));
@@ -58,5 +62,30 @@ public class CartService {
                 .totalAmount(totalAmount)
                 .build();
 
+    }
+    @Transactional
+    public  CartResponse addItemToCart(Integer userId, AddCartItemRequest request){
+        System.out.println("POST add cart called");
+        System.out.println("userId = " + userId);
+        System.out.println("skuId = " + request.getSkuId());
+        System.out.println("quantity = " + request.getQuantity());
+        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()->
+                new RuntimeException("không tìm được giỏ hàng của người dùng: " + userId));
+
+        ProductSku sku = productSkuRepository.findBySkuId(request.getSkuId()).orElseThrow(()->
+                new RuntimeException("không tìm thy SKU phù hợp: " + request.getSkuId()));
+         Integer quantity = request.getQuantity() == null || request.getQuantity() <= 0 ? 1 : request.getQuantity();
+         CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), sku.getSkuId()).orElse(null);
+    if(cartItem == null){
+        cartItem = new CartItem();
+        cartItem.setCart(cart);
+        cartItem.setSku(sku);
+        cartItem.setQuantity(quantity);
+
+    }else {
+        cartItem.setQuantity(cartItem.getQuantity() + quantity);
+    }
+        cartItemRepository.save(cartItem);
+        return getCartDetailByUserId(userId);
     }
 }
