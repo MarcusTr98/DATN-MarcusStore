@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useSettings } from '@/composables/useSettings'
 
 const router = useRouter()
 
@@ -10,6 +11,8 @@ const isLoggedIn = ref(false)
 const userName = ref('')
 const searchQuery = ref('')
 //const isMobileMenuOpen = ref(false)
+
+const { sysSettings, fetchSettings } = useSettings()
 
 const checkAuth = () => {
   const token = localStorage.getItem('ACCESS_TOKEN')
@@ -41,6 +44,7 @@ const updateCartHeader = () => {
 onMounted(() => {
   checkAuth()
   updateCartHeader()
+  fetchSettings()
   window.addEventListener('cart-updated', updateCartHeader)
   window.addEventListener('auth-changed', checkAuth)
 })
@@ -60,13 +64,18 @@ onUnmounted(() => {
           <div class="topbar-left">
             <span class="topbar-item">
               <i class="fas fa-tag"></i>
-              <span>Khuyến mãi hôm nay: Giảm đến <strong>50%</strong> phụ kiện chính hãng</span>
+              <span
+                >Khuyến mãi hôm nay:
+                <strong>{{ sysSettings.PROMO_TEXT || 'Đang cập nhật' }}</strong></span
+              >
             </span>
           </div>
           <div class="topbar-right">
-            <a href="tel:0907640098" class="topbar-item topbar-link">
+            <a :href="'tel:' + sysSettings.HOTLINE" class="topbar-item topbar-link">
               <i class="fas fa-headset"></i>
-              <span>Hotline: <strong>(+84) 907 640 098</strong></span>
+              <span
+                >Hotline: <strong>(+84) {{ sysSettings.HOTLINE || 'Đang cập nhật' }}</strong></span
+              >
             </a>
             <span class="topbar-divider">|</span>
             <router-link to="/he-thong-cua-hang" class="topbar-item topbar-link">
@@ -225,9 +234,9 @@ onUnmounted(() => {
             <i class="fas fa-shield-alt"></i>
             <span>Ốp lưng & Bảo vệ</span>
           </router-link>
-          <router-link to="/category/phu-kien" class="cat-nav-item">
-            <i class="fas fa-plug"></i>
-            <span>Phụ kiện khác</span>
+          <router-link to="/blog" class="cat-nav-item">
+            <i class="fas fa-newspaper"></i>
+            <span>Tin công nghệ</span>
           </router-link>
           <router-link to="/khuyen-mai" class="cat-nav-item cat-nav-sale">
             <i class="fas fa-fire"></i>

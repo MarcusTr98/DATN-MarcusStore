@@ -63,32 +63,54 @@
             <div class="contact-list">
               <div class="contact-item">
                 <i class="fas fa-map-marker-alt"></i>
-                <span>118 Cát Bi, Hải An, Hải Phòng, Việt Nam</span>
+                <span>{{ sysSettings.ADDRESS || 'Đang cập nhật địa chỉ' }}</span>
               </div>
               <div class="contact-item">
                 <i class="fas fa-phone-alt"></i>
-                <a href="tel:0907640098">(+84) 907 640 098</a>
+                <a :href="'tel:' + sysSettings.HOTLINE">(+84) {{ sysSettings.HOTLINE }}</a>
               </div>
               <div class="contact-item">
                 <i class="fas fa-envelope"></i>
-                <a href="mailto:support@marcus.com">support@marcus.com</a>
+                <a :href="'mailto:' + sysSettings.EMAIL">{{
+                  sysSettings.EMAIL || 'support@marcus.com'
+                }}</a>
               </div>
               <div class="contact-item">
                 <i class="fas fa-clock"></i>
-                <span>08:00 – 21:00 (Hàng ngày)</span>
+                <span>{{ sysSettings.WORKING_HOURS || '08:00 – 21:00' }}</span>
               </div>
             </div>
             <div class="social-row">
-              <a class="social-btn facebook" href="#" aria-label="Facebook">
+              <a
+                class="social-btn facebook"
+                :href="sysSettings.FACEBOOK_URL || '#'"
+                target="_blank"
+                aria-label="Facebook"
+              >
                 <i class="fab fa-facebook-f"></i>
               </a>
-              <a class="social-btn youtube" href="#" aria-label="YouTube">
+              <a
+                class="social-btn youtube"
+                :href="sysSettings.YOUTUBE_URL || '#'"
+                target="_blank"
+                aria-label="YouTube"
+              >
                 <i class="fab fa-youtube"></i>
               </a>
-              <a class="social-btn tiktok" href="#" aria-label="TikTok">
+              <a
+                class="social-btn tiktok"
+                :href="sysSettings.TIKTOK_URL || '#'"
+                target="_blank"
+                aria-label="TikTok"
+              >
                 <i class="fab fa-tiktok"></i>
               </a>
-              <a class="social-btn instagram" href="#" aria-label="Instagram">
+              <a
+                class="social-btn instagram"
+                :href="sysSettings.INSTAGRAM_URL || '#'"
+                target="_blank"
+                aria-label="Instagram"
+              >
                 <i class="fab fa-instagram"></i>
               </a>
             </div>
@@ -177,3 +199,14 @@
     </div>
   </footer>
 </template>
+
+<script setup>
+import { onMounted } from 'vue'
+import { useSettings } from '@/composables/useSettings'
+
+const { sysSettings, fetchSettings } = useSettings()
+
+onMounted(() => {
+  fetchSettings() // Đọi API. Header đã gọi rồi, footer chỉ lấy data từ Cache
+})
+</script>
