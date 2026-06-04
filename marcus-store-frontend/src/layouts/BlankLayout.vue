@@ -1,7 +1,19 @@
 <template>
-  <div class="blank-layout bg-light min-vh-100 d-flex align-items-center justify-content-center">
-    <router-view></router-view>
+  <div class="blank-layout">
+    <RouterView />
   </div>
 </template>
 
-<script setup></script>
+<script setup>
+import { RouterView } from 'vue-router'
+</script>
+
+<style scoped>
+.blank-layout {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: transparent;
+}
+</style>

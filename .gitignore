@@ -1,1 +1,10 @@
+# Bỏ qua các file cấu hình IDE ở cấp dự án
+.vscode/
 .idea/
+*.iml
+*.iws
+.DS_Store
+
+# Bỏ qua rác Node.js nếu lỡ gõ nhầm npm install ở ngoài cùng
+node_modules/
+package-lock.json
