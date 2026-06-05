@@ -39,6 +39,9 @@ public class Product {
     @Column(name = "status")
     private Boolean status = true;
 
+    @Column(name = "slug", unique = true, length = 255)
+    private String slug;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
