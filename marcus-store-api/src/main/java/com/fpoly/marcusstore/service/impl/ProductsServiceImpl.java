@@ -15,8 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -49,7 +47,7 @@ public class ProductsServiceImpl implements ProductsService {
 
     @Override
     public ProductResponse createProduct (CreateProduct createProduct) {
-        if(productRepository.existsProductByProductName(((createProduct.getProductName())))){
+        if(productRepository.existsByProductName(((createProduct.getProductName())))){
             throw new RuntimeException("Tên sản phẩm đã tồn tại");
         }
 
@@ -88,8 +86,13 @@ public class ProductsServiceImpl implements ProductsService {
         final Slugify slg = Slugify.builder().build();
         String slug = slg.slugify(updateProduct.getProductName());
 
-        if(productRepository.existsBySlug(slug)){
-            throw new RuntimeException("slug đã tồn tại");
+        if(!product.getProductName().equals(updateProduct.getProductName())){
+            if(productRepository.existsByProductNameAndProductIdNot(updateProduct.getProductName(), id)){
+                    throw new RuntimeException("tên sản phẩm đã tồn tại");
+                }
+            if(productRepository.existsBySlug(slug)){
+                throw new RuntimeException("slug đã tồn tại");
+            }       
         }
 
         Category category = cateRepo.findById(updateProduct.getCategoryId())
@@ -103,7 +106,7 @@ public class ProductsServiceImpl implements ProductsService {
         product.setStatus(updateProduct.getStatus());
         product.setCategory(category);
 
-        return toProductResponse(productRepository.save(product)) ;
+        return toProductResponse(productRepository.save(product));
     }
 
     @Override

@@ -26,9 +26,6 @@ public class CreateProduct {
     @NotBlank (message = "Ko được để trống đường dẫn ảnh")
     private String thumbnailUrl;
 
-    @NotBlank (message = "Ko được để trống slug")
-    private String slug;
-
     @NotNull (message = "Ko được để trống CategoryId")
     private Integer categoryId;
 }

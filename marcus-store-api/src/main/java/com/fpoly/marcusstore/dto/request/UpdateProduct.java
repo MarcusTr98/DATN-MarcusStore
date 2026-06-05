@@ -28,9 +28,6 @@ public class UpdateProduct {
 
     private Boolean status;
 
-    @NotBlank (message = "Ko được để trống slug")
-    private String slug;
-
     @NotNull (message = "Ko được để trống CategoryId")
     private Integer categoryId;
 }
