@@ -13,29 +13,29 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
     private final CartService cartService;
 
-    @GetMapping("/{userId}")
-    public CartResponse getDetailByUserId(@PathVariable("userId") Integer userId) {
-        return cartService.getCartDetailByUserId(userId);
+    @GetMapping
+    public CartResponse getDetail() {
+        return cartService.getCartDetail();
     }
 
-    @PostMapping("/{userId}/items")
-    public CartResponse addItemToCart(@PathVariable("userId") Integer userId, @RequestBody AddCartItemRequest request) {
-        return cartService.addItemToCart(userId, request);
+    @PostMapping("/items")
+    public CartResponse addItemToCart(@RequestBody AddCartItemRequest request) {
+        return cartService.addItemToCart(request);
     }
 
-    @DeleteMapping("/{userId}/items/{skuId}")
-    public CartResponse removeItemFromCart(@PathVariable("userId") Integer userId, @PathVariable("skuId") Integer skuId) {
-        return cartService.removeItemFromCart(userId, skuId);
+    @DeleteMapping("/items/{skuId}")
+    public CartResponse removeItemFromCart(@PathVariable("skuId") Integer skuId) {
+        return cartService.removeItemFromCart(skuId);
     }
 
-    @DeleteMapping("/{userId}/items/selected")
-    public CartResponse removeItemsFromCart(@PathVariable("userId") Integer userId, @RequestBody DeleteSelectedCartItemRequest request) {
-        return cartService.removeItemsFromCart(userId, request.getSkuIds());
+    @DeleteMapping("/items/selected")
+    public CartResponse removeItemsFromCart(@RequestBody DeleteSelectedCartItemRequest request) {
+        return cartService.removeItemsFromCart(request.getSkuIds());
     }
 
-    @DeleteMapping("/{userId}/items")
-    public CartResponse removeCartItems(@PathVariable("userId") Integer userId) {
-        return cartService.removeCartItems(userId);
+    @DeleteMapping("/items")
+    public CartResponse removeCartItems() {
+        return cartService.removeCartItems();
     }
 }
 
