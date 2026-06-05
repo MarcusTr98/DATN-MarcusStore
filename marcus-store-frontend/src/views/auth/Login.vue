@@ -52,16 +52,13 @@
         </div>
 
         <div class="divider"><span>hoặc đăng nhập bằng tài khoản</span></div>
-
+        <div v-if="errorMessage" class="error-box">
+          {{ errorMessage }}
+        </div>
         <form @submit.prevent="handleLogin">
           <div class="form-group">
             <label>TÊN ĐĂNG NHẬP HOẶC EMAIL</label>
-            <input
-              type="text"
-              v-model="loginForm.username"
-              placeholder="Nhập tên đăng nhập của bạn"
-              required
-            />
+            <input type="text" v-model="loginForm.username" placeholder="Nhập tên đăng nhập của bạn" />
           </div>
 
           <div class="form-group">
@@ -70,15 +67,11 @@
               <router-link to="/auth/forgot-password">QUÊN MẬT KHẨU?</router-link>
             </div>
             <div class="password-input">
-              <input
-                :type="showLoginPassword ? 'text' : 'password'"
-                v-model="loginForm.password"
-                placeholder="Nhập mật khẩu của bạn"
-                required
-              />
+              <input :type="showLoginPassword ? 'text' : 'password'" v-model="loginForm.password"
+                placeholder="Nhập mật khẩu của bạn" />
               <span class="eye" @click="showLoginPassword = !showLoginPassword">{{
                 showLoginPassword ? '🙈' : '👁'
-              }}</span>
+                }}</span>
             </div>
           </div>
 
@@ -100,30 +93,108 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
+import { useRouter } from 'vue-router'
+import { loginApi } from '@/api/authApi'
+
+const router = useRouter()
 
 const showLoginPassword = ref(false)
+const errorMessage = ref('')
+const loading = ref(false)
 
-// ĐÃ SỬA: Binding dữ liệu Form Đăng nhập
 const loginForm = reactive({
   username: '',
   password: '',
   rememberMe: false,
 })
 
-const handleLogin = () => {
-  console.log('Dữ liệu Đăng nhập gửi lên Backend:', loginForm)
-  // Thực hiện tích hợp Jwt Token lưu vào LocalStorage/Pinia tại đây
+const handleLogin = async () => {
+  errorMessage.value = ''
+
+
+  if (!loginForm.username.trim()) {
+    errorMessage.value = 'Vui lòng nhập tên đăng nhập'
+    return
+  }
+
+
+  if (!loginForm.password.trim()) {
+    errorMessage.value = 'Vui lòng nhập mật khẩu'
+    return
+  }
+
+  try {
+    loading.value = true
+
+    const response = await loginApi({
+      username: loginForm.username,
+      password: loginForm.password,
+    })
+
+    console.log('Response:', response)
+
+    const userData = response.data.data
+
+  
+localStorage.setItem('ACCESS_TOKEN', userData.token)
+localStorage.setItem('USERNAME', userData.username)
+localStorage.setItem('USER_ROLE', JSON.stringify(userData.roles))
+window.dispatchEvent(new Event('auth-changed'))
+  
+if (userData.roles.includes('ROLE_ADMIN')) {
+  router.push('/admin/dashboard')
+}
+else if (userData.roles.includes('ROLE_STAFF')) {
+  router.push('/admin/dashboard')
+}
+else {
+  router.push('/')
+}
+  } catch (error) {
+  console.error(error)
+
+  const status = error?.response?.status
+  const message = error?.response?.data?.message
+
+  if (status === 401) {
+    errorMessage.value =
+      message || 'Sai tên đăng nhập hoặc mật khẩu'
+  } else if (status === 403) {
+    errorMessage.value =
+      message || 'Tài khoản đã bị khóa'
+  } else if (status === 500) {
+    errorMessage.value =
+      message || 'Đã xảy ra lỗi hệ thống'
+  } else {
+    errorMessage.value =
+      message || 'Không thể kết nối đến máy chủ'
+  }
+} finally {
+    loading.value = false
+  }
 }
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+.error-box {
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  border: 1px solid #ffb3b3;
+  border-radius: 8px;
+  background: #fff2f2;
+  color: #ff4d4f;
+  text-align: center;
+  font-size: 14px;
+}
 .auth-page {
   display: flex;
   min-height: 100vh;
-  width: 100%; /* BẮT BUỘC: Ép component giãn hết chiều ngang hệ thống */
+  width: 100%;
+  /* BẮT BUỘC: Ép component giãn hết chiều ngang hệ thống */
   background: #fff7fa;
 }
+
 * {
   margin: 0;
   padding: 0;
