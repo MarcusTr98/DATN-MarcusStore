@@ -11,4 +11,6 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
     List<Category> findByParentIsNullAndStatusTrue();
 
     boolean existsCategoriesByCategoryName(String categoryName);
+    boolean existsBySlug(String slug);
+
 }
