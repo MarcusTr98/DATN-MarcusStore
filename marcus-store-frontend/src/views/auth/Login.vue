@@ -133,17 +133,13 @@ const handleLogin = async () => {
 
     console.log('Response:', response)
 
-    const userData = response.data
+    const userData = response.data.data
 
   
-    localStorage.setItem('access_token', userData.token)
-
-
-    localStorage.setItem(
-      'roles',
-      JSON.stringify(userData.roles)
-    )
-
+localStorage.setItem('ACCESS_TOKEN', userData.token)
+localStorage.setItem('USERNAME', userData.username)
+localStorage.setItem('USER_ROLE', JSON.stringify(userData.roles))
+window.dispatchEvent(new Event('auth-changed'))
   
 if (userData.roles.includes('ROLE_ADMIN')) {
   router.push('/admin/dashboard')

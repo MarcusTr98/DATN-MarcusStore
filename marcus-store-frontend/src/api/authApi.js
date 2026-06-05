@@ -1,5 +1,5 @@
-import axiosClient from './axiosClient'
+import api from '@/utils/api'
 
 export const loginApi = (data) => {
-  return axiosClient.post('/auth/login', data)
+  return api.post('/auth/login', data)
 }
