@@ -136,7 +136,7 @@ const handleLogin = async () => {
     const userData = response.data.data
 
   
-localStorage.setItem('ACCESS_TOKEN', userData.token)
+localStorage.setItem('token', userData.token)
 localStorage.setItem('USERNAME', userData.username)
 localStorage.setItem('USER_ROLE', JSON.stringify(userData.roles))
 window.dispatchEvent(new Event('auth-changed'))
