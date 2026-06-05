@@ -182,14 +182,23 @@
           </button>
         </div>
 
-        <form class="modal-body-grid" novalidate @submit.prevent="saveVoucher">
+        <form class="voucher-form" novalidate @submit.prevent="saveVoucher">
+          <section class="form-section">
+            <div class="section-title">
+              <span>1</span>
+              <div>
+                <h3>Thông tin Voucher chính</h3>
+                <p>Mã Voucher và trạng thái hiển thị của voucher.</p>
+              </div>
+            </div>
+            <div class="modal-body-grid compact">
           <div>
             <label class="form-label">Mã voucher <span>*</span></label>
             <input
               v-model.trim="form.voucher_code"
               type="text"
               class="form-control text-uppercase"
-              :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
+              :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
               placeholder="VD: SUMMER2026"
             />
             <div v-if="errors.voucher_code" class="invalid-feedback">
@@ -208,29 +217,44 @@
             </small>
           </div>
 
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title">
+              <span>2</span>
+              <div>
+                <h3>Chi tiết Giảm giá</h3>
+                <p>Chọn loại giảm giá theo % hoặc theo giá cố định.</p>
+              </div>
+            </div>
+
           <div class="wide-field">
             <label class="form-label">Loại giảm giá <span>*</span></label>
             <div class="discount-choice-grid">
               <label class="discount-choice" :class="{ active: form.discount_type === 'PERCENT' }">
                 <input v-model="form.discount_type" type="radio" value="PERCENT" />
-                <span>
+                <span class="discount-choice-text">
                   <strong>Giảm theo phần trăm</strong>
-                  <small>Ví dụ giảm 10%, cần nhập số tiền giảm tối đa.</small>
+
                 </span>
               </label>
 
               <label class="discount-choice" :class="{ active: form.discount_type === 'AMOUNT' }">
                 <input v-model="form.discount_type" type="radio" value="AMOUNT" />
-                <span>
+                <span class="discount-choice-text">
                   <strong>Giảm tiền trực tiếp</strong>
-                  <small>Ví dụ giảm 50.000đ, không cần giảm tối đa.</small>
+
                 </span>
               </label>
             </div>
           </div>
 
           <div>
-            <label class="form-label">Giá trị giảm <span>*</span></label>
+            <label class="form-label">
+              {{ form.discount_type === 'PERCENT' ? 'Giá trị giảm (%)' : 'Số tiền giảm trực tiếp' }}
+              <span>*</span>
+            </label>
             <div class="input-group">
               <input
                 v-model.number="form.discount_value"
@@ -239,49 +263,69 @@
                 :max="form.discount_type === 'PERCENT' ? 100 : undefined"
                 :step="form.discount_type === 'PERCENT' ? 1 : 1000"
                 class="form-control"
-                :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
+                :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
+                :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000đ'"
 
               />
-              <span class="input-group-text">{{ form.discount_type === 'PERCENT' ? '%' : 'VNĐ' }}</span>
+              <span class="input-group-text">{{ form.discount_type === 'PERCENT' ? '%' : 'đ' }}</span>
               <div v-if="errors.discount_value" class="invalid-feedback">
                 {{ errors.discount_value }}
               </div>
             </div>
           </div>
 
+          <div v-if="form.discount_type === 'PERCENT'">
+            <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
+            <div class="input-group">
+              <input
+                v-model.number="form.max_discount_amount"
+                type="number"
+                min="0"
+                step="1000"
+                class="form-control"
+                :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
+                placeholder="Nhập số tiền giảm tối đa"
+              />
+              <span class="input-group-text">đ</span>
+              <div v-if="isSubmitted && errors.max_discount_amount" class="invalid-feedback">
+                {{ errors.max_discount_amount }}
+              </div>
+            </div>
+          </div>
+
+          </section>
+
+          <section class="form-section">
+            <div class="section-title">
+              <span>3</span>
+              <div>
+                <h3>Điều kiện Sử dụng</h3>
+                <p>Giá trị đơn hàng tối thiểu và số lượt có thể dùng.</p>
+              </div>
+            </div>
+
+            <div class="modal-body-grid compact">
           <div>
-            <label class="form-label">Đơn tối thiểu</label>
-            <input
-              v-model.number="form.min_order_value"
-              type="number"
-              min="0"
-              step="1000"
-              class="form-control"
-              :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
-              placeholder="VD: 500000"
-            />
-            <div v-if="errors.min_order_value" class="invalid-feedback">
-              {{ errors.min_order_value }}
+            <label class="form-label with-help">
+              Đơn tối thiểu
+              <i class="bi bi-question-circle" title="Áp dụng cho đơn hàng có giá trị từ số tiền này trở lên."></i>
+            </label>
+            <div class="input-group">
+              <input
+                v-model.number="form.min_order_value"
+                type="number"
+                min="0"
+                step="1000"
+                class="form-control"
+                :class="{ 'is-invalid': isSubmitted && errors.min_order_value }"
+                placeholder="Nhập giá trị đơn tối thiểu"
+              />
+              <span class="input-group-text">đ</span>
+              <div v-if="errors.min_order_value" class="invalid-feedback">
+                {{ errors.min_order_value }}
+              </div>
             </div>
           </div>
-
-          <div >
-            <label class="form-label">Số tiền giảm tối đa <span>*</span></label>
-            <input
-              v-model.number="form.max_discount_amount"
-              type="number"
-              min="0"
-              step="1000"
-              class="form-control"
-              :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
-              placeholder="VD: 100000"
-              :disabled="form.discount_type === 'AMOUNT'"
-            />
-            <div v-if="isSubmitted && errors.max_discount_amount" class="invalid-feedback">
-              {{ errors.max_discount_amount }}
-            </div>
-          </div>
-
 
           <div>
             <label class="form-label">Số lượng voucher / lượt dùng <span>*</span></label>
@@ -291,25 +335,38 @@
               min="0"
               step="1"
               class="form-control"
-              :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
-              placeholder="VD: 100 lượt dùng"
+              :class="{ 'is-invalid': isSubmitted && errors.quantity }"
+              placeholder="Nhập số lượt dùng"
             />
-            <small class="form-help">
-              Đây là số lượt voucher có thể được sử dụng, không phải số lượng sản phẩm.
-            </small>
+
             <div v-if="errors.quantity" class="invalid-feedback">
               {{ errors.quantity }}
             </div>
           </div>
 
+            </div>
+          </section>
+
+          <section class="form-section">
+            <div class="section-title">
+              <span>4</span>
+              <div>
+                <h3>Thời gian Sử dụng</h3>
+                <p>Ngày kết thúc phải lớn hơn ngày bắt đầu.</p>
+              </div>
+            </div>
+
+            <div class="modal-body-grid compact">
           <div>
             <label class="form-label">Ngày bắt đầu <span>*</span></label>
             <input
               v-model="form.start_date"
               type="datetime-local"
               class="form-control"
-              :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
+              :min="todayDateTime"
+              :class="{ 'is-invalid': isSubmitted && errors.start_date }"
             />
+            <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
             <div v-if="errors.start_date" class="invalid-feedback">
               {{ errors.start_date }}
             </div>
@@ -321,8 +378,10 @@
               v-model="form.end_date"
               type="datetime-local"
               class="form-control"
-              :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
+              :min="form.start_date || todayDateTime"
+              :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
             />
+            <small class="form-help">Không được trước ngày bắt đầu.</small>
             <div v-if="errors.end_date" class="invalid-feedback">
               {{ errors.end_date }}
             </div>
@@ -331,12 +390,24 @@
             </div>
           </div>
 
+            </div>
+          </section>
+
+          <section v-if="isPreviewVisible" class="voucher-preview">
+            <div>
+              <span class="preview-eyebrow">Xem trước</span>
+              <strong>{{ previewVoucher.code }}</strong>
+              <p>{{ previewVoucher.discountText }}</p>
+              <small>{{ previewVoucher.conditionText }}</small>
+            </div>
+          </section>
+
           <div class="form-actions">
             <button type="button" class="btn btn-soft" @click="resetForm">
               Làm mới
             </button>
-            <button type="button" class="btn btn-soft" @click="closeModal">
-              Hủy
+            <button type="button" class="btn btn-preview" @click="isPreviewVisible = !isPreviewVisible">
+              Xem trước
             </button>
             <button type="submit" class="btn btn-primary-action">
               Lưu Voucher
@@ -350,10 +421,11 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-
+import '@/assets/css/Voucher.css'
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const isSubmitted = ref(false)
+const isPreviewVisible = ref(false)
 
 const toast = reactive({
   show: false,
@@ -416,11 +488,33 @@ const defaultForm = {
   min_order_value: 0,
   start_date: '',
   end_date: '',
-  quantity: 100,
+  quantity: null,
   is_active: true,
 }
 
 const form = reactive({ ...defaultForm })
+
+const todayDateTime = computed(() => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  return now.toISOString().slice(0, 16)
+})
+
+const previewVoucher = computed(() => {
+  const code = form.voucher_code.trim().toUpperCase() || 'SUMMER2026'
+  const discountValue = Number(form.discount_value || 0)
+  const maxDiscount = Number(form.max_discount_amount || 0)
+  const minOrder = Number(form.min_order_value || 0)
+
+  return {
+    code,
+    discountText:
+      form.discount_type === 'PERCENT'
+        ? `Giảm ${discountValue || 0}%${maxDiscount > 0 ? `, tối đa ${formatCurrency(maxDiscount)}` : ''}`
+        : `Giảm trực tiếp ${formatCurrency(discountValue)}`,
+    conditionText: minOrder > 0 ? `Áp dụng cho đơn từ ${formatCurrency(minOrder)}` : 'Áp dụng cho mọi đơn hàng',
+  }
+})
 
 const filteredVouchers = computed(() => {
   const keyword = filters.keyword.trim().toLowerCase()
@@ -563,6 +657,7 @@ function resetFilters() {
 
 function resetForm() {
   isSubmitted.value = false
+  isPreviewVisible.value = false
   Object.assign(form, { ...defaultForm })
   isEditing.value = false
   isSubmitted.value = false
@@ -721,463 +816,5 @@ function formatDateTime(value) {
 </script>
 
 <style scoped>
-.voucher-page {
-  position: relative;
-  min-height: calc(100vh - 64px);
-  background: #fff7fa;
-  color: #202636;
-}
 
-.toast-alert {
-  position: fixed;
-  top: 18px;
-  right: 18px;
-  z-index: 1100;
-  display: grid;
-  gap: 4px;
-  width: min(360px, calc(100vw - 32px));
-  padding: 14px 16px;
-  border: 1px solid #bbf7d0;
-  border-radius: 8px;
-  background: #f0fdf4;
-  color: #15803d;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.18);
-}
-
-.toast-alert.error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.toast-alert strong {
-  font-size: 0.95rem;
-}
-
-.toast-alert span {
-  font-size: 0.86rem;
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-
-.voucher-shell {
-  width: min(100%, 1280px);
-  margin: 0 auto;
-  padding: 24px;
-}
-
-.voucher-hero,
-.toolbar-panel,
-.table-panel,
-.voucher-modal,
-.stat-card {
-  border: 1px solid #f3d6e3;
-  background: #ffffff;
-  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
-}
-
-.voucher-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 20px;
-  border-radius: 8px;
-}
-
-.hero-title {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.hero-icon {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  place-items: center;
-  border-radius: 8px;
-  background: #f55d9b;
-  color: #ffffff;
-  font-size: 1.45rem;
-}
-
-.hero-title h1,
-.modal-head h2 {
-  margin: 0;
-  color: #f55d9b;
-  font-size: 1.45rem;
-  font-weight: 800;
-}
-
-.hero-title p,
-.modal-head p {
-  margin: 4px 0 0;
-  color: #6b7280;
-  font-size: 0.9rem;
-}
-
-.btn-primary-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  border-radius: 8px;
-  background: #f55d9b;
-  color: #ffffff;
-  font-weight: 700;
-  padding: 10px 16px;
-}
-
-.btn-primary-action:hover,
-.btn-primary-action:focus {
-  background: #ec4d8d;
-  color: #ffffff;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.stat-card {
-  padding: 18px;
-  border-radius: 8px;
-}
-
-.stat-card span {
-  display: block;
-  color: #6b7280;
-  font-size: 0.86rem;
-  font-weight: 700;
-}
-
-.stat-card strong {
-  display: block;
-  margin-top: 6px;
-  font-size: 1.65rem;
-  line-height: 1;
-}
-
-.text-accent {
-  color: #f55d9b;
-}
-
-.toolbar-panel {
-  margin-bottom: 18px;
-  padding: 16px;
-  border-radius: 8px;
-}
-
-.form-label {
-  color: #b4557d;
-  font-size: 0.76rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
-}
-
-.form-label span {
-  color: #dc3545;
-}
-
-.form-control,
-.form-select,
-.input-group-text {
-  border-color: #f3d6e3;
-  background-color: #fffafd;
-}
-
-.form-control:focus,
-.form-select:focus {
-  border-color: #f55d9b;
-  box-shadow: 0 0 0 0.18rem rgba(245, 93, 155, 0.12);
-}
-
-.form-select:disabled {
-  cursor: not-allowed;
-  background-color: #f1f5f9;
-  color: #94a3b8;
-}
-
-.form-help {
-  display: block;
-  margin-top: 5px;
-  color: #6b7280;
-  font-size: 0.76rem;
-}
-
-.btn-soft {
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #202636;
-  font-weight: 700;
-}
-
-.btn-soft:hover,
-.btn-soft:focus {
-  border-color: #efbdd2;
-  background: #fff0f7;
-}
-
-.table-panel {
-  overflow: hidden;
-  border-radius: 8px;
-}
-
-.voucher-table {
-  min-width: 1060px;
-}
-
-.voucher-table thead th {
-  background: #fff0f7;
-  color: #b4557d;
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.voucher-table td {
-  color: #4b5563;
-  font-size: 0.9rem;
-}
-
-.voucher-code {
-  color: #202636;
-  font-weight: 800;
-}
-
-.voucher-table small,
-.date-line {
-  color: #6b7280;
-  font-size: 0.78rem;
-}
-
-.type-badge,
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 26px;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-
-.type-badge.percent,
-.status-badge {
-  background: #ffe4ef;
-  color: #d63384;
-}
-
-.type-badge.amount {
-  background: #fff0d9;
-  color: #9a5b00;
-}
-
-.status-badge.inactive {
-  background: #f1f5f9;
-  color: #64748b;
-}
-
-.icon-button {
-  display: inline-grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #202636;
-}
-
-.icon-button:hover,
-.icon-button:focus {
-  background: #fff0f7;
-  color: #d63384;
-}
-
-.icon-button.danger {
-  border-color: #f5c2c7;
-  background: #fff5f6;
-  color: #dc3545;
-}
-
-.icon-button.danger:hover,
-.icon-button.danger:focus {
-  background: #f8d7da;
-}
-
-.empty-state {
-  padding: 42px 16px;
-  text-align: center;
-}
-
-.empty-state i {
-  color: #f55d9b;
-  font-size: 2.4rem;
-}
-
-.empty-state h3 {
-  margin: 12px 0 4px;
-  font-size: 1.1rem;
-  font-weight: 800;
-}
-
-.empty-state p {
-  margin: 0;
-  color: #6b7280;
-}
-
-.modal-backdrop-custom {
-  position: fixed;
-  inset: 0;
-  z-index: 1050;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-  background: rgba(15, 23, 42, 0.46);
-}
-
-.voucher-modal {
-  width: min(100%, 880px);
-  max-height: 92vh;
-  overflow: auto;
-  border-radius: 8px;
-}
-
-.modal-head {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 20px;
-  border-bottom: 1px solid #f3d6e3;
-  background: #ffffff;
-}
-
-.modal-body-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  padding: 20px;
-}
-
-.wide-field,
-.form-actions {
-  grid-column: 1 / -1;
-}
-
-.discount-choice-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.discount-choice {
-  display: flex;
-  gap: 10px;
-  min-height: 96px;
-  padding: 14px;
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  background: #ffffff;
-  cursor: pointer;
-}
-
-.discount-choice.active {
-  border-color: #f55d9b;
-  background: #ffe4ef;
-}
-
-.discount-choice input {
-  margin-top: 4px;
-  accent-color: #f55d9b;
-}
-
-.discount-choice strong,
-.discount-choice small,
-.amount-note strong,
-.amount-note span {
-  display: block;
-}
-
-.discount-choice strong {
-  color: #202636;
-}
-
-.discount-choice small,
-.amount-note span {
-  margin-top: 4px;
-  color: #6b7280;
-}
-
-.amount-note {
-  min-height: 88px;
-  padding: 14px;
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  background: #fffafd;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding-top: 18px;
-  border-top: 1px solid #f3d6e3;
-}
-
-@media (max-width: 992px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .voucher-shell {
-    padding: 16px;
-  }
-
-  .voucher-hero {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .stats-grid,
-  .modal-body-grid,
-  .discount-choice-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .form-actions {
-    flex-direction: column;
-  }
-
-  .form-actions .btn {
-    width: 100%;
-  }
-}
 </style>
