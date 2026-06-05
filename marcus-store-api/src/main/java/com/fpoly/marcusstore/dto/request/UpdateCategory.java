@@ -18,7 +18,5 @@ public class UpdateCategory {
 
     private Boolean status;
     
-    private String slug;
-    
     private Integer parentId;
 }

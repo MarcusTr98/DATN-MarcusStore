@@ -23,8 +23,8 @@ public class AdminCategoryController {
     CategoriesService categoriesService;
 
     @GetMapping
-    public Page<CategoryResponse> findAllCategory(Pageable pageable) {
-        return categoriesService.findAllCategory(pageable);
+    public ApiResponse<Page<CategoryResponse>> findAllCategory(Pageable pageable) {
+        return ApiResponse.success(categoriesService.findAllCategory(pageable));
     }
 
     @PostMapping
@@ -33,8 +33,8 @@ public class AdminCategoryController {
     }
 
     @GetMapping("/{id}")
-    public Optional<CategoryResponse> getCategoryById(@PathVariable Integer id) {
-        return categoriesService.getCategoryById(id);
+    public ApiResponse<Optional<CategoryResponse>> getCategoryById(@PathVariable Integer id) {
+        return ApiResponse.success(categoriesService.getCategoryById(id));
     }
 
     @PutMapping("/{id}")
@@ -43,7 +43,7 @@ public class AdminCategoryController {
     }
 
     @PutMapping("/hidden/{id}")
-    public Category hiddenCategory(@PathVariable Integer id) {
-        return categoriesService.hiddenCategory(id);
+    public ApiResponse<Category> hiddenCategory(@PathVariable Integer id) {
+        return ApiResponse.success(categoriesService.hiddenCategory(id));
     }
 }
