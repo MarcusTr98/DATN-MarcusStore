@@ -8,12 +8,9 @@ const api = axios.create({
   },
 })
 
-// Tự động gắn Token bảo mật vào tất cả các gói tin gửi lên Backend
 api.interceptors.request.use(
   (config) => {
-    // Lấy token từ LocalStorage
-    const token = localStorage.getItem('token')
-
+    const token = localStorage.getItem('ACCESS_TOKEN')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }

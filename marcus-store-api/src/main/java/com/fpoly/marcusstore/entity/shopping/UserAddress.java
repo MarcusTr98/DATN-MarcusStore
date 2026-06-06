@@ -1,4 +1,4 @@
-package com.fpoly.marcusstore.entity.address;
+package com.fpoly.marcusstore.entity.shopping;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fpoly.marcusstore.entity.auth.User;
@@ -23,11 +23,25 @@ public class UserAddress {
     @Column(name = "address_id")
     private Integer addressId;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
+    private User user;
+
     @Column(name = "recipient_name", nullable = false, length = 100)
     private String recipientName;
 
     @Column(name = "phone_number", nullable = false, length = 10)
     private String phoneNumber;
+
+    @Column(name = "province_name", nullable = false, length = 100)
+    private String provinceName;
+
+    @Column(name = "district_name", nullable = false, length = 100)
+    private String districtName;
+
+    @Column(name = "ward_name", nullable = false, length = 100)
+    private String wardName;
 
     @Column(name = "detail_address", nullable = false, length = 300)
     private String detailAddress;
@@ -45,22 +59,4 @@ public class UserAddress {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    // Liên kết với Master Data Hành chính (Trỏ về các Code)
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "province_code", nullable = false)
-    private Province province;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "district_code", nullable = false)
-    private District district;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "ward_code", nullable = false)
-    private Ward ward;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnore
-    private User user;
 }
