@@ -25,6 +25,9 @@ public class Category {
     @Column(name = "status")
     private Boolean status = true;
 
+    @Column(name = "slug", unique = true, length = 255)
+    private String slug;
+
     // Đệ quy ngược lên danh mục cha
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_id")

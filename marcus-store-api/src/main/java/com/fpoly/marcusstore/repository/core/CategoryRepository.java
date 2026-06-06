@@ -9,4 +9,8 @@ import java.util.List;
 public interface CategoryRepository extends JpaRepository<Category, Integer> {
     // Lấy các danh mục gốc (không có cha) để làm Menu
     List<Category> findByParentIsNullAndStatusTrue();
+
+    boolean existsByCategoryName(String categoryName);
+    boolean existsBySlug(String slug);
+    boolean existsByCategoryNameAndCategoryId(String categoryName, Integer id);
 }
