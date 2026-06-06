@@ -299,7 +299,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import '@/assets/css/cart.css'
+  import '@/assets/css/cart.css'
 const cartItems = ref([
   {
     id: 'item-iphone',
