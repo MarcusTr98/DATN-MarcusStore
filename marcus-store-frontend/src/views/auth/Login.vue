@@ -58,7 +58,11 @@
         <form @submit.prevent="handleLogin">
           <div class="form-group">
             <label>TÊN ĐĂNG NHẬP HOẶC EMAIL</label>
-            <input type="text" v-model="loginForm.username" placeholder="Nhập tên đăng nhập của bạn" />
+            <input
+              type="text"
+              v-model="loginForm.username"
+              placeholder="Nhập tên đăng nhập của bạn"
+            />
           </div>
 
           <div class="form-group">
@@ -67,11 +71,14 @@
               <router-link to="/auth/forgot-password">QUÊN MẬT KHẨU?</router-link>
             </div>
             <div class="password-input">
-              <input :type="showLoginPassword ? 'text' : 'password'" v-model="loginForm.password"
-                placeholder="Nhập mật khẩu của bạn" />
+              <input
+                :type="showLoginPassword ? 'text' : 'password'"
+                v-model="loginForm.password"
+                placeholder="Nhập mật khẩu của bạn"
+              />
               <span class="eye" @click="showLoginPassword = !showLoginPassword">{{
                 showLoginPassword ? '🙈' : '👁'
-                }}</span>
+              }}</span>
             </div>
           </div>
 
@@ -111,12 +118,10 @@ const loginForm = reactive({
 const handleLogin = async () => {
   errorMessage.value = ''
 
-
   if (!loginForm.username.trim()) {
     errorMessage.value = 'Vui lòng nhập tên đăng nhập'
     return
   }
-
 
   if (!loginForm.password.trim()) {
     errorMessage.value = 'Vui lòng nhập mật khẩu'
@@ -135,41 +140,35 @@ const handleLogin = async () => {
 
     const userData = response.data.data
 
-  
-localStorage.setItem('ACCESS_TOKEN', userData.token)
-localStorage.setItem('USERNAME', userData.username)
-localStorage.setItem('USER_ROLE', JSON.stringify(userData.roles))
-window.dispatchEvent(new Event('auth-changed'))
-  
-if (userData.roles.includes('ROLE_ADMIN')) {
-  router.push('/admin/dashboard')
-}
-else if (userData.roles.includes('ROLE_STAFF')) {
-  router.push('/admin/dashboard')
-}
-else {
-  router.push('/')
-}
+    localStorage.setItem('ACCESS_TOKEN', userData.token)
+    localStorage.setItem('USERNAME', userData.username)
+    localStorage.setItem('USER_ROLE', JSON.stringify(userData.roles))
+
+    window.dispatchEvent(new Event('auth-changed'))
+
+    if (userData.roles.includes('ROLE_ADMIN')) {
+      router.push('/admin/dashboard')
+    } else if (userData.roles.includes('ROLE_STAFF')) {
+      router.push('/admin/dashboard')
+    } else {
+      router.push('/')
+    }
   } catch (error) {
-  console.error(error)
+    console.error(error)
 
-  const status = error?.response?.status
-  const message = error?.response?.data?.message
+    const status = error?.response?.status
+    const message = error?.response?.data?.message
 
-  if (status === 401) {
-    errorMessage.value =
-      message || 'Sai tên đăng nhập hoặc mật khẩu'
-  } else if (status === 403) {
-    errorMessage.value =
-      message || 'Tài khoản đã bị khóa'
-  } else if (status === 500) {
-    errorMessage.value =
-      message || 'Đã xảy ra lỗi hệ thống'
-  } else {
-    errorMessage.value =
-      message || 'Không thể kết nối đến máy chủ'
-  }
-} finally {
+    if (status === 401) {
+      errorMessage.value = message || 'Sai tên đăng nhập hoặc mật khẩu'
+    } else if (status === 403) {
+      errorMessage.value = message || 'Tài khoản đã bị khóa'
+    } else if (status === 500) {
+      errorMessage.value = message || 'Đã xảy ra lỗi hệ thống'
+    } else {
+      errorMessage.value = message || 'Không thể kết nối đến máy chủ'
+    }
+  } finally {
     loading.value = false
   }
 }

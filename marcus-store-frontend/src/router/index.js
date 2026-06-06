@@ -94,10 +94,10 @@ const routes = [
   {
     path: '/admin',
     component: AdminLayout,
-      meta: {
-    requiresAuth: true,
-    roles: ['ROLE_ADMIN', 'ROLE_STAFF']
-  },
+    meta: {
+      requiresAuth: true,
+      roles: ['ROLE_ADMIN', 'ROLE_STAFF'],
+    },
     children: [
       { path: '', redirect: '/admin/dashboard' },
       {
@@ -124,9 +124,9 @@ const routes = [
         path: 'sku',
         name: 'SkuManager',
         component: () => import('@/views/admin/product/SkuManager.vue'),
-          meta: {
-    roles: ['ROLE_ADMIN']
-  }
+        meta: {
+          roles: ['ROLE_ADMIN'],
+        },
       },
       {
         path: 'order',
@@ -188,12 +188,8 @@ const router = createRouter({
   },
 })
 router.beforeEach((to) => {
-
-  const token = localStorage.getItem('token')
-
-  const roles = JSON.parse(
-    localStorage.getItem('USER_ROLE') || '[]'
-  )
+  const token = localStorage.getItem('ACCESS_TOKEN')
+  const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
 
   // Chưa login mà cố vào admin
   if (to.path.startsWith('/admin') && !token) {
@@ -211,22 +207,14 @@ router.beforeEach((to) => {
 
   // Kiểm tra quyền riêng từng màn hình
   const requiredRoles = to.meta.roles
-
   if (requiredRoles) {
-
-    const hasPermission = roles.some(role =>
-      requiredRoles.includes(role)
-    )
-
+    const hasPermission = roles.some((role) => requiredRoles.includes(role))
     if (!hasPermission) {
-
       alert('Bạn không có quyền truy cập trang này')
-
-      // Vẫn ở khu Admin
       return '/admin/dashboard'
     }
   }
-
   return true
 })
+
 export default router
