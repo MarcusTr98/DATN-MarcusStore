@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.request.AddCartItemRequest;
 import com.fpoly.marcusstore.dto.response.CartItemResponse;
 import com.fpoly.marcusstore.dto.response.CartResponse;
+import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Cart;
 import com.fpoly.marcusstore.entity.shopping.CartItem;
@@ -23,7 +24,21 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductSkuRepository productSkuRepository;
-
+    // lấy giá trị thuộc tính của SKU theo tên giá trị
+    private String getSkuAttributeValue(ProductSku sku, String attributeName){
+        if(sku == null || sku.getAttributeValues() == null){
+            return null;
+        }
+        return sku.getAttributeValues().stream()
+                .filter(value -> value!=null) // bỏ qua phần tử null
+                .filter(value -> value.getAttribute() != null)
+                .filter(value -> value.getAttribute().getAttributeName() !=null)// check sự tồn tại của thuộc tính
+                .filter(value -> value.getAttribute().getAttributeName().equalsIgnoreCase(attributeName))// so sánh attributeName
+                .map(AttributeValue::getValueString)
+                .filter(value -> value != null && !value.isBlank())
+                .findFirst()
+                .orElse(null);
+    }
     @Transactional(readOnly = true)
     public CartResponse getCartDetail() {
         Integer userId = SecurityUtils.getCurrentUserId();
@@ -31,6 +46,12 @@ public class CartService {
         Integer cartId = cart.getCartId();
         List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cartId);
         List<CartItemResponse> itemResponses = cartItems.stream().map(item -> {
+        String color = getSkuAttributeValue(item.getSku(), "Màu sắc");
+        String storage = getSkuAttributeValue(item.getSku(), "Dung lượng bộ nhớ");
+        String variantText = "";
+        if(color != null && storage != null){
+            variantText = color + " / " + storage;
+        }
             BigDecimal price = item.getSku().getPrice();
             Integer quantity = item.getQuantity();
             BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
@@ -44,6 +65,9 @@ public class CartService {
                     .skuCode(item.getSku().getSkuCode())
                     .productName(item.getSku().getProduct().getProductName())
                     .imageUrl(imageUrl)
+                    .color(color)
+                    .storage(storage)
+                    .variantText(variantText)
                     .price(price)
                     .quantity(quantity)
                     .totalPrice(totalPrice)

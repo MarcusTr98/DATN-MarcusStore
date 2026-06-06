@@ -1,12 +1,20 @@
 ﻿<template>
-  <div class="cart-wrapper">
+
     <div class="cart-header">
+      <div class="cart-wrapper">
+        <div v-if="isLoadingCart" class="cart-loading">
+          Đang tải giỏ hàng...
+        </div>
+
+        <div v-else-if="cartError" class="cart-error">
+          {{ cartError }}
+        </div>
       <i class="ti ti-shopping-cart cart-title-icon" aria-hidden="true"></i>
       <h2>Giỏ hàng của bạn</h2>
       <span class="count">{{ selectedCount }} sản phẩm</span>
     </div>
 
-    <div class="cart-layout" v-if="cartItems.length > 0">
+    <div class="cart-layout" v-else-if="cartItems.length > 0">
       <div class="cart-main-content">
         <div class="cart-items">
           <div class="cart-footer">
@@ -28,7 +36,16 @@
               </div>
               <div class="item-info">
                 <div class="item-img">
-                  <span class="item-img-placeholder">{{ item.icon }}</span>
+                  <img
+                    v-if="item.imageUrl"
+                    :src="item.imageUrl"
+                    :alt="item.name"
+                    class="cart-product-img"
+                  />
+
+                  <span v-else class="item-img-placeholder">
+    {{ item.icon }}
+  </span>
                 </div>
                 <div class="item-details">
                   <div class="item-name">{{ item.name }}</div>
@@ -298,43 +315,18 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import '@/assets/css/cart.css'
-const cartItems = ref([
-  {
-    id: 'item-iphone',
-    name: 'iPhone 16 Pro Max 256GB',
-    variant: 'Màu: Titan Sa Mạc | VN/A',
-    badge: 'Chính hãng VN/A',
-    icon: 'Điện thoại',
-    price: 29990000,
-    originalPrice: 33990000,
-    quantity: 1,
-    checked: true,
-  },
-  {
-    id: 'item-ipad',
-    name: 'iPad Pro M4 11 inch Wi-Fi 256GB',
-    variant: 'Màu: Bạc | Siêu mỏng',
-    badge: 'Hàng mới về',
-    icon: 'iPad',
-    price: 26490000,
-    originalPrice: 28990000,
-    quantity: 1,
-    checked: true,
-  },
-  {
-    id: 'item-macbook',
-    name: 'MacBook Air M3 13 inch 16GB - 512GB',
-    variant: 'Màu: Xanh Đen (Midnight)',
-    badge: 'Giảm 10%',
-    icon: 'Mac',
-    price: 29990000,
-    originalPrice: 32990000,
-    quantity: 1,
-    checked: true,
-  },
-])
+import { computed, onMounted, ref } from 'vue'
+import { useCartStore } from '@/stores/cartStore'
+
+const cartStore = useCartStore()
+
+onMounted(() => {
+  cartStore.fetchCart()
+})
+
+const cartItems = computed(() => cartStore.items)
+const isLoadingCart = computed(() => cartStore.loading)
+const cartError = computed(() => cartStore.error)
 
 const accessories = [
   {
@@ -439,12 +431,28 @@ function changeQty(item, delta) {
   item.quantity = Math.max(item.quantity + delta, 1)
 }
 
-function removeItem(id) {
-  cartItems.value = cartItems.value.filter((item) => item.id !== id)
+async  function removeItem(skuId){
+  const success = await cartStore.removeItemFromCart(skuId)
+  if(success){
+    showToast("xóa thành công")
+  }else{
+    showAlert(cartStore.error || "xóa sản phẩm thất bại")
+  }
 }
 
 function deleteChecked() {
-  cartItems.value = cartItems.value.filter((item) => !item.checked)
+  const checkedItems = cartItems.value.filter((item) => !item.checked)
+  if(checkedItems.length === "0"){
+    showAlert("vui lòng chọn 1 sản phẩm để xóa")
+    return
+  }
+  const skuIds = checkedItems.map((item) => item.skuId)
+  const success = cartStore.removeManyItemFromCart(skuIds)
+  if(success){
+    showToast("xóa các sản phẩm thành công")
+  }else{
+    showAlert(cartStore.error || 'xóa thất bại')
+  }
 }
 
 function showAlert(message) {
