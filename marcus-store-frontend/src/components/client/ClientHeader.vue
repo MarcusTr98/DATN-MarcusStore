@@ -131,7 +131,7 @@ onUnmounted(() => {
             <!-- Account -->
             <div class="h-action">
               <template v-if="!isLoggedIn">
-                <router-link to="/login" class="h-action-btn">
+                <router-link to="/auth/login" class="h-action-btn">
                   <div class="h-action-icon"><i class="far fa-user"></i></div>
                   <div class="h-action-text">
                     <span class="h-action-sub">Đăng nhập</span>
