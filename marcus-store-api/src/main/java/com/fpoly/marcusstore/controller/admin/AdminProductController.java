@@ -23,8 +23,8 @@ public class AdminProductController {
     ProductsService productsService;
 
     @GetMapping
-    public Page<ProductResponse> findAllProducts(Pageable pageable) {
-        return productsService.findAllProducts(pageable);
+    public ApiResponse<Page<ProductResponse>> findAllProducts(Pageable pageable) {
+        return ApiResponse.success(productsService.findAllProducts(pageable));
     }
 
     @PostMapping
@@ -33,17 +33,18 @@ public class AdminProductController {
     }
 
     @GetMapping("/{id}")
-    public Optional<ProductResponse> getProductById(@PathVariable Integer id) {
-        return productsService.getProductsById(id);
+    public ApiResponse<Optional<ProductResponse>> getProductById(@PathVariable Integer id) {
+        return ApiResponse.success(productsService.getProductsById(id));
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<ProductResponse> updateProduct(@Valid @PathVariable Integer id, @RequestBody UpdateProduct updateProduct) {
+    public ApiResponse<ProductResponse> updateProduct(@Valid @PathVariable Integer id,
+            @RequestBody UpdateProduct updateProduct) {
         return ApiResponse.success(productsService.updateProduct(id, updateProduct));
     }
 
     @PutMapping("/hidden/{id}")
-    public Product hiddenProduct(@PathVariable Integer id) {
-        return productsService.hiddenProduct(id);
+    public ApiResponse<Product> hiddenProduct(@PathVariable Integer id) {
+        return ApiResponse.success(productsService.hiddenProduct(id));
     }
 }

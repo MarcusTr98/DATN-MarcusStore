@@ -14,21 +14,18 @@ import lombok.Setter;
 @NoArgsConstructor
 @Builder
 public class CreateProduct {
-    @NotBlank (message = "Ko được để trống tên sản phẩm")
+    @NotBlank(message = "Ko được để trống tên sản phẩm")
     private String productName;
 
-    @NotBlank (message = "Ko được để trống mô tả sản phẩm")
+    @NotBlank(message = "Ko được để trống mô tả sản phẩm")
     private String description;
 
-    @NotBlank (message = "Ko được để trống thương hiệu sản phẩm")
+    @NotBlank(message = "Ko được để trống thương hiệu sản phẩm")
     private String brand;
 
-    @NotBlank (message = "Ko được để trống đường dẫn ảnh")
+    @NotBlank(message = "Ko được để trống đường dẫn ảnh")
     private String thumbnailUrl;
 
-    @NotBlank (message = "Ko được để trống slug")
-    private String slug;
-
-    @NotNull (message = "Ko được để trống CategoryId")
+    @NotNull(message = "Ko được để trống CategoryId")
     private Integer categoryId;
 }

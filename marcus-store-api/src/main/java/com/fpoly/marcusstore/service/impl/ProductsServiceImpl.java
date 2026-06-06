@@ -15,8 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -27,41 +25,42 @@ public class ProductsServiceImpl implements ProductsService {
     @Autowired
     private CategoryRepository cateRepo;
 
-    private ProductResponse toProductResponse(Product product){
+    private ProductResponse toProductResponse(Product product) {
         return ProductResponse.builder()
-        .productId(product.getProductId())
-        .productName(product.getProductName())
-        .description(product.getDescription())
-        .brand(product.getBrand())
-        .slug(product.getSlug())
-        .status(product.getStatus())
-        .thumbnailUrl(product.getThumbnailUrl())
-        .createdAt(product.getCreatedAt())
-        .categoryName(product.getCategory().getCategoryName())
-        .build();
+                .productId(product.getProductId())
+                .productName(product.getProductName())
+                .description(product.getDescription())
+                .brand(product.getBrand())
+                .slug(product.getSlug())
+                .status(product.getStatus())
+                .thumbnailUrl(product.getThumbnailUrl())
+                .createdAt(product.getCreatedAt())
+                .categoryName(product.getCategory().getCategoryName())
+                .build();
     }
 
     @Override
-    public Page<ProductResponse> findAllProducts (Pageable pageable) {
+    public Page<ProductResponse> findAllProducts(Pageable pageable) {
         Page<Product> product = productRepository.findAll(pageable);
-        return product.map(this::toProductResponse); 
+        return product.map(this::toProductResponse);
     }
 
     @Override
-    public ProductResponse createProduct (CreateProduct createProduct) {
-        if(productRepository.existsProductByProductName(((createProduct.getProductName())))){
+    public ProductResponse createProduct(CreateProduct createProduct) {
+
+        if (productRepository.existsByProductName(((createProduct.getProductName())))) {
             throw new RuntimeException("Tên sản phẩm đã tồn tại");
         }
 
         final Slugify slg = Slugify.builder().build();
         String slug = slg.slugify(createProduct.getProductName());
 
-        if(productRepository.existsBySlug(slug)){
+        if (productRepository.existsBySlug(slug)) {
             throw new RuntimeException("slug đã tồn tại");
         }
 
         Category category = cateRepo.findById(createProduct.getCategoryId())
-        .orElseThrow(() -> new RuntimeException("ko tìm thấy category"));
+                .orElseThrow(() -> new RuntimeException("ko tìm thấy category"));
 
         Product product = new Product();
         product.setProductName(createProduct.getProductName());
@@ -75,25 +74,30 @@ public class ProductsServiceImpl implements ProductsService {
     }
 
     @Override
-    public Optional<ProductResponse> getProductsById(Integer id){
+    public Optional<ProductResponse> getProductsById(Integer id) {
         Optional<Product> product = productRepository.findById(id);
         return product.map(this::toProductResponse);
     }
 
     @Override
-    public ProductResponse updateProduct (Integer id, UpdateProduct updateProduct){
+    public ProductResponse updateProduct(Integer id, UpdateProduct updateProduct) {
         Product product = productRepository.findById(id)
-        .orElseThrow(()-> new RuntimeException("Ko tìm thấy ID sản phẩm"));
+                .orElseThrow(() -> new RuntimeException("Ko tìm thấy ID sản phẩm"));
 
         final Slugify slg = Slugify.builder().build();
         String slug = slg.slugify(updateProduct.getProductName());
 
-        if(productRepository.existsBySlug(slug)){
-            throw new RuntimeException("slug đã tồn tại");
+        if (!product.getProductName().equals(updateProduct.getProductName())) {
+            if (productRepository.existsByProductNameAndProductIdNot(updateProduct.getProductName(), id)) {
+                throw new RuntimeException("tên sản phẩm đã tồn tại");
+            }
+            if (productRepository.existsBySlug(slug)) {
+                throw new RuntimeException("slug đã tồn tại");
+            }
         }
 
         Category category = cateRepo.findById(updateProduct.getCategoryId())
-        .orElseThrow(() -> new RuntimeException("ko tìm thấy category"));
+                .orElseThrow(() -> new RuntimeException("ko tìm thấy category"));
 
         product.setProductName(updateProduct.getProductName());
         product.setDescription(updateProduct.getDescription());
@@ -102,16 +106,15 @@ public class ProductsServiceImpl implements ProductsService {
         product.setSlug(slug);
         product.setStatus(updateProduct.getStatus());
         product.setCategory(category);
-
-        return toProductResponse(productRepository.save(product)) ;
+        return toProductResponse(productRepository.save(product));
     }
 
     @Override
-    public Product hiddenProduct (Integer id){
+    public Product hiddenProduct(Integer id) {
         Product product = productRepository.findById(id)
-        .orElseThrow(() -> new RuntimeException("Id sản phẩm ko tồn tại"));
+                .orElseThrow(() -> new RuntimeException("Id sản phẩm ko tồn tại"));
 
-        if(!product.getStatus()){
+        if (!product.getStatus()) {
             throw new RuntimeException("Danh mục đã bị ẩn");
         }
         product.setStatus(false);
