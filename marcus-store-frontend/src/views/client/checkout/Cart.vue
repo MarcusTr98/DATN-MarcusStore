@@ -1,20 +1,20 @@
 ﻿<template>
-
+  <div class="cart-wrapper">
     <div class="cart-header">
-      <div class="cart-wrapper">
-        <div v-if="isLoadingCart" class="cart-loading">
-          Đang tải giỏ hàng...
-        </div>
-
-        <div v-else-if="cartError" class="cart-error">
-          {{ cartError }}
-        </div>
       <i class="ti ti-shopping-cart cart-title-icon" aria-hidden="true"></i>
       <h2>Giỏ hàng của bạn</h2>
       <span class="count">{{ selectedCount }} sản phẩm</span>
     </div>
 
-    <div class="cart-layout" v-else-if="cartItems.length > 0">
+    <div v-if="isLoadingCart" class="cart-loading">
+      Đang tải giỏ hàng...
+    </div>
+
+    <div v-else-if="cartError" class="cart-error">
+      {{ cartError }}
+    </div>
+
+    <div v-else-if="cartItems.length > 0" class="cart-layout">
       <div class="cart-main-content">
         <div class="cart-items">
           <div class="cart-footer">
@@ -317,7 +317,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useCartStore } from '@/stores/cartStore'
-
+import '@/assets/css/cart.css'
 const cartStore = useCartStore()
 
 onMounted(() => {
@@ -328,57 +328,9 @@ const cartItems = computed(() => cartStore.items)
 const isLoadingCart = computed(() => cartStore.loading)
 const cartError = computed(() => cartStore.error)
 
-const accessories = [
-  {
-    id: 'item-sac-anker',
-    name: 'Củ sạc nhanh Anker Nano GaN 30W',
-    variant: 'Trắng | Bảo hành 18 tháng',
-    icon: '30W',
-    price: 350000,
-    originalPrice: 450000,
-  },
-  {
-    id: 'item-cl-iphone-12',
-    name: 'Kính cường lực iPhone 12 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 180000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-cl-iphone-13',
-    name: 'Kính cường lực iPhone 13 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 200000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-cl-iphone-14',
-    name: 'Kính cường lực iPhone 14 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 5000000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-tui-tomtoc',
-    name: 'Túi chống sốc Laptop/Macbook Tomtoc 13 inch',
-    variant: 'Màu Xám | Kháng nước CornerArmor',
-    icon: 'Túi',
-    price: 790000,
-    originalPrice: 950000,
-  },
-  {
-    id: 'item-chuot-logi',
-    name: 'Chuột không dây Silent Logitech M220',
-    variant: 'Đen | Kết nối USB receiver',
-    icon: 'Mouse',
-    price: 299000,
-    originalPrice: 390000,
-  },
-]
-
+// function addAccessoryToCart(accessory) {
+//   showAlert('Chức năng thêm phụ kiện vào giỏ sẽ làm sau khi có skuId thật')
+// }
 const isVoucherModalOpen = ref(false)
 const selectedVoucher = ref(0)
 const shippingVoucher = ref(true)
@@ -420,7 +372,7 @@ const allSelected = computed({
 })
 
 function formatPrice(value) {
-  return `${value.toLocaleString('vi-VN')}đ`
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`
 }
 
 function normalizeQty(item) {
@@ -440,14 +392,14 @@ async  function removeItem(skuId){
   }
 }
 
-function deleteChecked() {
-  const checkedItems = cartItems.value.filter((item) => !item.checked)
-  if(checkedItems.length === "0"){
+ async function deleteChecked() {
+  const checkedItems = cartItems.value.filter((item) => item.checked)
+  if(checkedItems.length === 0){
     showAlert("vui lòng chọn 1 sản phẩm để xóa")
     return
   }
   const skuIds = checkedItems.map((item) => item.skuId)
-  const success = cartStore.removeManyItemFromCart(skuIds)
+  const success = await cartStore.removeManyItemFromCart(skuIds)
   if(success){
     showToast("xóa các sản phẩm thành công")
   }else{
