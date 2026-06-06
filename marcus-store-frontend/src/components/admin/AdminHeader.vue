@@ -10,7 +10,7 @@
     <div class="header-right">
       <router-link to="/admin/profile" class="header-btn profile-btn">
         <img :src="personCircleIcon" alt="" class="avatar" />
-        <span>Admin Profile</span>
+        <span>{{ username }}</span>
       </router-link>
 
       <button class="header-btn logout-btn" @click="handleLogout">
@@ -22,6 +22,7 @@
 </template>
 
 <script setup>
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import boltIcon from '/src/assets/icons/lightning.svg'
@@ -30,10 +31,26 @@ import logoutIcon from '/src/assets/icons/logout.svg'
 
 const router = useRouter()
 
+const username = ref('')
+
+const loadUser = () => {
+  username.value =
+    localStorage.getItem('USERNAME') || 'Admin'
+}
+
+onMounted(() => {
+  loadUser()
+
+  window.addEventListener('auth-changed', loadUser)
+})
+
 const handleLogout = () => {
-  // Thực hiện xóa Token bảo mật
   localStorage.removeItem('token')
-  localStorage.removeItem('user')
+  localStorage.removeItem('USERNAME')
+  localStorage.removeItem('USER_ROLE')
+
+  window.dispatchEvent(new Event('auth-changed'))
+
   router.push('/auth/login')
 }
 </script>
