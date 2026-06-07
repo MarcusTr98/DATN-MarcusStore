@@ -52,7 +52,7 @@ public class CartService {
         if(color != null && storage != null){
             variantText = color + " / " + storage;
         }
-            BigDecimal price = item.getSku().getPrice();
+         BigDecimal price = item.getSku().getPrice();
             Integer quantity = item.getQuantity();
             BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
             String imageUrl = item.getSku().getSkuImageUrl();
