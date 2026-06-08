@@ -1210,7 +1210,11 @@
     grid-column: 3;
     grid-row: 1;
   }
-
+  .cart-product-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
   .suggested-header {
     align-items: flex-start;
   }

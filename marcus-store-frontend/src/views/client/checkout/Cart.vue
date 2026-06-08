@@ -6,7 +6,15 @@
       <span class="count">{{ selectedCount }} sản phẩm</span>
     </div>
 
-    <div class="cart-layout" v-if="cartItems.length > 0">
+    <div v-if="isLoadingCart" class="cart-loading">
+      Đang tải giỏ hàng...
+    </div>
+
+    <div v-else-if="cartError" class="cart-error">
+      {{ cartError }}
+    </div>
+
+    <div v-else-if="cartItems.length > 0" class="cart-layout">
       <div class="cart-main-content">
         <div class="cart-items">
           <div class="cart-footer">
@@ -28,7 +36,16 @@
               </div>
               <div class="item-info">
                 <div class="item-img">
-                  <span class="item-img-placeholder">{{ item.icon }}</span>
+                  <img
+                    v-if="item.imageUrl"
+                    :src="item.imageUrl"
+                    :alt="item.name"
+                    class="cart-product-img"
+                  />
+
+                  <span v-else class="item-img-placeholder">
+    {{ item.icon }}
+  </span>
                 </div>
                 <div class="item-details">
                   <div class="item-name">{{ item.name }}</div>
@@ -43,9 +60,34 @@
                 {{ formatPrice(item.price) }}
               </div>
               <div class="qty-control">
-                <button class="qty-btn" type="button" @click="changeQty(item, -1)">-</button>
-                <input v-model.number="item.quantity" class="qty-num" min="1" type="number" @change="normalizeQty(item)" />
-                <button class="qty-btn" type="button" @click="changeQty(item, 1)">+</button>
+                <button
+                  class="qty-btn"
+                  type="button"
+
+                  :disabled="item.quantity <= 1 || isLoadingCart"
+                  @click="changeQty(item, -1)"
+                >
+                  -
+                </button>
+
+                <input
+                  v-model.number="item.quantity"
+                  class="qty-num"
+                  min="1"
+                  :max="item.stockQuantity"
+                  type="number"
+                  :disabled="isLoadingCart"
+                  @change="normalizeQty(item)"
+                />
+
+                <button
+                  class="qty-btn"
+                  type="button"
+                  :disabled="isLoadingCart"
+                  @click="changeQty(item, 1)"
+                >
+                  +
+                </button>
               </div>
               <div class="item-total">{{ formatPrice(item.price * item.quantity) }}</div>
               <button class="item-remove" type="button" aria-label="Xóa sản phẩm" @click="removeItem(item.id)">
@@ -298,95 +340,22 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-  import '@/assets/css/cart.css'
-const cartItems = ref([
-  {
-    id: 'item-iphone',
-    name: 'iPhone 16 Pro Max 256GB',
-    variant: 'Màu: Titan Sa Mạc | VN/A',
-    badge: 'Chính hãng VN/A',
-    icon: 'Điện thoại',
-    price: 29990000,
-    originalPrice: 33990000,
-    quantity: 1,
-    checked: true,
-  },
-  {
-    id: 'item-ipad',
-    name: 'iPad Pro M4 11 inch Wi-Fi 256GB',
-    variant: 'Màu: Bạc | Siêu mỏng',
-    badge: 'Hàng mới về',
-    icon: 'iPad',
-    price: 26490000,
-    originalPrice: 28990000,
-    quantity: 1,
-    checked: true,
-  },
-  {
-    id: 'item-macbook',
-    name: 'MacBook Air M3 13 inch 16GB - 512GB',
-    variant: 'Màu: Xanh Đen (Midnight)',
-    badge: 'Giảm 10%',
-    icon: 'Mac',
-    price: 29990000,
-    originalPrice: 32990000,
-    quantity: 1,
-    checked: true,
-  },
-])
+import { computed, onMounted, ref } from 'vue'
+import { useCartStore } from '@/stores/cartStore'
+import '@/assets/css/cart.css'
+const cartStore = useCartStore()
 
-const accessories = [
-  {
-    id: 'item-sac-anker',
-    name: 'Củ sạc nhanh Anker Nano GaN 30W',
-    variant: 'Trắng | Bảo hành 18 tháng',
-    icon: '30W',
-    price: 350000,
-    originalPrice: 450000,
-  },
-  {
-    id: 'item-cl-iphone-12',
-    name: 'Kính cường lực iPhone 12 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 180000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-cl-iphone-13',
-    name: 'Kính cường lực iPhone 13 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 200000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-cl-iphone-14',
-    name: 'Kính cường lực iPhone 14 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 5000000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-tui-tomtoc',
-    name: 'Túi chống sốc Laptop/Macbook Tomtoc 13 inch',
-    variant: 'Màu Xám | Kháng nước CornerArmor',
-    icon: 'Túi',
-    price: 790000,
-    originalPrice: 950000,
-  },
-  {
-    id: 'item-chuot-logi',
-    name: 'Chuột không dây Silent Logitech M220',
-    variant: 'Đen | Kết nối USB receiver',
-    icon: 'Mouse',
-    price: 299000,
-    originalPrice: 390000,
-  },
-]
+onMounted(() => {
+  cartStore.fetchCart()
+})
 
+const cartItems = computed(() => cartStore.items)
+const isLoadingCart = computed(() => cartStore.loading)
+const cartError = computed(() => cartStore.error)
+
+// function addAccessoryToCart(accessory) {
+//   showAlert('Chức năng thêm phụ kiện vào giỏ sẽ làm sau khi có skuId thật')
+// }
 const isVoucherModalOpen = ref(false)
 const selectedVoucher = ref(0)
 const shippingVoucher = ref(true)
@@ -428,23 +397,60 @@ const allSelected = computed({
 })
 
 function formatPrice(value) {
-  return `${value.toLocaleString('vi-VN')}đ`
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`
+}
+async function updateItemQuantity(item, newQuantity) {
+  const quantity = Math.max(Number(newQuantity) || 1, 1)
+  if (item.stockQuantity && quantity > item.stockQuantity) {
+    showAlert("số lượng đã vượt quá trong kho")
+    await cartStore.fetchCart()
+    return
+  }
+
+  const success = await cartStore.updateItemQuantity(item.skuId, quantity)
+  if (!success) {
+    showAlert(cartError || "cập nhật số lượng thất bại")
+    await cartStore.fetchCart()
+  }
+}
+async  function normalizeQty(item) {
+ await  updateItemQuantity(item, item.quantity)
+}
+async function changeQty(item, delta) {
+  const newQuantity = item.quantity + delta
+  if(newQuantity < 1){
+    return
+  }
+  if (item.stockQuantity && newQuantity > item.stockQuantity) {
+    showAlert('Số lượng nhập vượt quá số lượng trong kho')
+    return
+  }
+  await updateItemQuantity(item, newQuantity)
 }
 
-function normalizeQty(item) {
-  item.quantity = Math.max(Number(item.quantity) || 1, 1)
+
+async  function removeItem(skuId){
+  const success = await cartStore.removeItemFromCart(skuId)
+  if(success){
+    showToast("xóa thành công")
+  }else{
+    showAlert(cartStore.error || "xóa sản phẩm thất bại")
+  }
 }
 
-function changeQty(item, delta) {
-  item.quantity = Math.max(item.quantity + delta, 1)
-}
-
-function removeItem(id) {
-  cartItems.value = cartItems.value.filter((item) => item.id !== id)
-}
-
-function deleteChecked() {
-  cartItems.value = cartItems.value.filter((item) => !item.checked)
+ async function deleteChecked() {
+  const checkedItems = cartItems.value.filter((item) => item.checked)
+  if(checkedItems.length === 0){
+    showAlert("vui lòng chọn 1 sản phẩm để xóa")
+    return
+  }
+  const skuIds = checkedItems.map((item) => item.skuId)
+  const success = await cartStore.removeManyItemFromCart(skuIds)
+  if(success){
+    showToast("xóa các sản phẩm thành công")
+  }else{
+    showAlert(cartStore.error || 'xóa thất bại')
+  }
 }
 
 function showAlert(message) {

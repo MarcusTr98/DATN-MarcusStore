@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.controller.client;
 
 import com.fpoly.marcusstore.dto.request.AddCartItemRequest;
 import com.fpoly.marcusstore.dto.request.DeleteSelectedCartItemRequest;
+import com.fpoly.marcusstore.dto.request.UpdateCartItemRequest;
 import com.fpoly.marcusstore.dto.response.CartResponse;
 import com.fpoly.marcusstore.service.CartService;
 import lombok.RequiredArgsConstructor;
@@ -37,5 +38,9 @@ public class CartController {
     public CartResponse removeCartItems() {
         return cartService.removeCartItems();
     }
+     @PutMapping("/items/{skuId}")
+    public CartResponse updateCartItemsQuantity(@PathVariable("skuId") Integer skuId, @RequestBody UpdateCartItemRequest request){
+        return cartService.updateItemQuantity(skuId, request);
+     }
 }
 
