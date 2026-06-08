@@ -1,12 +1,14 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useCartStore } from '@/stores/cartStore'
 import { useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
 
 const router = useRouter()
+const cartStore = useCartStore()
 
-const totalMoney = ref(0)
-const totalQuantity = ref(0)
+const totalMoney = computed(() => cartStore.totalAmount)
+const totalQuantity = computed(() => cartStore.totalQuantity)
 const isLoggedIn = ref(false)
 const userName = ref('')
 const searchQuery = ref('')
@@ -35,22 +37,19 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-const updateCartHeader = () => {
-  const cart = JSON.parse(localStorage.getItem('marcus_cart')) || []
-  totalMoney.value = cart.reduce((total, item) => total + item.price * item.quantity, 0)
-  totalQuantity.value = cart.reduce((total, item) => total + item.quantity, 0)
-}
+
 
 onMounted(() => {
   checkAuth()
-  updateCartHeader()
+
+  if (localStorage.getItem('ACCESS_TOKEN')) {
+    cartStore.fetchCart()
+  }
+
   fetchSettings()
-  window.addEventListener('cart-updated', updateCartHeader)
   window.addEventListener('auth-changed', checkAuth)
 })
-
 onUnmounted(() => {
-  window.removeEventListener('cart-updated', updateCartHeader)
   window.removeEventListener('auth-changed', checkAuth)
 })
 </script>
