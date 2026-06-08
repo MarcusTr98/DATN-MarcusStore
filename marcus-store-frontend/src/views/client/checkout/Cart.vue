@@ -60,9 +60,34 @@
                 {{ formatPrice(item.price) }}
               </div>
               <div class="qty-control">
-                <button class="qty-btn" type="button" @click="changeQty(item, -1)">-</button>
-                <input v-model.number="item.quantity" class="qty-num" min="1" type="number" @change="normalizeQty(item)" />
-                <button class="qty-btn" type="button" @click="changeQty(item, 1)">+</button>
+                <button
+                  class="qty-btn"
+                  type="button"
+
+                  :disabled="item.quantity <= 1 || isLoadingCart"
+                  @click="changeQty(item, -1)"
+                >
+                  -
+                </button>
+
+                <input
+                  v-model.number="item.quantity"
+                  class="qty-num"
+                  min="1"
+                  :max="item.stockQuantity"
+                  type="number"
+                  :disabled="isLoadingCart"
+                  @change="normalizeQty(item)"
+                />
+
+                <button
+                  class="qty-btn"
+                  type="button"
+                  :disabled="isLoadingCart"
+                  @click="changeQty(item, 1)"
+                >
+                  +
+                </button>
               </div>
               <div class="item-total">{{ formatPrice(item.price * item.quantity) }}</div>
               <button class="item-remove" type="button" aria-label="Xóa sản phẩm" @click="removeItem(item.id)">
@@ -374,14 +399,35 @@ const allSelected = computed({
 function formatPrice(value) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`
 }
+async function updateItemQuantity(item, newQuantity) {
+  const quantity = Math.max(Number(newQuantity) || 1, 1)
+  if (item.stockQuantity && quantity > item.stockQuantity) {
+    showAlert("số lượng đã vượt quá trong kho")
+    await cartStore.fetchCart()
+    return
+  }
 
-function normalizeQty(item) {
-  item.quantity = Math.max(Number(item.quantity) || 1, 1)
+  const success = await cartStore.updateItemQuantity(item.skuId, quantity)
+  if (!success) {
+    showAlert(cartError || "cập nhật số lượng thất bại")
+    await cartStore.fetchCart()
+  }
+}
+async  function normalizeQty(item) {
+ await  updateItemQuantity(item, item.quantity)
+}
+async function changeQty(item, delta) {
+  const newQuantity = item.quantity + delta
+  if(newQuantity < 1){
+    return
+  }
+  if (item.stockQuantity && newQuantity > item.stockQuantity) {
+    showAlert('Số lượng nhập vượt quá số lượng trong kho')
+    return
+  }
+  await updateItemQuantity(item, newQuantity)
 }
 
-function changeQty(item, delta) {
-  item.quantity = Math.max(item.quantity + delta, 1)
-}
 
 async  function removeItem(skuId){
   const success = await cartStore.removeItemFromCart(skuId)

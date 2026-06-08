@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.request.AddCartItemRequest;
+import com.fpoly.marcusstore.dto.request.UpdateCartItemRequest;
 import com.fpoly.marcusstore.dto.response.CartItemResponse;
 import com.fpoly.marcusstore.dto.response.CartResponse;
 import com.fpoly.marcusstore.entity.core.AttributeValue;
@@ -154,5 +155,27 @@ public class CartService {
                 -> new RuntimeException("không tìm thấy giỏ hàng"));
         cartItemRepository.deleteByCart_CartId(cart.getCartId());
         return getCartDetail();
+    }
+    // transactional để khi đang CRUD mà bị sai thì rollback lại tránh làm sai dữ liệu
+    @Transactional
+    public CartResponse updateItemQuantity(Integer skuId, UpdateCartItemRequest request){
+        Integer userId = SecurityUtils.getCurrentUserId();
+        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()-> new RuntimeException("không tìm thấy giỏ hàng"));
+         if(request.getQuantity() == null || request.getQuantity() <= 0){
+             throw new RuntimeException("số lượng sản phẩm phải lớn hơn 0");
+         }
+         CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), skuId).orElseThrow(()
+                 ->new RuntimeException("khong tìm thấy sản phẩm"));
+            ProductSku sku = cartItem.getSku();
+            Integer stockQuantity = sku.getStockQuantity();
+            if(stockQuantity == null || stockQuantity <= 0){
+                throw  new RuntimeException("sản phẩm đã hết hàng");
+            }
+            if(request.getQuantity() > stockQuantity){
+                throw new RuntimeException("số lượng đã vượt quá số lượng trong kho");
+            }
+            cartItem.setQuantity(request.getQuantity());
+            cartItemRepository.save(cartItem);
+            return getCartDetail();
     }
 }

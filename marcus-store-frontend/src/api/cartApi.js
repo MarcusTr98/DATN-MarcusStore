@@ -9,6 +9,9 @@ const cartApi = {
     return api.post('/cart/items', data)
   },
 
+    updateItemQuantity(skuId, quantity){
+    return api.put(`/cart/items/${skuId}`, {quantity})
+    },
   removeItemFromCart(skuId) {
     return api.delete(`/cart/items/${skuId}`)
   },
