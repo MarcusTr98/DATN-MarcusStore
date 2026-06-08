@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -40,12 +41,14 @@ public class ProductsServiceImpl implements ProductsService {
     }
 
     @Override
+    @Transactional
     public Page<ProductResponse> findAllProducts(Pageable pageable) {
         Page<Product> product = productRepository.findAll(pageable);
         return product.map(this::toProductResponse);
     }
 
     @Override
+    @Transactional
     public ProductResponse createProduct(CreateProduct createProduct) {
 
         if (productRepository.existsByProductName(((createProduct.getProductName())))) {
@@ -74,12 +77,14 @@ public class ProductsServiceImpl implements ProductsService {
     }
 
     @Override
+    @Transactional
     public Optional<ProductResponse> getProductsById(Integer id) {
         Optional<Product> product = productRepository.findById(id);
         return product.map(this::toProductResponse);
     }
 
     @Override
+    @Transactional
     public ProductResponse updateProduct(Integer id, UpdateProduct updateProduct) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Ko tìm thấy ID sản phẩm"));
@@ -110,12 +115,13 @@ public class ProductsServiceImpl implements ProductsService {
     }
 
     @Override
+    @Transactional
     public Product hiddenProduct(Integer id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Id sản phẩm ko tồn tại"));
 
         if (!product.getStatus()) {
-            throw new RuntimeException("Danh mục đã bị ẩn");
+            throw new RuntimeException("Sản phẩm đã bị ẩn");
         }
         product.setStatus(false);
         return productRepository.save(product);
