@@ -6,9 +6,9 @@ import com.fpoly.marcusstore.dto.response.PostResponseDTO;
 import com.fpoly.marcusstore.service.PostService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/posts")
@@ -19,8 +19,8 @@ public class AdminPostController {
 
     // GET /api/admin/posts
     @GetMapping
-    public ApiResponse<List<PostResponseDTO>> getAll() {
-        return ApiResponse.success(postService.getAll());
+    public ApiResponse<Page<PostResponseDTO>> getAll(Pageable pageable) {
+        return ApiResponse.success(postService.getAll(pageable));
     }
 
     // GET /api/admin/posts/{id}
