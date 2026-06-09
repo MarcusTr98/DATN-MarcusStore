@@ -118,7 +118,6 @@ export const useCartStore = defineStore('cart', {
           error.response?.data?.data||
           "cập nhật số lượng không thành công"
         return false
-      }finally {
 
       }
      },

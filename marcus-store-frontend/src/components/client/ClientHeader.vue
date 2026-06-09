@@ -33,6 +33,12 @@ const handleLogout = () => {
   localStorage.removeItem('ACCESS_TOKEN')
   localStorage.removeItem('USER_ROLE')
   localStorage.removeItem('USERNAME')
+
+
+  cartStore.cart = null
+  cartStore.items = []
+  cartStore.error = null
+
   isLoggedIn.value = false
   router.push('/login')
 }
