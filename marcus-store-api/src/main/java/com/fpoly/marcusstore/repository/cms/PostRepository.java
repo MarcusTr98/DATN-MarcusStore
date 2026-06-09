@@ -7,6 +7,9 @@ import java.util.Optional;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, Integer> {
-    // Dùng slug để SEO trên URL (VD: marcus.com/blog/iphone-15-ra-mat)
-    Optional<Post> findBySlugAndIsPublishedTrue(String slug);
+     Optional<Post> findBySlugAndIsPublishedTrue(String slug);
+
+    boolean existsBySlug(String slug);
+
+    boolean existsBySlugAndPostIdNot(String slug, Integer postId);
 }
