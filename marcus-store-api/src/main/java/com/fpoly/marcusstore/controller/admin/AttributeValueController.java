@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.controller.admin;
 
+import com.fpoly.marcusstore.dto.request.AttributeValueRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.service.AttributeValueService;
@@ -21,28 +22,21 @@ public class AttributeValueController {
 
     @GetMapping("/attribute/{attributeId}")
     public ResponseEntity<ApiResponse<List<AttributeValue>>> getValuesByAttribute(@PathVariable Integer attributeId) {
-        return ResponseEntity.ok(ApiResponse.success(valueService.getValuesByAttributeId(attributeId)));
+        // Kiểm tra xem service này có trả về đúng dữ liệu không
+        List<AttributeValue> list = valueService.getValuesByAttributeId(attributeId);
+        System.out.println("DEBUG: Số lượng giá trị tìm được: " + list.size());
+        return ResponseEntity.ok(ApiResponse.success(list));
     }
 
+    // Marcus sửa vì đã thêm dto
     @PostMapping
-    public ResponseEntity<ApiResponse<AttributeValue>> create(@RequestBody Map<String, Object> body) {
-        try {
-            Integer attributeId = Integer.parseInt(body.get("attributeId").toString());
-            String valueString = body.get("valueString").toString();
-            return ResponseEntity.ok(ApiResponse.success(valueService.createValue(attributeId, valueString)));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
-        }
+    public ApiResponse<AttributeValue> create(@RequestBody AttributeValueRequest req) {
+        return ApiResponse.success(valueService.createValue(req.getAttributeId(), req.getValueString()));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<AttributeValue>> update(@PathVariable Integer id,
-            @RequestBody Map<String, String> body) {
-        try {
-            return ResponseEntity.ok(ApiResponse.success(valueService.updateValue(id, body.get("valueString"))));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
-        }
+    public ApiResponse<AttributeValue> update(@PathVariable Integer id, @RequestBody AttributeValueRequest req) {
+        return ApiResponse.success(valueService.updateValue(id, req.getValueString()));
     }
 
     @DeleteMapping("/{id}")
