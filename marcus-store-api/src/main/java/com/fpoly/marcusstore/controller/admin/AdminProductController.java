@@ -38,8 +38,8 @@ public class AdminProductController {
     }
 
     @PutMapping("/{id}")
-    public ApiResponse<ProductResponse> updateProduct(@Valid @PathVariable Integer id,
-            @RequestBody UpdateProduct updateProduct) {
+    public ApiResponse<ProductResponse> updateProduct(@PathVariable Integer id,
+           @Valid @RequestBody UpdateProduct updateProduct) {
         return ApiResponse.success(productsService.updateProduct(id, updateProduct));
     }
 
