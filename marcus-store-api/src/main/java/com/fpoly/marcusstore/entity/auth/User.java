@@ -53,4 +53,7 @@ public class User {
     @JoinColumn(name = "role_id", nullable = false)
     @JsonIgnore
     private Role role;
+
+    @Column(name = "email_verified")
+    private Boolean emailVerified;
 }
