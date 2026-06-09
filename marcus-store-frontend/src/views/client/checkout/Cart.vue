@@ -367,6 +367,56 @@ const toastMessage = ref('')
 const toastKey = ref(0)
 let toastTimer = null
 const suggestedTrack = ref(null)
+const accessories = [
+  {
+    id: 'item-sac-anker',
+    name: 'Củ sạc nhanh Anker Nano GaN 30W',
+    variant: 'Trắng | Bảo hành 18 tháng',
+    icon: '30W',
+    price: 350000,
+    originalPrice: 450000,
+  },
+  {
+    id: 'item-cl-iphone-12',
+    name: 'Kính cường lực iPhone 12 Pro Max Kingkong',
+    variant: 'Hộp sắt | Chống vân tay',
+    icon: 'Glass',
+    price: 180000,
+    originalPrice: 250000,
+  },
+  {
+    id: 'item-cl-iphone-13',
+    name: 'Kính cường lực iPhone 13 Pro Max Kingkong',
+    variant: 'Hộp sắt | Chống vân tay',
+    icon: 'Glass',
+    price: 200000,
+    originalPrice: 250000,
+  },
+  {
+    id: 'item-cl-iphone-14',
+    name: 'Kính cường lực iPhone 14 Pro Max Kingkong',
+    variant: 'Hộp sắt | Chống vân tay',
+    icon: 'Glass',
+    price: 5000000,
+    originalPrice: 250000,
+  },
+  {
+    id: 'item-tui-tomtoc',
+    name: 'Túi chống sốc Laptop/Macbook Tomtoc 13 inch',
+    variant: 'Màu Xám | Kháng nước CornerArmor',
+    icon: 'Tui',
+    price: 790000,
+    originalPrice: 950000,
+  },
+  {
+    id: 'item-chuot-logi',
+    name: 'Chuột không dây Silent Logitech M220',
+    variant: 'Đen | Kết nối USB receiver',
+    icon: 'Mouse',
+    price: 299000,
+    originalPrice: 390000,
+  },
+]
 const selectedItems = computed(() => cartItems.value.filter((item) => item.checked))
 
 const selectedCount = computed(() =>

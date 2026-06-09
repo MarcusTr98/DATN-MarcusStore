@@ -108,17 +108,17 @@ export const useCartStore = defineStore('cart', {
         this.error = null;
         const res = await cartApi.updateItemQuantity(skuId, Quantity)
         const  data = res.data
+        this.cart = data
         this.items = (data.items || []).map(mapCartItem);
         return true
       }catch (error){
         console.error("lỗi cập nhật số lượng: ", error)
         this.error =
-          error.respone?.data?.message||
-          error.respone?.data?.data||
+          error.response?.data?.message||
+          error.response?.data?.data||
           "cập nhật số lượng không thành công"
         return false
-      }finally {
-        this.loading = false
+
       }
      },
     async removeItemFromCart(skuId) {
@@ -138,7 +138,7 @@ export const useCartStore = defineStore('cart', {
         this.error = 'Xóa sản phẩm thất bại'
         return false
       } finally {
-
+        this.loading = false
       }
     },
 
