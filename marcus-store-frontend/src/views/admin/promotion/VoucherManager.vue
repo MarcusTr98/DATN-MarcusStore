@@ -94,70 +94,70 @@
         <div class="table-responsive">
           <table class="table align-middle voucher-table mb-0">
             <thead>
-              <tr>
-                <th>ID</th>
-                <th>Mã voucher</th>
-                <th>Loại</th>
-                <th>Giá trị</th>
-                <th>Giảm tối đa</th>
-                <th>Đơn tối thiểu</th>
-                <th>Thời gian</th>
-                <th>SL voucher</th>
-                <th>Trạng thái</th>
-                <th class="text-end">Thao tác</th>
-              </tr>
+            <tr>
+              <th>ID</th>
+              <th>Mã voucher</th>
+              <th>Loại</th>
+              <th>Giá trị</th>
+              <th>Giảm tối đa</th>
+              <th>Đơn tối thiểu</th>
+              <th>Thời gian</th>
+              <th>SL voucher</th>
+              <th>Trạng thái</th>
+              <th class="text-end">Thao tác</th>
+            </tr>
             </thead>
 
             <tbody>
-              <tr v-for="voucher in filteredVouchers" :key="voucher.voucher_id">
-                <td class="fw-bold">#{{ voucher.voucher_id }}</td>
-                <td>
-                  <div class="voucher-code">{{ voucher.voucher_code }}</div>
+            <tr v-for="(voucher, index) in filteredVouchers"  :key="voucher.voucherId">
+              <td class="fw-bold">#{{ index + 1}}</td>
+              <td>
+                <div class="voucher-code">{{ voucher.voucherCode }}</div>
 
-                </td>
-                <td>
-                  <span class="type-badge" :class="voucher.discount_type.toLowerCase()">
-                    {{ formatDiscountType(voucher.discount_type) }}
+              </td>
+              <td>
+                  <span class="type-badge" :class="voucher.discountType.toLowerCase()">
+                    {{ formatDiscountType(voucher.discountType) }}
                   </span>
-                </td>
-                <td class="fw-semibold">{{ formatDiscountValue(voucher) }}</td>
-                <td>{{ formatCurrency(voucher.max_discount_amount) }}</td>
-                <td>{{ formatCurrency(voucher.min_order_value) }}</td>
-                <td>
-                  <div class="date-line">Từ: {{ formatDateTime(voucher.start_date) }}</div>
-                  <div class="date-line">Đến: {{ formatDateTime(voucher.end_date) }}</div>
-                </td>
-                <td>
+              </td>
+              <td class="fw-semibold">{{ formatDiscountValue(voucher) }}</td>
+              <td>{{ formatCurrency(voucher.maxDiscountAmount) }}</td>
+              <td>{{ formatCurrency(voucher.minOrderValue) }}</td>
+              <td>
+                <div class="date-line">Từ: {{ formatDateTime(voucher.startDate) }}</div>
+                <div class="date-line">Đến: {{ formatDateTime(voucher.endDate) }}</div>
+              </td>
+              <td>
                   <span :class="voucher.quantity === 0 ? 'text-danger fw-bold' : 'fw-bold'">
                     {{ voucher.quantity }}
                   </span>
-                </td>
-                <td>
-                  <span class="status-badge" :class="{ inactive: !voucher.is_active }">
-                    {{ voucher.is_active ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
+              </td>
+              <td>
+                  <span class="status-badge" :class="{ inactive: !voucher.isActive }">
+                    {{ voucher.isActive ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
                   </span>
-                </td>
-                <td>
-                  <div class="d-flex justify-content-end gap-2">
-                    <button
-                      type="button"
-                      class="icon-button"
-                      title="Sửa voucher"
-                      @click="openEditModal(voucher)"
-                    >
-                      <i class="bi bi-pencil-square"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="icon-button danger"
-                      title="Xóa voucher"
-                      @click="deleteVoucher(voucher)"
-                    >
-                      <i class="bi bi-trash3"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              </td>
+              <td>
+                <div class="d-flex justify-content-end gap-2">
+                  <button
+                    type="button"
+                    class="icon-button"
+                    title="Sửa voucher"
+                    @click="openEditModal(voucher)"
+                  >
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button danger"
+                    title="Xóa voucher"
+                    @click="deleteVoucher(voucher)"
+                  >
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
             </tbody>
           </table>
         </div>
@@ -192,30 +192,31 @@
               </div>
             </div>
             <div class="modal-body-grid compact">
-          <div>
-            <label class="form-label">Mã voucher <span>*</span></label>
-            <input
-              v-model.trim="form.voucher_code"
-              type="text"
-              class="form-control text-uppercase"
-              :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
-              placeholder="VD: SUMMER2026"
-            />
-            <div v-if="errors.voucher_code" class="invalid-feedback">
-              {{ errors.voucher_code }}
-            </div>
-          </div>
+              <div>
+                <label class="form-label">Mã voucher <span>*</span></label>
+                <input
+                  v-model.trim="form.voucher_code"
+                  type="text"
+                  class="form-control text-uppercase"
+                  :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
+                  placeholder="VD: SUMMER2026"
+                />
+                <div v-if="errors.voucher_code" class="invalid-feedback">
+                  {{ errors.voucher_code }}
+                </div>
+              </div>
 
-          <div>
-            <label class="form-label">Trạng thái</label>
-            <select v-model="form.is_active" :disabled="isZeroQuantity(form.quantity)" class="form-select">
-              <option :value="true">Đang sử dụng</option>
-              <option :value="false">Ngừng sử dụng</option>
-            </select>
-            <small v-if="isZeroQuantity(form.quantity)" class="form-help text-danger">
-              Số lượng voucher = 0 nên trạng thái tự chuyển thành Ngừng sử dụng.
-            </small>
-          </div>
+              <div>
+                <label class="form-label">Trạng thái</label>
+                <select v-model="form.is_active" :disabled="isZeroQuantity(form.quantity)"
+                        class="form-select">
+                  <option :value="true">Đang sử dụng</option>
+                  <option :value="false">Ngừng sử dụng</option>
+                </select>
+                <small v-if="isZeroQuantity(form.quantity)" class="form-help text-danger">
+                  Số lượng voucher = 0 nên trạng thái tự chuyển thành Ngừng sử dụng.
+                </small>
+              </div>
 
             </div>
           </section>
@@ -229,69 +230,74 @@
               </div>
             </div>
 
-          <div class="wide-field">
-            <label class="form-label">Loại giảm giá <span>*</span></label>
-            <div class="discount-choice-grid">
-              <label class="discount-choice" :class="{ active: form.discount_type === 'PERCENT' }">
-                <input v-model="form.discount_type" type="radio" value="PERCENT" />
-                <span class="discount-choice-text">
+            <div class="wide-field">
+              <label class="form-label">Loại giảm giá <span>*</span></label>
+              <div class="discount-choice-grid">
+                <label class="discount-choice"
+                       :class="{ active: form.discount_type === 'PERCENT' }">
+                  <input v-model="form.discount_type" type="radio" value="PERCENT"/>
+                  <span class="discount-choice-text">
                   <strong>Giảm theo phần trăm</strong>
 
                 </span>
-              </label>
+                </label>
 
-              <label class="discount-choice" :class="{ active: form.discount_type === 'AMOUNT' }">
-                <input v-model="form.discount_type" type="radio" value="AMOUNT" />
-                <span class="discount-choice-text">
+                <label class="discount-choice" :class="{ active: form.discount_type === 'AMOUNT' }">
+                  <input v-model="form.discount_type" type="radio" value="AMOUNT"/>
+                  <span class="discount-choice-text">
                   <strong>Giảm tiền trực tiếp</strong>
 
                 </span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label class="form-label">
+                {{
+                  form.discount_type === 'PERCENT' ? 'Giá trị giảm (%)' : 'Số tiền giảm trực tiếp'
+                }}
+                <span>*</span>
               </label>
-            </div>
-          </div>
+              <div class="input-group">
+                <input
+                  v-model.number="form.discount_value"
+                  type="number"
+                  min="0"
+                  :max="form.discount_type === 'PERCENT' ? 100 : undefined"
+                  :step="form.discount_type === 'PERCENT' ? 1 : 1000"
+                  class="form-control"
+                  :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
+                  :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000đ'"
 
-          <div>
-            <label class="form-label">
-              {{ form.discount_type === 'PERCENT' ? 'Giá trị giảm (%)' : 'Số tiền giảm trực tiếp' }}
-              <span>*</span>
-            </label>
-            <div class="input-group">
-              <input
-                v-model.number="form.discount_value"
-                type="number"
-                min="0"
-                :max="form.discount_type === 'PERCENT' ? 100 : undefined"
-                :step="form.discount_type === 'PERCENT' ? 1 : 1000"
-                class="form-control"
-                :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
-                :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000đ'"
-
-              />
-              <span class="input-group-text">{{ form.discount_type === 'PERCENT' ? '%' : 'đ' }}</span>
-              <div v-if="errors.discount_value" class="invalid-feedback">
-                {{ errors.discount_value }}
+                />
+                <span class="input-group-text">{{
+                    form.discount_type === 'PERCENT' ? '%' : 'đ'
+                  }}</span>
+                <div v-if="errors.discount_value" class="invalid-feedback">
+                  {{ errors.discount_value }}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div v-if="form.discount_type === 'PERCENT'">
-            <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
-            <div class="input-group">
-              <input
-                v-model.number="form.max_discount_amount"
-                type="number"
-                min="0"
-                step="1000"
-                class="form-control"
-                :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
-                placeholder="Nhập số tiền giảm tối đa"
-              />
-              <span class="input-group-text">đ</span>
-              <div v-if="isSubmitted && errors.max_discount_amount" class="invalid-feedback">
-                {{ errors.max_discount_amount }}
+            <div v-if="form.discount_type === 'PERCENT'">
+              <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
+              <div class="input-group">
+                <input
+                  v-model.number="form.max_discount_amount"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  class="form-control"
+                  :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
+                  placeholder="Nhập số tiền giảm tối đa"
+                />
+                <span class="input-group-text">đ</span>
+                <div v-if="isSubmitted && errors.max_discount_amount" class="invalid-feedback">
+                  {{ errors.max_discount_amount }}
+                </div>
               </div>
             </div>
-          </div>
 
           </section>
 
@@ -305,44 +311,45 @@
             </div>
 
             <div class="modal-body-grid compact">
-          <div>
-            <label class="form-label with-help">
-              Đơn tối thiểu
-              <i class="bi bi-question-circle" title="Áp dụng cho đơn hàng có giá trị từ số tiền này trở lên."></i>
-            </label>
-            <div class="input-group">
-              <input
-                v-model.number="form.min_order_value"
-                type="number"
-                min="0"
-                step="1000"
-                class="form-control"
-                :class="{ 'is-invalid': isSubmitted && errors.min_order_value }"
-                placeholder="Nhập giá trị đơn tối thiểu"
-              />
-              <span class="input-group-text">đ</span>
-              <div v-if="errors.min_order_value" class="invalid-feedback">
-                {{ errors.min_order_value }}
+              <div>
+                <label class="form-label with-help">
+                  Đơn tối thiểu
+                  <i class="bi bi-question-circle"
+                     title="Áp dụng cho đơn hàng có giá trị từ số tiền này trở lên."></i>
+                </label>
+                <div class="input-group">
+                  <input
+                    v-model.number="form.min_order_value"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    class="form-control"
+                    :class="{ 'is-invalid': isSubmitted && errors.min_order_value }"
+                    placeholder="Nhập giá trị đơn tối thiểu"
+                  />
+                  <span class="input-group-text">đ</span>
+                  <div v-if="errors.min_order_value" class="invalid-feedback">
+                    {{ errors.min_order_value }}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <div>
-            <label class="form-label">Số lượng voucher / lượt dùng <span>*</span></label>
-            <input
-              v-model.number="form.quantity"
-              type="number"
-              min="0"
-              step="1"
-              class="form-control"
-              :class="{ 'is-invalid': isSubmitted && errors.quantity }"
-              placeholder="Nhập số lượt dùng"
-            />
+              <div>
+                <label class="form-label">Số lượng voucher / lượt dùng <span>*</span></label>
+                <input
+                  v-model.number="form.quantity"
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="form-control"
+                  :class="{ 'is-invalid': isSubmitted && errors.quantity }"
+                  placeholder="Nhập số lượt dùng"
+                />
 
-            <div v-if="errors.quantity" class="invalid-feedback">
-              {{ errors.quantity }}
-            </div>
-          </div>
+                <div v-if="errors.quantity" class="invalid-feedback">
+                  {{ errors.quantity }}
+                </div>
+              </div>
 
             </div>
           </section>
@@ -357,38 +364,38 @@
             </div>
 
             <div class="modal-body-grid compact">
-          <div>
-            <label class="form-label">Ngày bắt đầu <span>*</span></label>
-            <input
-              v-model="form.start_date"
-              type="datetime-local"
-              class="form-control"
-              :min="todayDateTime"
-              :class="{ 'is-invalid': isSubmitted && errors.start_date }"
-            />
-            <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
-            <div v-if="errors.start_date" class="invalid-feedback">
-              {{ errors.start_date }}
-            </div>
-          </div>
+              <div>
+                <label class="form-label">Ngày bắt đầu <span>*</span></label>
+                <input
+                  v-model="form.start_date"
+                  type="datetime-local"
+                  class="form-control"
+                  :min="todayDateTime"
+                  :class="{ 'is-invalid': isSubmitted && errors.start_date }"
+                />
+                <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
+                <div v-if="errors.start_date" class="invalid-feedback">
+                  {{ errors.start_date }}
+                </div>
+              </div>
 
-          <div>
-            <label class="form-label">Ngày kết thúc <span>*</span></label>
-            <input
-              v-model="form.end_date"
-              type="datetime-local"
-              class="form-control"
-              :min="form.start_date || todayDateTime"
-              :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
-            />
-            <small class="form-help">Không được trước ngày bắt đầu.</small>
-            <div v-if="errors.end_date" class="invalid-feedback">
-              {{ errors.end_date }}
-            </div>
-            <div v-if="errors.time" class="invalid-feedback d-block">
-              {{ errors.time }}
-            </div>
-          </div>
+              <div>
+                <label class="form-label">Ngày kết thúc <span>*</span></label>
+                <input
+                  v-model="form.end_date"
+                  type="datetime-local"
+                  class="form-control"
+                  :min="form.start_date || todayDateTime"
+                  :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
+                />
+                <small class="form-help">Không được trước ngày bắt đầu.</small>
+                <div v-if="errors.end_date" class="invalid-feedback">
+                  {{ errors.end_date }}
+                </div>
+                <div v-if="errors.time" class="invalid-feedback d-block">
+                  {{ errors.time }}
+                </div>
+              </div>
 
             </div>
           </section>
@@ -406,7 +413,8 @@
             <button type="button" class="btn btn-soft" @click="resetForm">
               Làm mới
             </button>
-            <button type="button" class="btn btn-preview" @click="isPreviewVisible = !isPreviewVisible">
+            <button type="button" class="btn btn-preview"
+                    @click="isPreviewVisible = !isPreviewVisible">
               Xem trước
             </button>
             <button type="submit" class="btn btn-primary-action">
@@ -420,8 +428,19 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import {computed, reactive, ref, watch, onMounted} from 'vue'
+import {storeToRefs} from 'pinia'
+import {useVoucherStore} from '@/stores/voucherStore'
 import '@/assets/css/Voucher.css'
+import voucherApi from "@/api/voucherApi.js";
+
+const voucherStore = useVoucherStore()
+
+const {vouchers, loading, error} = storeToRefs(voucherStore)
+
+onMounted(() => {
+  voucherStore.fetchVouchers()
+})
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const isSubmitted = ref(false)
@@ -440,44 +459,6 @@ const filters = reactive({
   status: 'ALL',
 })
 
-const vouchers = ref([
-  {
-    voucher_id: 1,
-    voucher_code: 'SUMMER2026',
-    discount_value: 10,
-    discount_type: 'PERCENT',
-    max_discount_amount: 100000,
-    min_order_value: 500000,
-    start_date: '2026-06-05T08:00',
-    end_date: '2026-06-10T23:59',
-    quantity: 100,
-    is_active: true,
-  },
-  {
-    voucher_id: 2,
-    voucher_code: 'FREESHIP50K',
-    discount_value: 50000,
-    discount_type: 'AMOUNT',
-    max_discount_amount: null,
-    min_order_value: 300000,
-    start_date: '2026-06-01T00:00',
-    end_date: '2026-06-30T23:59',
-    quantity: 50,
-    is_active: true,
-  },
-  {
-    voucher_id: 3,
-    voucher_code: 'WELCOME15',
-    discount_value: 15,
-    discount_type: 'PERCENT',
-    max_discount_amount: 150000,
-    min_order_value: 800000,
-    start_date: '2026-06-02T00:00',
-    end_date: '2026-06-15T23:59',
-    quantity: 0,
-    is_active: false,
-  },
-])
 
 const defaultForm = {
   voucher_id: null,
@@ -492,7 +473,7 @@ const defaultForm = {
   is_active: true,
 }
 
-const form = reactive({ ...defaultForm })
+const form = reactive({...defaultForm})
 
 const todayDateTime = computed(() => {
   const now = new Date()
@@ -520,12 +501,18 @@ const filteredVouchers = computed(() => {
   const keyword = filters.keyword.trim().toLowerCase()
 
   return vouchers.value.filter((voucher) => {
-    const matchKeyword = voucher.voucher_code.toLowerCase().includes(keyword)
-    const matchType = filters.discountType === 'ALL' || voucher.discount_type === filters.discountType
+    const voucherCode = voucher.voucherCode?.toLowerCase() || ''
+
+    const matchKeyword = voucherCode.includes(keyword)
+
+    const matchType =
+      filters.discountType === 'ALL' ||
+      voucher.discountType === filters.discountType
+
     const matchStatus =
       filters.status === 'ALL' ||
-      (filters.status === 'ACTIVE' && voucher.is_active) ||
-      (filters.status === 'INACTIVE' && !voucher.is_active)
+      (filters.status === 'ACTIVE' && voucher.isActive) ||
+      (filters.status === 'INACTIVE' && !voucher.isActive)
 
     return matchKeyword && matchType && matchStatus
   })
@@ -533,9 +520,9 @@ const filteredVouchers = computed(() => {
 
 const stats = computed(() => ({
   total: vouchers.value.length,
-  active: vouchers.value.filter((voucher) => voucher.is_active).length,
-  percent: vouchers.value.filter((voucher) => voucher.discount_type === 'PERCENT').length,
-  amount: vouchers.value.filter((voucher) => voucher.discount_type === 'AMOUNT').length,
+  active: vouchers.value.filter((voucher) => voucher.isActive).length,
+  percent: vouchers.value.filter((voucher) => voucher.discountType === 'PERCENT').length,
+  amount: vouchers.value.filter((voucher) => voucher.discountType === 'AMOUNT').length,
 }))
 
 const errors = computed(() => {
@@ -638,7 +625,7 @@ function isZeroQuantity(quantity) {
   return !Number.isNaN(numberQuantity) && numberQuantity <= 0
 }
 
-function showToast({ type = 'success', title, message }) {
+function showToast({type = 'success', title, message}) {
   toast.show = true
   toast.type = type
   toast.title = title
@@ -658,7 +645,7 @@ function resetFilters() {
 function resetForm() {
   isSubmitted.value = false
   isPreviewVisible.value = false
-  Object.assign(form, { ...defaultForm })
+  Object.assign(form, {...defaultForm})
   isEditing.value = false
   isSubmitted.value = false
 }
@@ -710,6 +697,7 @@ function buildPayload() {
 
 function saveVoucher() {
   isSubmitted.value = true
+
   function saveVoucher() {
     isSubmitted.value = true
 
@@ -719,6 +707,7 @@ function saveVoucher() {
 
     // phần lưu voucher bên dưới
   }
+
   if (Object.keys(errors.value).length > 0) {
     showToast({
       type: 'error',
@@ -758,26 +747,30 @@ function saveVoucher() {
   })
 }
 
-function deleteVoucher(voucher) {
-  const confirmed = window.confirm(`Bạn có chắc muốn xóa voucher ${voucher.voucher_code} không?`)
+async function deleteVoucher(voucher) {
+  const confirmed = window.confirm(`Bạn có chắc muốn xóa voucher ${voucher.voucherCode} không?`)
 
   if (!confirmed) return
-
-  vouchers.value = vouchers.value.filter((item) => item.voucher_id !== voucher.voucher_id)
-
+  const success = await voucherStore.deleteVoucherById(voucher.voucherId)
+if(success){
   showToast({
     type: 'success',
     title: 'Xóa voucher thành công',
-    message: `Voucher ${voucher.voucher_code} đã được xóa khỏi danh sách.`,
+    message: `Voucher ${voucher.voucherCode} đã được xóa khỏi danh sách.`,
   })
+
+}
+
+
+
 }
 
 function formatDiscountValue(voucher) {
-  if (voucher.discount_type === 'PERCENT') {
-    return `${voucher.discount_value}%`
+  if (voucher.discountType === 'PERCENT') {
+    return `${voucher.discountValue}%`
   }
 
-  return formatCurrency(voucher.discount_value)
+  return formatCurrency(voucher.discountValue)
 }
 
 function formatDiscountType(discountType) {
