@@ -26,7 +26,10 @@
       <div
         class="menu-item menu-parent"
         :class="{
-          active: $route.path.includes('/admin/product') || $route.path.includes('/admin/sku'),
+          active:
+            $route.path.includes('/admin/product') ||
+            $route.path.includes('/admin/sku') ||
+            $route.path.includes('/admin/attribute'),
         }"
         @click="toggleProductMenu"
       >
@@ -36,12 +39,15 @@
       </div>
 
       <div v-if="isProductMenuOpen" class="submenu">
-        <router-link to="/admin/product" class="submenu-item" active-class="active">
-          Sản phẩm gốc
-        </router-link>
-        <router-link to="/admin/sku" class="submenu-item" active-class="active">
-          Quản lý biến thể (SKU)
-        </router-link>
+        <router-link to="/admin/product" class="submenu-item" active-class="active"
+          >Sản phẩm gốc</router-link
+        >
+        <router-link to="/admin/attribute" class="submenu-item" active-class="active"
+          >Quản lý Thuộc tính</router-link
+        >
+        <router-link to="/admin/skugenerator" class="submenu-item" active-class="active"
+          >Tạo biến thể (SKU)</router-link
+        >
       </div>
 
       <router-link to="/admin/order" class="menu-item" active-class="active">
@@ -115,7 +121,15 @@ import gearIcon from '/src/assets/icons/gear.svg'
 
 const route = useRoute()
 const isProductMenuOpen = ref(false)
-
+onMounted(() => {
+  if (
+    route.path.includes('/admin/product') ||
+    route.path.includes('/admin/sku') ||
+    route.path.includes('/admin/attribute')
+  ) {
+    isProductMenuOpen.value = true
+  }
+})
 const toggleProductMenu = () => {
   isProductMenuOpen.value = !isProductMenuOpen.value
 }

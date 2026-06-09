@@ -20,13 +20,19 @@ import java.util.Optional;
 
 @Service
 public class ProductsServiceImpl implements ProductsService {
+
     @Autowired
-    ProductRepository productRepository;
+    private ProductRepository productRepository;
 
     @Autowired
     private CategoryRepository cateRepo;
 
+    // Marcus sửa để làm màn generete SKU admin
     private ProductResponse toProductResponse(Product product) {
+        String categoryName = "Chưa phân loại";
+        if (product.getCategory() != null) {
+            categoryName = product.getCategory().getCategoryName();
+        }
         return ProductResponse.builder()
                 .productId(product.getProductId())
                 .productName(product.getProductName())
@@ -36,14 +42,14 @@ public class ProductsServiceImpl implements ProductsService {
                 .status(product.getStatus())
                 .thumbnailUrl(product.getThumbnailUrl())
                 .createdAt(product.getCreatedAt())
-                .categoryName(product.getCategory().getCategoryName())
+                .categoryName(categoryName)
                 .build();
     }
 
     @Override
-    @Transactional
-    public Page<ProductResponse> findAllProducts(Pageable pageable) {
-        Page<Product> product = productRepository.findAll(pageable);
+    @Transactional(readOnly = true)
+    public Page<ProductResponse> findAllProducts(String keyword, String filter, Pageable pageable) {
+        Page<Product> product = productRepository.findProductsWithFilter(keyword, filter, pageable);
         return product.map(this::toProductResponse);
     }
 
@@ -51,7 +57,7 @@ public class ProductsServiceImpl implements ProductsService {
     @Transactional
     public ProductResponse createProduct(CreateProduct createProduct) {
 
-        if (productRepository.existsByProductName(((createProduct.getProductName())))) {
+        if (productRepository.existsByProductName(createProduct.getProductName())) {
             throw new RuntimeException("Tên sản phẩm đã tồn tại");
         }
 
@@ -59,11 +65,11 @@ public class ProductsServiceImpl implements ProductsService {
         String slug = slg.slugify(createProduct.getProductName());
 
         if (productRepository.existsBySlug(slug)) {
-            throw new RuntimeException("slug đã tồn tại");
+            throw new RuntimeException("Slug đã tồn tại");
         }
 
         Category category = cateRepo.findById(createProduct.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("ko tìm thấy category"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy category"));
 
         Product product = new Product();
         product.setProductName(createProduct.getProductName());
@@ -73,11 +79,12 @@ public class ProductsServiceImpl implements ProductsService {
         product.setSlug(slug);
         product.setStatus(true);
         product.setCategory(category);
+
         return toProductResponse(productRepository.save(product));
     }
 
     @Override
-    @Transactional
+    @Transactional(readOnly = true)
     public Optional<ProductResponse> getProductsById(Integer id) {
         Optional<Product> product = productRepository.findById(id);
         return product.map(this::toProductResponse);
@@ -87,22 +94,22 @@ public class ProductsServiceImpl implements ProductsService {
     @Transactional
     public ProductResponse updateProduct(Integer id, UpdateProduct updateProduct) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ko tìm thấy ID sản phẩm"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy ID sản phẩm"));
 
         final Slugify slg = Slugify.builder().build();
         String slug = slg.slugify(updateProduct.getProductName());
 
         if (!product.getProductName().equals(updateProduct.getProductName())) {
             if (productRepository.existsByProductNameAndProductIdNot(updateProduct.getProductName(), id)) {
-                throw new RuntimeException("tên sản phẩm đã tồn tại");
+                throw new RuntimeException("Tên sản phẩm đã tồn tại");
             }
             if (productRepository.existsBySlug(slug)) {
-                throw new RuntimeException("slug đã tồn tại");
+                throw new RuntimeException("Slug đã tồn tại");
             }
         }
 
         Category category = cateRepo.findById(updateProduct.getCategoryId())
-                .orElseThrow(() -> new RuntimeException("ko tìm thấy category"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy category"));
 
         product.setProductName(updateProduct.getProductName());
         product.setDescription(updateProduct.getDescription());
@@ -111,6 +118,7 @@ public class ProductsServiceImpl implements ProductsService {
         product.setSlug(slug);
         product.setStatus(updateProduct.getStatus());
         product.setCategory(category);
+
         return toProductResponse(productRepository.save(product));
     }
 
@@ -118,7 +126,7 @@ public class ProductsServiceImpl implements ProductsService {
     @Transactional
     public Product hiddenProduct(Integer id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Id sản phẩm ko tồn tại"));
+                .orElseThrow(() -> new RuntimeException("ID sản phẩm không tồn tại"));
 
         if (!product.getStatus()) {
             throw new RuntimeException("Sản phẩm đã bị ẩn");

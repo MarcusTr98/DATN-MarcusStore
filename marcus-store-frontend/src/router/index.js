@@ -121,12 +121,16 @@ const routes = [
         component: () => import('@/views/admin/product/ProductManager.vue'),
       },
       {
-        path: 'sku',
-        name: 'SkuManager',
-        component: () => import('@/views/admin/product/SkuManager.vue'),
-        meta: {
-          roles: ['ROLE_ADMIN'],
-        },
+        path: 'attribute',
+        name: 'AttributeManager',
+        component: () => import('@/views/admin/product/Attributemanager.vue'),
+        meta: { roles: ['ROLE_ADMIN'] },
+      },
+      {
+        path: 'skugenerator',
+        name: 'Skugeneratorview',
+        component: () => import('@/views/admin/product/Skugeneratorview.vue'),
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'order',

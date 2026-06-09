@@ -1,7 +1,7 @@
 package com.fpoly.marcusstore.controller.admin;
 
+import com.fpoly.marcusstore.dto.request.SkuBatchCreateRequest;
 import com.fpoly.marcusstore.dto.request.SkuBulkUpdateRequest;
-import com.fpoly.marcusstore.dto.request.SkuGenerationRequest;
 import com.fpoly.marcusstore.dto.request.SkuSingleUpdateRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.entity.core.ProductSku;
@@ -22,56 +22,39 @@ public class ProductSkuController {
     @Autowired
     private ProductConfigService configService;
 
-    // 1. Lấy danh sách SKU theo Product ID
+    // Lấy danh sách SKU của 1 Sản phẩm
     @GetMapping("/product/{productId}")
-    public ResponseEntity<ApiResponse<List<ProductSku>>> getSkusByProduct(@PathVariable Integer productId) {
-        return ResponseEntity.ok(ApiResponse.success(configService.getSkusByProductId(productId)));
+    public ApiResponse<List<ProductSku>> getSkusByProduct(@PathVariable Integer productId) {
+        return ApiResponse.success(configService.getSkusByProductId(productId));
     }
 
-    // 2. Sinh SKU tự động
-    @PostMapping("/generate")
-    public ResponseEntity<ApiResponse<String>> generateSkus(@Valid @RequestBody SkuGenerationRequest request) {
-        try {
-            configService.generateAndSaveProductSkus(request);
-            return ResponseEntity.ok(ApiResponse.success("Đã sinh và lưu thành công các biến thể SKU!"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
-        }
+    // Nhận Ma trận SKU từ Frontend và lưu
+    @PostMapping("/batch")
+    public ApiResponse<String> batchCreateSkus(@Valid @RequestBody SkuBatchCreateRequest request) {
+        configService.batchCreateSkus(request);
+        return ApiResponse.success("Đã lưu thành công ma trận SKU!");
     }
 
-    // 3. Cập nhật đồng loạt (Bulk Update)
+    // Cập nhật giá, tồn kho đồng loạt
     @PutMapping("/bulk-update")
-    public ResponseEntity<ApiResponse<String>> bulkUpdateSkus(@RequestBody SkuBulkUpdateRequest request) {
-        try {
-            configService.bulkUpdateSkus(request);
-            return ResponseEntity.ok(ApiResponse.success("Cập nhật giá và tồn kho đồng loạt thành công!"));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
-        }
+    public ApiResponse<String> bulkUpdateSkus(@RequestBody SkuBulkUpdateRequest request) {
+        configService.bulkUpdateSkus(request);
+        return ApiResponse.success("Cập nhật đồng loạt thành công!");
     }
 
-    // 4. Cập nhật lẻ 1 SKU
+    // Cập nhật 1 SKU lẻ
     @PutMapping("/{skuId}")
-    public ResponseEntity<ApiResponse<ProductSku>> updateSingleSku(
+    public ApiResponse<ProductSku> updateSingleSku(
             @PathVariable Integer skuId,
             @Valid @RequestBody SkuSingleUpdateRequest request) {
-        try {
-            ProductSku updatedSku = configService.updateSingleSku(skuId, request.getPrice(),
-                    request.getStockQuantity());
-            return ResponseEntity.ok(ApiResponse.success(updatedSku));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
-        }
+        return ApiResponse
+                .success(configService.updateSingleSku(skuId, request.getPrice(), request.getStockQuantity()));
     }
 
-    // 5. Xóa mềm SKU
+    // Xóa mềm SKU
     @DeleteMapping("/{skuId}")
-    public ResponseEntity<ApiResponse<String>> deleteSku(@PathVariable Integer skuId) {
-        try {
-            configService.deleteSku(skuId);
-            return ResponseEntity.ok(ApiResponse.success("Đã vô hiệu hóa SKU thành công!"));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
-        }
+    public ApiResponse<String> deleteSku(@PathVariable Integer skuId) {
+        configService.deleteSku(skuId);
+        return ApiResponse.success("Đã vô hiệu hóa SKU thành công!");
     }
 }
