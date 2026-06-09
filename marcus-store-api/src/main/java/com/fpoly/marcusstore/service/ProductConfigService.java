@@ -1,13 +1,13 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.SkuBatchCreateRequest;
 import com.fpoly.marcusstore.dto.request.SkuBulkUpdateRequest;
-import com.fpoly.marcusstore.dto.request.SkuGenerationRequest;
 import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
+import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
+import com.fpoly.marcusstore.repository.core.ProductRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
-import com.fpoly.marcusstore.utils.SkuGeneratorUtils;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,94 +22,71 @@ public class ProductConfigService {
     @Autowired
     private ProductSkuRepository skuRepository;
 
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private AttributeValueRepository attributeValueRepository;
+
+    // 1. LƯU MA TRẬN SKU TỪ FRONTEND
     @Transactional(rollbackFor = Exception.class)
-    public void generateAndSaveProductSkus(SkuGenerationRequest request) {
+    public void batchCreateSkus(SkuBatchCreateRequest request) {
+        Product product = productRepository.findById(request.getProductId())
+                .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại!"));
 
-        // 1. Chặn request quá lớn
-        if (request.getAttributeValueIds().size() > 5) {
-            throw new IllegalArgumentException("Hệ thống chỉ hỗ trợ tối đa 5 lớp thuộc tính cho một sản phẩm!");
-        }
-
-        // 2. Sinh tổ hợp chuỗi mã (dạng: IPHONE15-RED-128GB)
-        List<List<String>> codeCombinations = SkuGeneratorUtils.generateCombinations(request.getAttributeValueCodes());
-
-        // 3. Sinh tổ hợp ID thuộc tính
-        List<List<Integer>> idCombinations = SkuGeneratorUtils.generateCombinations(request.getAttributeValueIds());
-
-        // 4. Khởi tạo danh sách lưu Batch Insert nâng cao hiệu năng
-        List<ProductSku> skusToSave = new ArrayList<>();
-
-        // Khởi tạo đối tượng Product Proxy (chỉ set ID) để gán quan hệ khóa ngoại
-        Product productRef = new Product();
-        productRef.setProductId(request.getProductId());
-
-        for (int i = 0; i < codeCombinations.size(); i++) {
-            List<String> codeCombo = codeCombinations.get(i);
-            List<Integer> idCombo = idCombinations.get(i);
-
-            // Xử lý tạo mã SKU độc nhất
-            String generatedSkuCode = SkuGeneratorUtils.buildSkuCode(request.getProductCode(), codeCombo);
-
+        for (SkuBatchCreateRequest.SkuItem item : request.getSkus()) {
             ProductSku sku = new ProductSku();
-            sku.setProduct(productRef);
-            sku.setSkuCode(generatedSkuCode);
-            sku.setPrice(BigDecimal.ZERO); // Đảm bảo đúng kiểu dữ liệu BigDecimal
-            sku.setStockQuantity(0); // Khớp chính xác trường stockQuantity trong Entity
+            sku.setProduct(product);
+            sku.setSkuCode(item.getSkuCode());
+            sku.setPrice(item.getPrice());
+            sku.setStockQuantity(item.getStock());
             sku.setIsActive(true);
 
-            // Map trực tiếp danh sách các AttributeValue vào SKU
-            List<AttributeValue> attributeValues = new ArrayList<>();
-            for (Integer attrValueId : idCombo) {
-                AttributeValue valueRef = new AttributeValue();
-                valueRef.setValueId(attrValueId);
-                attributeValues.add(valueRef);
+            List<AttributeValue> attributeValues = attributeValueRepository.findAllById(item.getValueIds());
+            if (attributeValues.size() != item.getValueIds().size()) {
+                throw new RuntimeException("Có lỗi: Một số ID thuộc tính không tồn tại trong CSDL.");
             }
             sku.setAttributeValues(attributeValues);
-            skusToSave.add(sku);
-        }
 
-        // 5.lưu hàng loạt xuống Database.
-        skuRepository.saveAll(skusToSave);
+            skuRepository.save(sku); // Save từng cái — IDENTITY tự tăng đúng
+        }
     }
 
+    // 2. CẬP NHẬT HÀNG LOẠT (Giá, Tồn kho)
     @Transactional(rollbackFor = Exception.class)
     public void bulkUpdateSkus(SkuBulkUpdateRequest request) {
         List<ProductSku> skusToUpdate = new ArrayList<>();
-
         for (SkuBulkUpdateRequest.SkuUpdateItem item : request.getSkus()) {
-            // Lấy SKU từ DB lên để update
             ProductSku sku = skuRepository.findById(item.getSkuId())
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU ID: " + item.getSkuId()));
-
             sku.setPrice(item.getPrice());
             sku.setStockQuantity(item.getStockQuantity());
-
             skusToUpdate.add(sku);
         }
         skuRepository.saveAll(skusToUpdate);
     }
 
+    // 3. LẤY DANH SÁCH SKU THEO PRODUCT
     public List<ProductSku> getSkusByProductId(Integer productId) {
         return skuRepository.findByProductProductIdAndIsActiveTrue(productId);
     }
 
+    // 4. CẬP NHẬT 1 SKU LẺ
     @Transactional
     public ProductSku updateSingleSku(Integer skuId, BigDecimal price, Integer stockQuantity) {
-        // @EntityGraph thay vì findById mặc định
-        ProductSku sku = skuRepository.findBySkuId(skuId)
+        ProductSku sku = skuRepository.findById(skuId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
-
         sku.setPrice(price);
         sku.setStockQuantity(stockQuantity);
-
         return skuRepository.save(sku);
     }
 
+    // 5. XÓA MỀM SKU
     @Transactional
     public void deleteSku(Integer skuId) {
         ProductSku sku = skuRepository.findById(skuId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
-        sku.setIsActive(false); // Chuyển trạng thái thay vì xóa cứng để giữ lịch sử hóa đơn
+        sku.setIsActive(false);
         skuRepository.save(sku);
     }
 }
