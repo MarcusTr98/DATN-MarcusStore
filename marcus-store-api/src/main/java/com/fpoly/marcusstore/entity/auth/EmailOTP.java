@@ -27,4 +27,7 @@ public class EmailOTP {
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "attempt_count")
+    private int attemptCount = 0;
 }

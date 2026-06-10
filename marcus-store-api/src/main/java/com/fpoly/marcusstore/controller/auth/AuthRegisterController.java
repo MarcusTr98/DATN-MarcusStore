@@ -6,7 +6,6 @@ import com.fpoly.marcusstore.dto.request.RegisterRequest;
 import com.fpoly.marcusstore.dto.request.VerifyOtpRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.service.AuthRegisterService;
-
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -15,14 +14,16 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthRegisterController {
 
-    private final AuthRegisterService authService;
+
+    private final AuthRegisterService authRegisterService;
+
 
      @PostMapping("/register/request")
     public ResponseEntity<?> requestRegister(
             @Valid @RequestBody RegisterRequest request
     ) {
 
-        authService.requestRegister(request);
+        authRegisterService.requestRegister(request);
 
         return ResponseEntity.ok(
                 ApiResponse.success(
@@ -30,15 +31,10 @@ public class AuthRegisterController {
                 )
         );
     }
-     @PostMapping("/register/verify")
-    public ResponseEntity<?> verifyRegister(
-            @Valid @RequestBody VerifyOtpRequest request
-    ) {
+    @PostMapping("/register/verify")
+    public ResponseEntity<?> verify(@RequestBody VerifyOtpRequest request) {
 
-        return ResponseEntity.ok(
-                ApiResponse.success(
-                        authService.verifyRegister(request)
-                )
-        );
+         String result = authRegisterService.verifyRegister(request);
+    return ResponseEntity.ok(ApiResponse.success(result));
     }
 }

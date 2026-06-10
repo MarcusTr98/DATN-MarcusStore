@@ -21,6 +21,11 @@ const routes = [
         name: 'ResetPassword',
         component: () => import('@/views/auth/ResetPassword.vue'),
       },
+            {
+  path: '/auth/verify-otp',
+  name: 'VerifyOtp',
+  component: () => import('@/views/auth/VerifyOtp.vue'),
+}
     ],
   },
 

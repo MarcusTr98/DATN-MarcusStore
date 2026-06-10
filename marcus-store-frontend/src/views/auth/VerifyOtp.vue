@@ -11,7 +11,6 @@
         </p>
       </div>
 
-      <!-- OTP INPUT -->
       <input
         v-model="otp"
         maxlength="6"
@@ -23,34 +22,72 @@
         Xác nhận
       </button>
     </div>
+     <BaseModal
+      :visible="modal.visible"
+      :type="modal.type"
+      :title="modal.title"
+      :message="modal.message"
+      @close="onModalClose"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onMounted, ref, reactive } from 'vue' 
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/utils/api'
+import BaseModal from '@/layouts/BaseModal.vue'
 
 const route = useRoute()
 const router = useRouter()
-
-const email = route.query.email
 const otp = ref('')
+const email = route.query.email
+const loading = ref(false)
 
-const verifyOtp = async () => {
-  try {
-    await api.post('/auth/register/verify', {
-      email,
-      otp: otp.value
-    })
 
-    alert('Xác thực thành công!')
+const modal = reactive({
+  visible: false,
+  type: 'error',
+  title: '',
+  message: '',
+})
 
+
+const showModal = (type, title, message) => {
+  modal.type = type
+  modal.title = title
+  modal.message = message
+  modal.visible = true
+}
+
+
+const onModalClose = () => {
+  modal.visible = false
+  if (modal.type === 'success') {
     router.push('/auth/login')
-  } catch (e) {
-    alert('OTP không hợp lệ!')
   }
 }
+
+const verifyOtp = async () => {
+  if (loading.value) return
+  loading.value = true
+
+  try {
+    await api.post('/auth/register/verify', { email, otp: otp.value })
+    showModal('success', 'Thành công', 'Tài khoản đã được xác thực. Bạn có thể đăng nhập ngay!')
+  } catch (e) {
+    const msg = e.response?.data?.message || 'OTP không hợp lệ!'
+    showModal('error', 'Xác thực thất bại', msg)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  if (!email) {
+    router.replace('/auth/register')
+  }
+})
 </script>
 <style scoped>
 .otp-page {

@@ -84,7 +84,7 @@
             </div>
             <div class="form-group">
               <label>SỐ ĐIỆN THOẠI</label>
-              <input type="text" v-model="registerForm.phone" placeholder="0901 234 567" required />
+              <input type="text" v-model="registerForm.phone" placeholder="0901234567" required />
             </div>
             <div class="form-group">
               <label>MẬT KHẨU</label>
