@@ -109,8 +109,8 @@
             </thead>
 
             <tbody>
-            <tr v-for="(voucher, index) in filteredVouchers"  :key="voucher.voucherId">
-              <td class="fw-bold">#{{ index + 1}}</td>
+            <tr v-for="(voucher, index) in filteredVouchers" :key="voucher.voucherId">
+              <td class="fw-bold">#{{ index + 1 }}</td>
               <td>
                 <div class="voucher-code">{{ voucher.voucherCode }}</div>
 
@@ -417,8 +417,8 @@
                     @click="isPreviewVisible = !isPreviewVisible">
               Xem trước
             </button>
-            <button type="submit" class="btn btn-primary-action">
-              Lưu Voucher
+            <button type="submit" class="btn btn-primary-action" :disabled="loading">
+              {{ loading ? 'Đang lưu...' : 'Lưu Voucher' }}
             </button>
           </div>
         </form>
@@ -432,7 +432,6 @@ import {computed, reactive, ref, watch, onMounted} from 'vue'
 import {storeToRefs} from 'pinia'
 import {useVoucherStore} from '@/stores/voucherStore'
 import '@/assets/css/Voucher.css'
-import voucherApi from "@/api/voucherApi.js";
 
 const voucherStore = useVoucherStore()
 
@@ -539,8 +538,8 @@ const errors = computed(() => {
 
   const duplicated = vouchers.value.some((voucher) => {
     return (
-      voucher.voucher_code.toLowerCase() === voucherCode.toLowerCase() &&
-      voucher.voucher_id !== form.voucher_id
+      voucher.voucherCode?.toLowerCase() === voucherCode.toLowerCase() &&
+      voucher.voucherId !== form.voucher_id
     )
   })
 
@@ -657,22 +656,24 @@ function openCreateModal() {
 
 function openEditModal(voucher) {
   isSubmitted.value = false
+
   Object.assign(form, {
-    voucher_id: voucher.voucher_id,
-    voucher_code: voucher.voucher_code,
-    discount_value: voucher.discount_value,
-    discount_type: voucher.discount_type,
-    max_discount_amount: voucher.max_discount_amount,
-    min_order_value: voucher.min_order_value,
-    start_date: voucher.start_date,
-    end_date: voucher.end_date,
+    voucher_id: voucher.voucherId,
+    voucher_code: voucher.voucherCode,
+    discount_value: voucher.discountValue,
+    discount_type: voucher.discountType,
+    max_discount_amount: voucher.maxDiscountAmount,
+    min_order_value: voucher.minOrderValue,
+    start_date: voucher.startDate,
+    end_date: voucher.endDate,
     quantity: voucher.quantity,
-    is_active: voucher.is_active,
+    is_active: voucher.isActive,
   })
 
   isEditing.value = true
   isModalOpen.value = true
 }
+
 
 function closeModal() {
   isModalOpen.value = false
@@ -682,31 +683,23 @@ function buildPayload() {
   const quantity = Number(form.quantity)
 
   return {
-    voucher_id: form.voucher_id,
-    voucher_code: form.voucher_code.trim().toUpperCase(),
-    discount_value: Number(form.discount_value),
-    discount_type: form.discount_type,
-    max_discount_amount: form.discount_type === 'AMOUNT' ? null : Number(form.max_discount_amount),
-    min_order_value: Number(form.min_order_value || 0),
-    start_date: form.start_date,
-    end_date: form.end_date,
+    voucherCode: form.voucher_code.trim().toUpperCase(),
+    discountValue: Number(form.discount_value),
+    discountType: form.discount_type,
+    maxDiscountAmount:
+      form.discount_type === 'AMOUNT'
+        ? null
+        : Number(form.max_discount_amount),
+    minOrderValue: Number(form.min_order_value || 0),
+    startDate: form.start_date,
+    endDate: form.end_date,
     quantity,
-    is_active: quantity > 0 ? Boolean(form.is_active) : false,
+    isActive: quantity > 0 ? Boolean(form.is_active) : false,
   }
 }
 
-function saveVoucher() {
+async function saveVoucher() {
   isSubmitted.value = true
-
-  function saveVoucher() {
-    isSubmitted.value = true
-
-    if (Object.keys(errors.value).length > 0) {
-      return
-    }
-
-    // phần lưu voucher bên dưới
-  }
 
   if (Object.keys(errors.value).length > 0) {
     showToast({
@@ -717,33 +710,38 @@ function saveVoucher() {
     return
   }
 
-  const payload = buildPayload()
-  const isUpdate = Boolean(payload.voucher_id)
-
-  if (isUpdate) {
-    const index = vouchers.value.findIndex((voucher) => voucher.voucher_id === payload.voucher_id)
-
-    if (index !== -1) {
-      vouchers.value[index] = payload
-    }
-  } else {
-    const maxId = Math.max(...vouchers.value.map((voucher) => voucher.voucher_id), 0)
-
-    vouchers.value.unshift({
-      ...payload,
-      voucher_id: maxId + 1,
+  if (isEditing.value) {
+    showToast({
+      type: 'error',
+      title: 'Chưa hỗ trợ cập nhật',
+      message: 'Hiện tại backend mới có API thêm voucher, phần sửa voucher làm sau.',
     })
+    return
+  }
+
+  const voucherData = buildPayload()
+
+  const success = await voucherStore.addVoucher(voucherData)
+
+  if (!success) {
+    showToast({
+      type: 'error',
+      title: 'Thêm voucher thất bại',
+      message: voucherStore.error || 'Vui lòng kiểm tra lại dữ liệu.',
+    })
+    return
   }
 
   closeModal()
+  resetForm()
 
   showToast({
     type: 'success',
-    title: isUpdate ? 'Cập nhật voucher thành công' : 'Thêm voucher thành công',
+    title: 'Thêm voucher thành công',
     message:
-      payload.quantity <= 0
-        ? 'Voucher đã được lưu và tự chuyển sang Ngừng sử dụng vì số lượng bằng 0.'
-        : `Voucher ${payload.voucher_code} đã được lưu.`,
+      voucherData.quantity <= 0
+        ? 'Voucher đã được thêm và tự chuyển sang Ngừng sử dụng vì số lượng bằng 0.'
+        : `Voucher ${voucherData.voucherCode} đã được thêm.`,
   })
 }
 
@@ -752,15 +750,14 @@ async function deleteVoucher(voucher) {
 
   if (!confirmed) return
   const success = await voucherStore.deleteVoucherById(voucher.voucherId)
-if(success){
-  showToast({
-    type: 'success',
-    title: 'Xóa voucher thành công',
-    message: `Voucher ${voucher.voucherCode} đã được xóa khỏi danh sách.`,
-  })
+  if (success) {
+    showToast({
+      type: 'success',
+      title: 'Xóa voucher thành công',
+      message: `Voucher ${voucher.voucherCode} đã được xóa khỏi danh sách.`,
+    })
 
-}
-
+  }
 
 
 }

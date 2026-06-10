@@ -11,5 +11,9 @@ const  voucherApi = {
   deleteVoucherById(voucherId) {
     return api.delete(`/admin/voucher/${voucherId}`)
   },
+
+  createVoucher(data) {
+    return api.post('/admin/voucher', data)
+  }
 }
 export default voucherApi

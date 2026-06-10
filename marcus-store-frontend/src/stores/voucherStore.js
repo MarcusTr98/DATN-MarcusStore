@@ -113,6 +113,30 @@ function mapVoucher(voucher) {
         } finally {
           this.loading = false
         }
+      },
+      async addVoucher(payload) {
+        try {
+          this.loading = true
+          this.error = null
+
+          const response = await voucherApi.createVoucher(payload)
+
+          this.vouchers.unshift(response.data)
+
+          return true
+        } catch (error) {
+          console.error('lỗi addVoucher:', error)
+
+          this.error =
+            error.response?.data?.message ||
+            error.response?.data?.error ||
+            error.response?.data?.data ||
+            'Không thể thêm voucher'
+
+          return false
+        } finally {
+          this.loading = false
+        }
       }
     }
   })
