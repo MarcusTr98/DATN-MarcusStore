@@ -137,6 +137,37 @@ function mapVoucher(voucher) {
         } finally {
           this.loading = false
         }
+      },
+      async updateVoucher(voucherId, payload) {
+        try {
+          this.loading = true
+          this.error = null
+
+          const response = await voucherApi.updateVoucher(voucherId, payload)
+          const updatedVoucher = mapVoucher(response.data)
+
+          const index = this.vouchers.findIndex(
+            (voucher) => voucher.voucherId === voucherId
+          )
+
+          if (index !== -1) {
+            this.vouchers[index] = updatedVoucher
+          }
+
+          return true
+        } catch (error) {
+          console.error('lỗi updateVoucher:', error)
+
+          this.error =
+            error.response?.data?.message ||
+            error.response?.data?.error ||
+            error.response?.data?.data ||
+            'Không thể cập nhật voucher'
+
+          return false
+        } finally {
+          this.loading = false
+        }
       }
     }
   })

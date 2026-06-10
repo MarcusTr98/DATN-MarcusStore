@@ -35,4 +35,9 @@ public class VoucherController {
         VoucherResponse response =  voucherService.addVoucher(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+    @PutMapping("/voucher/{voucherId}")
+    public ResponseEntity<VoucherResponse> updateVoucher(@PathVariable("voucherId") Integer voucherId, @RequestBody AddVoucherRequest request){
+        VoucherResponse voucher = voucherService.updateVoucher(voucherId, request);
+        return ResponseEntity.status(HttpStatus.OK).body(voucher);
+    }
 }

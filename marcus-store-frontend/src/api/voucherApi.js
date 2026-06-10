@@ -14,6 +14,9 @@ const  voucherApi = {
 
   createVoucher(data) {
     return api.post('/admin/voucher', data)
-  }
+  },
+  updateVoucher(voucherId, data) {
+    return api.put(`/admin/voucher/${voucherId}`, data)
+  },
 }
 export default voucherApi

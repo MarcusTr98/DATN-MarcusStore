@@ -710,16 +710,31 @@ async function saveVoucher() {
     return
   }
 
+  const voucherData = buildPayload()
+
   if (isEditing.value) {
+    const success = await voucherStore.updateVoucher(form.voucher_id, voucherData)
+
+    if (!success) {
+      showToast({
+        type: 'error',
+        title: 'Cập nhật voucher thất bại',
+        message: voucherStore.error || 'Vui lòng kiểm tra lại dữ liệu.',
+      })
+      return
+    }
+
+    closeModal()
+    resetForm()
+
     showToast({
-      type: 'error',
-      title: 'Chưa hỗ trợ cập nhật',
-      message: 'Hiện tại backend mới có API thêm voucher, phần sửa voucher làm sau.',
+      type: 'success',
+      title: 'Cập nhật voucher thành công',
+      message: `Voucher ${voucherData.voucherCode} đã được cập nhật.`,
     })
+
     return
   }
-
-  const voucherData = buildPayload()
 
   const success = await voucherStore.addVoucher(voucherData)
 

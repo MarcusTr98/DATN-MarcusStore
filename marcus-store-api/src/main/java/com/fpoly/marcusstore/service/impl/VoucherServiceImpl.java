@@ -9,11 +9,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Locale;
+
 
 @Service
 @RequiredArgsConstructor
@@ -164,4 +165,42 @@ public class VoucherServiceImpl implements VoucherService {
             );
         }
     }
+     @Override
+    @Transactional
+    public VoucherResponse updateVoucher(Integer voucherId, AddVoucherRequest request){
+        Voucher voucher = voucherRepository.findById(voucherId).orElseThrow(
+                ()-> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "không tìm thấy voucher"
+                ));
+         String voucherCode = request.getVoucherCode().trim().toUpperCase();
+         String discountType = request.getDiscountType().trim().toUpperCase();
+         validateVoucherRequest(request);
+         if (
+                 voucherRepository.existsByVoucherCode(voucherCode)
+                         && !voucher.getVoucherCode().equalsIgnoreCase(voucherCode)
+         ) {
+             throw new ResponseStatusException(
+                     HttpStatus.BAD_REQUEST,
+                     "Mã voucher đã tồn tại"
+             );
+         }
+         voucher.setVoucherCode(voucherCode);
+         voucher.setDiscountValue(request.getDiscountValue());
+         voucher.setDiscountType(discountType);
+
+         if ("AMOUNT".equals(discountType)) {
+             voucher.setMaxDiscountAmount(null);
+         } else {
+             voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
+         }
+         voucher.setMinOrderValue(request.getMinOrderValue());
+         voucher.setStartDate(request.getStartDate());
+         voucher.setEndDate(request.getEndDate());
+         voucher.setQuantity(request.getQuantity());
+         voucher.setIsActive(
+                 request.getQuantity() > 0 && Boolean.TRUE.equals(request.getIsActive())
+         );
+         return toResponse(voucherRepository.save(voucher));
+     }
 }
