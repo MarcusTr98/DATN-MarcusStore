@@ -1,17 +1,24 @@
 package com.fpoly.marcusstore.dto.response;
 
 import lombok.Builder;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+import java.math.BigDecimal;
+
+@Getter
+@Setter
 @Builder
 public class AddressResponseDTO {
-    private Integer id;
+    private Integer addressId;
     private String recipientName;
-    private String phone;
+    private String phoneNumber;
     private String provinceName;
     private String districtName;
     private String wardName;
-    private String detail;
+    private String detailAddress;
+    private String note;
     private Boolean isDefault;
+    private BigDecimal latitude;
+    private BigDecimal longitude;
 }
