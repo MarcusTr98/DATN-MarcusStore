@@ -84,7 +84,7 @@
             </div>
             <div class="form-group">
               <label>SỐ ĐIỆN THOẠI</label>
-              <input type="text" v-model="registerForm.phone" placeholder="0901 234 567" required />
+              <input type="text" v-model="registerForm.phone" placeholder="0901234567" required />
             </div>
             <div class="form-group">
               <label>MẬT KHẨU</label>
@@ -124,7 +124,9 @@
             >
           </div>
 
-          <button type="submit" class="main-btn">Đăng ký ngay</button>
+          <button class="main-btn" type="submit" :disabled="loading">
+            {{ loading ? 'Đang xử lý...' : 'Đăng ký ngay' }}
+          </button>
         </form>
 
         <div class="bottom-link">
@@ -137,10 +139,12 @@
 
 <script setup>
 import { ref, reactive } from 'vue'
-
+import { useRouter } from 'vue-router'
+import api from '@/utils/api'
+const router = useRouter()
 const showRegisterPassword = ref(false)
 const showRegisterConfirm = ref(false)
-
+const loading = ref(false)
 // ĐÃ SỬA: Khởi tạo Object Reactive để lưu trữ dữ liệu Form đầu vào
 const registerForm = reactive({
   fullName: '',
@@ -152,14 +156,49 @@ const registerForm = reactive({
   agree: false,
 })
 
-const handleRegister = () => {
+const handleRegister =async  () => {
+   try {
   if (registerForm.password !== registerForm.confirmPassword) {
     alert('Mật khẩu xác nhận không trùng khớp!')
+    registerForm.confirmPassword = ''
     return
   }
-  console.log('Dữ liệu Đăng ký gửi lên Backend:', registerForm)
-  // Luồng kết nối Axios API của bạn sẽ đặt tại đây
+  if (!registerForm.agree) {
+      alert('Bạn phải đồng ý điều khoản!')
+      return
+    }
+ loading.value = true
+
+    const payload = {
+      username: registerForm.username,
+      password: registerForm.password,
+      email: registerForm.email,
+      fullName: registerForm.fullName,
+      phoneNumber: registerForm.phone,
+    }
+
+    const response = await api.post('/auth/register/request', payload)
+       if (response?.data?.success === false) {
+      alert(response.data.message || 'Đăng ký thất bại!')
+      return
+    }
+
+router.push({
+      path: '/auth/verify-otp',
+      query: {
+        email: registerForm.email
+      }
+    })
+
+  } catch (error) {
+    alert(error.response?.data?.message || 'Đăng ký thất bại!')
+  } finally {
+    loading.value = false
+  }
 }
+
+
+
 </script>
 
 <style scoped>
@@ -508,6 +547,17 @@ input:focus {
 
   .title h2 {
     font-size: 26px;
+  }
+}
+@keyframes popupShow {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 </style>
