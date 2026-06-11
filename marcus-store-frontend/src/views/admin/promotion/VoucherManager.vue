@@ -94,69 +94,70 @@
         <div class="table-responsive">
           <table class="table align-middle voucher-table mb-0">
             <thead>
-              <tr>
-                <th>ID</th>
-                <th>Mã voucher</th>
-                <th>Loại</th>
-                <th>Giá trị</th>
-                <th>Giảm tối đa</th>
-                <th>Đơn tối thiểu</th>
-                <th>Thời gian</th>
-                <th>SL voucher</th>
-                <th>Trạng thái</th>
-                <th class="text-end">Thao tác</th>
-              </tr>
+            <tr>
+              <th>ID</th>
+              <th>Mã voucher</th>
+              <th>Loại</th>
+              <th>Giá trị</th>
+              <th>Giảm tối đa</th>
+              <th>Đơn tối thiểu</th>
+              <th>Thời gian</th>
+              <th>SL voucher</th>
+              <th>Trạng thái</th>
+              <th class="text-end">Thao tác</th>
+            </tr>
             </thead>
 
             <tbody>
-              <tr v-for="voucher in filteredVouchers" :key="voucher.voucher_id">
-                <td class="fw-bold">#{{ voucher.voucher_id }}</td>
-                <td>
-                  <div class="voucher-code">{{ voucher.voucher_code }}</div>
-                </td>
-                <td>
-                  <span class="type-badge" :class="voucher.discount_type.toLowerCase()">
-                    {{ formatDiscountType(voucher.discount_type) }}
+            <tr v-for="(voucher, index) in filteredVouchers" :key="voucher.voucherId">
+              <td class="fw-bold">#{{ index + 1 }}</td>
+              <td>
+                <div class="voucher-code">{{ voucher.voucherCode }}</div>
+
+              </td>
+              <td>
+                  <span class="type-badge" :class="voucher.discountType.toLowerCase()">
+                    {{ formatDiscountType(voucher.discountType) }}
                   </span>
-                </td>
-                <td class="fw-semibold">{{ formatDiscountValue(voucher) }}</td>
-                <td>{{ formatCurrency(voucher.max_discount_amount) }}</td>
-                <td>{{ formatCurrency(voucher.min_order_value) }}</td>
-                <td>
-                  <div class="date-line">Từ: {{ formatDateTime(voucher.start_date) }}</div>
-                  <div class="date-line">Đến: {{ formatDateTime(voucher.end_date) }}</div>
-                </td>
-                <td>
+              </td>
+              <td class="fw-semibold">{{ formatDiscountValue(voucher) }}</td>
+              <td>{{ formatCurrency(voucher.maxDiscountAmount) }}</td>
+              <td>{{ formatCurrency(voucher.minOrderValue) }}</td>
+              <td>
+                <div class="date-line">Từ: {{ formatDateTime(voucher.startDate) }}</div>
+                <div class="date-line">Đến: {{ formatDateTime(voucher.endDate) }}</div>
+              </td>
+              <td>
                   <span :class="voucher.quantity === 0 ? 'text-danger fw-bold' : 'fw-bold'">
                     {{ voucher.quantity }}
                   </span>
-                </td>
-                <td>
-                  <span class="status-badge" :class="{ inactive: !voucher.is_active }">
-                    {{ voucher.is_active ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
+              </td>
+              <td>
+                  <span class="status-badge" :class="{ inactive: !voucher.isActive }">
+                    {{ voucher.isActive ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
                   </span>
-                </td>
-                <td>
-                  <div class="d-flex justify-content-end gap-2">
-                    <button
-                      type="button"
-                      class="icon-button"
-                      title="Sửa voucher"
-                      @click="openEditModal(voucher)"
-                    >
-                      <i class="bi bi-pencil-square"></i>
-                    </button>
-                    <button
-                      type="button"
-                      class="icon-button danger"
-                      title="Xóa voucher"
-                      @click="deleteVoucher(voucher)"
-                    >
-                      <i class="bi bi-trash3"></i>
-                    </button>
-                  </div>
-                </td>
-              </tr>
+              </td>
+              <td>
+                <div class="d-flex justify-content-end gap-2">
+                  <button
+                    type="button"
+                    class="icon-button"
+                    title="Sửa voucher"
+                    @click="openEditModal(voucher)"
+                  >
+                    <i class="bi bi-pencil-square"></i>
+                  </button>
+                  <button
+                    type="button"
+                    class="icon-button danger"
+                    title="Xóa voucher"
+                    @click="deleteVoucher(voucher)"
+                  >
+                    <i class="bi bi-trash3"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
             </tbody>
           </table>
         </div>
@@ -207,11 +208,8 @@
 
               <div>
                 <label class="form-label">Trạng thái</label>
-                <select
-                  v-model="form.is_active"
-                  :disabled="isZeroQuantity(form.quantity)"
-                  class="form-select"
-                >
+                <select v-model="form.is_active" :disabled="isZeroQuantity(form.quantity)"
+                        class="form-select">
                   <option :value="true">Đang sử dụng</option>
                   <option :value="false">Ngừng sử dụng</option>
                 </select>
@@ -219,6 +217,7 @@
                   Số lượng voucher = 0 nên trạng thái tự chuyển thành Ngừng sử dụng.
                 </small>
               </div>
+
             </div>
           </section>
 
@@ -234,21 +233,21 @@
             <div class="wide-field">
               <label class="form-label">Loại giảm giá <span>*</span></label>
               <div class="discount-choice-grid">
-                <label
-                  class="discount-choice"
-                  :class="{ active: form.discount_type === 'PERCENT' }"
-                >
-                  <input v-model="form.discount_type" type="radio" value="PERCENT" />
+                <label class="discount-choice"
+                       :class="{ active: form.discount_type === 'PERCENT' }">
+                  <input v-model="form.discount_type" type="radio" value="PERCENT"/>
                   <span class="discount-choice-text">
-                    <strong>Giảm theo phần trăm</strong>
-                  </span>
+                  <strong>Giảm theo phần trăm</strong>
+
+                </span>
                 </label>
 
                 <label class="discount-choice" :class="{ active: form.discount_type === 'AMOUNT' }">
-                  <input v-model="form.discount_type" type="radio" value="AMOUNT" />
+                  <input v-model="form.discount_type" type="radio" value="AMOUNT"/>
                   <span class="discount-choice-text">
-                    <strong>Giảm tiền trực tiếp</strong>
-                  </span>
+                  <strong>Giảm tiền trực tiếp</strong>
+
+                </span>
                 </label>
               </div>
             </div>
@@ -269,15 +268,12 @@
                   :step="form.discount_type === 'PERCENT' ? 1 : 1000"
                   class="form-control"
                   :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
-                  :placeholder="
-                    form.discount_type === 'PERCENT'
-                      ? 'Nhập %, VD: 10'
-                      : 'Nhập số tiền, VD: 50.000đ'
-                  "
+                  :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000đ'"
+
                 />
                 <span class="input-group-text">{{
-                  form.discount_type === 'PERCENT' ? '%' : 'đ'
-                }}</span>
+                    form.discount_type === 'PERCENT' ? '%' : 'đ'
+                  }}</span>
                 <div v-if="errors.discount_value" class="invalid-feedback">
                   {{ errors.discount_value }}
                 </div>
@@ -302,6 +298,7 @@
                 </div>
               </div>
             </div>
+
           </section>
 
           <section class="form-section">
@@ -317,10 +314,8 @@
               <div>
                 <label class="form-label with-help">
                   Đơn tối thiểu
-                  <i
-                    class="bi bi-question-circle"
-                    title="Áp dụng cho đơn hàng có giá trị từ số tiền này trở lên."
-                  ></i>
+                  <i class="bi bi-question-circle"
+                     title="Áp dụng cho đơn hàng có giá trị từ số tiền này trở lên."></i>
                 </label>
                 <div class="input-group">
                   <input
@@ -355,6 +350,7 @@
                   {{ errors.quantity }}
                 </div>
               </div>
+
             </div>
           </section>
 
@@ -400,6 +396,7 @@
                   {{ errors.time }}
                 </div>
               </div>
+
             </div>
           </section>
 
@@ -413,15 +410,16 @@
           </section>
 
           <div class="form-actions">
-            <button type="button" class="btn btn-soft" @click="resetForm">Làm mới</button>
-            <button
-              type="button"
-              class="btn btn-preview"
-              @click="isPreviewVisible = !isPreviewVisible"
-            >
+            <button type="button" class="btn btn-soft" @click="resetForm">
+              Làm mới
+            </button>
+            <button type="button" class="btn btn-preview"
+                    @click="isPreviewVisible = !isPreviewVisible">
               Xem trước
             </button>
-            <button type="submit" class="btn btn-primary-action">Lưu Voucher</button>
+            <button type="submit" class="btn btn-primary-action" :disabled="loading">
+              {{ loading ? 'Đang lưu...' : 'Lưu Voucher' }}
+            </button>
           </div>
         </form>
       </div>
@@ -430,8 +428,18 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import {computed, reactive, ref, watch, onMounted} from 'vue'
+import {storeToRefs} from 'pinia'
+import {useVoucherStore} from '@/stores/voucherStore'
 import '@/assets/css/Voucher.css'
+
+const voucherStore = useVoucherStore()
+
+const {vouchers, loading, error} = storeToRefs(voucherStore)
+
+onMounted(() => {
+  voucherStore.fetchVouchers()
+})
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const isSubmitted = ref(false)
@@ -450,44 +458,6 @@ const filters = reactive({
   status: 'ALL',
 })
 
-const vouchers = ref([
-  {
-    voucher_id: 1,
-    voucher_code: 'SUMMER2026',
-    discount_value: 10,
-    discount_type: 'PERCENT',
-    max_discount_amount: 100000,
-    min_order_value: 500000,
-    start_date: '2026-06-05T08:00',
-    end_date: '2026-06-10T23:59',
-    quantity: 100,
-    is_active: true,
-  },
-  {
-    voucher_id: 2,
-    voucher_code: 'FREESHIP50K',
-    discount_value: 50000,
-    discount_type: 'AMOUNT',
-    max_discount_amount: null,
-    min_order_value: 300000,
-    start_date: '2026-06-01T00:00',
-    end_date: '2026-06-30T23:59',
-    quantity: 50,
-    is_active: true,
-  },
-  {
-    voucher_id: 3,
-    voucher_code: 'WELCOME15',
-    discount_value: 15,
-    discount_type: 'PERCENT',
-    max_discount_amount: 150000,
-    min_order_value: 800000,
-    start_date: '2026-06-02T00:00',
-    end_date: '2026-06-15T23:59',
-    quantity: 0,
-    is_active: false,
-  },
-])
 
 const defaultForm = {
   voucher_id: null,
@@ -502,7 +472,7 @@ const defaultForm = {
   is_active: true,
 }
 
-const form = reactive({ ...defaultForm })
+const form = reactive({...defaultForm})
 
 const todayDateTime = computed(() => {
   const now = new Date()
@@ -522,8 +492,7 @@ const previewVoucher = computed(() => {
       form.discount_type === 'PERCENT'
         ? `Giảm ${discountValue || 0}%${maxDiscount > 0 ? `, tối đa ${formatCurrency(maxDiscount)}` : ''}`
         : `Giảm trực tiếp ${formatCurrency(discountValue)}`,
-    conditionText:
-      minOrder > 0 ? `Áp dụng cho đơn từ ${formatCurrency(minOrder)}` : 'Áp dụng cho mọi đơn hàng',
+    conditionText: minOrder > 0 ? `Áp dụng cho đơn từ ${formatCurrency(minOrder)}` : 'Áp dụng cho mọi đơn hàng',
   }
 })
 
@@ -531,13 +500,18 @@ const filteredVouchers = computed(() => {
   const keyword = filters.keyword.trim().toLowerCase()
 
   return vouchers.value.filter((voucher) => {
-    const matchKeyword = voucher.voucher_code.toLowerCase().includes(keyword)
+    const voucherCode = voucher.voucherCode?.toLowerCase() || ''
+
+    const matchKeyword = voucherCode.includes(keyword)
+
     const matchType =
-      filters.discountType === 'ALL' || voucher.discount_type === filters.discountType
+      filters.discountType === 'ALL' ||
+      voucher.discountType === filters.discountType
+
     const matchStatus =
       filters.status === 'ALL' ||
-      (filters.status === 'ACTIVE' && voucher.is_active) ||
-      (filters.status === 'INACTIVE' && !voucher.is_active)
+      (filters.status === 'ACTIVE' && voucher.isActive) ||
+      (filters.status === 'INACTIVE' && !voucher.isActive)
 
     return matchKeyword && matchType && matchStatus
   })
@@ -545,9 +519,9 @@ const filteredVouchers = computed(() => {
 
 const stats = computed(() => ({
   total: vouchers.value.length,
-  active: vouchers.value.filter((voucher) => voucher.is_active).length,
-  percent: vouchers.value.filter((voucher) => voucher.discount_type === 'PERCENT').length,
-  amount: vouchers.value.filter((voucher) => voucher.discount_type === 'AMOUNT').length,
+  active: vouchers.value.filter((voucher) => voucher.isActive).length,
+  percent: vouchers.value.filter((voucher) => voucher.discountType === 'PERCENT').length,
+  amount: vouchers.value.filter((voucher) => voucher.discountType === 'AMOUNT').length,
 }))
 
 const errors = computed(() => {
@@ -564,8 +538,8 @@ const errors = computed(() => {
 
   const duplicated = vouchers.value.some((voucher) => {
     return (
-      voucher.voucher_code.toLowerCase() === voucherCode.toLowerCase() &&
-      voucher.voucher_id !== form.voucher_id
+      voucher.voucherCode?.toLowerCase() === voucherCode.toLowerCase() &&
+      voucher.voucherId !== form.voucher_id
     )
   })
 
@@ -573,11 +547,7 @@ const errors = computed(() => {
     result.voucher_code = 'Mã voucher đã tồn tại'
   }
 
-  if (
-    form.discount_value === null ||
-    form.discount_value === '' ||
-    Number(form.discount_value) <= 0
-  ) {
+  if (form.discount_value === null || form.discount_value === '' || Number(form.discount_value) <= 0) {
     result.discount_value = 'Giá trị giảm phải lớn hơn 0'
   }
 
@@ -654,7 +624,7 @@ function isZeroQuantity(quantity) {
   return !Number.isNaN(numberQuantity) && numberQuantity <= 0
 }
 
-function showToast({ type = 'success', title, message }) {
+function showToast({type = 'success', title, message}) {
   toast.show = true
   toast.type = type
   toast.title = title
@@ -674,7 +644,7 @@ function resetFilters() {
 function resetForm() {
   isSubmitted.value = false
   isPreviewVisible.value = false
-  Object.assign(form, { ...defaultForm })
+  Object.assign(form, {...defaultForm})
   isEditing.value = false
   isSubmitted.value = false
 }
@@ -686,22 +656,24 @@ function openCreateModal() {
 
 function openEditModal(voucher) {
   isSubmitted.value = false
+
   Object.assign(form, {
-    voucher_id: voucher.voucher_id,
-    voucher_code: voucher.voucher_code,
-    discount_value: voucher.discount_value,
-    discount_type: voucher.discount_type,
-    max_discount_amount: voucher.max_discount_amount,
-    min_order_value: voucher.min_order_value,
-    start_date: voucher.start_date,
-    end_date: voucher.end_date,
+    voucher_id: voucher.voucherId,
+    voucher_code: voucher.voucherCode,
+    discount_value: voucher.discountValue,
+    discount_type: voucher.discountType,
+    max_discount_amount: voucher.maxDiscountAmount,
+    min_order_value: voucher.minOrderValue,
+    start_date: voucher.startDate,
+    end_date: voucher.endDate,
     quantity: voucher.quantity,
-    is_active: voucher.is_active,
+    is_active: voucher.isActive,
   })
 
   isEditing.value = true
   isModalOpen.value = true
 }
+
 
 function closeModal() {
   isModalOpen.value = false
@@ -711,30 +683,24 @@ function buildPayload() {
   const quantity = Number(form.quantity)
 
   return {
-    voucher_id: form.voucher_id,
-    voucher_code: form.voucher_code.trim().toUpperCase(),
-    discount_value: Number(form.discount_value),
-    discount_type: form.discount_type,
-    max_discount_amount: form.discount_type === 'AMOUNT' ? null : Number(form.max_discount_amount),
-    min_order_value: Number(form.min_order_value || 0),
-    start_date: form.start_date,
-    end_date: form.end_date,
+    voucherCode: form.voucher_code.trim().toUpperCase(),
+    discountValue: Number(form.discount_value),
+    discountType: form.discount_type,
+    maxDiscountAmount:
+      form.discount_type === 'AMOUNT'
+        ? null
+        : Number(form.max_discount_amount),
+    minOrderValue: Number(form.min_order_value || 0),
+    startDate: form.start_date,
+    endDate: form.end_date,
     quantity,
-    is_active: quantity > 0 ? Boolean(form.is_active) : false,
+    isActive: quantity > 0 ? Boolean(form.is_active) : false,
   }
 }
 
-function saveVoucher() {
+async function saveVoucher() {
   isSubmitted.value = true
-  function saveVoucher() {
-    isSubmitted.value = true
 
-    if (Object.keys(errors.value).length > 0) {
-      return
-    }
-
-    // phần lưu voucher bên dưới
-  }
   if (Object.keys(errors.value).length > 0) {
     showToast({
       type: 'error',
@@ -744,56 +710,79 @@ function saveVoucher() {
     return
   }
 
-  const payload = buildPayload()
-  const isUpdate = Boolean(payload.voucher_id)
+  const voucherData = buildPayload()
 
-  if (isUpdate) {
-    const index = vouchers.value.findIndex((voucher) => voucher.voucher_id === payload.voucher_id)
+  if (isEditing.value) {
+    const success = await voucherStore.updateVoucher(form.voucher_id, voucherData)
 
-    if (index !== -1) {
-      vouchers.value[index] = payload
+    if (!success) {
+      showToast({
+        type: 'error',
+        title: 'Cập nhật voucher thất bại',
+        message: voucherStore.error || 'Vui lòng kiểm tra lại dữ liệu.',
+      })
+      return
     }
-  } else {
-    const maxId = Math.max(...vouchers.value.map((voucher) => voucher.voucher_id), 0)
 
-    vouchers.value.unshift({
-      ...payload,
-      voucher_id: maxId + 1,
+    closeModal()
+    resetForm()
+
+    showToast({
+      type: 'success',
+      title: 'Cập nhật voucher thành công',
+      message: `Voucher ${voucherData.voucherCode} đã được cập nhật.`,
     })
+
+    return
+  }
+
+  const success = await voucherStore.addVoucher(voucherData)
+
+  if (!success) {
+    showToast({
+      type: 'error',
+      title: 'Thêm voucher thất bại',
+      message: voucherStore.error || 'Vui lòng kiểm tra lại dữ liệu.',
+    })
+    return
   }
 
   closeModal()
+  resetForm()
 
   showToast({
     type: 'success',
-    title: isUpdate ? 'Cập nhật voucher thành công' : 'Thêm voucher thành công',
+    title: 'Thêm voucher thành công',
     message:
-      payload.quantity <= 0
-        ? 'Voucher đã được lưu và tự chuyển sang Ngừng sử dụng vì số lượng bằng 0.'
-        : `Voucher ${payload.voucher_code} đã được lưu.`,
+      voucherData.quantity <= 0
+        ? 'Voucher đã được thêm và tự chuyển sang Ngừng sử dụng vì số lượng bằng 0.'
+        : `Voucher ${voucherData.voucherCode} đã được thêm.`,
   })
 }
 
-function deleteVoucher(voucher) {
-  const confirmed = window.confirm(`Bạn có chắc muốn xóa voucher ${voucher.voucher_code} không?`)
+async function deleteVoucher(voucher) {
+  const confirmed = window.confirm(`Bạn có chắc muốn xóa voucher ${voucher.voucherCode} không?`)
 
   if (!confirmed) return
+  const success = await voucherStore.deleteVoucherById(voucher.voucherId)
+  if (success) {
+    showToast({
+      type: 'success',
+      title: 'Xóa voucher thành công',
+      message: `Voucher ${voucher.voucherCode} đã được xóa khỏi danh sách.`,
+    })
 
-  vouchers.value = vouchers.value.filter((item) => item.voucher_id !== voucher.voucher_id)
+  }
 
-  showToast({
-    type: 'success',
-    title: 'Xóa voucher thành công',
-    message: `Voucher ${voucher.voucher_code} đã được xóa khỏi danh sách.`,
-  })
+
 }
 
 function formatDiscountValue(voucher) {
-  if (voucher.discount_type === 'PERCENT') {
-    return `${voucher.discount_value}%`
+  if (voucher.discountType === 'PERCENT') {
+    return `${voucher.discountValue}%`
   }
 
-  return formatCurrency(voucher.discount_value)
+  return formatCurrency(voucher.discountValue)
 }
 
 function formatDiscountType(discountType) {
@@ -831,4 +820,6 @@ function formatDateTime(value) {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+
+</style>
