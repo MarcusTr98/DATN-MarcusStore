@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ClientLayout from '@/layouts/ClientLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import BlankLayout from '@/layouts/BlankLayout.vue'
-
+import Profile from '@/views/client/account/Profile.vue'
 const routes = [
   // 1. LUỒNG XÁC THỰC
   {
@@ -21,11 +21,11 @@ const routes = [
         name: 'ResetPassword',
         component: () => import('@/views/auth/ResetPassword.vue'),
       },
-            {
-  path: '/auth/verify-otp',
-  name: 'VerifyOtp',
-  component: () => import('@/views/auth/VerifyOtp.vue'),
-}
+      {
+        path: '/auth/verify-otp',
+        name: 'VerifyOtp',
+        component: () => import('@/views/auth/VerifyOtp.vue'),
+      },
     ],
   },
 
@@ -58,9 +58,9 @@ const routes = [
         component: () => import('@/views/client/checkout/OrderSuccess.vue'),
       },
       {
-        path: 'profile',
-        name: 'Profile',
-        component: () => import('@/views/client/account/Profile.vue'),
+        path: '/profile',
+        name: 'ClientProfile',
+        component: Profile,
       },
       {
         path: 'my-orders',
