@@ -58,26 +58,6 @@ const routes = [
         component: () => import('@/views/client/checkout/OrderSuccess.vue'),
       },
       {
-        path: '/profile',
-        name: 'ClientProfile',
-        component: Profile,
-      },
-      {
-        path: 'my-orders',
-        name: 'MyOrders',
-        component: () => import('@/views/client/account/MyOrders.vue'),
-      },
-      {
-        path: 'my-orders/:id',
-        name: 'OrderDetail',
-        component: () => import('@/views/client/account/OrderDetailView.vue'),
-      },
-      {
-        path: 'wishlist',
-        name: 'Wishlist',
-        component: () => import('@/views/client/account/Wishlist.vue'),
-      },
-      {
         path: 'blog',
         name: 'BlogList',
         component: () => import('@/views/client/cms/BlogList.vue'),
@@ -91,6 +71,39 @@ const routes = [
         path: 'chinh-sach',
         name: 'Policy',
         component: () => import('@/views/client/cms/Policy.vue'),
+      },
+
+      //PROFILE
+      {
+        path: 'profile',
+        component: () => import('@/views/client/account/ProfileLayout.vue'),
+        children: [
+          {
+            path: '',
+            name: 'ClientProfile',
+            component: () => import('@/views/client/account/UserInfo.vue'),
+          },
+          {
+            path: 'addresses',
+            name: 'UserAddresses',
+            component: () => import('@/views/client/account/AddressBook.vue'),
+          },
+          {
+            path: 'orders',
+            name: 'MyOrders',
+            component: () => import('@/views/client/account/MyOrders.vue'),
+          },
+          {
+            path: 'orders/:id',
+            name: 'OrderDetail',
+            component: () => import('@/views/client/account/OrderDetailView.vue'),
+          },
+          {
+            path: 'wishlist',
+            name: 'Wishlist',
+            component: () => import('@/views/client/account/Wishlist.vue'),
+          },
+        ],
       },
     ],
   },
