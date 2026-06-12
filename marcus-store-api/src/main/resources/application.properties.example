@@ -53,6 +53,6 @@ vnpay.payUrl=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 vnpay.returnUrl=http://localhost:5173/order-success
 
 # CẤU HÌNH CLOUDINARY
-cloudinary.cloud-name=dwldxc5fb
-cloudinary.api-key=671381372687819
-cloudinary.api-secret=789TzuCBhCJ5uHtiz1oNVEjouYE
+cloudinary.cloud-name=dyeb3lju6
+cloudinary.api-key=336949236443174
+cloudinary.api-secret=IiIrPDrALvo70daj_FVpCciOuWM
