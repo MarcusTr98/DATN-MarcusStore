@@ -298,7 +298,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import addressApi from '@/api/addressApi'
 import ghnApi from '@/api/ghnApi'
 import MapLocator from '@/components/common/MapLocator.vue'
