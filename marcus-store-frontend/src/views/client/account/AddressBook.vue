@@ -40,56 +40,50 @@
             class="ab-item"
             :class="{ 'ab-item--default': addr.isDefault }"
           >
-            <span v-if="addr.isDefault" class="ab-badge-default">
-              <i class="fas fa-check-circle"></i> Mặc định
-            </span>
+            <div class="ab-item__left">
+              <div class="ab-row1">
+                <span class="ab-name">{{ addr.recipientName }}</span>
+                <span class="ab-sep">·</span>
+                <span class="ab-phone">
+                  <i class="fas fa-phone-alt"></i> {{ addr.phoneNumber }}
+                </span>
+              </div>
+              <p class="ab-detail"><i class="fas fa-home"></i> {{ addr.detailAddress }}</p>
+              <p class="ab-region">
+                <i class="fas fa-map-pin"></i>
+                {{ addr.wardName }}, {{ addr.districtName }}, {{ addr.provinceName }}
+              </p>
+              <p v-if="addr.latitude && addr.longitude" class="ab-coords">
+                <i class="fas fa-crosshairs"></i>
+                {{ addr.latitude.toFixed(5) }}, {{ addr.longitude.toFixed(5) }}
+              </p>
+            </div>
 
-            <div class="ab-item__body">
-              <div class="ab-item__info">
-                <div class="ab-row1">
-                  <span class="ab-name">{{ addr.recipientName }}</span>
-                  <span class="ab-sep">·</span>
-                  <span class="ab-phone">
-                    <i class="fas fa-phone-alt"></i>
-                    {{ addr.phoneNumber }}
-                  </span>
-                </div>
-                <p class="ab-detail"><i class="fas fa-home"></i> {{ addr.detailAddress }}</p>
-                <p class="ab-region">
-                  <i class="fas fa-map-pin"></i>
-                  {{ addr.wardName }}, {{ addr.districtName }}, {{ addr.provinceName }}
-                </p>
-                <p v-if="addr.latitude && addr.longitude" class="ab-coords">
-                  <i class="fas fa-crosshairs"></i>
-                  {{ addr.latitude.toFixed(5) }}, {{ addr.longitude.toFixed(5) }}
-                </p>
+            <div class="ab-item__right">
+              <div class="ab-badge-wrap">
+                <span v-if="addr.isDefault" class="ab-badge-default">
+                  <i class="fas fa-check-circle"></i> Mặc định
+                </span>
               </div>
 
-              <div class="ab-item__actions">
-                <div class="ab-actions-left">
-                  <button class="ab-action-btn ab-action-btn--edit" @click="openModal(addr)">
-                    <i class="fas fa-pen"></i> Sửa
-                  </button>
-                  <button
-                    v-if="!addr.isDefault"
-                    class="ab-action-btn ab-action-btn--delete"
-                    @click="deleteAddress(addr.addressId)"
-                  >
-                    <i class="fas fa-trash"></i> Xóa
-                  </button>
-                </div>
-                <div class="ab-actions-right">
-                  <button
-                    v-if="!addr.isDefault"
-                    class="ab-action-btn ab-action-btn--setdefault"
-                    @click="setDefault(addr.addressId)"
-                  >
-                    <i class="fas fa-star"></i> Đặt mặc định
-                  </button>
-                  <span v-else class="ab-action-default-label">
-                    <i class="fas fa-check-circle"></i> Địa chỉ mặc định
-                  </span>
-                </div>
+              <div class="ab-actions-group">
+                <button class="ab-action-btn ab-action-btn--edit" @click="openModal(addr)">
+                  <i class="fas fa-pen"></i> Sửa
+                </button>
+                <button
+                  v-if="!addr.isDefault"
+                  class="ab-action-btn ab-action-btn--delete"
+                  @click="deleteAddress(addr.addressId)"
+                >
+                  <i class="fas fa-trash"></i> Xóa
+                </button>
+                <button
+                  v-if="!addr.isDefault"
+                  class="ab-action-btn ab-action-btn--setdefault"
+                  @click="setDefault(addr.addressId)"
+                >
+                  Đặt mặc định
+                </button>
               </div>
             </div>
           </div>
