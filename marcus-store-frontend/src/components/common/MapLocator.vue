@@ -175,30 +175,40 @@ const clearPin = () => {
   emit('update:location', { lat: null, lng: null })
 }
 
-const flyToAddress = async (addressText) => {
-  if (!addressText || !map) return
+const flyToAddress = async (addressText, zoomLevel = 14) => {
+  if (!addressText || !map) return false
+
   isFlying.value = true
+
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&accept-language=vi&limit=1&q=${encodeURIComponent(addressText)}`,
     )
     const data = await res.json()
+
     if (data.length > 0) {
       const lat = parseFloat(data[0].lat)
       const lng = parseFloat(data[0].lon)
 
-      map.flyTo([lat, lng], 14, { duration: 1.4, easeLinearity: 0.25 })
+      // Bay tới với mức độ zoom được truyền vào (Tỉnh zoom xa, Phường zoom gần)
+      map.flyTo([lat, lng], zoomLevel, { duration: 1.4, easeLinearity: 0.25 })
 
       setTimeout(() => {
         if (mainMarker) {
           mainMarker.setLatLng([lat, lng])
           currentLat = lat
           currentLng = lng
+          emit('update:location', { lat, lng }) // Cập nhật luôn tọa độ khi bay tới
         }
       }, 1500)
+
+      return true
     }
+
+    return false
   } catch (err) {
-    console.error('[MapLocator] flyToAddress lỗi, giữ nguyên vị trí:', err)
+    console.error('[MapLocator] Lỗi flyToAddress:', err)
+    return false
   } finally {
     setTimeout(() => {
       isFlying.value = false

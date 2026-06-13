@@ -224,8 +224,8 @@
   flex-direction: column;
   justify-content: space-between;
   align-items: flex-end;
-  width: 140px; /* Khóa cứng chiều rộng cột phải */
-  flex-shrink: 0; /* Không cho phép co lại */
+  /* Đã gỡ bỏ khóa width: 140px để khối linh hoạt giãn theo chiều ngang */
+  flex-shrink: 0;
   border-left: 1px dashed var(--border);
   padding-left: 24px;
 }
@@ -246,17 +246,19 @@
   align-items: center;
   gap: 5px;
 }
+
+/* ĐỔI THÀNH HÀNG NGANG TẠI ĐÂY */
 .ab-actions-group {
   display: flex;
-  flex-direction: column;
+  flex-direction: row; /* Đổi từ column sang row */
+  align-items: center;
   gap: 8px;
-  width: 100%;
   margin-top: 16px;
 }
 
 /* Nút Action */
 .ab-action-btn {
-  width: 100%;
+  /* Đã gỡ bỏ width: 100% để nút tự co giãn theo độ dài chữ */
   justify-content: center;
   display: inline-flex;
   align-items: center;
@@ -269,6 +271,7 @@
   cursor: pointer;
   border: 1.5px solid transparent;
   transition: all 0.16s;
+  white-space: nowrap; /* Ép chữ trong nút không bị rớt dòng */
 }
 .ab-action-btn--edit {
   background: var(--blue-light, rgba(37, 99, 235, 0.08));

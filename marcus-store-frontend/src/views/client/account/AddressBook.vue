@@ -386,9 +386,14 @@ const loadProvinces = async () => {
 const onProvinceChange = async () => {
   const selected = ghnData.provinces.find((p) => p.ProvinceID === form.provinceId)
   form.provinceName = selected?.ProvinceName ?? ''
+
+  // Reset cấp dưới
   Object.assign(form, { districtId: '', districtName: '', wardCode: '', wardName: '' })
   ghnData.districts = []
   ghnData.wards = []
+
+  // Kích hoạt bay map tỉnh
+  syncMapPosition()
 
   if (!form.provinceId) return
   ghnLoading.districts = true
@@ -396,7 +401,7 @@ const onProvinceChange = async () => {
     const res = await ghnApi.getDistricts(form.provinceId)
     ghnData.districts = res.data.data
   } catch (err) {
-    console.error('[AddressBook] Không load được quận GHN:', err)
+    console.error('[AddressBook] Lỗi:', err)
   } finally {
     ghnLoading.districts = false
   }
@@ -405,8 +410,13 @@ const onProvinceChange = async () => {
 const onDistrictChange = async () => {
   const selected = ghnData.districts.find((d) => d.DistrictID === form.districtId)
   form.districtName = selected?.DistrictName ?? ''
+
+  // Reset cấp dưới
   Object.assign(form, { wardCode: '', wardName: '' })
   ghnData.wards = []
+
+  // Kích hoạt bay map quận/huyện
+  syncMapPosition()
 
   if (!form.districtId) return
   ghnLoading.wards = true
@@ -414,7 +424,7 @@ const onDistrictChange = async () => {
     const res = await ghnApi.getWards(form.districtId)
     ghnData.wards = res.data.data
   } catch (err) {
-    console.error('[AddressBook] Không load được phường GHN:', err)
+    console.error('[AddressBook] Lỗi:', err)
   } finally {
     ghnLoading.wards = false
   }
@@ -423,18 +433,37 @@ const onDistrictChange = async () => {
 const onWardChange = () => {
   const selected = ghnData.wards.find((w) => w.WardCode === form.wardCode)
   form.wardName = selected?.WardName ?? ''
+
+  // Kích hoạt bay map phường/xã
   syncMapPosition()
 }
 
-const syncMapPosition = () => {
-  const { provinceName, districtName, wardName } = form
-  if (!provinceName || !districtName || !wardName) return
-  const addressString = `${wardName}, ${districtName}, ${provinceName}, Việt Nam`
-  nextTick(() => {
-    mapRef.value?.flyToAddress(addressString)
-  })
-}
+const syncMapPosition = async () => {
+  if (!mapRef.value || !form.provinceName) return
 
+  // 1. Nếu đã chọn đủ 3 cấp => Zoom 15 - phường
+  if (form.wardName && form.districtName && form.provinceName) {
+    const success = await mapRef.value.flyToAddress(
+      `${form.wardName}, ${form.districtName}, ${form.provinceName}, Việt Nam`,
+      15,
+    )
+    if (success) return // Nếu bay thành công thì dừng
+  }
+
+  // 2. Fallback 1: Nếu Phường tìm không ra, hoặc đang ở bước chọn Quận => Zoom 13 - quận/ huyện
+  if (form.districtName && form.provinceName) {
+    const success = await mapRef.value.flyToAddress(
+      `${form.districtName}, ${form.provinceName}, Việt Nam`,
+      13,
+    )
+    if (success) return // Nếu bay thành công thì dừng
+  }
+
+  // 3. Fallback 2: Nếu Quận cũng không ra, hoặc mới chọn ở bước Tỉnh => Zoom 11 - thành phố/ tỉnh
+  if (form.provinceName) {
+    await mapRef.value.flyToAddress(`${form.provinceName}, Việt Nam`, 11)
+  }
+}
 const openModal = async (addr = null) => {
   if (addr) {
     isEditing.value = true
