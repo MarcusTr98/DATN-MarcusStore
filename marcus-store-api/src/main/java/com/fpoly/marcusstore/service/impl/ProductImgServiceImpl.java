@@ -54,6 +54,9 @@ public class ProductImgServiceImpl implements ProductImgService {
 
     @Override
     public ProductImgResponse createProductImg(Integer productId, MultipartFile file, ProductImgRequest imgRequest) {
+        Product product = productRepo.findById(productId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với id: " + productId));
+
         String imageUrl;
         try {
             imageUrl = cloudinaryService.uploadImage(file);
@@ -61,8 +64,11 @@ public class ProductImgServiceImpl implements ProductImgService {
             throw new RuntimeException("Upload ảnh thất bại");
         }
 
-        Product product = productRepo.findById(productId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với id: " + productId));
+        if (Boolean.TRUE.equals(imgRequest.getIsPrimary())) {
+            List<ProductImage> images = imgRepo.findByProduct_ProductId(productId);
+            images.forEach(img -> img.setIsPrimary(false));
+            imgRepo.saveAll(images);
+        }
 
         ProductImage productImage = new ProductImage();
         productImage.setImageUrl(imageUrl);
@@ -78,23 +84,38 @@ public class ProductImgServiceImpl implements ProductImgService {
         ProductImage productImage = imgRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với id: " + id));
 
-        try {
-            String oldPublicId = extractPublicId(productImage.getImageUrl());
-            cloudinaryService.deleteImage(oldPublicId);
-            String newImageUrl = cloudinaryService.uploadImage(file);
-            productImage.setImageUrl(newImageUrl);
-        } catch (IOException e) {
-            throw new RuntimeException("Xử lý ảnh thất bại: ");
+        if (file != null && !file.isEmpty()) {
+            try {
+                String oldPublicId = extractPublicId(productImage.getImageUrl());
+                cloudinaryService.deleteImage(oldPublicId);
+                String newImageUrl = cloudinaryService.uploadImage(file);
+
+                if (!newImageUrl.equals(productImage.getImageUrl())) {
+                    productImage.setImageUrl(newImageUrl);
+                }
+            } catch (IOException e) {
+                throw new RuntimeException("Xử lý ảnh thất bại");
+            }
         }
 
-        productImage.setIsPrimary(imgRequest.getIsPrimary() != null ? imgRequest.getIsPrimary() : false);
-        productImage.setDisplayOrder(imgRequest.getDisplayOrder() != null ? imgRequest.getDisplayOrder() : 0);
+        if (imgRequest.getIsPrimary() != null) {
+            if (Boolean.TRUE.equals(imgRequest.getIsPrimary())) {
+                List<ProductImage> images = imgRepo.findByProduct_ProductId(productImage.getProduct().getProductId());
+                images.forEach(img -> img.setIsPrimary(false));
+                imgRepo.saveAll(images);
+            }
+            productImage.setIsPrimary(imgRequest.getIsPrimary());
+        }
+
+        if (imgRequest.getDisplayOrder() != null) {
+            productImage.setDisplayOrder(imgRequest.getDisplayOrder());
+        }
 
         return toImgResponse(imgRepo.save(productImage));
     }
 
     @Override
-    public void deleteProductImg(Integer id){
+    public void deleteProductImg(Integer id) {
         ProductImage productImage = imgRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với id: " + id));
 

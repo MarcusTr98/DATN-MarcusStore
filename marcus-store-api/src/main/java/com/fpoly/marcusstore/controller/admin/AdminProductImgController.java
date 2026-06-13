@@ -46,9 +46,9 @@ public class AdminProductImgController {
     @PutMapping("/images/{id}")
     public ApiResponse<ProductImgResponse> updateProductImg(
             @PathVariable Integer id,
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "isPrimary", required = false, defaultValue = "false") Boolean isPrimary,
-            @RequestParam(value = "displayOrder", required = false, defaultValue = "0") Integer displayOrder) {
+            @RequestParam(value="file", required = false) MultipartFile file,
+            @RequestParam(value = "isPrimary", required = false) Boolean isPrimary,
+            @RequestParam(value = "displayOrder", required = false) Integer displayOrder) {
 
         ProductImgRequest productImgRequest = new ProductImgRequest();
         productImgRequest.setIsPrimary(isPrimary);
