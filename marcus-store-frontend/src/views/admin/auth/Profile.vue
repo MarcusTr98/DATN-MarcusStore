@@ -12,7 +12,7 @@
       </div>
       <div class="page-header-meta">
         <span class="last-updated-badge">
-          <i class="fas fa-clock me-1"></i> Cập nhật lần cuối: hôm nay
+          <i class="fas fa-clock me-1"></i> Cập nhật lần cuối: {{ lastUpdated || 'Đang tải...' }}
         </span>
       </div>
     </div>
@@ -433,7 +433,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/common/BaseModal.vue'
 import '@/assets/css/profile-admin.css'
-
+const lastUpdated = ref('')
 const isLoading = ref(false)
 const isSavingProfile = ref(false)
 const isChangingPassword = ref(false)
@@ -521,13 +521,15 @@ const fetchProfile = async () => {
   isLoading.value = true
   try {
     const res = await adminProfileApi.getProfile()
-    console.log('[Debug] Dữ liệu trả về từ API:', res.data)
 
     if (res.data && res.data.data) {
       Object.assign(profile, res.data.data)
     } else {
       Object.assign(profile, res.data)
     }
+
+    // thời gian lấy dữ liệu thành công
+    lastUpdated.value = formatDateTime(new Date())
   } catch (error) {
     console.error('Lỗi tải profile', error)
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
@@ -566,6 +568,10 @@ const handleUpdateProfile = async () => {
 
     profileSaved.value = true
     setTimeout(() => (profileSaved.value = false), 3000)
+
+    // sửa lại mốc thời gian ngay khi lưu DB thành công
+    lastUpdated.value = formatDateTime(new Date())
+
     showAlert('success', 'Thành công', 'Thông tin hồ sơ cá nhân đã được lưu vào hệ thống.')
   } catch (error) {
     const resData = error.response?.data
@@ -584,11 +590,24 @@ const handleChangePassword = async () => {
     showAlert('error', 'Lỗi xác nhận', 'Mật khẩu xác nhận không khớp!')
     return
   }
-  // TODO: Gọi API ChangePassword đợi Ngọc
+  // TODO: API đổi mật khẩu - đợi Ngọc làm
   showAlert(
     'info',
     'Chờ ghép nối API',
     'Giao diện Đổi mật khẩu đã xong. Chờ API Backend hoàn thiện để gắn vào.',
   )
+}
+// khai báo giờ
+const formatDateTime = (dateObj) => {
+  if (!dateObj) return ''
+  const pad = (n) => n.toString().padStart(2, '0')
+  const h = pad(dateObj.getHours())
+  const m = pad(dateObj.getMinutes())
+  const s = pad(dateObj.getSeconds())
+  const d = pad(dateObj.getDate())
+  const mo = pad(dateObj.getMonth() + 1)
+  const y = dateObj.getFullYear()
+
+  return `${h}:${m}:${s} - ${d}/${mo}/${y}`
 }
 </script>
