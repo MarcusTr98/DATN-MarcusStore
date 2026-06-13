@@ -1,0 +1,233 @@
+.mlc-wrapper {
+  --red: #d70018;
+  --red-dark: #b5001a;
+  --red-light: rgba(215, 0, 24, 0.1);
+  --green: #22c55e;
+  --green-bg: #f0fdf4;
+  --green-bdr: #86efac;
+  --text-muted: #8b95a1;
+  --border: #e5e7eb;
+  --bg-toolbar: #f8fafc;
+
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Toolbar ── */
+.mlc-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 14px;
+  background: var(--bg-toolbar);
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+}
+.mlc-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  line-height: 1.4;
+}
+.mlc-hint .fas {
+  color: var(--red);
+}
+.mlc-btn-locate {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 16px;
+  background: #fff;
+  border: 1.5px solid var(--red);
+  color: var(--red);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    background 0.18s,
+    color 0.18s,
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.mlc-btn-locate:hover:not(:disabled) {
+  background: var(--red);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(215, 0, 24, 0.28);
+}
+.mlc-btn-locate:active:not(:disabled) {
+  transform: translateY(0);
+}
+.mlc-btn-locate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Map Stage ── */
+.mlc-stage {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1.5px solid var(--border);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07);
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+}
+.mlc-stage--flying {
+  border-color: var(--red);
+  box-shadow:
+    0 0 0 3px var(--red-light),
+    0 4px 22px rgba(0, 0, 0, 0.1);
+}
+.mlc-canvas {
+  height: 320px;
+  width: 100%;
+}
+
+/* Watermark badge */
+.mlc-zoom-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 400;
+  background: rgba(215, 0, 24, 0.85);
+  color: #fff;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
+/* ── Flying Overlay ── */
+.mlc-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  pointer-events: none;
+}
+.mlc-pill {
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 10px 22px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  box-shadow: 0 4px 22px rgba(215, 0, 24, 0.4);
+  pointer-events: auto;
+}
+
+/* ── Pinned Address ── */
+.mlc-pinned {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--green-bg);
+  border: 1.5px solid var(--green-bdr);
+  border-radius: 10px;
+}
+.mlc-pinned__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.mlc-pinned__text {
+  flex: 1;
+  font-size: 12px;
+  color: #166534;
+  line-height: 1.5;
+}
+.mlc-pinned__clear {
+  background: none;
+  border: none;
+  color: #4ade80;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.mlc-pinned__clear:hover {
+  color: #166534;
+}
+
+/* ── Custom red pin icon (Vue compiler passes :deep automatically) ── */
+:deep(.mlc-pin) {
+  position: relative;
+  width: 28px;
+  height: 40px;
+  filter: drop-shadow(0 3px 6px rgba(215, 0, 24, 0.45));
+}
+:deep(.mlc-pin__head) {
+  width: 22px;
+  height: 22px;
+  border-radius: 50% 50% 50% 0;
+  background: linear-gradient(135deg, #d70018, #ff4060);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(215, 0, 24, 0.5);
+  transform: rotate(-45deg);
+  position: absolute;
+  top: 0;
+  left: 3px;
+}
+:deep(.mlc-pin__shadow) {
+  width: 12px;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 50%;
+  filter: blur(2px);
+  position: absolute;
+  bottom: 0;
+  left: 8px;
+}
+
+/* ── Transitions ── */
+.mlc-fade-enter-active,
+.mlc-fade-leave-active {
+  transition: opacity 0.28s;
+}
+.mlc-fade-enter-from,
+.mlc-fade-leave-to {
+  opacity: 0;
+}
+.mlc-slide-enter-active,
+.mlc-slide-leave-active {
+  transition:
+    opacity 0.25s,
+    transform 0.25s;
+}
+.mlc-slide-enter-from,
+.mlc-slide-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}

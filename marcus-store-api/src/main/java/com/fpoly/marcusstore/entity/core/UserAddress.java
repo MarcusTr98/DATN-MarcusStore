@@ -1,4 +1,4 @@
-package com.fpoly.marcusstore.entity.shopping;
+package com.fpoly.marcusstore.entity.core;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fpoly.marcusstore.entity.auth.User;
@@ -9,6 +9,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -22,11 +23,6 @@ public class UserAddress {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "address_id")
     private Integer addressId;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    @JsonIgnore
-    private User user;
 
     @Column(name = "recipient_name", nullable = false, length = 100)
     private String recipientName;
@@ -52,6 +48,22 @@ public class UserAddress {
     @Column(name = "is_default")
     private Boolean isDefault = false;
 
+    // Tọa độ cắm ghim trên Map
+    @Column(name = "latitude", precision = 10, scale = 8)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 11, scale = 8)
+    private BigDecimal longitude;
+
+    @Column(name = "province_id")
+    private Integer provinceId;
+
+    @Column(name = "district_id")
+    private Integer districtId;
+
+    @Column(name = "ward_code", length = 20)
+    private String wardCode;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -59,4 +71,10 @@ public class UserAddress {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Mối quan hệ N-1 với bảng Users
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
+    private User user;
 }
