@@ -339,9 +339,9 @@ import '@/assets/css/Profile.css'
 
 const router = useRouter()
 
-// ==========================================
+//
 // ĐIỀU HƯỚNG SIDEBAR (SCROLL MƯỢT)
-// ==========================================
+//
 const activeSection = ref('section-profile')
 
 const scrollTo = (id) => {
@@ -355,9 +355,9 @@ const scrollTo = (id) => {
   }
 }
 
-// ==========================================
+//
 // 1. HỒ SƠ CÁ NHÂN (Gọi từ API)
-// ==========================================
+//
 const user = reactive({
   username: '',
   email: '',
@@ -428,9 +428,9 @@ const handleLogout = () => {
   router.push('/login')
 }
 
-// ==========================================
+//
 // 2. SỔ ĐỊA CHỈ
-// ==========================================
+//
 const addresses = ref([])
 const isLoadingAddresses = ref(false)
 const showAddressModal = ref(false)
