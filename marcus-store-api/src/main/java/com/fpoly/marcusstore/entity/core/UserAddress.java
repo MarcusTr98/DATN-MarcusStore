@@ -55,6 +55,15 @@ public class UserAddress {
     @Column(name = "longitude", precision = 11, scale = 8)
     private BigDecimal longitude;
 
+    @Column(name = "province_id")
+    private Integer provinceId;
+
+    @Column(name = "district_id")
+    private Integer districtId;
+
+    @Column(name = "ward_code", length = 20)
+    private String wardCode;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

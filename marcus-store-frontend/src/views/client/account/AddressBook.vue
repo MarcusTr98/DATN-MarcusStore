@@ -77,44 +77,87 @@
           <div class="modal-bd custom-scrollbar">
             <form class="row g-3">
               <div class="col-12">
-                <label class="field-lbl"
-                  ><i class="fas fa-crosshairs me-1 text-cps"></i> Vị trí Bản đồ</label
-                >
-                <div class="map-wrap">
-                  <MapLocator
-                    :initialLat="form.latitude"
-                    :initialLng="form.longitude"
-                    @update:location="handleLocation"
-                    @apply-address="applyAddressToForm"
-                  />
-                </div>
+                <p class="fw-bold text-dark mb-1">
+                  <i class="fas fa-user text-danger me-1"></i> 1. Thông tin liên hệ
+                </p>
               </div>
-              <div class="col-12"><hr class="divider-light" /></div>
               <div class="col-md-6">
-                <label class="field-lbl field-lbl--req">Người nhận</label>
+                <label class="field-lbl field-lbl--req">Họ và tên người nhận</label>
                 <input v-model.trim="form.recipientName" type="text" class="f-input" />
               </div>
               <div class="col-md-6">
                 <label class="field-lbl field-lbl--req">Số điện thoại</label>
-                <input v-model.trim="form.phoneNumber" type="text" class="f-input" />
+                <input v-model.trim="form.phoneNumber" type="tel" class="f-input" />
+              </div>
+
+              <div class="col-12 mt-4">
+                <p class="fw-bold text-dark mb-1">
+                  <i class="fas fa-truck text-danger me-1"></i> 2. Khu vực giao hàng (Tính phí ship)
+                </p>
               </div>
               <div class="col-md-4">
                 <label class="field-lbl field-lbl--req">Tỉnh / Thành phố</label>
-                <input v-model.trim="form.provinceName" type="text" class="f-input" />
+                <select v-model="form.provinceId" @change="onProvinceChange" class="f-input">
+                  <option value="" disabled>-- Chọn Tỉnh/TP --</option>
+                  <option v-for="p in ghnData.provinces" :key="p.ProvinceID" :value="p.ProvinceID">
+                    {{ p.ProvinceName }}
+                  </option>
+                </select>
               </div>
               <div class="col-md-4">
-                <label class="field-lbl">Quận / Huyện</label>
-                <input v-model.trim="form.districtName" type="text" class="f-input" />
+                <label class="field-lbl field-lbl--req">Quận / Huyện</label>
+                <select
+                  v-model="form.districtId"
+                  @change="onDistrictChange"
+                  class="f-input"
+                  :disabled="!form.provinceId"
+                >
+                  <option value="" disabled>-- Chọn Quận/Huyện --</option>
+                  <option v-for="d in ghnData.districts" :key="d.DistrictID" :value="d.DistrictID">
+                    {{ d.DistrictName }}
+                  </option>
+                </select>
               </div>
               <div class="col-md-4">
-                <label class="field-lbl">Phường / Xã</label>
-                <input v-model.trim="form.wardName" type="text" class="f-input" />
+                <label class="field-lbl field-lbl--req">Phường / Xã</label>
+                <select
+                  v-model="form.wardCode"
+                  @change="onWardChange"
+                  class="f-input"
+                  :disabled="!form.districtId"
+                >
+                  <option value="" disabled>-- Chọn Phường/Xã --</option>
+                  <option v-for="w in ghnData.wards" :key="w.WardCode" :value="w.WardCode">
+                    {{ w.WardName }}
+                  </option>
+                </select>
               </div>
+
               <div class="col-12">
-                <label class="field-lbl">Số nhà, tên đường</label>
-                <input v-model.trim="form.detailAddress" type="text" class="f-input" />
+                <label class="field-lbl field-lbl--req">Số nhà, Tên đường (Chi tiết)</label>
+                <input
+                  v-model.trim="form.detailAddress"
+                  type="text"
+                  class="f-input"
+                  placeholder="Ví dụ: Số 12, ngõ 34 Bạch Đằng..."
+                />
               </div>
-              <div class="col-12">
+
+              <div class="col-12 mt-4">
+                <p class="fw-bold text-dark mb-1">
+                  <i class="fas fa-crosshairs text-danger me-1"></i> 3. Định vị tọa độ (Tùy chọn)
+                </p>
+                <p class="field-hint mb-2">
+                  Giúp Shipper tìm đường dễ hơn. Bấm "Vị trí của tôi" hoặc tự kéo ghim trên bản đồ.
+                </p>
+                <MapLocator
+                  :initialLat="form.latitude"
+                  :initialLng="form.longitude"
+                  @update:location="handleMapCoordinateUpdate"
+                />
+              </div>
+
+              <div class="col-12 mt-3">
                 <label class="checkbox-lbl">
                   <input v-model="form.isDefault" type="checkbox" class="chk-input" />
                   <span class="chk-box"></span
@@ -148,6 +191,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import addressApi from '@/api/addressApi'
+import ghnApi from '@/api/ghnApi'
 import MapLocator from '@/components/common/MapLocator.vue'
 import BaseModal from '@/components/common/BaseModal.vue'
 
@@ -157,12 +201,17 @@ const showModal = ref(false)
 const isEditing = ref(false)
 const isSaving = ref(false)
 
+const ghnData = reactive({ provinces: [], districts: [], wards: [] })
+
 const form = reactive({
   addressId: null,
   recipientName: '',
   phoneNumber: '',
+  provinceId: '',
   provinceName: '',
+  districtId: '',
   districtName: '',
+  wardCode: '',
   wardName: '',
   detailAddress: '',
   isDefault: false,
@@ -170,7 +219,6 @@ const form = reactive({
   longitude: null,
 })
 
-// Local Alert & Confirm
 const localModal = reactive({
   visible: false,
   type: 'info',
@@ -179,18 +227,16 @@ const localModal = reactive({
   actionCallback: null,
 })
 const showAlert = (type, title, msg) => {
-  localModal.type = type
-  localModal.title = title
-  localModal.message = msg
-  localModal.actionCallback = null
-  localModal.visible = true
+  Object.assign(localModal, { type, title, message: msg, actionCallback: null, visible: true })
 }
 const showConfirm = (title, msg, cb) => {
-  localModal.type = 'confirm'
-  localModal.title = title
-  localModal.message = msg
-  localModal.actionCallback = cb
-  localModal.visible = true
+  Object.assign(localModal, {
+    type: 'confirm',
+    title,
+    message: msg,
+    actionCallback: cb,
+    visible: true,
+  })
 }
 const execConfirm = () => {
   if (localModal.actionCallback) localModal.actionCallback()
@@ -198,6 +244,7 @@ const execConfirm = () => {
 
 onMounted(() => {
   fetchAddresses()
+  loadProvinces()
 })
 
 const fetchAddresses = async () => {
@@ -205,31 +252,93 @@ const fetchAddresses = async () => {
   try {
     const res = await addressApi.getMyAddresses()
     addresses.value = res.data.data
-  } catch (error) {
-    console.error(error)
   } finally {
     isLoading.value = false
   }
 }
 
-const openModal = (addr = null) => {
+// LOAD DATA TỪ GIAO HÀNG NHANH
+const loadProvinces = async () => {
+  try {
+    const res = await ghnApi.getProvinces()
+    ghnData.provinces = res.data.data
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const onProvinceChange = async () => {
+  const selected = ghnData.provinces.find((p) => p.ProvinceID === form.provinceId)
+  form.provinceName = selected?.ProvinceName || ''
+  form.districtId = ''
+  form.districtName = ''
+  form.wardCode = ''
+  form.wardName = ''
+  ghnData.districts = []
+  ghnData.wards = []
+
+  if (form.provinceId) {
+    const res = await ghnApi.getDistricts(form.provinceId)
+    ghnData.districts = res.data.data
+  }
+}
+
+const onDistrictChange = async () => {
+  const selected = ghnData.districts.find((d) => d.DistrictID === form.districtId)
+  form.districtName = selected?.DistrictName || ''
+  form.wardCode = ''
+  form.wardName = ''
+  ghnData.wards = []
+
+  if (form.districtId) {
+    const res = await ghnApi.getWards(form.districtId)
+    ghnData.wards = res.data.data
+  }
+}
+
+const onWardChange = () => {
+  const selected = ghnData.wards.find((w) => w.WardCode === form.wardCode)
+  form.wardName = selected?.WardName || ''
+}
+
+// BẢN ĐỒ CHỈ ĐẨY TỌA ĐỘ VÀO FORM
+const handleMapCoordinateUpdate = (locData) => {
+  form.latitude = locData.lat
+  form.longitude = locData.lng
+}
+
+// ĐÓNG MỞ MODAL & CRUD
+const openModal = async (addr = null) => {
   if (addr) {
     isEditing.value = true
     Object.assign(form, addr)
+    if (form.provinceId) {
+      const res1 = await ghnApi.getDistricts(form.provinceId)
+      ghnData.districts = res1.data.data
+    }
+    if (form.districtId) {
+      const res2 = await ghnApi.getWards(form.districtId)
+      ghnData.wards = res2.data.data
+    }
   } else {
     isEditing.value = false
     Object.assign(form, {
       addressId: null,
       recipientName: localStorage.getItem('USERNAME') || '',
       phoneNumber: '',
+      provinceId: '',
       provinceName: '',
+      districtId: '',
       districtName: '',
+      wardCode: '',
       wardName: '',
       detailAddress: '',
       isDefault: false,
       latitude: null,
       longitude: null,
     })
+    ghnData.districts = []
+    ghnData.wards = []
   }
   showModal.value = true
 }
@@ -238,34 +347,28 @@ const closeModal = () => {
   showModal.value = false
 }
 
-//chạy ngầm mỗi khi ghim bị di chuyển (Chỉ lấy tọa độ, tuyệt đối không chạm vào text)
-const handleLocation = (locData) => {
-  form.latitude = locData.lat
-  form.longitude = locData.lng
-}
-
-//kHI bấm nút Điền xuống Form
-const applyAddressToForm = (locData) => {
-  if (locData.province) form.provinceName = locData.province
-  if (locData.district) form.districtName = locData.district
-  if (locData.ward) form.wardName = locData.ward
-
-  if (locData.detail) {
-    form.detailAddress = locData.detail
-  } else if (locData.full) {
-    form.detailAddress = locData.full.split(',')[0]
-  }
-}
-
 const saveAddress = async () => {
-  if (!form.recipientName || !form.phoneNumber || !form.provinceName) {
-    showAlert('error', 'Thiếu dữ liệu', 'Vui lòng nhập đủ các trường bắt buộc!')
+  // Validate chặt chẽ
+  if (
+    !form.recipientName ||
+    !form.phoneNumber ||
+    !form.provinceId ||
+    !form.districtId ||
+    !form.wardCode ||
+    !form.detailAddress
+  ) {
+    showAlert(
+      'error',
+      'Thiếu thông tin',
+      'Vui lòng điền đầy đủ Thông tin liên hệ và Khu vực giao hàng!',
+    )
     return
   }
   isSaving.value = true
   try {
     if (isEditing.value) await addressApi.updateAddress(form.addressId, form)
     else await addressApi.addAddress(form)
+
     closeModal()
     fetchAddresses()
     showAlert('success', 'Thành công', 'Lưu địa chỉ thành công.')
@@ -280,7 +383,8 @@ const setDefault = async (id) => {
   await addressApi.setAsDefault(id)
   fetchAddresses()
 }
-const deleteAddress = async (id) => {
+
+const deleteAddress = (id) => {
   showConfirm('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa địa chỉ này?', async () => {
     try {
       await addressApi.deleteAddress(id)

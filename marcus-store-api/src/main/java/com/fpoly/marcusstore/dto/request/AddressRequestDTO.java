@@ -34,7 +34,12 @@ public class AddressRequestDTO {
 
     private Boolean isDefault;
 
-    // Tọa độ cắm ghim trên Map (Frontend sẽ gửi lên)
+    // Marcus lưu tọa độ cắm ghim trên Map vì dùng leaflet
     private BigDecimal latitude;
     private BigDecimal longitude;
+
+    // Marcus update vì dùng GHN
+    private Integer provinceId;
+    private Integer districtId;
+    private String wardCode;
 }

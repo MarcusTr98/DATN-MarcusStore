@@ -32,8 +32,11 @@ public class UserAddressServiceImpl implements UserAddressService {
                 .addressId(address.getAddressId())
                 .recipientName(address.getRecipientName())
                 .phoneNumber(address.getPhoneNumber())
+                .provinceId(address.getProvinceId())
                 .provinceName(address.getProvinceName())
+                .districtId(address.getDistrictId())
                 .districtName(address.getDistrictName())
+                .wardCode(address.getWardCode())
                 .wardName(address.getWardName())
                 .detailAddress(address.getDetailAddress())
                 .note(address.getNote())
@@ -71,7 +74,6 @@ public class UserAddressServiceImpl implements UserAddressService {
         // Nếu đây là địa chỉ ĐẦU TIÊN, bắt buộc phải là Mặc định
         boolean isDefault = (currentCount == 0) || Boolean.TRUE.equals(request.getIsDefault());
 
-        // Nếu người dùng chọn là Mặc định => Xóa mặc định của các địa chỉ cũ
         if (isDefault && currentCount > 0) {
             addressRepository.clearDefaultAddress(user.getUserId());
         }
@@ -79,9 +81,15 @@ public class UserAddressServiceImpl implements UserAddressService {
         address.setUser(user);
         address.setRecipientName(request.getRecipientName());
         address.setPhoneNumber(request.getPhoneNumber());
+
+        // GHN Master Data
+        address.setProvinceId(request.getProvinceId());
         address.setProvinceName(request.getProvinceName());
+        address.setDistrictId(request.getDistrictId());
         address.setDistrictName(request.getDistrictName());
+        address.setWardCode(request.getWardCode());
         address.setWardName(request.getWardName());
+
         address.setDetailAddress(request.getDetailAddress());
         address.setNote(request.getNote());
         address.setIsDefault(isDefault);
@@ -98,6 +106,7 @@ public class UserAddressServiceImpl implements UserAddressService {
 
         UserAddress address = addressRepository.findByAddressIdAndUser_UserId(addressId, user.getUserId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy địa chỉ hợp lệ để sửa"));
+
         if (Boolean.TRUE.equals(request.getIsDefault()) && !address.getIsDefault()) {
             addressRepository.clearDefaultAddress(user.getUserId());
             address.setIsDefault(true);
@@ -107,9 +116,15 @@ public class UserAddressServiceImpl implements UserAddressService {
 
         address.setRecipientName(request.getRecipientName());
         address.setPhoneNumber(request.getPhoneNumber());
+
+        // GHN Master Data
+        address.setProvinceId(request.getProvinceId());
         address.setProvinceName(request.getProvinceName());
+        address.setDistrictId(request.getDistrictId());
         address.setDistrictName(request.getDistrictName());
+        address.setWardCode(request.getWardCode());
         address.setWardName(request.getWardName());
+
         address.setDetailAddress(request.getDetailAddress());
         address.setNote(request.getNote());
         address.setLatitude(request.getLatitude());

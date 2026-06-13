@@ -21,4 +21,7 @@ public class AddressResponseDTO {
     private Boolean isDefault;
     private BigDecimal latitude;
     private BigDecimal longitude;
+    private Integer provinceId;
+    private Integer districtId;
+    private String wardCode;
 }
