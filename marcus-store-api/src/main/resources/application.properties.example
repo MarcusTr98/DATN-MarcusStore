@@ -51,3 +51,8 @@ vnpay.tmnCode=J5FYEBIL
 vnpay.hashSecret=S8ZZESV4I6D3GQVSVDU4YUKDDBNNLP2Y
 vnpay.payUrl=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 vnpay.returnUrl=http://localhost:5173/order-success
+
+# CẤU HÌNH CLOUDINARY
+cloudinary.cloud-name=dyeb3lju6
+cloudinary.api-key=336949236443174
+cloudinary.api-secret=IiIrPDrALvo70daj_FVpCciOuWM
