@@ -43,4 +43,5 @@ public class GlobalExceptionHandler {
         ApiResponse<Object> response = new ApiResponse<>(500, "Đã xảy ra lỗi hệ thống: " + ex.getMessage(), null);
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
 }

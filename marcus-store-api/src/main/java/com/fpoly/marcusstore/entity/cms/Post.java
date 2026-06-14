@@ -1,4 +1,4 @@
-package com.fpoly.marcusstore.entity.cms;
+ package com.fpoly.marcusstore.entity.cms;
 
 import com.fpoly.marcusstore.entity.auth.User;
 import jakarta.persistence.*;
