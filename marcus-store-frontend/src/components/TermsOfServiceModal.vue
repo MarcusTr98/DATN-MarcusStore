@@ -258,8 +258,8 @@ const prohibitedItems = [
   align-items: center;
   gap: 7px;
   font-size: 11.5px;
-  font-weight: 600;
-  color: #999;
+  font-weight: 700;
+  color: #1a1a1a;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   margin-bottom: 10px;
