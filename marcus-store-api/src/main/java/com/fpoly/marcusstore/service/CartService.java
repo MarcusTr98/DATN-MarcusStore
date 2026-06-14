@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Cart;
 import com.fpoly.marcusstore.entity.shopping.CartItem;
+import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -25,6 +27,7 @@ public class CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductSkuRepository productSkuRepository;
+    private final UserRepository userRepository; 
     // lấy giá trị thuộc tính của SKU theo tên giá trị
     private String getSkuAttributeValue(ProductSku sku, String attributeName){
         if(sku == null || sku.getAttributeValues() == null){
@@ -40,10 +43,10 @@ public class CartService {
                 .findFirst()
                 .orElse(null);
     }
-    @Transactional(readOnly = true)
+    @Transactional
     public CartResponse getCartDetail() {
         Integer userId = SecurityUtils.getCurrentUserId();
-        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(() -> new RuntimeException("không tìm thấy giỏ hàng của người dùng" + userId));
+        Cart cart = getOrCreateCart(userId);
         Integer cartId = cart.getCartId();
         List<CartItem> cartItems = cartItemRepository.findByCart_CartId(cartId);
         List<CartItemResponse> itemResponses = cartItems.stream().map(item -> {
@@ -91,6 +94,15 @@ public class CartService {
                 .build();
 
     }
+    private Cart getOrCreateCart(Integer userId) {
+    return cartRepository.findByUserUserId(userId)
+            .orElseGet(() -> {
+                Cart newCart = new Cart();
+                newCart.setUser(userRepository.getReferenceById(userId));
+                newCart.setCreatedAt(LocalDateTime.now());
+                return cartRepository.save(newCart);
+            });
+}
 
     @Transactional
     public CartResponse addItemToCart(AddCartItemRequest request) {
