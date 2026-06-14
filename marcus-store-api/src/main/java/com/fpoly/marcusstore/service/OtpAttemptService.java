@@ -18,7 +18,6 @@ public class OtpAttemptService {
             "UPDATE EmailOtps SET attempt_count = attempt_count + 1 WHERE otp_id = :id"
         ).setParameter("id", otpId).executeUpdate();
 
-        // Đọc lại giá trị mới từ DB
         Object result = entityManager.createNativeQuery(
             "SELECT attempt_count FROM EmailOtps WHERE otp_id = :id"
         ).setParameter("id", otpId).getSingleResult();

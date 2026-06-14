@@ -26,13 +26,24 @@ api.interceptors.response.use(
     if (error.response) {
       const status = error.response.status
       switch (status) {
-        case 401:
-          console.error('Lỗi 401: Token hết hạn hoặc chưa đăng nhập!')
-          localStorage.removeItem('ACCESS_TOKEN')
-          localStorage.removeItem('USERNAME')
-          localStorage.removeItem('USER_ROLE')
-          window.location.href = '/auth/login'
+        case 401: {
+        console.error('Lỗi 401: Bạn chưa đăng nhập')
+
+          // Chỉ redirect nếu người dùng đã từng đăng nhập
+          const token = localStorage.getItem('ACCESS_TOKEN')
+
+          if (token) {
+            localStorage.removeItem('ACCESS_TOKEN')
+            localStorage.removeItem('USERNAME')
+            localStorage.removeItem('USER_ROLE')
+
+            window.dispatchEvent(new Event('auth-changed'))
+
+            window.location.href = '/auth/login'
+          }
+
           break
+        }
         case 403:
           console.error('Lỗi 403: Bạn không có quyền truy cập!')
           alert('Bạn không có quyền thực hiện chức năng này!')
