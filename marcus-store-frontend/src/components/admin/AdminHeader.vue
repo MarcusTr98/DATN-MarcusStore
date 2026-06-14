@@ -34,8 +34,7 @@ const router = useRouter()
 const username = ref('')
 
 const loadUser = () => {
-  username.value =
-    localStorage.getItem('USERNAME') || 'Admin'
+  username.value = localStorage.getItem('USERNAME') || 'Admin'
 }
 
 onMounted(() => {
