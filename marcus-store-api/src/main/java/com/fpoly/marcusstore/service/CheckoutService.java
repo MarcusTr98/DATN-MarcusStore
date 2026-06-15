@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.CalculateFeeRequestDTO;
 import com.fpoly.marcusstore.dto.request.CheckoutRequestDTO;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.ProductSku;
@@ -11,6 +12,7 @@ import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
+import com.fpoly.marcusstore.repository.shopping.CartRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,10 @@ public class CheckoutService {
     @Autowired
     private CartItemRepository cartItemRepository;
 
+    // ĐÃ FIX: Thêm CartRepository vào đây để giải quyết lỗi "cannot be resolved"
+    @Autowired
+    private CartRepository cartRepository;
+
     @Autowired
     private ProductSkuRepository productSkuRepository;
 
@@ -45,6 +51,31 @@ public class CheckoutService {
 
     @Autowired
     private GhnService ghnService;
+
+    // Hàm tính phí ship cho Frontend gọi real-time
+    @Transactional(readOnly = true)
+    public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
+        Integer currentUserId = SecurityUtils.getCurrentUserId();
+
+        // 1. Lấy giỏ hàng của User
+        List<CartItem> cartItems = cartItemRepository.findByCart_CartId(
+                cartRepository.findByUserUserId(currentUserId)
+                        .orElseThrow(() -> new RuntimeException("Giỏ hàng rỗng"))
+                        .getCartId());
+
+        if (cartItems.isEmpty())
+            return 0;
+
+        // 2. Tính tổng khối lượng ship
+        int totalWeightGram = 0;
+        for (CartItem item : cartItems) {
+            int weight = item.getSku().getWeightGram() != null ? item.getSku().getWeightGram() : 500;
+            totalWeightGram += (weight * item.getQuantity());
+        }
+
+        // 3. GHN Service
+        return ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(), totalWeightGram);
+    }
 
     @Transactional
     public Order processCheckout(CheckoutRequestDTO req) {
@@ -112,7 +143,7 @@ public class CheckoutService {
             totalWeightGram += itemWeight;
         }
 
-        // 2. TÍNH PHÍ SHIP (GHN)
+        // 2. TÍNH PHÍ SHIP GHN
         Integer shippingFee = ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(),
                 totalWeightGram);
         BigDecimal shippingFeeDecimal = BigDecimal.valueOf(shippingFee);
@@ -132,7 +163,7 @@ public class CheckoutService {
                 throw new RuntimeException("Mã giảm giá đã hết hạn hoặc không hoạt động.");
             }
 
-            // Validate Số lượng (Dùng logic Countdown)
+            // Validate Số lượng
             if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
                 throw new RuntimeException("Mã giảm giá đã hết lượt sử dụng.");
             }

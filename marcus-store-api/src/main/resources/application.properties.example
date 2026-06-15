@@ -57,13 +57,12 @@ cloudinary.cloud-name=dyeb3lju6
 cloudinary.api-key=336949236443174
 cloudinary.api-secret=IiIrPDrALvo70daj_FVpCciOuWM
 
-# GIAO HANG NHANH (GHN)
-ghn.api.token=481d9b47-6663-11f1-968b-a2d7db98b190
-ghn.api.shop-id=5370316
+# GIAO HANG NHANH (GHN) - MOI TRUONG TEST
+ghn.api.token=a5435b66-68cc-11f1-a973-aee5264794df
+ghn.api.shop-id=200703
 
-# URL gọi API tính phí
+#URL
 ghn.api.url.fee=https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/fee
 
-# Địa chỉ Kho hàng (118 Cát Bi, Hải An, Hải Phòng)
 ghn.store.district-id=1526
 ghn.store.ward-code=20310
