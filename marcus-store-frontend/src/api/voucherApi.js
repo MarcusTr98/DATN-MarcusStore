@@ -1,8 +1,11 @@
 import api from '@/utils/api'
 
 const  voucherApi = {
-  getAllVoucher(){
-    return api.get('/admin/vouchers')
+  getAllVoucher(params){
+    return api.get('/admin/vouchers', { params })
+  },
+  getVoucherStats(params) {
+    return api.get('/admin/vouchers/stats', { params })
   },
 
   getOneVoucher(voucherId){

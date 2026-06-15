@@ -1,57 +1,92 @@
 <template>
-  <section class="order-page">
-    <div class="page-heading">
-      <div>
-        <h3>Quản lý đơn hàng</h3>
-        <p>Theo dõi đơn hàng và cập nhật trạng thái theo đúng luồng xử lý.</p>
-      </div>
+  <div class="order-page">
+    <div class="order-shell">
+      <section class="order-hero">
+        <div class="hero-title">
+          <div class="hero-icon">
+            <i class="bi bi-bag-check-fill"></i>
+          </div>
+          <div>
+            <h1>Quản lý đơn hàng</h1>
+            <p>Theo dõi đơn hàng, thanh toán và trạng thái xử lý.</p>
+          </div>
+        </div>
+      </section>
 
-      <div class="stat-pills">
-        <span class="stat-pill"><strong>{{ orders.length }}</strong> tổng đơn</span>
-        <span class="stat-pill"><strong>{{ statusCount.PENDING }}</strong> chờ xác nhận</span>
-        <span class="stat-pill"><strong>{{ statusCount.SHIPPING }}</strong> đang giao</span>
-        <span class="stat-pill"><strong>{{ statusCount.COMPLETED }}</strong> hoàn thành</span>
-      </div>
-    </div>
+      <section class="stats-grid">
+        <article class="stat-card">
+          <span>Tổng đơn</span>
+          <strong>{{ orders.length }}</strong>
+        </article>
 
-    <div class="order-card toolbar-card">
-      <div class="filters">
-        <input
-          v-model.trim="keyword"
-          class="control"
-          type="search"
-          placeholder="Tìm theo mã đơn, người nhận hoặc số điện thoại"
-        />
+        <article class="stat-card">
+          <span>Chờ xác nhận</span>
+          <strong class="text-accent">{{ statusCount.PENDING }}</strong>
+        </article>
 
-        <select v-model="paymentMethod" class="control">
-          <option value="all">Tất cả thanh toán</option>
-          <option value="VNPay">VNPay</option>
-          <option value="COD">COD</option>
-          <option value="MoMo">MoMo</option>
-          <option value="BankTransfer">Chuyển khoản</option>
-        </select>
+        <article class="stat-card">
+          <span>Đang giao</span>
+          <strong>{{ statusCount.SHIPPING }}</strong>
+        </article>
 
-        <select v-model="orderStatus" class="control">
-          <option value="all">Tất cả trạng thái</option>
-          <option v-for="item in statusOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </option>
-        </select>
+        <article class="stat-card">
+          <span>Hoàn thành</span>
+          <strong>{{ statusCount.COMPLETED }}</strong>
+        </article>
+      </section>
 
-        <button class="outline-btn" type="button" @click="resetFilters">Làm mới</button>
-      </div>
-    </div>
+      <section class="toolbar-panel">
+        <div class="row g-3 align-items-end">
+          <div class="col-12 col-lg-5">
+            <label class="form-label">Tìm kiếm</label>
+            <div class="input-group">
+              <span class="input-group-text">
+                <i class="bi bi-search"></i>
+              </span>
+              <input
+                v-model.trim="keyword"
+                type="search"
+                class="form-control"
+                placeholder="Tìm theo mã đơn, người nhận hoặc số điện thoại"
+              />
+            </div>
+          </div>
 
-    <div class="order-card table-card">
-      <div class="table-top">
-        <h4>Danh sách đơn hàng</h4>
-        <span>Hiển thị {{ filteredOrders.length }} đơn hàng</span>
-      </div>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label class="form-label">Thanh toán</label>
+            <select v-model="paymentMethod" class="form-select">
+              <option value="all">Tất cả</option>
+              <option value="VNPay">VNPay</option>
+              <option value="COD">COD</option>
+              <option value="MoMo">MoMo</option>
+              <option value="BankTransfer">Chuyển khoản</option>
+            </select>
+          </div>
 
-      <div class="table-wrap">
-        <table>
-          <thead>
+          <div class="col-12 col-md-6 col-lg-3">
+            <label class="form-label">Trạng thái</label>
+            <select v-model="orderStatus" class="form-select">
+              <option value="all">Tất cả</option>
+              <option v-for="item in statusOptions" :key="item.value" :value="item.value">
+                {{ item.label }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-12 col-lg-1">
+            <button type="button" class="btn btn-soft w-100" title="Xóa lọc" @click="resetFilters">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="table-panel">
+        <div class="table-responsive">
+          <table class="table align-middle order-table mb-0">
+            <thead>
             <tr>
+              <th>ID</th>
               <th>Mã đơn</th>
               <th>Người nhận</th>
               <th>Thành tiền</th>
@@ -59,66 +94,78 @@
               <th>Trạng thái TT</th>
               <th>Trạng thái đơn</th>
               <th>Ngày tạo</th>
-              <th>Thao tác</th>
+              <th class="text-end">Thao tác</th>
             </tr>
-          </thead>
+            </thead>
 
-          <tbody v-if="filteredOrders.length">
-            <tr v-for="order in filteredOrders" :key="order.id">
+            <tbody>
+            <tr v-for="(order, index) in filteredOrders" :key="order.id">
+              <td class="fw-bold">#{{ index + 1 }}</td>
               <td>
-                <span class="main-line">{{ order.orderCode }}</span>
-                <span class="sub-line">{{ getItemCount(order) }} sản phẩm</span>
+                <div class="order-code">{{ order.orderCode }}</div>
+                <small>{{ getItemCount(order) }} sản phẩm</small>
               </td>
               <td>
-                <span class="main-line">{{ order.recipientName }}</span>
-                <span class="sub-line">{{ order.recipientPhone }}</span>
+                <div class="order-code">{{ order.recipientName }}</div>
+                <small>{{ order.recipientPhone }}</small>
               </td>
-              <td>
-                <span class="money">{{ formatCurrency(order.finalAmount) }}</span>
-              </td>
+              <td class="fw-semibold">{{ formatCurrency(order.finalAmount) }}</td>
               <td>{{ paymentMethodMap[order.paymentMethod] || order.paymentMethod }}</td>
               <td>
-                <span class="badge" :class="paymentStatusMap[order.paymentStatus]?.className">
+                <span class="status-badge" :class="paymentStatusMap[order.paymentStatus]?.className">
                   {{ paymentStatusMap[order.paymentStatus]?.label || order.paymentStatus }}
                 </span>
               </td>
               <td>
-                <span class="badge" :class="orderStatusMap[order.orderStatus]?.className">
+                <span class="status-badge" :class="orderStatusMap[order.orderStatus]?.className">
                   {{ orderStatusMap[order.orderStatus]?.label || order.orderStatus }}
                 </span>
               </td>
               <td>
-                <span class="main-line">{{ formatDate(order.createdAt) }}</span>
-                <span class="sub-line">{{ formatTime(order.createdAt) }}</span>
+                <div class="date-line">Ngày: {{ formatDate(order.createdAt) }}</div>
+                <div class="date-line">Giờ: {{ formatTime(order.createdAt) }}</div>
               </td>
               <td>
-                <div class="row-actions">
-                  <button class="action-btn detail-btn" type="button" @click="showOrderDetail(order)">
-                    Chi tiết
+                <div class="d-flex justify-content-end gap-2">
+                  <button
+                    type="button"
+                    class="icon-button"
+                    title="Xem chi tiết"
+                    @click="showOrderDetail(order)"
+                  >
+                    <i class="bi bi-eye"></i>
                   </button>
-                  <button class="action-btn hide-btn" type="button" @click="hideOrder(order)">
-                    Ẩn đơn hàng
+                  <button
+                    type="button"
+                    class="icon-button danger"
+                    title="Ẩn đơn hàng"
+                    @click="hideOrder(order)"
+                  >
+                    <i class="bi bi-eye-slash"></i>
                   </button>
                 </div>
               </td>
             </tr>
-          </tbody>
-        </table>
-
-        <div v-if="!filteredOrders.length" class="empty-state">
-          Không tìm thấy đơn hàng phù hợp.
+            </tbody>
+          </table>
         </div>
-      </div>
+
+        <div v-if="filteredOrders.length === 0" class="empty-state">
+          <i class="bi bi-bag-x"></i>
+          <h3>Không có đơn hàng nào</h3>
+          <p>Hãy thay đổi bộ lọc hoặc làm mới danh sách.</p>
+        </div>
+      </section>
     </div>
 
     <div class="toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
-  </section>
+  </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-
+import '@/assets/css/OrderList.css'
 const router = useRouter()
 const keyword = ref('')
 const paymentMethod = ref('all')
@@ -216,26 +263,6 @@ const statusOptions = Object.entries(orderStatusMap).map(([value, item]) => ({
   label: item.label,
 }))
 
-const statusTransitions = {
-  PENDING: [
-    { value: 'CONFIRMED', label: 'Xác nhận đơn' },
-    { value: 'CANCELLED', label: 'Hủy đơn' },
-  ],
-  CONFIRMED: [
-    { value: 'SHIPPING', label: 'Đang giao hàng' },
-    { value: 'CANCELLED', label: 'Hủy đơn' },
-  ],
-  SHIPPING: [
-    { value: 'COMPLETED', label: 'Giao thành công' },
-    { value: 'FAILED', label: 'Giao thất bại' },
-  ],
-  COMPLETED: [],
-  CANCELLED: [],
-  FAILED: [],
-}
-
-const terminalStatuses = new Set(['COMPLETED', 'CANCELLED', 'FAILED'])
-
 const paymentStatusMap = {
   PAID: { label: 'Đã thanh toán', className: 'confirmed' },
   UNPAID: { label: 'Chưa thanh toán', className: 'pending' },
@@ -293,40 +320,12 @@ const formatTime = (value) =>
 
 const getItemCount = (order) => order.items.reduce((total, item) => total + item.quantity, 0)
 
-const getNextStatuses = (status) => statusTransitions[status] || []
-
-const getDefaultNextStatus = (status) => getNextStatuses(status)[0]?.value || status
-
-const isTerminalStatus = (status) => terminalStatuses.has(status)
-
-const getStatusNote = (status) => {
-  if (isTerminalStatus(status)) {
-    return 'Đơn đã ở trạng thái cuối.'
-  }
-
-  return 'Chỉ hiện các trạng thái hợp lệ.'
-}
-
 const showToast = (message) => {
   toastMessage.value = message
   window.clearTimeout(showToast.timer)
   showToast.timer = window.setTimeout(() => {
     toastMessage.value = ''
   }, 2600)
-}
-
-const updateOrderStatus = (order, nextStatus) => {
-  const allow = getNextStatuses(order.orderStatus).some((item) => item.value === nextStatus)
-  if (!allow) {
-    showToast('Trạng thái chuyển không hợp lệ.')
-    return
-  }
-
-  const oldStatus = orderStatusMap[order.orderStatus]?.label || order.orderStatus
-  order.orderStatus = nextStatus
-  const newStatus = orderStatusMap[nextStatus]?.label || nextStatus
-
-  showToast(`Đã chuyển đơn ${order.orderCode} từ ${oldStatus} sang ${newStatus}.`)
 }
 
 const showOrderDetail = (order) => {
@@ -350,334 +349,5 @@ const resetFilters = () => {
 </script>
 
 <style scoped>
-.order-page {
-  display: grid;
-  gap: 20px;
-  padding: 16px;
-  color: #5e4a54;
-}
 
-.page-heading {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.page-heading h3 {
-  margin: 0;
-  color: #ff4d94;
-  font-size: 34px;
-  font-weight: 850;
-}
-
-.page-heading p {
-  margin: 8px 0 0;
-  color: #6b5660;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.stat-pills {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.stat-pill {
-  padding: 10px 14px;
-  border: 1px solid #ffd4e4;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #6b5660;
-  font-size: 13px;
-  font-weight: 800;
-  box-shadow: 0 8px 18px rgba(94, 74, 84, 0.05);
-}
-
-.stat-pill strong {
-  color: #ff4d94;
-  margin-right: 4px;
-}
-
-.order-card {
-  background: #ffffff;
-  border: 1px solid rgba(255, 220, 233, 0.85);
-  border-radius: 20px;
-  box-shadow: 0 10px 24px rgba(94, 74, 84, 0.07);
-}
-
-.toolbar-card {
-  padding: 22px;
-}
-
-.filters {
-  display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) minmax(170px, 0.8fr) minmax(180px, 0.8fr) auto;
-  gap: 14px;
-  align-items: center;
-}
-
-.control {
-  width: 100%;
-  min-height: 48px;
-  border: 1px solid #ffd4e4;
-  border-radius: 14px;
-  background: #ffffff;
-  color: #5e4a54;
-  outline: none;
-  padding: 0 14px;
-  font-size: 14px;
-  font-weight: 650;
-}
-
-.control:focus {
-  border-color: #ff4d94;
-  box-shadow: 0 0 0 4px rgba(255, 77, 148, 0.12);
-}
-
-.control:disabled {
-  color: #9b8791;
-  background: #fff7fa;
-  cursor: not-allowed;
-}
-
-.outline-btn {
-  min-height: 48px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #ffd4e4;
-  border-radius: 14px;
-  padding: 0 18px;
-  background: #ffffff;
-  color: #5e4a54;
-  font-weight: 850;
-  white-space: nowrap;
-}
-
-.outline-btn:hover {
-  background: #fff0f6;
-}
-
-.table-card {
-  overflow: hidden;
-}
-
-.table-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  padding: 18px 22px;
-  border-bottom: 1px solid rgba(255, 212, 228, 0.7);
-}
-
-.table-top h4 {
-  margin: 0;
-  color: #5e4a54;
-  font-size: 18px;
-  font-weight: 850;
-}
-
-.table-top span {
-  color: #6b5660;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.table-wrap {
-  width: 100%;
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  min-width: 1060px;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-thead th {
-  padding: 18px 16px;
-  background: #fffafb;
-  border-bottom: 1px solid rgba(255, 212, 228, 0.72);
-  color: #5e4a54;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-align: left;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-tbody td {
-  padding: 17px 16px;
-  border-bottom: 1px solid rgba(255, 212, 228, 0.58);
-  vertical-align: middle;
-  color: #5e4a54;
-  font-size: 14px;
-  font-weight: 650;
-}
-
-tbody tr:hover {
-  background: #fff0f6;
-}
-
-tbody tr:last-child td {
-  border-bottom: 0;
-}
-
-.main-line {
-  display: block;
-  color: #5e4a54;
-  font-weight: 900;
-}
-
-.sub-line {
-  display: block;
-  margin-top: 5px;
-  color: #6b5660;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.money {
-  color: #4b3943;
-  font-weight: 900;
-  white-space: nowrap;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 7px 13px;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 1.15;
-  font-weight: 950;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.badge.pending {
-  background: #fff1c7;
-  color: #8a5700;
-}
-
-.badge.confirmed {
-  background: #d9f8ed;
-  color: #087a5b;
-}
-
-.badge.shipping {
-  background: #dff0ff;
-  color: #1d67a6;
-}
-
-.badge.completed {
-  background: #e9ddff;
-  color: #6f3bbd;
-}
-
-.badge.cancelled {
-  background: #f2edf0;
-  color: #8c5f6f;
-}
-
-.badge.failed {
-  background: #ffe2e8;
-  color: #c72250;
-}
-
-.row-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-width: 210px;
-}
-
-.action-btn {
-  min-height: 38px;
-  border-radius: 12px;
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 850;
-  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-}
-
-.action-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 14px rgba(255, 77, 148, 0.12);
-}
-
-.detail-btn {
-  color: #5e4a54;
-  background: #ffffff;
-  border: 1px solid #ffd4e4;
-}
-
-.hide-btn {
-  color: #ff4d94;
-  background: #fff0f6;
-  border: 1px solid #ffd4e4;
-}
-
-.empty-state {
-  padding: 44px 20px;
-  text-align: center;
-  color: #6b5660;
-  font-weight: 800;
-}
-
-.toast {
-  position: fixed;
-  right: 26px;
-  bottom: 26px;
-  max-width: 420px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: #ffffff;
-  border: 1px solid #ffd4e4;
-  box-shadow: 0 18px 38px rgba(94, 74, 84, 0.16);
-  color: #5e4a54;
-  font-weight: 750;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(12px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 100;
-}
-
-.toast.show {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-@media (max-width: 1180px) {
-  .filters {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-@media (max-width: 768px) {
-  .order-page {
-    padding: 12px;
-  }
-
-  .page-heading,
-  .table-top {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .filters {
-    grid-template-columns: 1fr;
-  }
-}
 </style>
