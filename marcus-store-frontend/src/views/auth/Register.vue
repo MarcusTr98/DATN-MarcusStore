@@ -57,71 +57,54 @@
           <div class="grid-form">
             <div class="form-group">
               <label>HỌ VÀ TÊN</label>
-              <input
-                type="text"
-                v-model="registerForm.fullName"
-                placeholder="Nguyễn Văn A"
-                required
-              />
+              <input type="text" v-model="registerForm.fullName" placeholder="Nguyễn Văn A"  />
             </div>
             <div class="form-group">
               <label>TÊN ĐĂNG NHẬP</label>
-              <input
-                type="text"
-                v-model="registerForm.username"
-                placeholder="nguyenvana123"
-                required
-              />
+              <input type="text" v-model="registerForm.username" placeholder="nguyenvana123"  />
             </div>
             <div class="form-group">
               <label>EMAIL</label>
-              <input
-                type="email"
-                v-model="registerForm.email"
-                placeholder="email@example.com"
-                required
-              />
+              <input type="email" v-model="registerForm.email" placeholder="email@example.com"  />
             </div>
             <div class="form-group">
               <label>SỐ ĐIỆN THOẠI</label>
-              <input type="text" v-model="registerForm.phone" placeholder="0901234567" required />
+              <input type="text" v-model="registerForm.phone" placeholder="0901234567"  />
             </div>
             <div class="form-group">
               <label>MẬT KHẨU</label>
               <div class="password-input">
-                <input
-                  :type="showRegisterPassword ? 'text' : 'password'"
-                  v-model="registerForm.password"
-                  placeholder="Tối thiểu 6 ký tự"
-                  required
-                />
+                <input :type="showRegisterPassword ? 'text' : 'password'" v-model="registerForm.password"
+                  placeholder="Tối thiểu 6 ký tự" />
                 <span class="eye" @click="showRegisterPassword = !showRegisterPassword">{{
                   showRegisterPassword ? '🙈' : '👁'
-                }}</span>
+                  }}</span>
               </div>
             </div>
             <div class="form-group">
               <label>XÁC NHẬN MẬT KHẨU</label>
               <div class="password-input">
-                <input
-                  :type="showRegisterConfirm ? 'text' : 'password'"
-                  v-model="registerForm.confirmPassword"
-                  placeholder="Nhập lại mật khẩu"
-                  required
-                />
+                <input :type="showRegisterConfirm ? 'text' : 'password'" v-model="registerForm.confirmPassword"
+                  placeholder="Nhập lại mật khẩu"  />
                 <span class="eye" @click="showRegisterConfirm = !showRegisterConfirm">{{
                   showRegisterConfirm ? '🙈' : '👁'
-                }}</span>
+                  }}</span>
               </div>
             </div>
           </div>
 
           <div class="agree">
-            <input type="checkbox" v-model="registerForm.agree" required />
-            <span
-              >Tôi đồng ý với <a href="#">Điều khoản dịch vụ</a> và
-              <a href="#">Chính sách bảo mật</a></span
-            >
+            <input type="checkbox" v-model="registerForm.agree"  />
+            <span>Tôi đồng ý với   <a href="#" @click.prevent="showTermsModal = true">
+    Điều khoản dịch vụ
+  </a>
+
+  và
+
+  <a href="#" @click.prevent="showPrivacyModal = true">
+    Chính sách bảo mật
+  </a>
+</span>
           </div>
 
           <button class="main-btn" type="submit" :disabled="loading">
@@ -135,17 +118,34 @@
       </div>
     </div>
   </div>
+  <BaseModal 
+  :visible="modal.visible" 
+  :type="modal.type" :title="modal.title" 
+  :message="modal.message"
+  @close="modal.visible = false" />
+  <TermsOfServiceModal 
+  :show="showTermsModal" 
+  @close="showTermsModal = false" />
+
+  <PrivacyPolicyModal 
+  :show="showPrivacyModal" 
+  @close="showPrivacyModal = false" />
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/utils/api'
+import BaseModal from '@/components/BaseModal.vue'
+import PrivacyPolicyModal from '@/components/PrivacyPolicyModal.vue'
+import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
+const showTermsModal = ref(false)
+const showPrivacyModal = ref(false)
 const router = useRouter()
 const showRegisterPassword = ref(false)
 const showRegisterConfirm = ref(false)
 const loading = ref(false)
-// ĐÃ SỬA: Khởi tạo Object Reactive để lưu trữ dữ liệu Form đầu vào
+
 const registerForm = reactive({
   fullName: '',
   username: '',
@@ -155,19 +155,51 @@ const registerForm = reactive({
   confirmPassword: '',
   agree: false,
 })
+const modal = reactive({
+  visible: false,
+  type: 'error',
+  title: '',
+  message: '',
+})
 
-const handleRegister =async  () => {
-   try {
-  if (registerForm.password !== registerForm.confirmPassword) {
-    alert('Mật khẩu xác nhận không trùng khớp!')
-    registerForm.confirmPassword = ''
-    return
-  }
-  if (!registerForm.agree) {
-      alert('Bạn phải đồng ý điều khoản!')
+const showModal = (type, title, message) => {
+  modal.type = type
+  modal.title = title
+  modal.message = message
+  modal.visible = true
+}
+const handleRegister = async () => {
+  try {
+    if (!registerForm.fullName.trim()) {
+      showModal('error', 'Thiếu thông tin', 'Vui lòng nhập họ và tên.')
       return
     }
- loading.value = true
+
+    if (!registerForm.username.trim()) {
+      showModal('error', 'Thiếu thông tin', 'Vui lòng nhập tên đăng nhập.')
+      return
+    }
+
+    if (!registerForm.email.trim()) {
+      showModal('error', 'Thiếu thông tin', 'Vui lòng nhập email.')
+      return
+    }
+
+    if (!registerForm.phone.trim()) {
+      showModal('error', 'Thiếu thông tin', 'Vui lòng nhập số điện thoại.')
+      return
+    }
+
+    if (!registerForm.password.trim()) {
+      showModal('error', 'Thiếu thông tin', 'Vui lòng nhập mật khẩu.')
+      return
+    }
+        if (!registerForm.agree) {
+      showModal('error', 'Chưa đồng ý', 'Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.')
+      return
+    }
+
+    loading.value = true
 
     const payload = {
       username: registerForm.username,
@@ -178,37 +210,76 @@ const handleRegister =async  () => {
     }
 
     const response = await api.post('/auth/register/request', payload)
-       if (response?.data?.success === false) {
-      alert(response.data.message || 'Đăng ký thất bại!')
+
+    if (response?.data?.success === false) {
+      showModal(
+        'error',
+        'Đăng ký thất bại',
+        response.data.message || 'Không thể đăng ký tài khoản.'
+      )
       return
     }
 
-router.push({
-      path: '/auth/verify-otp',
-      query: {
-        email: registerForm.email
-      }
-    })
+    showModal(
+      'success',
+      'Đăng ký thành công',
+      'Mã OTP đã được gửi đến email của bạn.'
+    )
 
+    setTimeout(() => {
+      router.push({
+        path: '/auth/verify-otp',
+        query: {
+          email: registerForm.email,
+        },
+      })
+    }, 1500)
   } catch (error) {
-    alert(error.response?.data?.message || 'Đăng ký thất bại!')
+    const status = error?.response?.status
+    const message = error?.response?.data?.message
+
+    if (status === 400) {
+      showModal(
+        'error',
+        'Thông tin không hợp lệ',
+        message || 'Dữ liệu đăng ký không hợp lệ.'
+      )
+    } else if (status === 409) {
+      showModal(
+        'error',
+        'Tài khoản đã tồn tại',
+        message || 'Tên đăng nhập hoặc email đã được sử dụng.'
+      )
+    } else if (status === 500) {
+      showModal(
+        'error',
+        'Lỗi hệ thống',
+        message || 'Máy chủ đang gặp sự cố.'
+      )
+    } else {
+      showModal(
+        'error',
+        'Đăng ký thất bại',
+        message || 'Không thể kết nối đến máy chủ.'
+      )
+    }
   } finally {
     loading.value = false
   }
 }
-
-
-
 </script>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 .auth-page {
   display: flex;
   min-height: 100vh;
-  width: 100%; /* BẮT BUỘC: Ép component giãn hết chiều ngang hệ thống */
+  width: 100%;
+  /* BẮT BUỘC: Ép component giãn hết chiều ngang hệ thống */
   background: #fff7fa;
 }
+
 * {
   margin: 0;
   padding: 0;
@@ -549,6 +620,7 @@ input:focus {
     font-size: 26px;
   }
 }
+
 @keyframes popupShow {
   from {
     opacity: 0;

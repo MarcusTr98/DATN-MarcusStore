@@ -36,14 +36,16 @@
 import { onMounted, ref, reactive } from 'vue' 
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/utils/api'
-import BaseModal from '@/layouts/BaseModal.vue'
+import BaseModal from '@/components/BaseModal.vue'
 
 const route = useRoute()
 const router = useRouter()
 const otp = ref('')
 const email = route.query.email
+const type = route.query.type
 const loading = ref(false)
-
+const failCount = ref(0)
+const MAX_ATTEMPTS = 3
 
 const modal = reactive({
   visible: false,
@@ -63,29 +65,107 @@ const showModal = (type, title, message) => {
 
 const onModalClose = () => {
   modal.visible = false
+
   if (modal.type === 'success') {
-    router.push('/auth/login')
+
+    if (type === 'forgot-password') {
+
+      router.push('/auth/reset-password')
+
+    } else {
+
+      router.push('/auth/login')
+
+    }
+
+  } else if (failCount.value >= MAX_ATTEMPTS) {
+
+    if (type === 'forgot-password') {
+
+      router.push('/auth/forgot-password')
+
+    } else {
+
+      router.push('/auth/register')
+
+    }
+
   }
 }
-
 const verifyOtp = async () => {
   if (loading.value) return
+
   loading.value = true
 
   try {
-    await api.post('/auth/register/verify', { email, otp: otp.value })
-    showModal('success', 'Thành công', 'Tài khoản đã được xác thực. Bạn có thể đăng nhập ngay!')
+
+    if (type === 'forgot-password') {
+
+      await api.post('/auth/verify-otp', {
+        email,
+        otp: otp.value,
+      })
+     sessionStorage.setItem('allowResetPassword', 'true')
+      showModal(
+        'success',
+        'Thành công',
+        'OTP hợp lệ. Vui lòng đặt lại mật khẩu.'
+      )
+
+    } else {
+
+      await api.post('/auth/register/verify', {
+        email,
+        otp: otp.value,
+      })
+
+      showModal(
+        'success',
+        'Thành công',
+        'Tài khoản đã được xác thực. Bạn có thể đăng nhập ngay!'
+      )
+    }
+
   } catch (e) {
-    const msg = e.response?.data?.message || 'OTP không hợp lệ!'
-    showModal('error', 'Xác thực thất bại', msg)
+
+    failCount.value++
+
+    const msg =
+      e.response?.data?.message ||
+      'OTP không hợp lệ!'
+
+    if (failCount.value >= MAX_ATTEMPTS) {
+
+      showModal(
+        'error',
+        'Sai quá nhiều lần',
+        'Bạn đã nhập sai OTP quá 3 lần.'
+      )
+
+    } else {
+
+      showModal(
+        'error',
+        'Xác thực thất bại',
+        `${msg} (Còn ${
+          MAX_ATTEMPTS - failCount.value
+        } lần thử)`
+      )
+    }
+
   } finally {
     loading.value = false
   }
 }
-
 onMounted(() => {
   if (!email) {
-    router.replace('/auth/register')
+
+    if (type === 'forgot-password') {
+      router.replace('/auth/forgot-password')
+    } else {
+      router.replace('/auth/register')
+    }
+
   }
 })
 </script>

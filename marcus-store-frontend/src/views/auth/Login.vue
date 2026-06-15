@@ -96,12 +96,20 @@
       </div>
     </div>
   </div>
+  <BaseModal
+    :visible="modal.visible"
+    :type="modal.type"
+    :title="modal.title"
+    :message="modal.message"
+    @close="modal.visible = false"
+  />
 </template>
 
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginApi } from '@/api/authApi'
+import BaseModal from '@/components/BaseModal.vue'
 
 const router = useRouter()
 
@@ -114,17 +122,28 @@ const loginForm = reactive({
   password: '',
   rememberMe: false,
 })
-
+const modal = reactive({
+  visible: false,
+  type: 'error',
+  title: '',
+  message: '',
+})
+const showModal = (type, title, message) => {
+  modal.type = type
+  modal.title = title
+  modal.message = message
+  modal.visible = true
+}
 const handleLogin = async () => {
   errorMessage.value = ''
 
   if (!loginForm.username.trim()) {
-    errorMessage.value = 'Vui lòng nhập tên đăng nhập'
+    showModal('error', 'Thiếu thông tin', 'Vui lòng nhập tên đăng nhập hoặc email.')
     return
   }
-
+ 
   if (!loginForm.password.trim()) {
-    errorMessage.value = 'Vui lòng nhập mật khẩu'
+    showModal('error', 'Thiếu thông tin', 'Vui lòng nhập mật khẩu.')
     return
   }
 
@@ -159,14 +178,16 @@ const handleLogin = async () => {
     const status = error?.response?.status
     const message = error?.response?.data?.message
 
-    if (status === 401) {
-      errorMessage.value = message || 'Sai tên đăng nhập hoặc mật khẩu'
+     if (status === 400) {
+      showModal('error', 'Thông tin không hợp lệ', message || 'Tên đăng nhập hoặc mật khẩu không đúng định dạng.')
+    } else if (status === 401) {
+      showModal('error', 'Đăng nhập thất bại', message || 'Sai tên đăng nhập hoặc mật khẩu. Vui lòng thử lại.')
     } else if (status === 403) {
-      errorMessage.value = message || 'Tài khoản đã bị khóa'
+      showModal('error', 'Tài khoản bị khóa', message || 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.')
     } else if (status === 500) {
-      errorMessage.value = message || 'Đã xảy ra lỗi hệ thống'
+      showModal('error', 'Lỗi hệ thống', message || 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau.')
     } else {
-      errorMessage.value = message || 'Không thể kết nối đến máy chủ'
+      showModal('error', 'Mất kết nối', message || 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng.')
     }
   } finally {
     loading.value = false
