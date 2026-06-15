@@ -2,10 +2,13 @@ package com.fpoly.marcusstore.service.impl;
 
 import com.fpoly.marcusstore.dto.request.AddVoucherRequest;
 import com.fpoly.marcusstore.dto.response.VoucherResponse;
+import com.fpoly.marcusstore.dto.response.VoucherStatsResponse;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.service.VoucherService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 
 @Service
@@ -36,9 +38,40 @@ public class VoucherServiceImpl implements VoucherService {
             .build();
     }
     @Override
-    public List<VoucherResponse> getAllVouChers(){
-        return voucherRepository.findAll().stream()
-                .map(this::toResponse).toList();
+    public Page<VoucherResponse> getVouchersPage(String keyword, String discountType, Boolean isActive, Pageable pageable) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        String normalizedDiscountType = normalizeDiscountType(discountType);
+
+        return voucherRepository
+                .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, pageable)
+                .map(this::toResponse);
+    }
+
+    @Override
+    public VoucherStatsResponse getVoucherStats(String keyword, String discountType, Boolean isActive) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        String normalizedDiscountType = normalizeDiscountType(discountType);
+
+        return new VoucherStatsResponse(
+                voucherRepository.countVouchers(normalizedKeyword, normalizedDiscountType, isActive),
+                voucherRepository.countActiveVouchers(normalizedKeyword, normalizedDiscountType, isActive),
+                voucherRepository.countPercentVouchers(normalizedKeyword, normalizedDiscountType, isActive),
+                voucherRepository.countAmountVouchers(normalizedKeyword, normalizedDiscountType, isActive)
+        );
+    }
+
+    private String normalizeKeyword(String keyword) {
+        return keyword == null || keyword.isBlank()
+                ? null
+                : keyword.trim();
+    }
+
+    private String normalizeDiscountType(String discountType) {
+        return discountType == null ||
+                discountType.isBlank() ||
+                "ALL".equalsIgnoreCase(discountType)
+                ? null
+                : discountType.trim().toUpperCase();
     }
 
     @Override
@@ -89,21 +122,27 @@ public class VoucherServiceImpl implements VoucherService {
         return toResponse(saveVoucher);
     }
     private void validateVoucherRequest(AddVoucherRequest request) {
-        if (request.getVoucherCode() == null || request.getVoucherCode().trim().isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Vui lòng nhập mã voucher"
-            );
-        }
+        String discountType = request.getDiscountType() == null
+                ? null
+                : request.getDiscountType().trim().toUpperCase();
 
-        if (request.getDiscountType() == null ||
-                (!"PERCENT".equals(request.getDiscountType()) && !"AMOUNT".equals(request.getDiscountType()))) {
+        if (discountType == null ||
+                (!"PERCENT".equals(discountType) && !"AMOUNT".equals(discountType))) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Loại giảm giá không hợp lệ"
             );
         }
 
+        if ("PERCENT".equals(discountType)) {
+            if (request.getMaxDiscountAmount() == null ||
+                    request.getMaxDiscountAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Số tiền giảm tối đa phải lớn hơn 0"
+                );
+            }
+        }
         if (request.getDiscountValue() == null ||
                 request.getDiscountValue().compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(
@@ -111,53 +150,13 @@ public class VoucherServiceImpl implements VoucherService {
                     "Giá trị giảm phải lớn hơn 0"
             );
         }
-
-        if ("PERCENT".equals(request.getDiscountType()) &&
+        if ("PERCENT".equals(discountType) &&
                 request.getDiscountValue().compareTo(new BigDecimal("100")) > 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Giảm theo phần trăm không được vượt quá 100%"
             );
         }
-
-        if ("PERCENT".equals(request.getDiscountType()) &&
-                (request.getMaxDiscountAmount() == null ||
-                        request.getMaxDiscountAmount().compareTo(BigDecimal.ZERO) <= 0)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Vui lòng nhập số tiền giảm tối đa"
-            );
-        }
-
-        if (request.getMinOrderValue() == null ||
-                request.getMinOrderValue().compareTo(BigDecimal.ZERO) < 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Đơn tối thiểu không được âm"
-            );
-        }
-
-        if (request.getQuantity() == null || request.getQuantity() < 0) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Số lượng phải lớn hơn hoặc bằng 0"
-            );
-        }
-
-        if (request.getStartDate() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Vui lòng chọn ngày bắt đầu"
-            );
-        }
-
-        if (request.getEndDate() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Vui lòng chọn ngày kết thúc"
-            );
-        }
-
         if (!request.getEndDate().isAfter(request.getStartDate())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
