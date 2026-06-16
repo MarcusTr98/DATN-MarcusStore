@@ -13,10 +13,12 @@ import com.fpoly.marcusstore.entity.auth.EmailOTP;
 import com.fpoly.marcusstore.entity.auth.PendingRegistration;
 import com.fpoly.marcusstore.entity.auth.Role;
 import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.entity.shopping.Cart;
 import com.fpoly.marcusstore.repository.auth.EmailOTPRepository;
 import com.fpoly.marcusstore.repository.auth.PendingRegistrationRepository;
 import com.fpoly.marcusstore.repository.auth.RoleRepository;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.shopping.CartRepository;
 
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +36,7 @@ public class AuthRegisterService {
     private final PasswordEncoder passwordEncoder;
     private final OtpService otpService;
     private final EntityManager entityManager; 
-
+    private final CartRepository cartRepository; 
        @Transactional
     public void requestRegister(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -104,7 +106,10 @@ public class AuthRegisterService {
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
-
+        Cart cart = new Cart();
+cart.setUser(user);
+cart.setCreatedAt(LocalDateTime.now());
+cartRepository.save(cart);
         pendingRepository.deleteByEmail(request.getEmail());
 
         return "Đăng ký thành công";

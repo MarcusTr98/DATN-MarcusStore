@@ -1,7 +1,9 @@
 <template>
-  <router-view></router-view>
+  <GlobalSpinner />
+
+  <router-view />
 </template>
 
-<script setup></script>
-
-<style></style>
+<script setup>
+import GlobalSpinner from '@/components/common/GlobalSpinner.vue'
+</script>
