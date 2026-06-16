@@ -1,10 +1,9 @@
 import axios from 'axios'
 
-// 1.Token DEV
-const GHN_TOKEN = 'a5435b66-68cc-11f1-a973-aee5264794df'
+// 1.Token DEV che API
+const GHN_TOKEN = import.meta.env.VITE_GHN_TOKEN
 
 const ghnClient = axios.create({
-  // 2.baseURL sang môi trường Test
   baseURL: 'https://dev-online-gateway.ghn.vn/shiip/public-api/master-data',
   headers: {
     token: GHN_TOKEN,
