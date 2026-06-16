@@ -1,6 +1,14 @@
-import  {defineStore} from "pinia";
+import { defineStore } from 'pinia'
 import voucherApi from '@/api/voucherApi.js'
-// convert dữ liệu từ backend sang frontend
+
+function formatDateTimeLocal(value) {
+  if (!value) {
+    return ''
+  }
+
+  return String(value).slice(0, 16)
+}
+
 function mapVoucher(voucher) {
   return {
     voucherId: voucher.voucherId,
@@ -15,6 +23,7 @@ function mapVoucher(voucher) {
     isActive: Boolean(voucher.isActive),
   }
 }
+
 function mapFieldErrors(errors = {}) {
   const mappedErrors = {
     voucher_code: errors.voucherCode,
@@ -31,6 +40,7 @@ function mapFieldErrors(errors = {}) {
     Object.entries(mappedErrors).filter(([, message]) => Boolean(message))
   )
 }
+
 function mapMessageToFieldError(message = '') {
   if (!message) {
     return {}
@@ -62,6 +72,7 @@ function mapMessageToFieldError(message = '') {
 
   return {}
 }
+
 function getErrorMessage(error) {
   const message = error.response?.data?.message || error.response?.data?.error
 
@@ -71,248 +82,191 @@ function getErrorMessage(error) {
 
   return ''
 }
-  // convert định dạng ngày backend trả về
-function matchesVoucherParams(voucher, params = {}) {
-  const keyword = params.keyword?.trim().toLowerCase()
-  const discountType = params.discountType
-  const isActive = params.isActive
 
-  if (keyword && !voucher.voucherCode?.toLowerCase().includes(keyword)) {
-    return false
-  }
-
-  if (discountType && voucher.discountType !== discountType) {
-    return false
-  }
-
-  if (typeof isActive === 'boolean' && Boolean(voucher.isActive) !== isActive) {
-    return false
-  }
-
-  return true
-}
-function buildStats(vouchers = []) {
+function buildFallbackStats(vouchers = [], totalElements = 0) {
   return {
-    total: vouchers.length,
+    total: totalElements,
     active: vouchers.filter((voucher) => voucher.isActive).length,
     percent: vouchers.filter((voucher) => voucher.discountType === 'PERCENT').length,
     amount: vouchers.filter((voucher) => voucher.discountType === 'AMOUNT').length,
   }
 }
-  function formatDateTimeLocal(value){
-    if(!value){
-      return ''
-    }
-    return String(value).slice(0,16)
-  }
-  export const useVoucherStore = defineStore('voucher', {
-    state: () => ({
-      //lấy danh sách voucher từ API
-      vouchers: [],
-      // Voucher đang được chọn để xem chi tiết
-      selectedVoucher: null,
-      // trạng thái loading khi gọi API
-      loading: false,
-      // lưu lỗi nếu API thất bại
-      error: null,
-      fieldErrors: {},
-      pagination: {
-        page: 0,
-        size: 10,
-        totalPages: 0,
-        totalElements: 0,
-      },
-      stats: {
-        total: 0,
-        active: 0,
-        percent: 0,
-        amount: 0,
-      }
-    }),
-    getters: {
-      totalVoucher: (state) =>{
-        return state.vouchers.length
-      },
-      activeVoucher: (state) => {
-        return state.vouchers.filter((voucher) => voucher.isActive).length
-      },
 
-      percentVoucher: (state) => {
-        return state.vouchers.filter((voucher) => voucher.discountType === 'PERCENT').length
-      },
-
-      amountVoucher: (state) => {
-        return state.vouchers.filter((voucher) => voucher.discountType === 'AMOUNT').length
-      },
+export const useVoucherStore = defineStore('voucher', {
+  state: () => ({
+    vouchers: [],
+    selectedVoucher: null,
+    loading: false,
+    error: null,
+    fieldErrors: {},
+    pagination: {
+      page: 0,
+      size: 10,
+      totalPages: 0,
+      totalElements: 0,
     },
-    actions:{
-      async fetchVouchers(params = {}){
-        try{
-          this.loading = true
-          this.error = null
-          const res = await voucherApi.getAllVoucher(params)
-          const pageData = res.data
-          const isArrayResponse = Array.isArray(pageData)
-          const page = params.page || 0
-          const size = params.size || 10
-          const allVouchers = isArrayResponse
-            ? pageData.map(mapVoucher).filter((voucher) => matchesVoucherParams(voucher, params))
-            : []
-          const vouchersData = isArrayResponse
-            ? allVouchers.slice(page * size, page * size + size)
-            : (pageData.content || [])
+    stats: {
+      total: 0,
+      active: 0,
+      percent: 0,
+      amount: 0,
+    },
+  }),
 
-          this.vouchers = isArrayResponse ? vouchersData : vouchersData.map(mapVoucher)
-          if (isArrayResponse) {
-            this.stats = buildStats(allVouchers)
-          } else {
-            const statsParams = { ...params }
-            delete statsParams.page
-            delete statsParams.size
-            const statsRes = await voucherApi.getVoucherStats(statsParams)
-            this.stats = statsRes.data || {
-              total: pageData.totalElements || 0,
-              active: 0,
-              percent: 0,
-              amount: 0,
-            }
-          }
-          this.pagination = isArrayResponse
-            ? {
-              page,
-              size,
-              totalPages: Math.ceil(allVouchers.length / size),
-              totalElements: allVouchers.length,
-            }
-            : {
-              page: pageData.number || 0,
-              size: pageData.size || params.size || 10,
-              totalPages: pageData.totalPages || 0,
-              totalElements: pageData.totalElements || 0,
-            }
-          return true
-        }catch (error){
-          console.error("có lỗi ở getAllVoucher: ", error)
-          this.vouchers = []
-          this.error = error.response?.data?.message ||
-            error.response?.data?.data ||
-            'Không thể tải danh sách voucher'
-          return false
-        }finally {
-          this.loading = false
-        }
-      },
-      async fetchGetOneVoucher(voucherId){
-        try{
-          this.loading = true
-          this.error = null
-          const res = await  voucherApi.getOneVoucher(voucherId)
-          this.selectedVoucher = mapVoucher(res.data)
-          return this.selectedVoucher
-        }catch (error){
-          console.error("lỗi getOneVoucher: " , error)
-          this.selectedVoucher = null
-          this.error =
-            error.response?.data?.message ||
-            error.response?.data?.data ||
-            'Không thể tải chi tiết voucher'
+  actions: {
+    async fetchVouchers(params = {}) {
+      try {
+        this.loading = true
+        this.error = null
 
-          return null
-        }finally {
-          this.loading = false
+        const res = await voucherApi.getAllVoucher(params)
+        const pageData = res.data
+
+        this.vouchers = (pageData.content || []).map(mapVoucher)
+        this.pagination = {
+          page: pageData.number || 0,
+          size: pageData.size || params.size || 10,
+          totalPages: pageData.totalPages || 0,
+          totalElements: pageData.totalElements || 0,
         }
-      },
-      async deleteVoucherById(voucherId) {
+
         try {
-          this.loading = true
-          this.error = null
-
-          await voucherApi.deleteVoucherById(voucherId)
-
-          this.vouchers = this.vouchers.filter(
-            (voucher) => voucher.voucherId !== voucherId
-          )
-
-          return true
-        } catch (error) {
-          console.error('lỗi deleteVoucherById:', error)
-
-          this.error =
-            error.response?.data?.message ||
-            error.response?.data?.data ||
-            'Không thể xóa voucher'
-
-          return false
-        } finally {
-          this.loading = false
+          const statsRes = await voucherApi.getVoucherStats({})
+          this.stats = statsRes.data || buildFallbackStats(this.vouchers, pageData.totalElements || 0)
+        } catch (statsError) {
+          this.stats = buildFallbackStats(this.vouchers, pageData.totalElements || 0)
         }
-      },
-      async addVoucher(payload) {
-        try {
-          this.loading = true
-          this.error = null
-          this.fieldErrors = {}
 
-          const response = await voucherApi.createVoucher(payload)
+        return true
+      } catch (error) {
+        console.error('có lỗi ở getAllVoucher: ', error)
+        this.vouchers = []
+        this.error =
+          error.response?.data?.message ||
+          error.response?.data?.data ||
+          'Không thể tải danh sách voucher'
 
-          this.vouchers.unshift(response.data)
-
-          return true
-        } catch (error) {
-          console.error('lỗi addVoucher:', error)
-          const message = getErrorMessage(error)
-          this.fieldErrors = {
-            ...mapFieldErrors(error.response?.data?.data),
-            ...mapMessageToFieldError(message),
-          }
-
-          this.error =
-            message ||
-            error.response?.data?.error ||
-            error.response?.data?.data ||
-            'Không thể thêm voucher'
-
-          return false
-        } finally {
-          this.loading = false
-        }
-      },
-      async updateVoucher(voucherId, payload) {
-        try {
-          this.loading = true
-          this.error = null
-          this.fieldErrors = {}
-
-          const response = await voucherApi.updateVoucher(voucherId, payload)
-          const updatedVoucher = mapVoucher(response.data)
-
-          const index = this.vouchers.findIndex(
-            (voucher) => voucher.voucherId === voucherId
-          )
-
-          if (index !== -1) {
-            this.vouchers[index] = updatedVoucher
-          }
-
-          return true
-        } catch (error) {
-          console.error('lỗi updateVoucher:', error)
-          const message = getErrorMessage(error)
-          this.fieldErrors = {
-            ...mapFieldErrors(error.response?.data?.data),
-            ...mapMessageToFieldError(message),
-          }
-
-          this.error =
-            message ||
-            error.response?.data?.error ||
-            error.response?.data?.data ||
-            'Không thể cập nhật voucher'
-
-          return false
-        } finally {
-          this.loading = false
-        }
+        return false
+      } finally {
+        this.loading = false
       }
-    }
-  })
+    },
+
+    async fetchGetOneVoucher(voucherId) {
+      try {
+        this.loading = true
+        this.error = null
+
+        const res = await voucherApi.getOneVoucher(voucherId)
+        this.selectedVoucher = mapVoucher(res.data)
+
+        return this.selectedVoucher
+      } catch (error) {
+        console.error('lỗi getOneVoucher: ', error)
+        this.selectedVoucher = null
+        this.error =
+          error.response?.data?.message ||
+          error.response?.data?.data ||
+          'Không thể tải chi tiết voucher'
+
+        return null
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async deleteVoucherById(voucherId) {
+      try {
+        this.loading = true
+        this.error = null
+
+        await voucherApi.deleteVoucherById(voucherId)
+
+        this.vouchers = this.vouchers.filter(
+          (voucher) => voucher.voucherId !== voucherId
+        )
+
+        return true
+      } catch (error) {
+        console.error('lỗi deleteVoucherById:', error)
+        this.error =
+          error.response?.data?.message ||
+          error.response?.data?.data ||
+          'Không thể xóa voucher'
+
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async addVoucher(payload) {
+      try {
+        this.loading = true
+        this.error = null
+        this.fieldErrors = {}
+
+        const response = await voucherApi.createVoucher(payload)
+        this.vouchers.unshift(mapVoucher(response.data))
+
+        return true
+      } catch (error) {
+        console.error('lỗi addVoucher:', error)
+        const message = getErrorMessage(error)
+
+        this.fieldErrors = {
+          ...mapFieldErrors(error.response?.data?.data),
+          ...mapMessageToFieldError(message),
+        }
+
+        this.error =
+          message ||
+          error.response?.data?.error ||
+          error.response?.data?.data ||
+          'Không thể thêm voucher'
+
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+    async updateVoucher(voucherId, payload) {
+      try {
+        this.loading = true
+        this.error = null
+        this.fieldErrors = {}
+
+        const response = await voucherApi.updateVoucher(voucherId, payload)
+        const updatedVoucher = mapVoucher(response.data)
+        const index = this.vouchers.findIndex(
+          (voucher) => voucher.voucherId === voucherId
+        )
+
+        if (index !== -1) {
+          this.vouchers[index] = updatedVoucher
+        }
+
+        return true
+      } catch (error) {
+        console.error('lỗi updateVoucher:', error)
+        const message = getErrorMessage(error)
+
+        this.fieldErrors = {
+          ...mapFieldErrors(error.response?.data?.data),
+          ...mapMessageToFieldError(message),
+        }
+
+        this.error =
+          message ||
+          error.response?.data?.error ||
+          error.response?.data?.data ||
+          'Không thể cập nhật voucher'
+
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+  },
+})

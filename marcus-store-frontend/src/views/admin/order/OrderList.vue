@@ -56,10 +56,9 @@
             <label class="form-label">Thanh toán</label>
             <select v-model="paymentMethod" class="form-select">
               <option value="all">Tất cả</option>
-              <option value="VNPay">VNPay</option>
-              <option value="COD">COD</option>
-              <option value="MoMo">MoMo</option>
-              <option value="BankTransfer">Chuyển khoản</option>
+              <option v-for="item in paymentOptions" :key="item" :value="item">
+                {{ paymentMethodMap[item] || item }}
+              </option>
             </select>
           </div>
 
@@ -67,8 +66,8 @@
             <label class="form-label">Trạng thái</label>
             <select v-model="orderStatus" class="form-select">
               <option value="all">Tất cả</option>
-              <option v-for="item in statusOptions" :key="item.value" :value="item.value">
-                {{ item.label }}
+              <option v-for="item in orderOptions" :key="item" :value="item">
+                {{ orderStatusMap[item]?.label || item }}
               </option>
             </select>
           </div>
@@ -99,31 +98,31 @@
             </thead>
 
             <tbody>
-            <tr v-for="(order, index) in filteredOrders" :key="order.id">
+            <tr v-for="(orders, index) in filteredOrders" :key="orders.orderId">
               <td class="fw-bold">#{{ index + 1 }}</td>
               <td>
-                <div class="order-code">{{ order.orderCode }}</div>
-                <small>{{ getItemCount(order) }} sản phẩm</small>
+                <div class="order-code">{{ orders.orderCode }}</div>
+                <small>{{ orders.itemCount}} sản phẩm</small>
               </td>
               <td>
-                <div class="order-code">{{ order.recipientName }}</div>
-                <small>{{ order.recipientPhone }}</small>
+                <div class="order-code">{{ orders.recipientName }}</div>
+                <small>{{ orders.recipientPhone }}</small>
               </td>
-              <td class="fw-semibold">{{ formatCurrency(order.finalAmount) }}</td>
-              <td>{{ paymentMethodMap[order.paymentMethod] || order.paymentMethod }}</td>
+              <td class="fw-semibold">{{ formatCurrency(orders.finalAmount) }}</td>
+              <td>{{ paymentMethodMap[orders.paymentMethod] || orders.paymentMethod }}</td>
               <td>
-                <span class="status-badge" :class="paymentStatusMap[order.paymentStatus]?.className">
-                  {{ paymentStatusMap[order.paymentStatus]?.label || order.paymentStatus }}
+                <span class="status-badge" :class="paymentStatusMap[orders.paymentStatus]?.className">
+                  {{ paymentStatusMap[orders.paymentStatus]?.label || orders.paymentStatus }}
                 </span>
               </td>
               <td>
-                <span class="status-badge" :class="orderStatusMap[order.orderStatus]?.className">
-                  {{ orderStatusMap[order.orderStatus]?.label || order.orderStatus }}
+                <span class="status-badge" :class="orderStatusMap[orders.orderStatus]?.className">
+                  {{ orderStatusMap[orders.orderStatus]?.label || orders.orderStatus }}
                 </span>
               </td>
               <td>
-                <div class="date-line">Ngày: {{ formatDate(order.createdAt) }}</div>
-                <div class="date-line">Giờ: {{ formatTime(order.createdAt) }}</div>
+                <div class="date-line">Ngày: {{ formatDate1(orders.createdAt) }}</div>
+                <div class="date-line">Giờ: {{ formatTime1(orders.createdAt) }}</div>
               </td>
               <td>
                 <div class="d-flex justify-content-end gap-2">
@@ -131,7 +130,7 @@
                     type="button"
                     class="icon-button"
                     title="Xem chi tiết"
-                    @click="showOrderDetail(order)"
+                    @click="showOrderDetail(orders)"
                   >
                     <i class="bi bi-eye"></i>
                   </button>
@@ -139,7 +138,7 @@
                     type="button"
                     class="icon-button danger"
                     title="Ẩn đơn hàng"
-                    @click="hideOrder(order)"
+                    @click="hideOrder(orders)"
                   >
                     <i class="bi bi-eye-slash"></i>
                   </button>
@@ -163,90 +162,71 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import OrderListApi from '@/api/orderListApi.js'
 import '@/assets/css/OrderList.css'
+
+const toastMessage = ref('')
 const router = useRouter()
 const keyword = ref('')
 const paymentMethod = ref('all')
 const orderStatus = ref('all')
-const toastMessage = ref('')
 
-const orders = ref([
-  {
-    id: 1,
-    orderCode: 'ORD-20260501-001',
-    recipientName: 'Nguyễn Văn An',
-    recipientPhone: '0983333333',
-    finalAmount: 24490000,
-    paymentMethod: 'VNPay',
-    paymentStatus: 'PAID',
-    orderStatus: 'COMPLETED',
-    createdAt: '2026-05-01 10:30:00',
-    items: [{ quantity: 1 }],
-  },
-  {
-    id: 2,
-    orderCode: 'ORD-20260515-002',
-    recipientName: 'Trần Thị Bình',
-    recipientPhone: '0974444444',
-    finalAmount: 27990000,
-    paymentMethod: 'COD',
-    paymentStatus: 'UNPAID',
-    orderStatus: 'SHIPPING',
-    createdAt: '2026-05-15 14:00:00',
-    items: [{ quantity: 1 }],
-  },
-  {
-    id: 3,
-    orderCode: 'ORD-20260530-003',
-    recipientName: 'Lê Minh Cường',
-    recipientPhone: '0965555555',
-    finalAmount: 29480000,
-    paymentMethod: 'MoMo',
-    paymentStatus: 'PAID',
-    orderStatus: 'CONFIRMED',
-    createdAt: '2026-05-30 09:15:00',
-    items: [{ quantity: 1 }, { quantity: 1 }],
-  },
-  {
-    id: 4,
-    orderCode: 'ORD-20260605-004',
-    recipientName: 'Phạm Thị Dung',
-    recipientPhone: '0956666666',
-    finalAmount: 8990000,
-    paymentMethod: 'BankTransfer',
-    paymentStatus: 'PAID',
-    orderStatus: 'PENDING',
-    createdAt: '2026-06-05 20:00:00',
-    items: [{ quantity: 1 }],
-  },
-  {
-    id: 5,
-    orderCode: 'ORD-20260608-005',
-    recipientName: 'Nguyễn Hoàng Nam',
-    recipientPhone: '0912888999',
-    finalAmount: 6490000,
-    paymentMethod: 'COD',
-    paymentStatus: 'UNPAID',
-    orderStatus: 'CANCELLED',
-    createdAt: '2026-06-08 11:20:00',
-    items: [{ quantity: 1 }],
-  },
-  {
-    id: 6,
-    orderCode: 'ORD-20260610-006',
-    recipientName: 'Vũ Minh Anh',
-    recipientPhone: '0933777666',
-    finalAmount: 19990000,
-    paymentMethod: 'VNPay',
-    paymentStatus: 'PAID',
-    orderStatus: 'FAILED',
-    createdAt: '2026-06-10 16:40:00',
-    items: [{ quantity: 1 }],
-  },
-])
+const orders = ref([])
+const currentPage = ref(0)
+const pageSize = ref(10)
+const totalPages = ref()
+const totalElements = ref()
+const loading = ref(false)
+const error = ref(null)
+const paymentOptions = ref([])
+const orderOptions = ref([])
+async function fetchGetAllOrder(){
+  try {
+    loading.value = true
+    error.value = null
+    const response = await OrderListApi.getAllOrder({
+      page: currentPage.value,
+      size: pageSize.value,
+      keyword: keyword.value || undefined,
+      paymentMethod: paymentMethod.value === 'all' ? undefined : paymentMethod.value,
+      orderStatus: orderStatus.value === 'all' ? undefined : orderStatus.value,
+    })
+    orders.value = response.data.content || []
+    totalPages.value = response.data.totalPages
+    totalElements.value = response.data.totalElements
 
+  }catch (e) {
+  error.value = "không thể tải được giỏ hàng"
+    console.error(e)
+  }finally {
+    loading.value = false
+  }
+ }
+ onMounted(()=> {
+   fetchGetAllOrder()
+   getFilterOption()
+ })
+watch([keyword, paymentMethod, orderStatus], () => {
+  currentPage.value = 0
+  fetchGetAllOrder()
+})
+async function getFilterOption(){
+  const response = await OrderListApi.getFilterOption()
+  paymentOptions.value = response.data.paymentMethods || []
+  orderOptions.value = response.data.orderStatuses || []
+
+}
+const formatDate1 = (value) => {
+  if (!value) return ''
+  return String(value).split(' ')[0]
+}
+
+const formatTime1 = (value) => {
+  if (!value) return ''
+  return String(value).split(' ')[1] || ''
+}
 const hiddenOrderIds = ref([])
 
 const orderStatusMap = {
@@ -258,10 +238,7 @@ const orderStatusMap = {
   FAILED: { label: 'Giao thất bại', className: 'failed' },
 }
 
-const statusOptions = Object.entries(orderStatusMap).map(([value, item]) => ({
-  value,
-  label: item.label,
-}))
+
 
 const paymentStatusMap = {
   PAID: { label: 'Đã thanh toán', className: 'confirmed' },
@@ -276,23 +253,9 @@ const paymentMethodMap = {
   BankTransfer: 'Chuyển khoản',
 }
 
-const filteredOrders = computed(() => {
-  const search = keyword.value.toLowerCase()
-
-  return orders.value.filter((order) => {
-    if (hiddenOrderIds.value.includes(order.id)) return false
-
-    const matchKeyword =
-      !search ||
-      [order.orderCode, order.recipientName, order.recipientPhone].some((value) =>
-        String(value).toLowerCase().includes(search),
-      )
-    const matchPayment = paymentMethod.value === 'all' || order.paymentMethod === paymentMethod.value
-    const matchStatus = orderStatus.value === 'all' || order.orderStatus === orderStatus.value
-
-    return matchKeyword && matchPayment && matchStatus
-  })
-})
+const filteredOrders = computed(() =>
+  orders.value.filter((order) => !hiddenOrderIds.value.includes(order.orderId)),
+)
 
 const statusCount = computed(() =>
   Object.keys(orderStatusMap).reduce((result, status) => {
@@ -308,18 +271,6 @@ const formatCurrency = (value) =>
     maximumFractionDigits: 0,
   }).format(value)
 
-const parseDate = (value) => new Date(value.replace(' ', 'T'))
-
-const formatDate = (value) => parseDate(value).toLocaleDateString('vi-VN')
-
-const formatTime = (value) =>
-  parseDate(value).toLocaleTimeString('vi-VN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-const getItemCount = (order) => order.items.reduce((total, item) => total + item.quantity, 0)
-
 const showToast = (message) => {
   toastMessage.value = message
   window.clearTimeout(showToast.timer)
@@ -329,12 +280,12 @@ const showToast = (message) => {
 }
 
 const showOrderDetail = (order) => {
-  router.push(`/admin/order/${order.id}`)
+  router.push(`/admin/order/${order.orderId}`)
 }
 
 const hideOrder = (order) => {
-  if (!hiddenOrderIds.value.includes(order.id)) {
-    hiddenOrderIds.value.push(order.id)
+  if (!hiddenOrderIds.value.includes(order.orderId)) {
+    hiddenOrderIds.value.push(order.orderId)
   }
 
   showToast(`Đã ẩn đơn ${order.orderCode} khỏi danh sách.`)

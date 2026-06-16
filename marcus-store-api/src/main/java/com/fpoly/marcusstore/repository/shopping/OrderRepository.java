@@ -1,8 +1,14 @@
 package com.fpoly.marcusstore.repository.shopping;
 
 import com.fpoly.marcusstore.entity.shopping.Order;
+
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -11,4 +17,132 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     Optional<Order> findByOrderCode(String orderCode);
 
     List<Order> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
+    @Query("""
+    SELECT o FROM Order o
+    WHERE (:keyword IS NULL
+        OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+        OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+      AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+      AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+    """)
+    Page<Order> searchOrders(
+            @Param("keyword") String keyword,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("orderStatus") String orderStatus,
+            Pageable pageable
+    );
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE (:keyword IS NULL
+            OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+          AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+          AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+        """)
+    long countOrders(
+            @Param("keyword") String keyword,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("orderStatus") String orderStatus
+    );
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE (:keyword IS NULL
+            OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+          AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+          AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+          AND o.orderStatus = 'PENDING'
+        """)
+    long countPendingOrders(
+            @Param("keyword") String keyword,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("orderStatus") String orderStatus
+    );
+
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE (:keyword IS NULL
+            OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+          AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+          AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+          AND o.orderStatus = 'CONFIRMED'
+        """)
+    long countConfirmedOrders(
+            @Param("keyword") String keyword,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("orderStatus") String orderStatus
+    );
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE (:keyword IS NULL
+            OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+          AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+          AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+          AND o.orderStatus = 'SHIPPING'
+        """)
+    long countShippingOrders(
+            @Param("keyword") String keyword,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("orderStatus") String orderStatus
+    );
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE (:keyword IS NULL
+            OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+          AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+          AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+          AND o.orderStatus = 'COMPLETED'
+        """)
+    long countCompletedOrders(
+            @Param("keyword") String keyword,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("orderStatus") String orderStatus
+    );
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE (:keyword IS NULL
+            OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+          AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+          AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+          AND o.orderStatus = 'CANCELLED'
+        """)
+    long countCancelledOrders(
+            @Param("keyword") String keyword,
+            @Param("paymentMethod") String paymentMethod,
+            @Param("orderStatus") String orderStatus
+    );
+    // lấy tổng số sản phẩm trong 1 đơn hàng
+    @Query("""
+    SELECT COALESCE(SUM(oi.quantity), 0)
+    FROM OrderItem oi
+    WHERE oi.order.orderId = :orderId
+""")
+    Integer countItemsByOrderId(@Param("orderId") Integer orderId);
+    @Query("SELECT DISTINCT o.paymentMethod FROM Order o WHERE o.paymentMethod IS NOT NULL")
+    List<String> findDistinctPaymentMethods();
+
+    @Query(value = """
+            SELECT status_code
+            FROM (VALUES
+                ('PENDING', 1),
+                ('CONFIRMED', 2),
+                ('SHIPPING', 3),
+                ('COMPLETED', 4),
+                ('CANCELLED', 5),
+                ('FAILED', 6)
+            ) AS statuses(status_code, sort_order)
+            ORDER BY sort_order
+            """, nativeQuery = true)
+    List<String> findDistinctOrderStatuses();
 }
