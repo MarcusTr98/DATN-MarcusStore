@@ -1,11 +1,6 @@
 <template>
   <div class="checkout-page pt-4">
-    <BaseModal
-      v-if="modal.show"
-      :show="modal.show"
-      :title="modal.title"
-      @close="modal.show = false"
-    >
+    <BaseModal v-if="modal.show" :title="modal.title" @close="modal.show = false">
       <div class="p-3 text-center">
         <p class="mb-4" style="font-size: 15px; color: #374151">{{ modal.message }}</p>
         <button class="btn btn-danger px-4 py-2 rounded-pill" @click="handleModalConfirm">
@@ -452,24 +447,24 @@ import ghnApi from '@/api/ghnApi'
 import api from '@/utils/api'
 
 const router = useRouter()
-
-// UI & Modal State
 const isProcessing = ref(false)
 const isFeeLoading = ref(false)
 const feeError = ref('')
 
 const modal = ref({ show: false, title: 'Thông báo', message: '', action: null })
+
 const showModal = (title, message, action = null) => {
   modal.value = { show: true, title, message, action }
 }
+
 const handleModalConfirm = () => {
   modal.value.show = false
   if (modal.value.action === 'redirect_cart') router.push('/cart')
   if (modal.value.action === 'redirect_login') router.push('/auth/login')
-  if (modal.value.action === 'redirect_success') router.push('/order-success')
+  // Đã gỡ bỏ hành động redirect_success vì giờ ta redirect tự động
 }
 
-// Data State
+// ─── Order & Cart Data
 const cartData = ref({ items: [], totalQuantity: 0, totalAmount: 0 })
 const appliedVoucherCode = ref('')
 const discountAmount = ref(0)
@@ -484,16 +479,10 @@ const orderForm = ref({
   note: '',
 })
 
-// GHN Identifiers
+// ─── GHN
 const toDistrictId = ref(null)
 const toWardCode = ref('')
 
-// Saved Addresses
-const savedAddresses = ref([])
-const selectedAddress = ref(null)
-const activeAddressId = ref(null)
-
-// Dropdown GHN
 const ghnProvinces = ref([])
 const ghnDistricts = ref([])
 const ghnWards = ref([])
@@ -502,31 +491,34 @@ const manualDistrictId = ref(null)
 const manualWardCode = ref('')
 const detailAddress = ref('')
 
-// Computed
+// ─── Saved Addresses
+const savedAddresses = ref([])
+const selectedAddress = ref(null)
+const activeAddressId = ref(null)
+
+// ─── Computed
 const finalAmount = computed(() => {
   const total = (cartData.value.totalAmount ?? 0) - discountAmount.value + shippingFee.value
   return total > 0 ? total : 0
 })
 
-// ─── Utils ──────────────────────────────────────────────────────────────
+const isAddressReady = computed(() => !!toDistrictId.value && !!toWardCode.value)
+
+// ─── Utils
 const formatDeliveryDate = (isoDate) => {
   if (!isoDate) return ''
   try {
     const d = new Date(isoDate)
     return `Dự kiến giao ${d.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}`
-  } catch (error) {
-    console.warn('Lỗi format date:', error)
+  } catch (e) {
+    console.warn('Lỗi format date:', e)
     return ''
   }
 }
 
-// Hàm này export ra template, đảm bảo không có gạch đỏ
-const returnToCart = () => {
-  router.push('/cart')
-}
+const validatePhone = (phone) => /(03|05|07|08|09)\d{8}/.test(phone)
 
-// ─── 1. Phí ship GHN ────────────────────────────────────────────────────
-// Đặt dưới các hàm Utils để tránh lỗi Hoisting
+//1. Phí vận chuyển GHN
 const calculateShippingFee = async () => {
   if (!toDistrictId.value || !toWardCode.value) {
     shippingFee.value = 0
@@ -543,25 +535,23 @@ const calculateShippingFee = async () => {
       toWardCode: toWardCode.value,
     })
 
-    // Xử lý dữ liệu trả về từ Backend
     const feeValue = res.data?.data
     if (typeof feeValue === 'number' && feeValue >= 0) {
       shippingFee.value = feeValue
+      estimatedDelivery.value = formatDeliveryDate(res.data?.expectedDelivery ?? null)
     } else {
       throw new Error('Phí ship không hợp lệ')
     }
   } catch (error) {
     console.error('Lỗi tính phí:', error)
     shippingFee.value = 0
-    feeError.value = 'Chưa thể tính phí ship. Vui lòng kiểm tra địa chỉ kho hàng trên GHN!'
+    feeError.value = 'Không thể tính phí vận chuyển. Vui lòng kiểm tra địa chỉ hoặc thử lại!'
   } finally {
     isFeeLoading.value = false
   }
 }
 
-const recalculateFee = () => calculateShippingFee()
-
-// ─── 2. SỔ ĐỊA CHỈ ─────────────────────────────────────────────────────────
+//2. Sổ địa chỉ
 const fetchMyAddresses = async () => {
   try {
     const res = await addressApi.getMyAddresses()
@@ -590,10 +580,14 @@ const clearSelectedAddress = () => {
   toDistrictId.value = null
   toWardCode.value = ''
   shippingFee.value = 0
+  estimatedDelivery.value = ''
   manualProvinceId.value = null
+  manualDistrictId.value = null
+  manualWardCode.value = ''
+  detailAddress.value = ''
 }
 
-// ─── 3. DROPDOWN GHN ───────────────────────────────────────────────────────
+//3. Dropdown GHN
 const fetchGhnProvinces = async () => {
   try {
     const res = await ghnApi.getProvinces()
@@ -607,7 +601,11 @@ const onManualProvinceChange = async () => {
   manualDistrictId.value = null
   manualWardCode.value = ''
   toDistrictId.value = null
+  toWardCode.value = ''
   shippingFee.value = 0
+  estimatedDelivery.value = ''
+  ghnDistricts.value = []
+  ghnWards.value = []
   if (!manualProvinceId.value) return
 
   try {
@@ -620,8 +618,11 @@ const onManualProvinceChange = async () => {
 
 const onManualDistrictChange = async () => {
   manualWardCode.value = ''
+  toWardCode.value = ''
   toDistrictId.value = manualDistrictId.value ?? null
   shippingFee.value = 0
+  estimatedDelivery.value = ''
+  ghnWards.value = []
   if (!manualDistrictId.value) return
 
   try {
@@ -637,7 +638,7 @@ const onManualWardChange = async () => {
   await calculateShippingFee()
 }
 
-// ─── 4. API PHỤ TRỢ ────────────────────────────────────────────────────────
+//4. API phụ trợ
 const fetchCart = async () => {
   try {
     const res = await cartApi.getCart()
@@ -646,7 +647,7 @@ const fetchCart = async () => {
     if (!cartData.value.items?.length) showModal('Lỗi', 'Giỏ hàng trống!', 'redirect_cart')
   } catch (error) {
     if (error.response?.status === 401)
-      showModal('Cảnh báo', 'Vui lòng đăng nhập.', 'redirect_login')
+      showModal('Cảnh báo', 'Vui lòng đăng nhập để tiếp tục.', 'redirect_login')
   }
 }
 
@@ -655,11 +656,11 @@ const prefillUserEmail = async () => {
     const res = await userApi.getMyProfile()
     orderForm.value.email = res.data?.data?.email ?? ''
   } catch (error) {
-    console.warn('Không thể pre-fill email', error)
+    console.warn('Không thể pre-fill email:', error)
   }
 }
 
-// ─── 5. SUBMIT FORM ────────────────────────────────────────────────────────
+//5. Submit
 const buildShippingAddress = () => {
   if (selectedAddress.value) {
     const a = selectedAddress.value
@@ -676,16 +677,29 @@ const buildShippingAddress = () => {
 const handleCheckout = async () => {
   if (!cartData.value.items?.length) return
 
-  if (feeError.value) {
+  if (!validatePhone(orderForm.value.recipientPhone)) {
     showModal(
-      'Lỗi Vận Chuyển',
-      'Không thể tính phí giao hàng. Vui lòng bấm F5 tải lại trang hoặc chọn địa chỉ khác!',
+      'Số điện thoại không hợp lệ',
+      'Vui lòng nhập số điện thoại Việt Nam hợp lệ (VD: 0901234567).',
     )
     return
   }
 
-  if (!toDistrictId.value || !toWardCode.value) {
-    showModal('Thiếu thông tin', 'Vui lòng chọn đầy đủ địa chỉ giao hàng!')
+  if (!selectedAddress.value && !detailAddress.value.trim()) {
+    showModal('Thiếu thông tin', 'Vui lòng nhập số nhà, tên đường.')
+    return
+  }
+
+  if (!isAddressReady.value) {
+    showModal('Thiếu thông tin', 'Vui lòng chọn đầy đủ địa chỉ giao hàng.')
+    return
+  }
+
+  if (feeError.value) {
+    showModal(
+      'Lỗi vận chuyển',
+      'Không thể tính phí giao hàng. Vui lòng thử lại hoặc chọn địa chỉ khác.',
+    )
     return
   }
 
@@ -706,13 +720,19 @@ const handleCheckout = async () => {
   try {
     const { data } = await api.post('/checkout', payload)
 
+    // Nếu là thanh toán VNPAY, đợi trả URL rồi đá sang trang thanh toán
     if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
       window.location.href = data.data.paymentUrl
       return
     }
-    showModal('Thành công', data?.message || 'Chốt đơn thành công!', 'redirect_success')
+
+    // ĐÃ SỬA: Bỏ gọi Modal phiền phức, Redirect thẳng sang trang Order Success!
+    router.push('/order-success')
   } catch (error) {
-    showModal('Lỗi Đặt Hàng', error.response?.data?.message ?? 'Hệ thống gián đoạn.')
+    showModal(
+      'Lỗi đặt hàng',
+      error.response?.data?.message ?? 'Hệ thống gián đoạn. Vui lòng thử lại.',
+    )
   } finally {
     isProcessing.value = false
   }
