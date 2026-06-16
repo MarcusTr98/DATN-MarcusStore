@@ -71,6 +71,13 @@ public class Order {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // Marcus thêm để tính phí GHN
+    @Column(name = "shipping_fee", precision = 18, scale = 2)
+    private BigDecimal shippingFee;
+    // Marcus thêm để tính phí GHN
+    @Column(name = "tracking_code", length = 100)
+    private String trackingCode;
+
     // Khóa ngoại trỏ về người đặt
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
