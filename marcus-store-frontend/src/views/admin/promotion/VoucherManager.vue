@@ -110,7 +110,7 @@
 
             <tbody>
             <tr v-for="(voucher, index) in filteredVouchers" :key="voucher.voucherId">
-              <td class="fw-bold">#{{ index + 1 }}</td>
+              <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
               <td>
                 <div class="voucher-code">{{ voucher.voucherCode }}</div>
 
@@ -166,6 +166,37 @@
           <i class="bi bi-ticket-perforated"></i>
           <h3>Không có voucher nào</h3>
           <p>Hãy thêm voucher mới hoặc thay đổi bộ lọc.</p>
+        </div>
+
+        <div v-if="pagination.totalPages > 0" class="voucher-pagination">
+          <div class="pagination-summary">
+            Tổng <strong>{{ pagination.totalElements }}</strong> voucher
+          </div>
+          <div class="pagination-controls">
+            <label class="page-size-control">
+              <span>Hiển thị</span>
+              <select v-model.number="pageSize" class="form-select form-select-sm">
+              <option :value="5">5</option>
+              <option :value="10">10</option>
+              <option :value="20">20</option>
+              <option :value="50">50</option>
+            </select>
+            </label>
+            <button type="button" class="pagination-button" :disabled="currentPage === 0" @click="goToPage(currentPage - 1)">
+              Trước
+            </button>
+            <span class="page-indicator">
+              Trang <strong>{{ currentPage + 1 }}</strong> / {{ pagination.totalPages }}
+            </span>
+            <button
+              type="button"
+              class="pagination-button"
+              :disabled="currentPage + 1 >= pagination.totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -424,6 +455,23 @@
         </form>
       </div>
     </div>
+
+    <BaseModal
+      :visible="deleteConfirm.visible"
+      type="confirm"
+      title="Xóa voucher"
+      :message="deleteConfirm.message"
+      @close="closeDeleteConfirm"
+      @confirm="confirmDeleteVoucher"
+    />
+
+    <BaseModal
+      :visible="successModal.visible"
+      type="success"
+      :title="successModal.title"
+      :message="successModal.message"
+      @close="closeSuccessModal"
+    />
   </div>
 </template>
 
@@ -431,14 +479,18 @@
 import {computed, reactive, ref, watch, onMounted} from 'vue'
 import {storeToRefs} from 'pinia'
 import {useVoucherStore} from '@/stores/voucherStore'
+import BaseModal from '@/components/common/BaseModal.vue'
 import '@/assets/css/Voucher.css'
 
 const voucherStore = useVoucherStore()
 
-const {vouchers, loading, error} = storeToRefs(voucherStore)
+const {vouchers, loading, error, fieldErrors, pagination, stats} = storeToRefs(voucherStore)
+
+const currentPage = ref(0)
+const pageSize = ref(10)
 
 onMounted(() => {
-  voucherStore.fetchVouchers()
+  loadVouchers()
 })
 const isModalOpen = ref(false)
 const isEditing = ref(false)
@@ -448,6 +500,18 @@ const isPreviewVisible = ref(false)
 const toast = reactive({
   show: false,
   type: 'success',
+  title: '',
+  message: '',
+})
+
+const deleteConfirm = reactive({
+  visible: false,
+  voucher: null,
+  message: '',
+})
+
+const successModal = reactive({
+  visible: false,
   title: '',
   message: '',
 })
@@ -497,32 +561,8 @@ const previewVoucher = computed(() => {
 })
 
 const filteredVouchers = computed(() => {
-  const keyword = filters.keyword.trim().toLowerCase()
-
-  return vouchers.value.filter((voucher) => {
-    const voucherCode = voucher.voucherCode?.toLowerCase() || ''
-
-    const matchKeyword = voucherCode.includes(keyword)
-
-    const matchType =
-      filters.discountType === 'ALL' ||
-      voucher.discountType === filters.discountType
-
-    const matchStatus =
-      filters.status === 'ALL' ||
-      (filters.status === 'ACTIVE' && voucher.isActive) ||
-      (filters.status === 'INACTIVE' && !voucher.isActive)
-
-    return matchKeyword && matchType && matchStatus
-  })
+  return vouchers.value
 })
-
-const stats = computed(() => ({
-  total: vouchers.value.length,
-  active: vouchers.value.filter((voucher) => voucher.isActive).length,
-  percent: vouchers.value.filter((voucher) => voucher.discountType === 'PERCENT').length,
-  amount: vouchers.value.filter((voucher) => voucher.discountType === 'AMOUNT').length,
-}))
 
 const errors = computed(() => {
   if (!isSubmitted.value) {
@@ -593,7 +633,10 @@ const errors = computed(() => {
     }
   }
 
-  return result
+  return {
+    ...result,
+    ...fieldErrors.value,
+  }
 })
 
 watch(
@@ -613,6 +656,19 @@ watch(
     }
   },
 )
+
+watch(
+  () => [filters.keyword, filters.discountType, filters.status],
+  () => {
+    currentPage.value = 0
+    loadVouchers()
+  },
+)
+
+watch(pageSize, () => {
+  currentPage.value = 0
+  loadVouchers()
+})
 
 function isZeroQuantity(quantity) {
   if (quantity === null || quantity === '') {
@@ -635,15 +691,54 @@ function showToast({type = 'success', title, message}) {
   }, 2500)
 }
 
+function showSuccessModal({title, message}) {
+  successModal.visible = true
+  successModal.title = title
+  successModal.message = message
+}
+
+function closeSuccessModal() {
+  successModal.visible = false
+  successModal.title = ''
+  successModal.message = ''
+}
+
 function resetFilters() {
   filters.keyword = ''
   filters.discountType = 'ALL'
   filters.status = 'ALL'
 }
 
+function buildVoucherQuery() {
+  return {
+    page: currentPage.value,
+    size: pageSize.value,
+    keyword: filters.keyword || undefined,
+    discountType: filters.discountType === 'ALL' ? undefined : filters.discountType,
+    isActive:
+      filters.status === 'ALL'
+        ? undefined
+        : filters.status === 'ACTIVE',
+  }
+}
+
+function loadVouchers() {
+  return voucherStore.fetchVouchers(buildVoucherQuery())
+}
+
+function goToPage(page) {
+  if (page < 0 || page >= pagination.value.totalPages) {
+    return
+  }
+
+  currentPage.value = page
+  loadVouchers()
+}
+
 function resetForm() {
   isSubmitted.value = false
   isPreviewVisible.value = false
+  voucherStore.fieldErrors = {}
   Object.assign(form, {...defaultForm})
   isEditing.value = false
   isSubmitted.value = false
@@ -656,6 +751,7 @@ function openCreateModal() {
 
 function openEditModal(voucher) {
   isSubmitted.value = false
+  voucherStore.fieldErrors = {}
 
   Object.assign(form, {
     voucher_id: voucher.voucherId,
@@ -700,13 +796,9 @@ function buildPayload() {
 
 async function saveVoucher() {
   isSubmitted.value = true
+  voucherStore.fieldErrors = {}
 
   if (Object.keys(errors.value).length > 0) {
-    showToast({
-      type: 'error',
-      title: 'Chưa thể lưu voucher',
-      message: 'Vui lòng kiểm tra lại các thông tin bị báo lỗi.',
-    })
     return
   }
 
@@ -716,6 +808,10 @@ async function saveVoucher() {
     const success = await voucherStore.updateVoucher(form.voucher_id, voucherData)
 
     if (!success) {
+      if (Object.keys(voucherStore.fieldErrors).length > 0) {
+        return
+      }
+
       showToast({
         type: 'error',
         title: 'Cập nhật voucher thất bại',
@@ -726,9 +822,9 @@ async function saveVoucher() {
 
     closeModal()
     resetForm()
+    loadVouchers()
 
-    showToast({
-      type: 'success',
+    showSuccessModal({
       title: 'Cập nhật voucher thành công',
       message: `Voucher ${voucherData.voucherCode} đã được cập nhật.`,
     })
@@ -739,6 +835,10 @@ async function saveVoucher() {
   const success = await voucherStore.addVoucher(voucherData)
 
   if (!success) {
+    if (Object.keys(voucherStore.fieldErrors).length > 0) {
+      return
+    }
+
     showToast({
       type: 'error',
       title: 'Thêm voucher thất bại',
@@ -749,9 +849,9 @@ async function saveVoucher() {
 
   closeModal()
   resetForm()
+  loadVouchers()
 
-  showToast({
-    type: 'success',
+  showSuccessModal({
     title: 'Thêm voucher thành công',
     message:
       voucherData.quantity <= 0
@@ -760,21 +860,39 @@ async function saveVoucher() {
   })
 }
 
-async function deleteVoucher(voucher) {
-  const confirmed = window.confirm(`Bạn có chắc muốn xóa voucher ${voucher.voucherCode} không?`)
+function deleteVoucher(voucher) {
+  deleteConfirm.voucher = voucher
+  deleteConfirm.message = `Bạn có chắc muốn xóa voucher ${voucher.voucherCode} không?`
+  deleteConfirm.visible = true
+}
 
-  if (!confirmed) return
+function closeDeleteConfirm() {
+  deleteConfirm.visible = false
+  deleteConfirm.voucher = null
+  deleteConfirm.message = ''
+}
+
+async function confirmDeleteVoucher() {
+  const voucher = deleteConfirm.voucher
+
+  if (!voucher) return
+
   const success = await voucherStore.deleteVoucherById(voucher.voucherId)
+
   if (success) {
-    showToast({
-      type: 'success',
+    closeDeleteConfirm()
+    await loadVouchers()
+
+    if (currentPage.value > 0 && currentPage.value >= pagination.value.totalPages) {
+      currentPage.value = Math.max(pagination.value.totalPages - 1, 0)
+      await loadVouchers()
+    }
+
+    showSuccessModal({
       title: 'Xóa voucher thành công',
       message: `Voucher ${voucher.voucherCode} đã được xóa khỏi danh sách.`,
     })
-
   }
-
-
 }
 
 function formatDiscountValue(voucher) {
