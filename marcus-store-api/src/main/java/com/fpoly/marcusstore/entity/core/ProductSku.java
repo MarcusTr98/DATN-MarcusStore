@@ -29,6 +29,8 @@ public class ProductSku {
     @Column(name = "price", nullable = false, precision = 18, scale = 2)
     private BigDecimal price;
 
+    Integer weightGram;
+
     @Column(name = "stock_quantity", nullable = false)
     private Integer stockQuantity;
 
