@@ -48,8 +48,8 @@ public class ProductsServiceImpl implements ProductsService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ProductResponse> findAllProducts(String keyword, String filter, Pageable pageable) {
-        Page<Product> product = productRepository.findProductsWithFilter(keyword, filter, pageable);
+    public Page<ProductResponse> findAllProducts(String keyword, String filter,String brand, Pageable pageable) {
+        Page<Product> product = productRepository.findProductsWithFilter(keyword, filter, brand, pageable);
         return product.map(this::toProductResponse);
     }
 

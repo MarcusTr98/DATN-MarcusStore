@@ -28,9 +28,10 @@ public class AdminProductController {
     public ApiResponse<Page<ProductResponse>> findAllProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false, defaultValue = "all") String filter,
+            @RequestParam(required = false) String brand,
             @PageableDefault(page = 0, size = 10) Pageable pageable) {
         // Chuyển các tham số này xuống Service xử lý
-        return ApiResponse.success(productsService.findAllProducts(keyword, filter, pageable));
+        return ApiResponse.success(productsService.findAllProducts(keyword, filter, brand, pageable));
     }
 
     @PostMapping

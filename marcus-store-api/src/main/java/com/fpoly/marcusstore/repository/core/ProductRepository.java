@@ -36,16 +36,18 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
 
         // Marcus làm lọc sp theo đk: có SKU hay ko, tìm kiếm theo tên ở màn tạo SKU
         @EntityGraph(attributePaths = { "category" })
-        @Query("SELECT p FROM Product p " +
-                        "WHERE p.status = true " +
-                        "AND (:keyword IS NULL OR :keyword = '' OR LOWER(p.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))) "
-                        +
+        @Query("SELECT p FROM Product p "
+                        + "WHERE (:keyword IS NULL OR :keyword = '' OR LOWER(p.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))) "
+                        + "AND (:brand IS NULL OR :brand = '' OR LOWER(p.brand) = LOWER(:brand)) " +
                         "AND (" +
                         "   (:filter = 'all') " +
+                        "   OR (:filter = 'active' AND p.status = true) " +
+                        "   OR (:filter = 'hidden' AND p.status = false) " +
                         "   OR (:filter = 'no_sku' AND p.skus IS EMPTY) " +
                         "   OR (:filter = 'has_sku' AND p.skus IS NOT EMPTY)" +
                         ")")
         Page<Product> findProductsWithFilter(@Param("keyword") String keyword, @Param("filter") String filter,
+                        @Param("brand") String brand,
                         Pageable pageable);
 
 }

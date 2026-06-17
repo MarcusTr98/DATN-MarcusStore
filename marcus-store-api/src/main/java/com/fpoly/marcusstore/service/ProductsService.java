@@ -11,7 +11,7 @@ import java.util.Optional;
 
 public interface ProductsService {
 
-    Page<ProductResponse> findAllProducts(String keyword, String filter, Pageable pageable);
+    Page<ProductResponse> findAllProducts(String keyword, String filter, String brand, Pageable pageable);
 
     ProductResponse createProduct(CreateProduct createProduct);
 
