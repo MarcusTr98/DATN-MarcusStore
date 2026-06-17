@@ -163,25 +163,131 @@ onMounted(() => {
 });
 
 const submit = async () => {
-  if (!form.value.currentPassword || !form.value.newPassword || !form.value.confirmPassword)
-    return showModal("error", "Thiếu thông tin", "Vui lòng nhập đầy đủ thông tin");
-  if (form.value.newPassword !== form.value.confirmPassword)
-    return showModal("error", "Lỗi xác nhận", "Mật khẩu xác nhận không khớp");
+
+  // 1. Kiểm tra mật khẩu hiện tại
+  if (!form.value.currentPassword.trim()) {
+    return showModal(
+      "error",
+      "Thiếu mật khẩu hiện tại",
+      "Vui lòng nhập mật khẩu hiện tại."
+    );
+  }
+
+  // 2. Kiểm tra mật khẩu mới
+  if (!form.value.newPassword.trim()) {
+    return showModal(
+      "error",
+      "Thiếu mật khẩu mới",
+      "Vui lòng nhập mật khẩu mới."
+    );
+  }
+
+  // 3. Kiểm tra xác nhận mật khẩu
+  if (!form.value.confirmPassword.trim()) {
+    return showModal(
+      "error",
+      "Thiếu xác nhận mật khẩu",
+      "Vui lòng nhập lại mật khẩu mới."
+    );
+  }
+
+  // 4. Kiểm tra độ dài mật khẩu
+  if (form.value.newPassword.length < 6) {
+    return showModal(
+      "error",
+      "Mật khẩu quá ngắn",
+      "Mật khẩu mới phải có ít nhất 6 ký tự."
+    );
+  }
+
+  // 5. Kiểm tra mật khẩu mới khác mật khẩu cũ
+  if (form.value.currentPassword === form.value.newPassword) {
+    return showModal(
+      "error",
+      "Mật khẩu không hợp lệ",
+      "Mật khẩu mới phải khác mật khẩu hiện tại."
+    );
+  }
+
+  // 6. Kiểm tra xác nhận mật khẩu
+  if (form.value.newPassword !== form.value.confirmPassword) {
+    return showModal(
+      "error",
+      "Mật khẩu xác nhận không khớp",
+      "Vui lòng nhập lại đúng mật khẩu mới."
+    );
+  }
+
   try {
     loading.value = true;
-    const response = await changePassword(form.value);
-    showModal("success", "Đổi mật khẩu thành công", response.data.message, () => {
-      localStorage.removeItem("ACCESS_TOKEN");
-      router.replace("/auth/login");
+
+    const response = await changePassword({
+      currentPassword: form.value.currentPassword,
+      newPassword: form.value.newPassword,
+      confirmPassword: form.value.confirmPassword
     });
+
+    showModal(
+      "success",
+      "Đổi mật khẩu thành công",
+      response.data?.message ||
+        "Mật khẩu của bạn đã được cập nhật thành công.",
+      () => {
+        localStorage.removeItem("ACCESS_TOKEN");
+        router.replace("/auth/login");
+      }
+    );
+
   } catch (error) {
+
     const status = error.response?.status;
+    const message =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      "Có lỗi xảy ra. Vui lòng thử lại.";
+
+    // Token hết hạn
     if (status === 401 || status === 403) {
       localStorage.removeItem("ACCESS_TOKEN");
-      return showModal("error", "Phiên đăng nhập hết hạn", "Vui lòng đăng nhập lại", () => {
-        router.replace("/auth/login");
-      });
+
+      return showModal(
+        "error",
+        "Phiên đăng nhập hết hạn",
+        "Vui lòng đăng nhập lại để tiếp tục.",
+        () => {
+          router.replace("/auth/login");
+        }
+      );
     }
+
+    // Các lỗi nghiệp vụ từ backend
+    if (
+      message.includes("current password") ||
+      message.includes("Mật khẩu hiện tại")
+    ) {
+      return showModal(
+        "error",
+        "Mật khẩu hiện tại không đúng",
+        message
+      );
+    }
+
+    if (
+      message.includes("new password") ||
+      message.includes("Mật khẩu mới")
+    ) {
+      return showModal(
+        "error",
+        "Mật khẩu mới không hợp lệ",
+        message
+      );
+    }
+
+    showModal(
+      "error",
+      "Đổi mật khẩu thất bại",
+      message
+    );
     showModal("error", "Đổi mật khẩu thất bại", error.response?.data?.message || "Có lỗi xảy ra");
   } finally {
     loading.value = false;

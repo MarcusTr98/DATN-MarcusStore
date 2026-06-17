@@ -16,7 +16,7 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/auth/")
 @RequiredArgsConstructor
 public class ChangePasswordController {
-     private final ChangePasswordService chagePass;
+     private final ChangePasswordService changePass;
 
     @PutMapping("/change-password")
     public ApiResponse<String> changePassword(
@@ -24,7 +24,7 @@ public class ChangePasswordController {
             @RequestBody
             ChangePasswordRequest request) {
 
-        chagePass.changePassword(request);
+        changePass.changePassword(request);
 
         return ApiResponse.success(
                 "Đổi mật khẩu thành công");
