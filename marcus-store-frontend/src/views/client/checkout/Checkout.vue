@@ -444,6 +444,9 @@ import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/check-out.css'
 
+import { useCartStore } from '@/stores/cartStore' // Import store
+const cartStore = useCartStore()
+
 import addressApi from '@/api/addressApi'
 import userApi from '@/api/userApi'
 import cartApi from '@/api/cartApi'
@@ -684,10 +687,11 @@ const buildShippingAddress = () => {
   return `${detailAddress.value}, ${wardName}, ${districtName}, ${provinceName}`
 }
 
+// ── 5. Submit Checkout (ĐÃ SỬA: gộp 2 try-catch thành 1, thêm clearCartState) ──
 const handleCheckout = async () => {
   if (!cartData.value.items?.length) return
 
-  // Validate cụ thể: Số điện thoại
+  // Validate số điện thoại
   if (!validatePhone(orderForm.value.recipientPhone)) {
     showModal(
       'Số điện thoại không hợp lệ',
@@ -696,7 +700,7 @@ const handleCheckout = async () => {
     return
   }
 
-  // Validate cụ thể: Email
+  // Validate email
   if (!validateEmail(orderForm.value.email)) {
     showModal(
       'Email không hợp lệ',
@@ -705,7 +709,7 @@ const handleCheckout = async () => {
     return
   }
 
-  // Validate cụ thể: Địa chỉ nhập tay
+  // Validate địa chỉ nhập tay
   if (!selectedAddress.value) {
     if (!manualProvinceId.value) {
       showModal('Thiếu địa chỉ', 'Vui lòng chọn <strong>Tỉnh / Thành phố</strong> giao hàng.')
@@ -741,7 +745,6 @@ const handleCheckout = async () => {
     return
   }
 
-  // Payload gửi lên Server
   const payload = {
     cartItemIds: cartData.value.items.map((i) => i.cartItemId),
     recipientName: orderForm.value.recipientName,
@@ -758,17 +761,19 @@ const handleCheckout = async () => {
   isProcessing.value = true
   try {
     const { data } = await api.post('/checkout', payload)
-    const savedOrderCode = data?.data?.orderCode || data?.orderCode || 'Không xác định'
 
+    //Xóa state Pinia ngay sau khi tạo đơn thành công
+    //Header.vue tự động reactive, totalQuantity về 0 k cần F5
+    cartStore.clearCartState()
+
+    // Nếu là VNPAY => redirect sang trang thanh toán của VNPAY
     if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
       window.location.href = data.data.paymentUrl
-      return
+      return // dừng ở đây, không push route
     }
 
-    router.push({
-      path: '/order-success',
-      query: { orderCode: savedOrderCode },
-    })
+    const savedOrderCode = data?.data?.orderCode || data?.orderCode || 'Không xác định'
+    router.push({ path: '/order-success', query: { orderCode: savedOrderCode } })
   } catch (error) {
     showModal(
       'Lỗi đặt hàng',
