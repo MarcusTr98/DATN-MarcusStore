@@ -29,6 +29,9 @@
               <router-link to="/profile/wishlist" active-class="active" class="nav-item">
                 <i class="fas fa-heart"></i> Sản phẩm yêu thích
               </router-link>
+              <router-link to="change-password" active-class="active" class="nav-item">
+                <i class="fas fa-shield-alt"></i>Đổi mật khẩu
+              </router-link>
             </nav>
 
             <hr class="divider" />
