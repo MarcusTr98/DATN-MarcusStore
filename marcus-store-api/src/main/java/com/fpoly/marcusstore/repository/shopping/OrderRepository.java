@@ -145,4 +145,16 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             ORDER BY sort_order
             """, nativeQuery = true)
     List<String> findDistinctOrderStatuses();
+//  Left join fetch dùng để lấy kèm dữ liệu quan hệ cùng lúc với Orde
+    @Query("""
+            SELECT DISTINCT o
+            FROM Order o
+            LEFT JOIN FETCH o.user
+            LEFT JOIN FETCH o.voucher
+            LEFT JOIN FETCH o.orderItems oi
+            LEFT JOIN FETCH oi.sku sku
+            LEFT JOIN FETCH sku.product
+            WHERE o.orderCode = :orderCode
+            """)
+    Optional<Order> findDetailByOrderCode(@Param("orderCode") String orderCode);
 }

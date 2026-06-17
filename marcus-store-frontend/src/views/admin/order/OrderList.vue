@@ -16,28 +16,28 @@
       <section class="stats-grid">
         <article class="stat-card">
           <span>Tổng đơn</span>
-          <strong>{{ orders.length }}</strong>
+          <strong>{{ orderStats.total }}</strong>
         </article>
 
         <article class="stat-card">
           <span>Chờ xác nhận</span>
-          <strong class="text-accent">{{ statusCount.PENDING }}</strong>
+          <strong class="text-accent">{{ orderStats.pending }}</strong>
         </article>
 
         <article class="stat-card">
           <span>Đang giao</span>
-          <strong>{{ statusCount.SHIPPING }}</strong>
+          <strong>{{ orderStats.shipping }}</strong>
         </article>
 
         <article class="stat-card">
           <span>Hoàn thành</span>
-          <strong>{{ statusCount.COMPLETED }}</strong>
+          <strong>{{ orderStats.completed }}</strong>
         </article>
       </section>
 
       <section class="toolbar-panel">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-lg-5">
+          <div class="col-12 col-md-6 col-lg-5">
             <label class="form-label">Tìm kiếm</label>
             <div class="input-group">
               <span class="input-group-text">
@@ -52,7 +52,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-md-6 col-lg-3">
+          <div class="col-12 col-md-6 col-lg">
             <label class="form-label">Thanh toán</label>
             <select v-model="paymentMethod" class="form-select">
               <option value="all">Tất cả</option>
@@ -62,7 +62,7 @@
             </select>
           </div>
 
-          <div class="col-12 col-md-6 col-lg-3">
+          <div class="col-12 col-md-6 col-lg">
             <label class="form-label">Trạng thái</label>
             <select v-model="orderStatus" class="form-select">
               <option value="all">Tất cả</option>
@@ -72,7 +72,7 @@
             </select>
           </div>
 
-          <div class="col-12 col-lg-1">
+          <div class="col-12 col-md-6 col-lg-auto">
             <button type="button" class="btn btn-soft w-100" title="Xóa lọc" @click="resetFilters">
               <i class="bi bi-arrow-counterclockwise"></i>
             </button>
@@ -99,7 +99,7 @@
 
             <tbody>
             <tr v-for="(orders, index) in filteredOrders" :key="orders.orderId">
-              <td class="fw-bold">#{{ index + 1 }}</td>
+              <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
               <td>
                 <div class="order-code">{{ orders.orderCode }}</div>
                 <small>{{ orders.itemCount}} sản phẩm</small>
@@ -154,6 +154,41 @@
           <h3>Không có đơn hàng nào</h3>
           <p>Hãy thay đổi bộ lọc hoặc làm mới danh sách.</p>
         </div>
+        <div v-if="totalPages > 0" class="order-pagination">
+          <div class="pagination-summary">
+            Tổng <strong>{{ totalElements }}</strong> đơn hàng
+          </div>
+          <div class="pagination-controls">
+            <label class="page-size-control">
+              <span>Hiển thị</span>
+              <select v-model.number="pageSize" class="form-select form-select-sm">
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              class="pagination-button"
+              :disabled="currentPage === 0"
+              @click="goToPage(currentPage - 1)"
+            >
+              Trước
+            </button>
+            <span class="page-indicator">
+              Trang <strong>{{ currentPage + 1 }}</strong> / {{ totalPages }}
+            </span>
+            <button
+              type="button"
+              class="pagination-button"
+              :disabled="currentPage + 1 >= totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
       </section>
     </div>
 
@@ -175,13 +210,21 @@ const orderStatus = ref('all')
 
 const orders = ref([])
 const currentPage = ref(0)
-const pageSize = ref(10)
-const totalPages = ref()
-const totalElements = ref()
+const pageSize = ref(5)
+const totalPages = ref(0)
+const totalElements = ref(0)
 const loading = ref(false)
 const error = ref(null)
 const paymentOptions = ref([])
 const orderOptions = ref([])
+const orderStats = ref({
+  total: 0,
+  pending: 0,
+  confirmed: 0,
+  shipping: 0,
+  completed: 0,
+  cancelled: 0,
+})
 async function fetchGetAllOrder(){
   try {
     loading.value = true
@@ -204,14 +247,34 @@ async function fetchGetAllOrder(){
     loading.value = false
   }
  }
+async function fetchOrderStats(){
+  const response = await OrderListApi.getOrderStats()
+  orderStats.value = response.data
+}
  onMounted(()=> {
    fetchGetAllOrder()
+   fetchOrderStats()
    getFilterOption()
  })
 watch([keyword, paymentMethod, orderStatus], () => {
   currentPage.value = 0
   fetchGetAllOrder()
 })
+
+watch(pageSize, () => {
+  currentPage.value = 0
+  fetchGetAllOrder()
+})
+
+function goToPage(page) {
+  if (page < 0 || page >= totalPages.value) {
+    return
+  }
+
+  currentPage.value = page
+  fetchGetAllOrder()
+}
+
 async function getFilterOption(){
   const response = await OrderListApi.getFilterOption()
   paymentOptions.value = response.data.paymentMethods || []
@@ -257,13 +320,6 @@ const filteredOrders = computed(() =>
   orders.value.filter((order) => !hiddenOrderIds.value.includes(order.orderId)),
 )
 
-const statusCount = computed(() =>
-  Object.keys(orderStatusMap).reduce((result, status) => {
-    result[status] = orders.value.filter((order) => order.orderStatus === status).length
-    return result
-  }, {}),
-)
-
 const formatCurrency = (value) =>
   new Intl.NumberFormat('vi-VN', {
     style: 'currency',
@@ -280,7 +336,7 @@ const showToast = (message) => {
 }
 
 const showOrderDetail = (order) => {
-  router.push(`/admin/order/${order.orderId}`)
+  router.push(`/admin/order/${order.orderCode}`)
 }
 
 const hideOrder = (order) => {

@@ -1,23 +1,27 @@
 package com.fpoly.marcusstore.service.impl;
 
-import com.fpoly.marcusstore.dto.response.OrderResponse;
-import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
-import com.fpoly.marcusstore.dto.response.VoucherResponse;
+import com.fpoly.marcusstore.dto.response.*;
+import com.fpoly.marcusstore.entity.core.Product;
+import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
-
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank()
                 ? null
@@ -37,7 +41,7 @@ public class OrderServiceImpl implements OrderService {
                 orderStatus.isBlank() ||
                 "ALL".equalsIgnoreCase(orderStatus)
                 ? null
-                : orderStatus.trim()    ;
+                : orderStatus.trim();
     }
 
     private OrderResponse toResponse(Order order) {
@@ -65,7 +69,8 @@ public class OrderServiceImpl implements OrderService {
                 .searchOrders(normalizeKeyword, normalizePaymentMethod, normalizeOrderStatus, pageable)
                 .map(this::toResponse);
     }
- // hàm gọi tổng đơn hàng và số lượng trạng thái đơn hàng
+
+    // hàm gọi tổng đơn hàng và số lượng trạng thái đơn hàng
     @Override
     public OrderStatsResponse getOrderStats(String keyword, String paymentMethod, String orderStatus) {
         String normalizedKeyword = normalizeKeyword(keyword);
@@ -105,12 +110,103 @@ public class OrderServiceImpl implements OrderService {
                 ))
                 .build();
     }
+
     @Override
     public List<String> getPaymentMethods() {
         return orderRepository.findDistinctPaymentMethods();
     }
-@Override
+
+    @Override
     public List<String> getOrderStatuses() {
         return orderRepository.findDistinctOrderStatuses();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderDetailResponse getOrderDetailResponse(String orderCode) {
+        // /ấy chi tiết đơn hàng theo mã đơn hàng
+        Order order = orderRepository.findDetailByOrderCode(orderCode).orElseThrow(() ->
+                new RuntimeException("không tìm thấy đơn hàng "));
+        // lấy trạng thái lịch sử đơn hàng
+        List<OrderStatusHistory> histories =
+                orderStatusHistoryRepository.findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
+        // map từ Entity sang DTO
+        // mỗi dòng khi được tách ra sẽ là một trạng thái của đơn hàng khi hiển thị lên FE
+        List<OrderStatusHistoryResponse> historyResponses = histories.stream()
+                .map(history -> OrderStatusHistoryResponse.builder()
+                        .status(history.getStatus())
+                        .title(history.getTitle())
+                        .note(history.getNote())
+                        .createdAt(history.getCreatedAt())
+                        .createdByName(
+                                history.getCreatedBy() != null
+                                        ? history.getCreatedBy().getFullName()
+                                        : null
+                        )
+
+                        .build()
+                )
+                .toList();
+        // map từ Entity sang DTO
+        return OrderDetailResponse.builder()
+                .orderCode(order.getOrderCode())
+                .orderStatus(order.getOrderStatus())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .recipientName(order.getRecipientName())
+                .recipientPhone(order.getRecipientPhone())
+                .shippingAddress(order.getShippingAddress())
+                .totalAmount(order.getTotalAmount())
+                .discountAmount(order.getDiscountAmount())
+                .shippingFee(order.getShippingFee())
+                .finalAmount(order.getFinalAmount())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentStatus(order.getPaymentStatus())
+                .transactionId(order.getTransactionId())
+                .trackingCode(order.getTrackingCode())
+                .fullName(order.getUser().getFullName())
+                .email(order.getUser().getEmail())
+                .phoneNumber(order.getUser().getPhoneNumber())
+                .voucherCode(order.getVoucher() != null ? order.getVoucher().getVoucherCode() : null)
+                .items(
+                        order.getOrderItems().stream().map(orderItem -> {
+                                    ProductSku sku = orderItem.getSku();
+                                    Product product = sku.getProduct();
+                                    return OrderItemDetailResponse.builder()
+                                            .skuId(sku.getSkuId())
+                                            .skuCode(sku.getSkuCode())
+                                            .productId(product.getProductId())
+                                            .productName(product.getProductName())
+                                            .productImage(
+                                                    sku.getSkuImageUrl() != null
+                                                            ? sku.getSkuImageUrl()
+                                                            : product.getThumbnailUrl()
+                                            )
+                                            .quantity(orderItem.getQuantity())
+                                            .priceAtPurchase(orderItem.getPriceAtPurchase())
+                                            .lineTotal(
+                                                    orderItem.getPriceAtPurchase()
+                                                            .multiply(BigDecimal.valueOf(orderItem.getQuantity()))
+                                            )
+                                            .imeis(
+                                                    orderItem.getProductItems().stream()
+                                                            .map(item -> ImeiResponse.builder()
+                                                                    .imeiCode(item.getImeiCode())
+
+                                                                    .build()
+                                                            )
+                                                            .toList()
+                                            )
+
+                                            .build();
+                                })
+                                .toList()
+                )
+                // ghép dto orderDetail và dto History
+                .history(historyResponses)
+                .build();
+
+
+    }
+
 }

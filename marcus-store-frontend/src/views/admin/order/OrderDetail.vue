@@ -1,15 +1,15 @@
-<template>
+﻿<template>
   <section class="order-detail-page">
     <div class="page-heading">
       <div>
         <div class="breadcrumb">
           <RouterLink to="/admin/order">Quản lý đơn hàng</RouterLink>
           <span>/</span>
-          <span>{{ order?.orderCode || 'Không tìm thấy' }}</span>
+          <span>{{ orderDetail?.orderCode || 'Không tìm thấy' }}</span>
         </div>
         <h3>Chi tiết đơn hàng</h3>
-        <p v-if="order">Đơn {{ order.orderCode }} - {{ orderStatusMap[order.currentStatus].label }}</p>
-        <p v-else>Không tìm thấy dữ liệu mẫu cho đơn hàng này.</p>
+        <p v-if="orderDetail">Đơn {{ orderDetail.orderCode }} - {{ orderStatusMap[orderDetail.orderStatus].label }}</p>
+        <p v-else>Không tìm thấy dữ liệu cho đơn hàng này.</p>
       </div>
 
       <div class="page-actions">
@@ -18,17 +18,17 @@
       </div>
     </div>
 
-    <template v-if="order">
+    <template v-if="orderDetail">
       <div class="summary-card card">
         <div class="summary-item">
           <span class="summary-label">Mã đơn</span>
-          <strong class="summary-value">{{ order.orderCode }}</strong>
+          <strong class="summary-value">{{ orderDetail.orderCode }}</strong>
         </div>
         <div class="summary-item">
           <span class="summary-label">Trạng thái</span>
           <span class="summary-value">
-            <span class="badge" :class="orderStatusMap[order.currentStatus].className">
-              {{ orderStatusMap[order.currentStatus].label }}
+            <span class="badge" :class="orderStatusMap[orderDetail.orderStatus].className">
+              {{ orderStatusMap[orderDetail.orderStatus].label }}
             </span>
           </span>
         </div>
@@ -38,7 +38,7 @@
         </div>
         <div class="summary-item">
           <span class="summary-label">Ngày tạo</span>
-          <strong class="summary-value">{{ formatDateTime(order.createdAt) }}</strong>
+          <strong class="summary-value">{{ formatDateTime(orderDetail.createdAt) }}</strong>
         </div>
       </div>
 
@@ -55,23 +55,19 @@
               <div class="info-grid">
                 <div class="info-box">
                   <span class="info-label">Khách hàng</span>
-                  <strong class="info-value">{{ order.customerName }}</strong>
-                </div>
-                <div class="info-box">
-                  <span class="info-label">Mã khách hàng</span>
-                  <strong class="info-value">{{ order.customerCode }}</strong>
+                  <strong class="info-value">{{ orderDetail.fullName }}</strong>
                 </div>
                 <div class="info-box">
                   <span class="info-label">Số điện thoại</span>
-                  <strong class="info-value">{{ order.customerPhone }}</strong>
+                  <strong class="info-value">{{ orderDetail.phoneNumber }}</strong>
                 </div>
                 <div class="info-box">
                   <span class="info-label">Email</span>
-                  <strong class="info-value">{{ order.customerEmail }}</strong>
+                  <strong class="info-value">{{ orderDetail.email }}</strong>
                 </div>
                 <div class="info-box full">
                   <span class="info-label">Địa chỉ giao hàng</span>
-                  <strong class="info-value">{{ order.shippingAddress }}</strong>
+                  <strong class="info-value">{{ orderDetail.shippingAddress }}</strong>
                 </div>
               </div>
             </div>
@@ -81,7 +77,7 @@
             <div class="section-header">
               <div>
                 <h4>Sản phẩm trong đơn</h4>
-                <p>{{ order.products.length }} dòng sản phẩm, tổng {{ totalQuantity }} sản phẩm.</p>
+                <p>{{ orderDetail.items?.length || 0 }} dòng sản phẩm, tổng {{ totalQuantity }} sản phẩm.</p>
               </div>
             </div>
             <div class="section-body">
@@ -97,20 +93,20 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="product in order.products" :key="product.sku">
+                    <tr v-for="item in orderDetail.items" :key="item.skuId">
                       <td>
                         <div class="product-cell">
                           <span class="product-thumb">📦</span>
                           <span>
-                            <span class="main-line">{{ product.name }}</span>
-                            <span class="sub-line">ID sản phẩm: {{ product.productId }}</span>
+                            <span class="main-line">{{ item.productName }}</span>
+
                           </span>
                         </div>
                       </td>
-                      <td>{{ product.sku }}</td>
-                      <td>{{ product.qty }}</td>
-                      <td><span class="money">{{ formatCurrency(product.price) }}</span></td>
-                      <td><span class="money">{{ formatCurrency(product.qty * product.price) }}</span></td>
+                      <td>{{ item.skuCode }}</td>
+                      <td>{{ item.quantity }}</td>
+                      <td><span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span></td>
+                      <td><span class="money">{{ formatCurrency(item.lineTotal) }}</span></td>
                     </tr>
                   </tbody>
                 </table>
@@ -118,8 +114,8 @@
 
               <div class="table-summary">
                 <div class="summary-row"><span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong></div>
-                <div class="summary-row"><span>Giảm giá</span><strong>- {{ formatCurrency(order.discountAmount) }}</strong></div>
-                <div class="summary-row"><span>Phí vận chuyển</span><strong>{{ formatCurrency(order.shippingFee) }}</strong></div>
+                <div class="summary-row"><span>Giảm giá</span><strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong></div>
+                <div class="summary-row"><span>Phí vận chuyển</span><strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong></div>
                 <div class="summary-row total"><span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong></div>
               </div>
             </div>
@@ -134,7 +130,7 @@
             </div>
             <div class="section-body">
               <div class="timeline">
-                <div v-for="item in order.history" :key="`${item.status}-${item.time}`" class="timeline-item">
+                <div v-for="item in orderHistory" :key="`${item.status}-${item.time}`" class="timeline-item">
                   <span class="timeline-dot">✓</span>
                   <div class="timeline-content">
                     <p class="timeline-title">
@@ -156,15 +152,15 @@
             <div class="section-header">
               <div>
                 <h4>Điều phối đơn</h4>
-                <p>Cập nhật trạng thái trên dữ liệu mẫu.</p>
+                <p>Cập nhật trạng thái đơn hàng.</p>
               </div>
             </div>
             <div class="section-body">
               <div class="current-status-box">
                 <span>Trạng thái hiện tại</span>
                 <strong>
-                  <span class="badge" :class="orderStatusMap[order.currentStatus].className">
-                    {{ orderStatusMap[order.currentStatus].label }}
+                  <span class="badge" :class="orderStatusMap[orderDetail.orderStatus].className">
+                    {{ orderStatusMap[orderDetail.orderStatus].label }}
                   </span>
                 </strong>
               </div>
@@ -172,14 +168,14 @@
               <div class="form-group">
                 <label class="form-label" for="statusDropdown">Cập nhật trạng thái</label>
                 <select id="statusDropdown" v-model="selectedStatus" class="control" :disabled="!nextStatuses.length">
-                  <option v-if="!nextStatuses.length" :value="order.currentStatus">
-                    {{ orderStatusMap[order.currentStatus].label }}
+                  <option v-if="!nextStatuses.length" :value="orderDetail.orderStatus">
+                    {{ orderStatusMap[orderDetail.orderStatus].label }}
                   </option>
                   <option v-for="item in nextStatuses" :key="item.value" :value="item.value">
                     {{ item.label }} ({{ item.value }})
                   </option>
                 </select>
-                <p class="helper-text">{{ statusHints[order.currentStatus] }}</p>
+                <p class="helper-text">{{ statusHints[orderDetail.orderStatus] }}</p>
               </div>
 
               <button class="primary-btn" type="button" :disabled="!nextStatuses.length" @click="saveStatusUpdate">
@@ -197,10 +193,10 @@
             </div>
             <div class="section-body">
               <div class="mini-list">
-                <div class="mini-row"><span class="mini-label">Mã hóa đơn</span><span class="mini-value">{{ order.invoiceNo }}</span></div>
-                <div class="mini-row"><span class="mini-label">Hình thức vận chuyển</span><span class="mini-value">{{ order.shippingMethod }}</span></div>
-                <div class="mini-row"><span class="mini-label">Phí ship</span><span class="mini-value">{{ formatCurrency(order.shippingFee) }}</span></div>
-                <div class="mini-row"><span class="mini-label">Ghi chú</span><span class="mini-value">{{ order.note || 'Không có ghi chú' }}</span></div>
+                <div class="mini-row"><span class="mini-label">Mã hóa đơn</span><span class="mini-value">{{ orderDetail.orderCode }}</span></div>
+                <div class="mini-row"><span class="mini-label">Hình thức vận chuyển</span><span class="mini-value">{{ orderDetail.trackingCode || '---' }}</span></div>
+                <div class="mini-row"><span class="mini-label">Phí ship</span><span class="mini-value">{{ formatCurrency(orderDetail.shippingFee) }}</span></div>
+                <div class="mini-row"><span class="mini-label">Ghi chú</span><span class="mini-value">{{ '---' }}</span></div>
               </div>
             </div>
           </section>
@@ -217,14 +213,14 @@
                 <div class="mini-row">
                   <span class="mini-label">Trạng thái</span>
                   <span class="mini-value">
-                    <span class="badge" :class="paymentStatusMap[order.paymentStatus].className">
-                      {{ paymentStatusMap[order.paymentStatus].label }}
+                    <span class="badge" :class="paymentStatusMap[orderDetail.paymentStatus].className">
+                      {{ paymentStatusMap[orderDetail.paymentStatus].label }}
                     </span>
                   </span>
                 </div>
-                <div class="mini-row"><span class="mini-label">Phương thức</span><span class="mini-value">{{ paymentMethodMap[order.paymentMethod] }}</span></div>
-                <div class="mini-row"><span class="mini-label">Mã giao dịch</span><span class="mini-value">{{ order.transactionId || '---' }}</span></div>
-                <div class="mini-row"><span class="mini-label">Thời gian thanh toán</span><span class="mini-value">{{ order.paidAt ? formatDateTime(order.paidAt) : '---' }}</span></div>
+                <div class="mini-row"><span class="mini-label">Phương thức</span><span class="mini-value">{{ paymentMethodMap[orderDetail.paymentMethod] }}</span></div>
+                <div class="mini-row"><span class="mini-label">Mã giao dịch</span><span class="mini-value">{{ orderDetail.transactionId || '---' }}</span></div>
+                <div class="mini-row"><span class="mini-label">Thời gian thanh toán</span><span class="mini-value">{{ orderDetail.paidAt ? formatDateTime(orderDetail.paidAt) : '---' }}</span></div>
               </div>
             </div>
           </section>
@@ -233,7 +229,7 @@
     </template>
 
     <div v-else class="card empty-card">
-      Không tìm thấy đơn hàng mẫu. Vui lòng quay lại danh sách đơn hàng.
+      Không tìm thấy đơn hàng. Vui lòng quay lại danh sách đơn hàng.
     </div>
 
     <div class="toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
@@ -241,170 +237,32 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import '@/assets/css/OrderDetails.css'
+import OrderDetailApi from '@/api/orderDetailApi.js'
 const route = useRoute()
 const toastMessage = ref('')
 
-const sampleOrders = ref([
-  {
-    id: 1,
-    orderCode: 'ORD-20260501-001',
-    invoiceNo: 'INV-20260501-001',
-    customerCode: 'KH-0001',
-    customerName: 'Nguyễn Văn An',
-    customerPhone: '0983333333',
-    customerEmail: 'an.nguyen@gmail.com',
-    shippingAddress: 'Số 12 Nguyễn Trãi, Quận Thanh Xuân, Hà Nội',
-    shippingMethod: 'Giao hàng tận nơi',
-    shippingFee: 30000,
-    note: 'Giao giờ hành chính.',
-    paymentStatus: 'PAID',
-    paymentMethod: 'VNPay',
-    transactionId: 'VNP-20260501-A11',
-    paidAt: '2026-05-01 10:31:00',
-    currentStatus: 'COMPLETED',
-    createdAt: '2026-05-01 10:30:00',
-    discountAmount: 500000,
-    products: [{ productId: 5, sku: 'IP15P-NAT-128', name: 'iPhone 15 Pro - Titan tự nhiên 128GB', qty: 1, price: 24990000 }],
-    history: [
-      { status: 'PENDING', title: 'Khách hàng tạo đơn', time: '2026-05-01 10:30:00' },
-      { status: 'CONFIRMED', title: 'Nhân viên xác nhận đơn', time: '2026-05-01 10:45:00' },
-      { status: 'SHIPPING', title: 'Đơn chuyển sang đang giao hàng', time: '2026-05-01 14:10:00' },
-      { status: 'COMPLETED', title: 'Giao hàng thành công', time: '2026-05-02 09:20:00' },
-    ],
-  },
-  {
-    id: 2,
-    orderCode: 'ORD-20260515-002',
-    invoiceNo: 'INV-20260515-002',
-    customerCode: 'KH-0002',
-    customerName: 'Trần Thị Bình',
-    customerPhone: '0974444444',
-    customerEmail: 'binh.tran@gmail.com',
-    shippingAddress: '45 Lê Lợi, Quận 1, TP. Hồ Chí Minh',
-    shippingMethod: 'Giao hàng nhanh',
-    shippingFee: 40000,
-    note: 'Khách thanh toán khi nhận hàng.',
-    paymentStatus: 'UNPAID',
-    paymentMethod: 'COD',
-    transactionId: '',
-    paidAt: '',
-    currentStatus: 'SHIPPING',
-    createdAt: '2026-05-15 14:00:00',
-    discountAmount: 40000,
-    products: [{ productId: 12, sku: 'S24U-BLK-256', name: 'Samsung Galaxy S24 Ultra - Đen 256GB', qty: 1, price: 27990000 }],
-    history: [
-      { status: 'PENDING', title: 'Khách hàng tạo đơn', time: '2026-05-15 14:00:00' },
-      { status: 'CONFIRMED', title: 'Nhân viên xác nhận đơn', time: '2026-05-15 15:05:00' },
-      { status: 'SHIPPING', title: 'Đơn chuyển sang đang giao hàng', time: '2026-05-16 08:30:00' },
-    ],
-  },
-  {
-    id: 3,
-    orderCode: 'ORD-20260530-003',
-    invoiceNo: 'INV-20260530-003',
-    customerCode: 'KH-0005',
-    customerName: 'Lê Minh Cường',
-    customerPhone: '0965555555',
-    customerEmail: 'khach3@gmail.com',
-    shippingAddress: 'Số 78, Ngõ 56, Đường Nguyễn Lương Bằng, Phường Khâm Thiên, Quận Đống Đa, Hà Nội',
-    shippingMethod: 'Giao hàng tận nơi',
-    shippingFee: 30000,
-    note: 'Khách yêu cầu gọi trước khi giao.',
-    paymentStatus: 'PAID',
-    paymentMethod: 'MoMo',
-    transactionId: 'MOMO-20260530-8X21CN',
-    paidAt: '2026-05-30 09:16:00',
-    currentStatus: 'CONFIRMED',
-    createdAt: '2026-05-30 09:15:00',
-    discountAmount: 500000,
-    products: [
-      { productId: 3, sku: 'IP15-BLK-128', name: 'iPhone 15 - Đen 128GB', qty: 1, price: 19990000 },
-      { productId: 7, sku: 'A55-BLU-128', name: 'Samsung Galaxy A55 5G - Xanh 128GB', qty: 1, price: 9990000 },
-    ],
-    history: [
-      { status: 'PENDING', title: 'Khách hàng tạo đơn', time: '2026-05-30 09:15:00' },
-      { status: 'CONFIRMED', title: 'Nhân viên xác nhận đơn', time: '2026-05-30 09:20:00' },
-    ],
-  },
-  {
-    id: 4,
-    orderCode: 'ORD-20260605-004',
-    invoiceNo: 'INV-20260605-004',
-    customerCode: 'KH-0006',
-    customerName: 'Phạm Thị Dung',
-    customerPhone: '0956666666',
-    customerEmail: 'dung.pham@gmail.com',
-    shippingAddress: '20 Trần Phú, Thành phố Đà Nẵng',
-    shippingMethod: 'Giao hàng tiêu chuẩn',
-    shippingFee: 30000,
-    note: '',
-    paymentStatus: 'PAID',
-    paymentMethod: 'BankTransfer',
-    transactionId: 'BANK-20260605-004',
-    paidAt: '2026-06-05 20:03:00',
-    currentStatus: 'PENDING',
-    createdAt: '2026-06-05 20:00:00',
-    discountAmount: 30000,
-    products: [{ productId: 19, sku: 'RN13P-BLK-256', name: 'Xiaomi Redmi Note 13 Pro+ - Đen 256GB', qty: 1, price: 8990000 }],
-    history: [{ status: 'PENDING', title: 'Khách hàng tạo đơn', time: '2026-06-05 20:00:00' }],
-  },
-  {
-    id: 5,
-    orderCode: 'ORD-20260608-005',
-    invoiceNo: 'INV-20260608-005',
-    customerCode: 'KH-0007',
-    customerName: 'Nguyễn Hoàng Nam',
-    customerPhone: '0912888999',
-    customerEmail: 'nam.nguyen@gmail.com',
-    shippingAddress: '88 Hai Bà Trưng, Quận Hoàn Kiếm, Hà Nội',
-    shippingMethod: 'Giao hàng tận nơi',
-    shippingFee: 25000,
-    note: 'Đơn đã hủy theo yêu cầu khách.',
-    paymentStatus: 'UNPAID',
-    paymentMethod: 'COD',
-    transactionId: '',
-    paidAt: '',
-    currentStatus: 'CANCELLED',
-    createdAt: '2026-06-08 11:20:00',
-    discountAmount: 25000,
-    products: [{ productId: 22, sku: 'APP2-WHT-STD', name: 'AirPods Pro thế hệ 2', qty: 1, price: 6490000 }],
-    history: [
-      { status: 'PENDING', title: 'Khách hàng tạo đơn', time: '2026-06-08 11:20:00' },
-      { status: 'CANCELLED', title: 'Đơn hàng đã bị hủy', time: '2026-06-08 12:05:00' },
-    ],
-  },
-  {
-    id: 6,
-    orderCode: 'ORD-20260610-006',
-    invoiceNo: 'INV-20260610-006',
-    customerCode: 'KH-0008',
-    customerName: 'Vũ Minh Anh',
-    customerPhone: '0933777666',
-    customerEmail: 'anh.vu@gmail.com',
-    shippingAddress: '19 Phan Chu Trinh, Thành phố Huế',
-    shippingMethod: 'Giao hàng nhanh',
-    shippingFee: 30000,
-    note: 'Giao thất bại do không liên hệ được khách.',
-    paymentStatus: 'PAID',
-    paymentMethod: 'VNPay',
-    transactionId: 'VNP-20260610-Z91',
-    paidAt: '2026-06-10 16:41:00',
-    currentStatus: 'FAILED',
-    createdAt: '2026-06-10 16:40:00',
-    discountAmount: 30000,
-    products: [{ productId: 7, sku: 'IP15-BLK-128', name: 'iPhone 15 - Đen 128GB', qty: 1, price: 19990000 }],
-    history: [
-      { status: 'PENDING', title: 'Khách hàng tạo đơn', time: '2026-06-10 16:40:00' },
-      { status: 'CONFIRMED', title: 'Nhân viên xác nhận đơn', time: '2026-06-10 17:00:00' },
-      { status: 'SHIPPING', title: 'Đơn chuyển sang đang giao hàng', time: '2026-06-11 08:00:00' },
-      { status: 'FAILED', title: 'Giao hàng thất bại', time: '2026-06-11 18:30:00' },
-    ],
-  },
-])
-
+const orderDetail = ref(null)
+const loading = ref(false)
+const error = ref(null)
+async function fetchGetDetailOrder(orderCode){
+  try {
+    loading.value = true
+    error.value = null
+    const response = await  OrderDetailApi.getOrderDetail(orderCode)
+    orderDetail.value = response.data
+  }catch (e){
+    error.value = "Không tải được chi tiết đơn hàng"
+    console.error(e)
+  }finally {
+    loading.value = false
+  }
+}
+onMounted(()=>{
+  fetchGetDetailOrder(route.params.id)
+})
 const orderStatusMap = {
   PENDING: { label: 'Chờ xác nhận', className: 'pending' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
@@ -462,20 +320,24 @@ const timelineTitleByStatus = {
   FAILED: 'Giao hàng thất bại',
 }
 
-const order = computed(() => sampleOrders.value.find((item) => item.id === Number(route.params.id)))
 const selectedStatus = ref('')
+const orderHistory = computed(() => orderDetail.value ? [{
+  status: orderDetail.value.orderStatus,
+  title: 'Trạng thái hiện tại',
+  time: orderDetail.value.updatedAt || orderDetail.value.createdAt,
+}] : [])
 
-const nextStatuses = computed(() => (order.value ? allowedTransitions[order.value.currentStatus] || [] : []))
-const subTotal = computed(() => order.value?.products.reduce((sum, product) => sum + product.qty * product.price, 0) || 0)
-const totalQuantity = computed(() => order.value?.products.reduce((sum, product) => sum + product.qty, 0) || 0)
+const nextStatuses = computed(() => (orderDetail.value ? allowedTransitions[orderDetail.value.orderStatus] || [] : []))
+const subTotal = computed(() => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0)
+const totalQuantity = computed(() => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0)
 const finalAmount = computed(() =>
-  order.value ? subTotal.value - order.value.discountAmount + order.value.shippingFee : 0,
+  orderDetail.value?.finalAmount || 0,
 )
 
 watch(
-  () => order.value?.currentStatus,
+  () => orderDetail.value?.orderStatus,
   () => {
-    selectedStatus.value = nextStatuses.value[0]?.value || order.value?.currentStatus || ''
+    selectedStatus.value = nextStatuses.value[0]?.value || orderDetail.value?.orderStatus || ''
   },
   { immediate: true },
 )
@@ -508,7 +370,7 @@ const showToast = (message) => {
 }
 
 const saveStatusUpdate = () => {
-  if (!order.value || !selectedStatus.value) return
+  if (!orderDetail.value || !selectedStatus.value) return
 
   const isValid = nextStatuses.value.some((item) => item.value === selectedStatus.value)
   if (!isValid) {
@@ -517,16 +379,8 @@ const saveStatusUpdate = () => {
   }
 
   const nextStatus = selectedStatus.value
-  order.value.currentStatus = nextStatus
-  order.value.history.push({
-    status: nextStatus,
-    title:
-      timelineTitleByStatus[nextStatus] ||
-      `Cập nhật trạng thái sang ${orderStatusMap[nextStatus].label}`,
-    time: new Date().toISOString().slice(0, 19).replace('T', ' '),
-  })
-
-  showToast(`Đã cập nhật trạng thái đơn sang ${orderStatusMap[order.value.currentStatus].label}.`)
+  orderDetail.value.orderStatus = nextStatus
+  showToast(`Đã cập nhật trạng thái đơn sang ${orderStatusMap[orderDetail.value.orderStatus].label}.`)
 }
 
 const printPage = () => {
@@ -537,3 +391,6 @@ const printPage = () => {
 <style scoped>
 
 </style>
+
+
+

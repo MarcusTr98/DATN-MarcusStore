@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.controller.admin;
 
+import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
 import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
 import com.fpoly.marcusstore.service.OrderService;
@@ -8,10 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
@@ -42,5 +40,9 @@ public class AdminOrderController {
                 "paymentMethods", orderService.getPaymentMethods(),
                 "orderStatuses", orderService.getOrderStatuses()
         );
+    }
+    @GetMapping("/order/{orderCode}")
+    public OrderDetailResponse getDetailResponse(@PathVariable("orderCode") String orderCode){
+        return orderService.getOrderDetailResponse(orderCode);
     }
 }

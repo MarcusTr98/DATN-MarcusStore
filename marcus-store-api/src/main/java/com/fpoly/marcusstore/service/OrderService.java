@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
 import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
 import com.fpoly.marcusstore.dto.response.VoucherStatsResponse;
@@ -15,4 +16,5 @@ public interface OrderService {
     List<String> getPaymentMethods();
 
     List<String> getOrderStatuses();
+    OrderDetailResponse getOrderDetailResponse(String orderCode);
 }
