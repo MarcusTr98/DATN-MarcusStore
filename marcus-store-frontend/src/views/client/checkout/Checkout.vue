@@ -1,6 +1,11 @@
 <template>
   <div class="checkout-page pt-4">
-    <BaseModal v-if="modal.show" :title="modal.title" @close="modal.show = false">
+    <BaseModal
+      v-if="modal.show"
+      :show="modal.show"
+      :title="modal.title"
+      @close="modal.show = false"
+    >
       <div class="p-3 text-center">
         <p class="mb-4" style="font-size: 15px; color: #374151">{{ modal.message }}</p>
         <button class="btn btn-danger px-4 py-2 rounded-pill" @click="handleModalConfirm">
@@ -461,7 +466,6 @@ const handleModalConfirm = () => {
   modal.value.show = false
   if (modal.value.action === 'redirect_cart') router.push('/cart')
   if (modal.value.action === 'redirect_login') router.push('/auth/login')
-  // Đã gỡ bỏ hành động redirect_success vì giờ ta redirect tự động
 }
 
 // ─── Order & Cart Data
@@ -720,14 +724,20 @@ const handleCheckout = async () => {
   try {
     const { data } = await api.post('/checkout', payload)
 
-    // Nếu là thanh toán VNPAY, đợi trả URL rồi đá sang trang thanh toán
+    //Lấy Mã đơn hàng từ API Backend trả về
+    const savedOrderCode = data?.data?.orderCode || data?.orderCode || 'Không xác định'
+
+    // Nếu chọn VNPAY => Bay sang VNPAY
     if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
       window.location.href = data.data.paymentUrl
       return
     }
 
-    // ĐÃ SỬA: Bỏ gọi Modal phiền phức, Redirect thẳng sang trang Order Success!
-    router.push('/order-success')
+    // Nếu là COD hoặc PayOS => Bay sang Success KÈM MÃ ĐƠN HÀNG
+    router.push({
+      path: '/order-success',
+      query: { orderCode: savedOrderCode },
+    })
   } catch (error) {
     showModal(
       'Lỗi đặt hàng',
