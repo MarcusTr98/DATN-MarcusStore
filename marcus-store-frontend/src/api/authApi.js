@@ -19,3 +19,9 @@ export const verifyForgotOtpApi = (email, otp) => {
 export const resetPasswordApi = (data) => {
   return api.post('/auth/reset', data)
 }
+export const changePassword = (data) => {
+  return api.put(
+    "/auth/change-password",
+    data
+  );
+}
