@@ -7,7 +7,7 @@
       @close="modal.show = false"
     >
       <div class="p-3 text-center">
-        <p class="mb-4" style="font-size: 15px; color: #374151">{{ modal.message }}</p>
+        <p class="mb-4" style="font-size: 15px; color: #374151" v-html="modal.message"></p>
         <button class="btn btn-danger px-4 py-2 rounded-pill" @click="handleModalConfirm">
           Đồng ý
         </button>
@@ -245,9 +245,9 @@
               </div>
               <div class="payment-option__body">
                 <span class="shipping-option__name">Giao Hàng Nhanh (GHN)</span>
-                <span class="payment-option__desc text-success" v-if="estimatedDelivery"
-                  ><i class="fas fa-calendar-check me-1"></i>{{ estimatedDelivery }}</span
-                >
+                <span class="payment-option__desc text-success" v-if="estimatedDelivery">
+                  <i class="fas fa-calendar-check me-1"></i>{{ estimatedDelivery }}
+                </span>
                 <span class="payment-option__desc" v-else>Giao hàng tận nơi toàn quốc</span>
               </div>
 
@@ -263,7 +263,6 @@
                   >Chưa xác định</span
                 >
               </div>
-
               <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
             </label>
           </div>
@@ -483,7 +482,7 @@ const orderForm = ref({
   note: '',
 })
 
-// ─── GHN
+// ─── GHN Data
 const toDistrictId = ref(null)
 const toWardCode = ref('')
 
@@ -508,7 +507,7 @@ const finalAmount = computed(() => {
 
 const isAddressReady = computed(() => !!toDistrictId.value && !!toWardCode.value)
 
-// ─── Utils
+// ─── Utils (Validation & Formatting)
 const formatDeliveryDate = (isoDate) => {
   if (!isoDate) return ''
   try {
@@ -522,7 +521,12 @@ const formatDeliveryDate = (isoDate) => {
 
 const validatePhone = (phone) => /(03|05|07|08|09)\d{8}/.test(phone)
 
-//1. Phí vận chuyển GHN
+const validateEmail = (email) => {
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return re.test(email)
+}
+
+// ─── 1. Phí vận chuyển GHN
 const calculateShippingFee = async () => {
   if (!toDistrictId.value || !toWardCode.value) {
     shippingFee.value = 0
@@ -555,7 +559,7 @@ const calculateShippingFee = async () => {
   }
 }
 
-//2. Sổ địa chỉ
+// ─── 2. Sổ địa chỉ
 const fetchMyAddresses = async () => {
   try {
     const res = await addressApi.getMyAddresses()
@@ -591,7 +595,7 @@ const clearSelectedAddress = () => {
   detailAddress.value = ''
 }
 
-//3. Dropdown GHN
+// ─── 3. Dropdown GHN
 const fetchGhnProvinces = async () => {
   try {
     const res = await ghnApi.getProvinces()
@@ -642,16 +646,18 @@ const onManualWardChange = async () => {
   await calculateShippingFee()
 }
 
-//4. API phụ trợ
+// ─── 4. API phụ trợ
 const fetchCart = async () => {
   try {
     const res = await cartApi.getCart()
     const data = res.data
     cartData.value = data?.data ?? data
-    if (!cartData.value.items?.length) showModal('Lỗi', 'Giỏ hàng trống!', 'redirect_cart')
+    if (!cartData.value.items?.length)
+      showModal('Giỏ hàng trống', 'Bạn chưa có sản phẩm nào trong giỏ hàng!', 'redirect_cart')
   } catch (error) {
-    if (error.response?.status === 401)
-      showModal('Cảnh báo', 'Vui lòng đăng nhập để tiếp tục.', 'redirect_login')
+    if (error.response?.status === 401) {
+      showModal('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để tiếp tục thanh toán.', 'redirect_login')
+    }
   }
 }
 
@@ -664,7 +670,7 @@ const prefillUserEmail = async () => {
   }
 }
 
-//5. Submit
+// ─── 5. Submit Checkout
 const buildShippingAddress = () => {
   if (selectedAddress.value) {
     const a = selectedAddress.value
@@ -681,32 +687,61 @@ const buildShippingAddress = () => {
 const handleCheckout = async () => {
   if (!cartData.value.items?.length) return
 
+  // Validate cụ thể: Số điện thoại
   if (!validatePhone(orderForm.value.recipientPhone)) {
     showModal(
       'Số điện thoại không hợp lệ',
-      'Vui lòng nhập số điện thoại Việt Nam hợp lệ (VD: 0901234567).',
+      'Vui lòng nhập đúng số điện thoại Việt Nam (VD: 0901234567).',
     )
     return
   }
 
-  if (!selectedAddress.value && !detailAddress.value.trim()) {
-    showModal('Thiếu thông tin', 'Vui lòng nhập số nhà, tên đường.')
+  // Validate cụ thể: Email
+  if (!validateEmail(orderForm.value.email)) {
+    showModal(
+      'Email không hợp lệ',
+      'Vui lòng nhập đúng định dạng email (VD: nguyenvan_a@gmail.com).',
+    )
     return
+  }
+
+  // Validate cụ thể: Địa chỉ nhập tay
+  if (!selectedAddress.value) {
+    if (!manualProvinceId.value) {
+      showModal('Thiếu địa chỉ', 'Vui lòng chọn <strong>Tỉnh / Thành phố</strong> giao hàng.')
+      return
+    }
+    if (!manualDistrictId.value) {
+      showModal('Thiếu địa chỉ', 'Vui lòng chọn <strong>Quận / Huyện</strong> giao hàng.')
+      return
+    }
+    if (!manualWardCode.value) {
+      showModal('Thiếu địa chỉ', 'Vui lòng chọn <strong>Phường / Xã</strong> giao hàng.')
+      return
+    }
+    if (!detailAddress.value.trim()) {
+      showModal('Thiếu địa chỉ', 'Vui lòng nhập <strong>Số nhà, tên đường</strong>.')
+      return
+    }
   }
 
   if (!isAddressReady.value) {
-    showModal('Thiếu thông tin', 'Vui lòng chọn đầy đủ địa chỉ giao hàng.')
-    return
-  }
-
-  if (feeError.value) {
     showModal(
-      'Lỗi vận chuyển',
-      'Không thể tính phí giao hàng. Vui lòng thử lại hoặc chọn địa chỉ khác.',
+      'Lỗi hệ thống',
+      'Chưa nhận diện được mã địa chỉ giao hàng. Vui lòng tải lại trang hoặc chọn lại địa chỉ.',
     )
     return
   }
 
+  if (feeError.value || isFeeLoading.value) {
+    showModal(
+      'Lỗi phí vận chuyển',
+      'Không thể tính phí giao hàng. Vui lòng đợi trong giây lát hoặc chọn địa chỉ khác.',
+    )
+    return
+  }
+
+  // Payload gửi lên Server
   const payload = {
     cartItemIds: cartData.value.items.map((i) => i.cartItemId),
     recipientName: orderForm.value.recipientName,
@@ -723,17 +758,13 @@ const handleCheckout = async () => {
   isProcessing.value = true
   try {
     const { data } = await api.post('/checkout', payload)
-
-    //Lấy Mã đơn hàng từ API Backend trả về
     const savedOrderCode = data?.data?.orderCode || data?.orderCode || 'Không xác định'
 
-    // Nếu chọn VNPAY => Bay sang VNPAY
     if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
       window.location.href = data.data.paymentUrl
       return
     }
 
-    // Nếu là COD hoặc PayOS => Bay sang Success KÈM MÃ ĐƠN HÀNG
     router.push({
       path: '/order-success',
       query: { orderCode: savedOrderCode },
