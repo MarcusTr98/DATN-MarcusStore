@@ -7,7 +7,7 @@ import { useSettings } from '@/composables/useSettings'
 const router = useRouter()
 const cartStore = useCartStore()
 
-const totalMoney = computed(() => cartStore.totalAmount)
+const totalMoney = computed(() => cartStore.totalAmount || 0)
 const totalQuantity = computed(() => cartStore.totalQuantity)
 const isLoggedIn = ref(false)
 const userName = ref('')
@@ -34,7 +34,6 @@ const handleLogout = () => {
   localStorage.removeItem('USER_ROLE')
   localStorage.removeItem('USERNAME')
 
-
   cartStore.cart = null
   cartStore.items = []
   cartStore.error = null
@@ -42,8 +41,6 @@ const handleLogout = () => {
   isLoggedIn.value = false
   router.push('/login')
 }
-
-
 
 onMounted(() => {
   checkAuth()

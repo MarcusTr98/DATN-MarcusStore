@@ -26,9 +26,10 @@ public class VnPayController {
     private final OrderRepository orderRepository;
 
     /**
-     * IPN VNPAY gọi endpoint này server-to-server
-     * sau khi khách hoàn tất thanh toán. ko đv bọc ApiResponse ở ngoài,
-     * phải trả đúng format {"RspCode":"00","Message":"Confirm Success"}.
+     * IPN VNPAY gọi endpoint này server-to-server sau khi khách hoàn tất thanh
+     * toán.
+     * Không được bọc ApiResponse ở ngoài, phải trả đúng format
+     * {"RspCode":"00","Message":"Confirm Success"}.
      */
     @Transactional
     @GetMapping("/ipn")
@@ -44,7 +45,7 @@ public class VnPayController {
             }
         }
 
-        // Tách chữ ký ra khỏi map trước khi băm (theo đúng spec VNPAY)
+        // Tách chữ ký ra khỏi map trước khi băm theo spec VNPAY
         String receivedHash = fields.remove("vnp_SecureHash");
         fields.remove("vnp_SecureHashType");
 
@@ -55,11 +56,13 @@ public class VnPayController {
         StringBuilder rawData = new StringBuilder();
         for (Iterator<String> it = sortedKeys.iterator(); it.hasNext();) {
             String key = it.next();
+            // Dùng URLEncoder.encode và chuẩn US_ASCII
             rawData.append(key)
                     .append('=')
-                    .append(URLDecoder.decode(fields.get(key), StandardCharsets.UTF_8));
-            if (it.hasNext())
+                    .append(java.net.URLEncoder.encode(fields.get(key), StandardCharsets.US_ASCII));
+            if (it.hasNext()) {
                 rawData.append('&');
+            }
         }
 
         String computedHash = vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), rawData.toString());
@@ -73,8 +76,15 @@ public class VnPayController {
         String orderCode = fields.get("vnp_TxnRef");
         String responseCode = fields.get("vnp_ResponseCode");
         String transactionId = fields.get("vnp_TransactionNo"); // mã GD phía VNPAY
+
+        // Đã bổ sung check null ở đây để chống lỗi NullPointerException sập Server
+        String amountStr = fields.get("vnp_Amount");
+        if (amountStr == null) {
+            log.warn("[VNPAY IPN] VNPAY không gửi số tiền về.");
+            return ok("01", "Invalid Amount");
+        }
         // VNPAY truyền số tiền đã nhân 100 (VD: 500000 → 5000000)
-        long vnpAmount = Long.parseLong(fields.get("vnp_Amount")) / 100;
+        long vnpAmount = Long.parseLong(amountStr) / 100;
 
         // ── Bước 4: Tìm đơn hàng trong DB
         Optional<Order> orderOpt = orderRepository.findByOrderCode(orderCode);
@@ -118,7 +128,7 @@ public class VnPayController {
         return ok("00", "Confirm Success");
     }
 
-    /** Tiện ích tạo response đúng format VNPAY yêu cầu */
+    // tạo response đúng format VNPAY yêu cầu
     private ResponseEntity<Map<String, String>> ok(String rspCode, String message) {
         return ResponseEntity.ok(Map.of("RspCode", rspCode, "Message", message));
     }
