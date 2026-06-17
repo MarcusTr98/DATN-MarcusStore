@@ -19,4 +19,8 @@ public class CategoryResponse {
     private Boolean status;
     
     private String slug;  
+
+    private Integer parentId;      
+    
+    private String  parentName;
 }

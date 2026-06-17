@@ -1,9 +1,5 @@
 <template>
   <div class="container-fluid px-4 py-3">
-
-    <!-- ═══════════════════════════════════════════
-         HEADER
-    ═══════════════════════════════════════════ -->
     <div class="page-header d-flex align-items-center justify-content-between mb-4">
       <div class="d-flex align-items-center gap-3">
         <div class="header-icon">
@@ -11,7 +7,9 @@
         </div>
         <div>
           <h4 class="header-title mb-0">Quản lý Danh mục</h4>
-          <p class="header-sub mb-0">Quản lý danh mục sản phẩm, danh mục con và trạng thái hiển thị.</p>
+          <p class="header-sub mb-0">
+            Quản lý danh mục sản phẩm, danh mục con và trạng thái hiển thị.
+          </p>
         </div>
       </div>
       <button class="btn btn-pink" @click="openCreate">
@@ -19,24 +17,17 @@
       </button>
     </div>
 
-    <!-- ═══════════════════════════════════════════
-         STATS — 4 thẻ thống kê
-    ═══════════════════════════════════════════ -->
     <div class="row g-3 mb-4">
       <div class="col-6 col-md-3" v-for="stat in stats" :key="stat.label">
         <div class="stat-card">
           <p class="stat-label">{{ stat.label }}</p>
-          <p class="stat-value" :class="{ 'pink': stat.highlight }">{{ stat.value }}</p>
+          <p class="stat-value" :class="{ pink: stat.highlight }">{{ stat.value }}</p>
         </div>
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════
-         FILTER
-    ═══════════════════════════════════════════ -->
     <div class="filter-card mb-4">
       <div class="row g-3 align-items-end">
-
         <div class="col-12 col-md-6">
           <label class="filter-label">TÌM KIẾM</label>
           <div class="input-wrapper">
@@ -65,17 +56,12 @@
             <i class="bi bi-arrow-clockwise"></i>
           </button>
         </div>
-
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════
-         TABLE
-    ═══════════════════════════════════════════ -->
     <div class="table-card">
-
       <div v-if="loading" class="text-center py-5">
-        <div class="spinner-border" style="color:#e91e63" role="status"></div>
+        <div class="spinner-border" style="color: #e91e63" role="status"></div>
         <p class="mt-2 text-muted small">Đang tải dữ liệu...</p>
       </div>
 
@@ -101,14 +87,43 @@
               </tr>
               <tr v-for="(item, i) in pagedRows" :key="item.categoryId">
                 <td class="text-muted small">{{ (page - 1) * PAGE_SIZE + i + 1 }}</td>
-                <td class="fw-500">{{ item.categoryName }}</td>
-                <td><span class="slug-badge">{{ item.slug }}</span></td>
+
+                <td>
+                  <div class="cat-name" :style="{ paddingLeft: item.level * 28 + 'px' }">
+
+                    <i
+                      v-if="item.hasChildren"
+                      class="bi bi-folder2-open cat-toggle"
+                      :class="{ 'is-leaf': !item.hasChildren }"
+                      title="Có danh mục con"
+                    ></i>
+                    <i
+                      v-else
+                      class="bi bi-circle cat-toggle is-leaf"
+                      style="font-size: 0.35rem"
+                    ></i>
+
+                    <span :class="item.level === 0 ? 'cat-root' : 'cat-child'">
+                      {{ item.categoryName }}
+                    </span>
+
+                    <span v-if="item.hasChildren" class="badge-count">
+                      {{ countAllChildren(item) }} con
+                    </span>
+                  </div>
+                </td>
+
+                <td>
+                  <span class="slug-badge">{{ item.slug }}</span>
+                </td>
                 <td class="text-muted small">{{ item.parentName || '—' }}</td>
+
                 <td class="text-center">
                   <span :class="item.status ? 'badge-on' : 'badge-off'">
                     {{ item.status ? 'Hiển thị' : 'Đã ẩn' }}
                   </span>
                 </td>
+
                 <td class="text-center">
                   <div class="d-flex justify-content-center gap-2">
                     <button class="act-btn edit-btn" title="Chỉnh sửa" @click="openEdit(item)">
@@ -129,8 +144,10 @@
           </table>
         </div>
 
-        <!-- Pagination -->
-        <div v-if="totalPages > 1" class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
+        <div
+          v-if="totalPages > 1"
+          class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2"
+        >
           <span class="text-muted small">
             Hiển thị {{ pagedRows.length }} / {{ filteredList.length }} danh mục
           </span>
@@ -139,7 +156,12 @@
               <li class="page-item" :class="{ disabled: page === 1 }">
                 <button class="page-link pg" @click="page--">‹</button>
               </li>
-              <li v-for="p in totalPages" :key="p" class="page-item" :class="{ active: p === page }">
+              <li
+                v-for="p in totalPages"
+                :key="p"
+                class="page-item"
+                :class="{ active: p === page }"
+              >
                 <button class="page-link pg" @click="page = p">{{ p }}</button>
               </li>
               <li class="page-item" :class="{ disabled: page === totalPages }">
@@ -149,22 +171,23 @@
           </nav>
         </div>
       </template>
-
     </div>
 
-    <!-- ═══════════════════════════════════════════
-         TOAST
-    ═══════════════════════════════════════════ -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+    <div class="toast-container position-fixed top-0 end-0 p-3 mt-3" style="z-index: 9999">
       <div
         id="cateToast"
         class="toast align-items-center text-white border-0"
         :class="toast.type === 'success' ? 'bg-success' : 'bg-danger'"
-        role="alert" aria-live="assertive" aria-atomic="true"
+        role="alert"
+        aria-live="assertive"
+        aria-atomic="true"
       >
         <div class="d-flex">
           <div class="toast-body fw-500">
-            <i class="bi me-2" :class="toast.type === 'success' ? 'bi-check-circle' : 'bi-x-circle'"></i>
+            <i
+              class="bi me-2"
+              :class="toast.type === 'success' ? 'bi-check-circle' : 'bi-x-circle'"
+            ></i>
             {{ toast.msg }}
           </div>
           <button type="button" class="btn-close btn-close-white me-2 m-auto"></button>
@@ -172,15 +195,11 @@
       </div>
     </div>
 
-    <!-- ═══════════════════════════════════════════
-         MODAL thêm / sửa
-    ═══════════════════════════════════════════ -->
     <div class="modal fade" id="cateModal" tabindex="-1" ref="modalEl">
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content rounded-4 border-0 shadow-lg">
-
           <div class="modal-header border-0 pb-0">
-            <h5 class="fw-bold mb-0" style="color:#e91e63">
+            <h5 class="fw-bold mb-0" style="color: #e91e63">
               <i class="bi me-2" :class="isEdit ? 'bi-pencil-square' : 'bi-plus-circle-fill'"></i>
               {{ isEdit ? 'Chỉnh sửa danh mục' : 'Thêm danh mục mới' }}
             </h5>
@@ -188,7 +207,6 @@
           </div>
 
           <div class="modal-body pt-3">
-
             <div class="mb-3">
               <label class="flabel">Tên danh mục <span class="text-danger">*</span></label>
               <input
@@ -215,16 +233,27 @@
               <label class="flabel">Trạng thái</label>
               <div class="d-flex gap-4 mt-1">
                 <div class="form-check">
-                  <input class="form-check-input" type="radio" :value="true" v-model="form.status" id="sOn" />
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    :value="true"
+                    v-model="form.status"
+                    id="sOn"
+                  />
                   <label class="form-check-label" for="sOn">Hiển thị</label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="radio" :value="false" v-model="form.status" id="sOff" />
+                  <input
+                    class="form-check-input"
+                    type="radio"
+                    :value="false"
+                    v-model="form.status"
+                    id="sOff"
+                  />
                   <label class="form-check-label" for="sOff">Ẩn</label>
                 </div>
               </div>
             </div>
-
           </div>
 
           <div class="modal-footer border-0 pt-1">
@@ -234,11 +263,9 @@
               {{ isEdit ? 'Cập nhật' : 'Thêm mới' }}
             </button>
           </div>
-
         </div>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -246,73 +273,107 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { Modal, Toast } from 'bootstrap'
 import api from '@/utils/api'
+import '@/assets/css/Category.css'
 
 const BASE_URL = '/admin/categories'
 
 const categoryApi = {
+  getAll: () => api.get(BASE_URL, { params: { page: 0, size: 999 } }),
 
-  getAll: () =>
-    api.get(BASE_URL, { params: { page: 0, size: 999 } }),
+  create: (payload) => api.post(BASE_URL, payload),
 
-  create: (payload) =>
-    api.post(BASE_URL, payload),
+  update: (id, payload) => api.put(`${BASE_URL}/${id}`, payload),
 
-  update: (id, payload) =>
-    api.put(`${BASE_URL}/${id}`, payload),
-
-  hide: (id) =>
-    api.put(`${BASE_URL}/hidden/${id}`),
+  hide: (id) => api.put(`${BASE_URL}/hidden/${id}`),
 }
 
-const PAGE_SIZE     = 10
+const PAGE_SIZE = 5
 const allCategories = ref([])
-const loading       = ref(false)
-const saving        = ref(false)
-const page          = ref(1)
-const filter        = ref({ search: '', status: '' })
-const isEdit        = ref(false)
-const editId        = ref(null)
-const form          = ref({ categoryName: '', parentId: null, status: true })
-const err           = ref({})
-const toast         = ref({ msg: '', type: 'success' })
-const modalEl       = ref(null)
+const loading = ref(false)
+const saving = ref(false)
+const page = ref(1)
+const filter = ref({ search: '', status: '' })
+const isEdit = ref(false)
+const editId = ref(null)
+const form = ref({ categoryName: '', parentId: null, status: true })
+const err = ref({})
+const toast = ref({ msg: '', type: 'success' })
+const modalEl = ref(null)
 let bsModal = null
 let bsToast = null
 
 const stats = computed(() => [
-  { label: 'Tổng danh mục', value: allCategories.value.length,                                  highlight: false },
-  { label: 'Đang hiển thị', value: allCategories.value.filter(c => c.status).length,            highlight: true  },
-  { label: 'Đã ẩn',         value: allCategories.value.filter(c => !c.status).length,           highlight: false },
-  { label: 'Danh mục con',  value: allCategories.value.filter(c => c.parentId != null).length,  highlight: false },
+  { label: 'Tổng danh mục', value: allCategories.value.length, highlight: false },
+  {
+    label: 'Đang hiển thị',
+    value: allCategories.value.filter((c) => c.status).length,
+    highlight: true,
+  },
+  { label: 'Đã ẩn', value: allCategories.value.filter((c) => !c.status).length, highlight: false },
+  {
+    label: 'Danh mục con',
+    value: allCategories.value.filter((c) => c.parentId != null).length,
+    highlight: false,
+  },
 ])
 
 const filteredList = computed(() => {
   let list = allCategories.value
   const q = filter.value.search.trim().toLowerCase()
-  if (q) list = list.filter(c => c.categoryName.toLowerCase().includes(q))
+  if (q) list = list.filter((c) => c.categoryName.toLowerCase().includes(q))
   if (filter.value.status !== '') {
-    list = list.filter(c => c.status === (filter.value.status === 'true'))
+    list = list.filter((c) => c.status === (filter.value.status === 'true'))
   }
   return list
 })
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(filteredList.value.length / PAGE_SIZE))
+function buildTree(list) {
+  const map = new Map()
+  const roots = []
+  list.forEach(c => map.set(c.categoryId, { ...c, children: [] }))
+  list.forEach(c => {
+    const node = map.get(c.categoryId)
+    if (c.parentId != null && map.has(c.parentId)) {
+      map.get(c.parentId).children.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  const sort = arr => arr.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'vi'))
+  sort(roots)
+  roots.forEach(r => sort(r.children))
+  return roots
+}
+// 2. Flatten cây → mảng phẳng, có level + hasChildren
+function flattenTree(nodes, level = 0, out = []) {
+  for (const n of nodes) {
+    out.push({ ...n, level, hasChildren: n.children.length > 0 })
+    if (n.children.length) flattenTree(n.children, level + 1, out)
+  }
+  return out
+}
+// 3. Đếm tổng con cháu (đệ quy)
+function countAllChildren(node) {
+  let total = node.children.length
+  for (const child of node.children) total += countAllChildren(child)
+  return total
+}
+// 4. Tree rows đã flatten theo thứ tự cây
+const treeRows = computed(() => flattenTree(buildTree(filteredList.value)))
+const parentOptions = computed(() =>
+  allCategories.value.filter((c) => c.categoryId !== editId.value),
 )
-
+// 5. Phân trang trên treeRows (thay thế computed cũ)
+const totalPages = computed(() => Math.max(1, Math.ceil(treeRows.value.length / PAGE_SIZE)))
 const pagedRows = computed(() => {
   const start = (page.value - 1) * PAGE_SIZE
-  return filteredList.value.slice(start, start + PAGE_SIZE)
+  return treeRows.value.slice(start, start + PAGE_SIZE)
 })
-
-const parentOptions = computed(() =>
-  allCategories.value.filter(c => c.categoryId !== editId.value)
-)
 
 async function fetchAll() {
   loading.value = true
   try {
-    const res     = await categoryApi.getAll()
+    const res = await categoryApi.getAll()
     const payload = res.data?.data ?? res.data
     allCategories.value = Array.isArray(payload) ? payload : (payload.content ?? [])
   } catch {
@@ -325,7 +386,10 @@ async function fetchAll() {
 async function doCreate() {
   saving.value = true
   try {
-    await categoryApi.create({ categoryName: form.value.categoryName, parentId: form.value.parentId })
+    await categoryApi.create({
+      categoryName: form.value.categoryName,
+      parentId: form.value.parentId,
+    })
     showToast('Thêm danh mục thành công!', 'success')
     bsModal.hide()
     await fetchAll()
@@ -341,8 +405,8 @@ async function doUpdate() {
   try {
     await categoryApi.update(editId.value, {
       categoryName: form.value.categoryName,
-      parentId:     form.value.parentId,
-      status:       form.value.status,
+      parentId: form.value.parentId,
+      status: form.value.status,
     })
     showToast('Cập nhật thành công!', 'success')
     bsModal.hide()
@@ -368,16 +432,20 @@ async function onHide(item) {
 function openCreate() {
   isEdit.value = false
   editId.value = null
-  form.value   = { categoryName: '', parentId: null, status: true }
-  err.value    = {}
+  form.value = { categoryName: '', parentId: null, status: true }
+  err.value = {}
   bsModal.show()
 }
 
 function openEdit(item) {
   isEdit.value = true
   editId.value = item.categoryId
-  form.value   = { categoryName: item.categoryName, parentId: item.parentId ?? null, status: item.status }
-  err.value    = {}
+  form.value = {
+    categoryName: item.categoryName,
+    parentId: item.parentId ?? null,
+    status: item.status,
+  }
+  err.value = {}
   bsModal.show()
 }
 
@@ -405,7 +473,7 @@ function showToast(msg, type = 'success') {
 
 function onReset() {
   filter.value = { search: '', status: '' }
-  page.value   = 1
+  page.value = 1
 }
 
 onMounted(async () => {
@@ -415,103 +483,4 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.page-header {
-  background: #fff; border-radius: 14px; padding: 20px 24px;
-  border: 1px solid #fce4ec; box-shadow: 0 1px 6px rgba(233,30,99,.07);
-  display: flex; align-items: center; justify-content: space-between;
-}
-.header-icon {
-  width: 48px; height: 48px; background: #e91e63; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 1.3rem; flex-shrink: 0;
-}
-.header-title { font-size: 1.2rem; font-weight: 700; color: #e91e63; }
-.header-sub   { font-size: .82rem; color: #aaa; }
-
-.btn-pink {
-  background: #e91e63; color: #fff; border: none;
-  border-radius: 10px; font-weight: 600; font-size: .9rem;
-  padding: 10px 20px; transition: background .2s;
-}
-.btn-pink:hover    { background: #c2185b; color: #fff; }
-.btn-pink:disabled { opacity: .7; }
-
-.stat-card {
-  background: #fff; border-radius: 12px; padding: 20px 24px;
-  border: 1px solid #fce4ec; box-shadow: 0 1px 6px rgba(233,30,99,.07);
-}
-.stat-label { font-size: .8rem; color: #999; font-weight: 500; margin-bottom: 6px; }
-.stat-value { font-size: 2rem; font-weight: 700; color: #222; margin: 0; line-height: 1; }
-.stat-value.pink { color: #e91e63; }
-
-.filter-card {
-  background: #fff; border-radius: 12px; padding: 20px 24px;
-  border: 1px solid #fce4ec; box-shadow: 0 1px 6px rgba(233,30,99,.07);
-}
-.filter-label {
-  display: block; font-size: .72rem; font-weight: 700;
-  color: #e91e63; letter-spacing: .08em; margin-bottom: 6px;
-}
-.input-wrapper { position: relative; }
-.search-icon {
-  position: absolute; left: 12px; top: 50%;
-  transform: translateY(-50%); color: #bbb; font-size: .9rem;
-}
-.f-input { border-radius: 8px; border: 1px solid #f0c0d0; font-size: .9rem; height: 42px; }
-.f-input:focus { border-color: #e91e63; box-shadow: 0 0 0 3px rgba(233,30,99,.1); }
-input.f-input { padding-left: 36px; }
-.btn-reset {
-  width: 42px; height: 42px; border-radius: 8px;
-  border: 1px solid #f0c0d0; background: #fff5f8; color: #e91e63;
-  font-size: 1rem; display: flex; align-items: center; justify-content: center;
-}
-.btn-reset:hover { background: #fce4ec; }
-
-.table-card {
-  background: #fff; border-radius: 12px;
-  border: 1px solid #fce4ec; box-shadow: 0 1px 6px rgba(233,30,99,.07);
-  overflow: hidden; padding-bottom: 4px;
-}
-.th {
-  background: #fff5f8; color: #e91e63;
-  font-size: .75rem; font-weight: 700; letter-spacing: .05em;
-  border-bottom: 2px solid #fce4ec !important;
-  padding: 12px 16px; white-space: nowrap;
-}
-.table tbody tr:hover { background: #fff9fb; }
-.fw-500 { font-weight: 500; }
-.slug-badge {
-  background: #fce4ec; color: #c2185b;
-  font-size: .74rem; padding: 3px 8px;
-  border-radius: 6px; font-family: monospace;
-}
-.badge-on {
-  background: #e8f5e9; color: #2e7d32; font-size: .78rem; font-weight: 600;
-  padding: 4px 10px; border-radius: 20px; display: inline-block;
-}
-.badge-off {
-  background: #f5f5f5; color: #9e9e9e; font-size: .78rem; font-weight: 600;
-  padding: 4px 10px; border-radius: 20px; display: inline-block;
-}
-.act-btn {
-  width: 32px; height: 32px; border-radius: 7px; border: none;
-  font-size: .85rem; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: background .15s;
-}
-.edit-btn { background: #fce4ec; color: #e91e63; }
-.edit-btn:hover { background: #f48fb1; color: #fff; }
-.hide-btn { background: #f5f5f5; color: #757575; }
-.hide-btn:hover:not(:disabled) { background: #e0e0e0; }
-.hide-btn:disabled { opacity: .4; cursor: not-allowed; }
-
-.pg { color: #e91e63; border-color: #fce4ec; }
-.pg:hover { background: #fce4ec; color: #e91e63; }
-.page-item.active .pg {
-  background: #e91e63 !important; border-color: #e91e63 !important; color: #fff !important;
-}
-
-.flabel { display: block; font-size: .82rem; font-weight: 600; color: #555; margin-bottom: 5px; }
-.finput { border-radius: 8px; border: 1px solid #f0c0d0; font-size: .9rem; }
-.finput:focus { border-color: #e91e63; box-shadow: 0 0 0 3px rgba(233,30,99,.1); }
 </style>
