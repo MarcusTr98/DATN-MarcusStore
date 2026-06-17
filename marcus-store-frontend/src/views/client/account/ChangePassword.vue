@@ -108,7 +108,6 @@
   <BaseModal :visible="modalVisible" :type="modalType" :title="modalTitle" :message="modalMessage"
     @close="closeModal" />
 </template>
-
 <script setup>
 import { changePassword } from "@/api/authApi";
 import BaseModal from "@/components/BaseModal.vue";
@@ -163,8 +162,6 @@ onMounted(() => {
 });
 
 const submit = async () => {
-
-  // 1. Kiểm tra mật khẩu hiện tại
   if (!form.value.currentPassword.trim()) {
     return showModal(
       "error",
@@ -173,7 +170,7 @@ const submit = async () => {
     );
   }
 
-  // 2. Kiểm tra mật khẩu mới
+
   if (!form.value.newPassword.trim()) {
     return showModal(
       "error",
@@ -182,7 +179,7 @@ const submit = async () => {
     );
   }
 
-  // 3. Kiểm tra xác nhận mật khẩu
+
   if (!form.value.confirmPassword.trim()) {
     return showModal(
       "error",
@@ -191,30 +188,12 @@ const submit = async () => {
     );
   }
 
-  // 4. Kiểm tra độ dài mật khẩu
+
   if (form.value.newPassword.length < 6) {
     return showModal(
       "error",
       "Mật khẩu quá ngắn",
       "Mật khẩu mới phải có ít nhất 6 ký tự."
-    );
-  }
-
-  // 5. Kiểm tra mật khẩu mới khác mật khẩu cũ
-  if (form.value.currentPassword === form.value.newPassword) {
-    return showModal(
-      "error",
-      "Mật khẩu không hợp lệ",
-      "Mật khẩu mới phải khác mật khẩu hiện tại."
-    );
-  }
-
-  // 6. Kiểm tra xác nhận mật khẩu
-  if (form.value.newPassword !== form.value.confirmPassword) {
-    return showModal(
-      "error",
-      "Mật khẩu xác nhận không khớp",
-      "Vui lòng nhập lại đúng mật khẩu mới."
     );
   }
 
@@ -260,7 +239,6 @@ const submit = async () => {
       );
     }
 
-    // Các lỗi nghiệp vụ từ backend
     if (
       message.includes("current password") ||
       message.includes("Mật khẩu hiện tại")
@@ -271,6 +249,30 @@ const submit = async () => {
         message
       );
     }
+
+
+    if (
+      message.includes("trùng mật khẩu cũ") ||
+      message.includes("must not match")
+    ) {
+      return showModal(
+        "error",
+        "Mật khẩu mới không hợp lệ",
+        message
+      );
+    }
+
+    if (
+      message.includes("xác nhận không khớp") ||
+      message.toLowerCase().includes("confirm")
+    ) {
+      return showModal(
+        "error",
+        "Xác nhận mật khẩu không khớp",
+        message
+      );
+    }
+
 
     if (
       message.includes("new password") ||
@@ -288,13 +290,12 @@ const submit = async () => {
       "Đổi mật khẩu thất bại",
       message
     );
-    showModal("error", "Đổi mật khẩu thất bại", error.response?.data?.message || "Có lỗi xảy ra");
+
   } finally {
     loading.value = false;
   }
-};
+}
 </script>
-
 <style scoped>
 .cp-page {
   min-height: 100vh;
