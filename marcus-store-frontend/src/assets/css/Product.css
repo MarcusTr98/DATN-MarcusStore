@@ -301,23 +301,106 @@ input.f-input { padding-left: 38px; }
 }
 .hide-btn:disabled { opacity: .35; cursor: not-allowed; }
 /* Pagination */
-.pg {
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 24px;
+  border-top: 1px solid #f3d6e3;
+  background: #fffafc;
+}
+
+.pagination-total {
+  color: #38445a;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.pagination-total strong {
+  color: #0f1f3a;
+  font-weight: 800;
+}
+
+.pagination-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-size-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #5f6675;
+  font-weight: 700;
+}
+
+.page-size-box select {
+  min-width: 98px;
+  height: 44px;
+  padding: 0 14px;
+  border: 1px solid #f3d6e3;
+  border-radius: 6px;
+  background: #fff;
+  color: #0f1f3a;
+  font-size: 16px;
+  font-weight: 800;
+  outline: none;
+}
+
+.page-size-box select:focus {
+  border-color: #f55d9b;
+  box-shadow: 0 0 0 3px rgba(245, 93, 155, 0.12);
+}
+
+.page-btn {
+  min-width: 92px;
+  height: 46px;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+  background: #fff;
+  color: #344057;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: #f55d9b;
   color: #f55d9b;
-  border-color: #f3d6e3;
-  border-radius: 8px !important;
-  margin: 0 2px;
-  font-weight: 600;
-  font-size: .82rem;
-  transition: all .15s;
+  background: #fff0f7;
 }
-.pg:hover { background: #fff0f7; color: #d63384; }
-.page-item.active .pg {
-  background: linear-gradient(135deg, #f55d9b, #ec4d8d) !important;
-  border-color: #f55d9b !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(245, 93, 155, 0.35);
+
+.page-btn:disabled {
+  color: #9ca3af;
+  background: #fafafa;
+  cursor: not-allowed;
 }
-.page-link { border-radius: 8px; }
+
+.page-current {
+  min-width: 110px;
+  text-align: center;
+  color: #0f1f3a;
+  font-size: 17px;
+  font-weight: 900;
+}
+
+@media (max-width: 768px) {
+  .pagination-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pagination-actions {
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .page-current {
+    order: -1;
+    width: 100%;
+  }
+}
 
 .modal-content {
   border-radius: 14px !important;

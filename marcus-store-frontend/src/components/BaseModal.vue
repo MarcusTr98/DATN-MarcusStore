@@ -3,13 +3,18 @@
     <div v-if="visible" class="modal-overlay" @click.self="close">
       <div class="modal-box">
         <div class="modal-icon">
-          {{ type === 'success' ? '✅' : '❌' }}
+          <span v-if="type === 'success'">✅</span>
+          <span v-else-if="type === 'confirm'">⚠️</span>
+          <span v-else>❌</span>
         </div>
         <h3 class="modal-title">{{ title }}</h3>
         <p class="modal-message">{{ message }}</p>
-        <button class="modal-btn" :class="type" @click="close">
-          Đóng
-        </button>
+        <div class="modal-actions" :class="{ single: !showConfirm }">
+          <button v-if="showConfirm" class="modal-btn confirm" @click="emit('confirm')">
+            Xác nhận
+          </button>
+          <button class="modal-btn" :class="type" @click="close">Đóng</button>
+        </div>
       </div>
     </div>
   </Teleport>
@@ -21,9 +26,10 @@ defineProps({
   type: { type: String, default: 'error' },
   title: { type: String, default: '' },
   message: { type: String, default: '' },
+  showConfirm: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'confirm'])
 const close = () => emit('close')
 </script>
 
@@ -68,8 +74,21 @@ const close = () => emit('close')
   line-height: 1.6;
 }
 
+.modal-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.modal-actions.single {
+  justify-content: center;
+}
+
+.modal-actions.single .modal-btn {
+  width: 160px;
+}
+
 .modal-btn {
-  width: 100%;
+  flex: 1;
   height: 46px;
   border: none;
   border-radius: 12px;
@@ -77,6 +96,11 @@ const close = () => emit('close')
   font-size: 15px;
   cursor: pointer;
   transition: 0.2s;
+}
+
+.modal-btn.confirm {
+  background: linear-gradient(135deg, #74b9ff, #0984e3);
+  color: white;
 }
 
 .modal-btn.success {
@@ -87,6 +111,11 @@ const close = () => emit('close')
 .modal-btn.error {
   background: linear-gradient(135deg, #ff76ae, #ff4d94);
   color: white;
+}
+
+.modal-btn.confirm-close {
+  background: #f0f0f0;
+  color: #333;
 }
 
 .modal-btn:hover {

@@ -14,6 +14,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -52,7 +53,12 @@ public class AdminProductController {
     }
 
     @PutMapping("/hidden/{id}")
-    public ApiResponse<Product> hiddenProduct(@PathVariable Integer id) {
+    public ApiResponse<ProductResponse> hiddenProduct(@PathVariable Integer id) {
         return ApiResponse.success(productsService.hiddenProduct(id));
+    }
+
+    @GetMapping("/brands")
+    public ResponseEntity<List<String>> getAllBrands() {
+        return ResponseEntity.ok(productsService.getAllDistinctBrands());
     }
 }

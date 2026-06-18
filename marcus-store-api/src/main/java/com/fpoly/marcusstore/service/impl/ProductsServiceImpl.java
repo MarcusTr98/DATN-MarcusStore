@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -124,7 +125,7 @@ public class ProductsServiceImpl implements ProductsService {
 
     @Override
     @Transactional
-    public Product hiddenProduct(Integer id) {
+    public ProductResponse hiddenProduct(Integer id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("ID sản phẩm không tồn tại"));
 
@@ -132,6 +133,12 @@ public class ProductsServiceImpl implements ProductsService {
             throw new RuntimeException("Sản phẩm đã bị ẩn");
         }
         product.setStatus(false);
-        return productRepository.save(product);
+        return toProductResponse(productRepository.save(product)) ;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllDistinctBrands(){
+        return productRepository.findAllDistinctBrands();
     }
 }

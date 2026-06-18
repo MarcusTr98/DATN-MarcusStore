@@ -50,4 +50,7 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
                         @Param("brand") String brand,
                         Pageable pageable);
 
+        // list tên brand 
+        @Query("SELECT DISTINCT p.brand FROM Product p WHERE p.brand IS NOT NULL AND p.brand <> ''")
+        List<String> findAllDistinctBrands();
 }

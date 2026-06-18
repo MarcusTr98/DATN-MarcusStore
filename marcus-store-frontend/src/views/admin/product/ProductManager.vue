@@ -165,51 +165,55 @@
         </div>
 
         <!-- Pagination -->
-        <div class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2">
-          <span class="text-muted small">Tổng {{ totalElements }} sản phẩm</span>
-          <nav v-if="totalPages > 1">
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item" :class="{ disabled: page === 0 }">
-                <button class="page-link pg" @click="changePage(page - 1)">‹</button>
-              </li>
-              <li
-                v-for="p in totalPages"
-                :key="p"
-                class="page-item"
-                :class="{ active: p - 1 === page }"
-              >
-                <button class="page-link pg" @click="changePage(p - 1)">{{ p }}</button>
-              </li>
-              <li class="page-item" :class="{ disabled: page === totalPages - 1 }">
-                <button class="page-link pg" @click="changePage(page + 1)">›</button>
-              </li>
-            </ul>
-          </nav>
+        <div v-if="totalPages > 0" class="pagination-bar">
+          <div class="pagination-total">
+            Tổng <strong>{{ totalElements }}</strong> sản phẩm
+          </div>
+
+          <div class="pagination-actions">
+            <label class="page-size-box">
+              <span>Hiển thị</span>
+              <select v-model.number="pageSize" @change="onFilterChange">
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+            </label>
+
+            <button
+              type="button"
+              class="page-btn"
+              :disabled="page === 0"
+              @click="changePage(page - 1)"
+            >
+              Trước
+            </button>
+
+            <span class="page-current">Trang {{ page + 1 }} / {{ totalPages }}</span>
+
+            <button
+              type="button"
+              class="page-btn"
+              :disabled="page + 1 >= totalPages"
+              @click="changePage(page + 1)"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </template>
     </div>
 
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999">
-      <div
-        id="prodToast"
-        class="toast align-items-center text-white border-0"
-        :class="toast.type === 'success' ? 'bg-success' : 'bg-danger'"
-        role="alert"
-        aria-live="assertive"
-        aria-atomic="true"
-      >
-        <div class="d-flex">
-          <div class="toast-body fw-500">
-            <i
-              class="bi me-2"
-              :class="toast.type === 'success' ? 'bi-check-circle' : 'bi-x-circle'"
-            ></i>
-            {{ toast.msg }}
-          </div>
-          <button type="button" class="btn-close btn-close-white me-2 m-auto"></button>
-        </div>
-      </div>
-    </div>
+    <BaseModal
+      :visible="baseModal.visible"
+      :show-confirm="baseModal.type === 'confirm'"
+      :type="baseModal.type"
+      :title="baseModal.title"
+      :message="baseModal.message"
+      @close="onModalClose"
+      @confirm="onModalConfirm"
+    />
 
     <div class="modal fade" id="prodModal" tabindex="-1" ref="modalEl">
       <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -266,16 +270,31 @@
               </div>
 
               <!-- Thumbnail URL -->
-              <div class="col-12">
-                <label class="flabel">URL ảnh thumbnail</label>
-                <input
-                  v-model="form.thumbnailUrl"
-                  type="text"
-                  class="form-control finput"
-                  placeholder="https://..."
-                />
-                <div v-if="form.thumbnailUrl" class="mt-2">
-                  <img :src="form.thumbnailUrl" class="thumb-preview" alt="preview" />
+              <div class="col-12" v-if="!isEdit">
+                <label class="flabel">Ảnh thumbnail</label>
+                <div class="upload-section">
+                  <div class="input-group">
+                    <input
+                      type="file"
+                      class="form-control finput"
+                      accept="image/*"
+                      ref="thumbnailFileInput"
+                      @change="onThumbnailSelect"
+                    />
+                  </div>
+                  <div v-if="thumbnailPreview" class="upload-preview mt-3">
+                    <img :src="thumbnailPreview" alt="preview" class="preview-thumb" />
+                    <span class="preview-name ms-2 text-muted small">{{
+                      thumbnailFile?.name
+                    }}</span>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger ms-auto"
+                      @click="clearThumbnail"
+                    >
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -346,7 +365,6 @@
           </div>
 
           <div class="modal-body pt-3">
-      
             <div class="upload-section mb-4">
               <div class="d-flex align-items-center gap-3">
                 <div class="flex-grow-1">
@@ -472,10 +490,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
-import { Modal, Toast } from 'bootstrap'
+import { ref, computed, onMounted } from 'vue'
+import BaseModal from '@/components/BaseModal.vue'
 import api from '@/utils/api'
 import '@/assets/css/Product.css'
+import { Modal } from 'bootstrap'
 
 const productApi = {
   getAll: (keyword, status, brand, page, size) =>
@@ -528,10 +547,8 @@ const form = ref({
 })
 const err = ref({})
 
-const toast = ref({ msg: '', type: 'success' })
 const modalEl = ref(null)
 let bsModal = null
-let bsToast = null
 
 const imagesModalEl = ref(null)
 const fileInput = ref(null)
@@ -556,6 +573,50 @@ const stats = computed(() => [
   { label: 'Đã ẩn', value: products.value.filter((p) => !p.status).length, highlight: false },
 ])
 
+const baseModal = ref({
+  visible: false,
+  type: 'error',
+  title: '',
+  message: '',
+  onConfirm: null,
+})
+
+const thumbnailFileInput = ref(null)
+const thumbnailFile = ref(null)
+const thumbnailPreview = ref(null)
+
+function onThumbnailSelect(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  thumbnailFile.value = file
+  const reader = new FileReader()
+  reader.onload = (e) => { thumbnailPreview.value = e.target.result }
+  reader.readAsDataURL(file)
+}
+
+function clearThumbnail() {
+  thumbnailFile.value = null
+  thumbnailPreview.value = null
+  if (thumbnailFileInput.value) thumbnailFileInput.value.value = ''
+}
+
+function showModal(type, title, message, onConfirm = null) {
+  console.log('showModal called:', type, title)
+  baseModal.value.type = type
+  baseModal.value.title = title
+  baseModal.value.message = message
+  baseModal.value.onConfirm = onConfirm
+  baseModal.value.visible = true
+}
+
+function onModalClose() {
+  baseModal.value.visible = false
+}
+
+function onModalConfirm() {
+  if (baseModal.value.onConfirm) baseModal.value.onConfirm()
+}
+
 async function fetchProducts() {
   loading.value = true
   try {
@@ -566,6 +627,7 @@ async function fetchProducts() {
       page.value,
       pageSize.value,
     )
+    console.log('raw response:', res.data)
     const payload = res.data?.data ?? res.data
     const content = Array.isArray(payload) ? payload : (payload.content ?? [])
     products.value = content
@@ -578,14 +640,12 @@ async function fetchProducts() {
   }
 }
 
-async function fetchAllBrands() {
+const fetchAllBrands = async () => {
   try {
-    const res = await productApi.getAll(undefined, 'all', undefined, 0, 9999)
-    const payload = res.data?.data ?? res.data
-    const content = Array.isArray(payload) ? payload : (payload.content ?? [])
-    const set = new Set(content.map((p) => p.brand).filter(Boolean))
-    allBrands.value = [...set].sort()
-  } catch {
+    const res = await api.get('/admin/product/brands')
+    allBrands.value = res.data
+  } catch (err) {
+    console.error('Lỗi lấy brands:', err)
   }
 }
 
@@ -594,22 +654,31 @@ async function fetchCategories() {
     const res = await categoryApi.getAll()
     const payload = res.data?.data ?? res.data
     categories.value = Array.isArray(payload) ? payload : (payload.content ?? [])
-  } catch {
-
-  }
+  } catch {}
 }
 
 async function doCreate() {
   saving.value = true
   try {
-    await productApi.create({
+    const res =await productApi.create({
       productName: form.value.productName,
       brand: form.value.brand,
       categoryId: form.value.categoryId,
-      thumbnailUrl: form.value.thumbnailUrl,
+      thumbnailUrl: '',
       description: form.value.description,
     })
+
+    const newProductId = res.data?.data?.productId ?? res.data?.productId
+
+    if (thumbnailFile.value && newProductId) {
+      const formData = new FormData()
+      formData.append('file', thumbnailFile.value)
+      formData.append('isPrimary', true)
+      await productImgApi.uploadImage(newProductId, formData)
+    }
+    
     showToast('Thêm sản phẩm thành công!', 'success')
+    clearThumbnail()
     bsModal.hide()
     await Promise.all([fetchProducts(), fetchAllBrands()])
   } catch (e) {
@@ -641,21 +710,36 @@ async function doUpdate() {
 }
 
 async function onHide(item) {
-  if (!confirm(`Ẩn sản phẩm "${item.productName}"?`)) return
-  try {
-    await productApi.hide(item.productId)
-    showToast('Đã ẩn sản phẩm', 'success')
-    await fetchProducts()
-  } catch (e) {
-    showToast(e.response?.data?.message ?? 'Lỗi khi ẩn sản phẩm', 'error')
-  }
+  showModal(
+    'confirm',
+    'Xác nhận ẩn sản phẩm',
+    `Bạn có chắc muốn ẩn sản phẩm "${item.productName}"?`,
+    async () => {
+      try {
+        await productApi.hide(item.productId)
+        const idx = products.value.findIndex((p) => p.productId === item.productId)
+        if (idx !== -1) products.value[idx].status = false
+        showModal('success', 'Thành công', 'Đã ẩn sản phẩm')
+      } catch (e) {
+        showModal('error', 'Lỗi', e.response?.data?.message ?? 'Lỗi khi ẩn sản phẩm')
+      }
+    },
+  )
 }
 
 function openCreate() {
   isEdit.value = false
   editId.value = null
-  form.value = { productName: '', brand: '', categoryId: null, thumbnailUrl: '', description: '', status: true }
+  form.value = {
+    productName: '',
+    brand: '',
+    categoryId: null,
+    thumbnailUrl: '',
+    description: '',
+    status: true,
+  }
   err.value = {}
+  clearThumbnail()
   bsModal.show()
 }
 
@@ -665,7 +749,8 @@ function openEdit(item) {
   form.value = {
     productName: item.productName,
     brand: item.brand ?? '',
-    categoryId: categories.value.find((c) => c.categoryName === item.categoryName)?.categoryId ?? null,
+    categoryId:
+      categories.value.find((c) => c.categoryName === item.categoryName)?.categoryId ?? null,
     thumbnailUrl: item.thumbnailUrl ?? '',
     description: item.description ?? '',
     status: item.status,
@@ -706,11 +791,7 @@ function changePage(p) {
 }
 
 function showToast(msg, type = 'success') {
-  toast.value = { msg, type }
-  nextTick(() => {
-    if (!bsToast) bsToast = new Toast(document.getElementById('prodToast'), { delay: 3000 })
-    bsToast.show()
-  })
+  showModal(type, type === 'success' ? 'Thành công' : 'Lỗi', msg)
 }
 
 async function openImagesModal(product) {
@@ -736,11 +817,16 @@ async function fetchProductImages(productId) {
 
 function onFileSelect(event) {
   const file = event.target.files[0]
-  if (!file) { resetUploadForm(); return }
+  if (!file) {
+    resetUploadForm()
+    return
+  }
   selectedFile.value = file
   selectedFileName.value = file.name
   const reader = new FileReader()
-  reader.onload = (e) => { selectedFilePreview.value = e.target.result }
+  reader.onload = (e) => {
+    selectedFilePreview.value = e.target.result
+  }
   reader.readAsDataURL(file)
 }
 
@@ -793,14 +879,15 @@ async function setPrimaryImage(img) {
 }
 
 async function deleteImage(img) {
-  if (!confirm('Xóa ảnh này?')) return
-  try {
-    await productImgApi.deleteImage(img.imageId)
-    showToast('Xóa ảnh thành công!', 'success')
-    await fetchProductImages(selectedProduct.value.productId)
-  } catch (e) {
-    showToast(e.response?.data?.message ?? 'Lỗi khi xóa ảnh', 'error')
-  }
+  showModal('confirm', 'Xác nhận xóa ảnh', 'Bạn có chắc muốn xóa ảnh này?', async () => {
+    try {
+      await productImgApi.deleteImage(img.imageId)
+      showModal('success', 'Thành công', 'Xóa ảnh thành công!')
+      await fetchProductImages(selectedProduct.value.productId)
+    } catch (e) {
+      showModal('error', 'Lỗi', e.response?.data?.message ?? 'Lỗi khi xóa ảnh')
+    }
+  })
 }
 
 function viewFullImage(url) {
