@@ -422,7 +422,7 @@
       :type="localModal.type"
       :title="localModal.title"
       :message="localModal.message"
-      @close="localModal.visible = false"
+      @close="handleModalClose"
       @confirm="execConfirm"
     />
   </div>
@@ -433,6 +433,10 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/profile-admin.css'
+import { changePassword } from '@/api/authApi'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 const lastUpdated = ref('')
 const isLoading = ref(false)
 const isSavingProfile = ref(false)
@@ -585,17 +589,82 @@ const handleUpdateProfile = async () => {
   }
 }
 
+//Xử lý đóng Modal và kích hoạt Logout
+const handleModalClose = () => {
+  localModal.visible = false
+  // Nếu có gài action thì chạy luôn khi đóng modal
+  if (localModal.actionCallback) {
+    localModal.actionCallback()
+    localModal.actionCallback = null // Xóa ngay để không bị dính vào lần sau
+  }
+}
+
 const handleChangePassword = async () => {
-  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-    showAlert('error', 'Lỗi xác nhận', 'Mật khẩu xác nhận không khớp!')
+  // Chặn để rỗng
+  if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+    showAlert('warning', 'Thiếu thông tin', 'Vui lòng điền đầy đủ các trường mật khẩu.')
     return
   }
-  // TODO: API đổi mật khẩu - đợi Ngọc làm
-  showAlert(
-    'info',
-    'Chờ ghép nối API',
-    'Giao diện Đổi mật khẩu đã xong. Chờ API Backend hoàn thiện để gắn vào.',
-  )
+
+  // Chặn mật khẩu mới trùng mật khẩu cũ
+  if (passwordForm.oldPassword === passwordForm.newPassword) {
+    showAlert(
+      'warning',
+      'Trùng lặp mật khẩu',
+      'Mật khẩu mới không được giống với mật khẩu hiện tại.',
+    )
+    return
+  }
+
+  // Chặn mật khẩu xác nhận không khớp
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    showAlert('error', 'Lỗi xác nhận', 'Mật khẩu xác nhận không khớp với mật khẩu mới!')
+    return
+  }
+  const payload = {
+    currentPassword: passwordForm.oldPassword,
+    newPassword: passwordForm.newPassword,
+    confirmPassword: passwordForm.confirmPassword,
+  }
+
+  isChangingPassword.value = true
+
+  try {
+    //xóa const res =, chỉ dùng await để gọi API
+    await changePassword(payload)
+
+    //Gài lệnh Logout vào modal. Khi bấm Đóng, nó sẽ chạy handleModalClose ở trên
+    Object.assign(localModal, {
+      visible: true,
+      type: 'success',
+      title: 'Đổi mật khẩu thành công',
+      message: 'Mật khẩu của bạn đã được thay đổi. Hệ thống sẽ tự động đăng xuất.',
+      actionCallback: () => {
+        localStorage.removeItem('ACCESS_TOKEN')
+        localStorage.removeItem('USER_ROLE')
+        localStorage.removeItem('USERNAME')
+        router.replace('/auth/login')
+      },
+    })
+  } catch (error) {
+    //Bắt lỗi từ Backend (Sai mật khẩu hiện tại, Token hết hạn...)
+    const status = error.response?.status
+    const resData = error.response?.data
+
+    if (status === 401 || status === 403) {
+      showAlert('error', 'Hết phiên đăng nhập', 'Vui lòng tải lại trang và đăng nhập lại.')
+      return
+    }
+
+    let errorMsg = resData?.message || 'Có lỗi xảy ra khi đổi mật khẩu.'
+    if (resData?.data && typeof resData.data === 'object' && Object.keys(resData.data).length > 0) {
+      errorMsg = Object.values(resData.data).join('<br>')
+    }
+
+    showAlert('error', 'Đổi mật khẩu thất bại', errorMsg)
+  } finally {
+    isChangingPassword.value = false
+  }
 }
 // khai báo giờ
 const formatDateTime = (dateObj) => {

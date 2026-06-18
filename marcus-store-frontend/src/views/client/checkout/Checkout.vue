@@ -1,18 +1,11 @@
 <template>
   <div class="checkout-page pt-4">
     <BaseModal
-      v-if="modal.show"
       :show="modal.show"
       :title="modal.title"
-      @close="modal.show = false"
-    >
-      <div class="p-3 text-center">
-        <p class="mb-4" style="font-size: 15px; color: #374151" v-html="modal.message"></p>
-        <button class="btn btn-danger px-4 py-2 rounded-pill" @click="handleModalConfirm">
-          Đồng ý
-        </button>
-      </div>
-    </BaseModal>
+      :message="modal.message"
+      @close="handleModalConfirm"
+    />
 
     <div class="checkout-header">
       <div class="checkout-header__inner">
@@ -263,6 +256,7 @@
                   >Chưa xác định</span
                 >
               </div>
+
               <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
             </label>
           </div>
@@ -444,6 +438,9 @@ import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/check-out.css'
 
+import { useCartStore } from '@/stores/cartStore'
+const cartStore = useCartStore()
+
 import addressApi from '@/api/addressApi'
 import userApi from '@/api/userApi'
 import cartApi from '@/api/cartApi'
@@ -465,6 +462,9 @@ const handleModalConfirm = () => {
   modal.value.show = false
   if (modal.value.action === 'redirect_cart') router.push('/cart')
   if (modal.value.action === 'redirect_login') router.push('/auth/login')
+
+  // Đảm bảo xóa action sau khi thực thi để tránh bị kẹt
+  modal.value.action = null
 }
 
 // ─── Order & Cart Data
@@ -687,7 +687,6 @@ const buildShippingAddress = () => {
 const handleCheckout = async () => {
   if (!cartData.value.items?.length) return
 
-  // Validate cụ thể: Số điện thoại
   if (!validatePhone(orderForm.value.recipientPhone)) {
     showModal(
       'Số điện thoại không hợp lệ',
@@ -696,7 +695,6 @@ const handleCheckout = async () => {
     return
   }
 
-  // Validate cụ thể: Email
   if (!validateEmail(orderForm.value.email)) {
     showModal(
       'Email không hợp lệ',
@@ -705,7 +703,6 @@ const handleCheckout = async () => {
     return
   }
 
-  // Validate cụ thể: Địa chỉ nhập tay
   if (!selectedAddress.value) {
     if (!manualProvinceId.value) {
       showModal('Thiếu địa chỉ', 'Vui lòng chọn <strong>Tỉnh / Thành phố</strong> giao hàng.')
@@ -741,7 +738,6 @@ const handleCheckout = async () => {
     return
   }
 
-  // Payload gửi lên Server
   const payload = {
     cartItemIds: cartData.value.items.map((i) => i.cartItemId),
     recipientName: orderForm.value.recipientName,
@@ -758,17 +754,16 @@ const handleCheckout = async () => {
   isProcessing.value = true
   try {
     const { data } = await api.post('/checkout', payload)
-    const savedOrderCode = data?.data?.orderCode || data?.orderCode || 'Không xác định'
+
+    cartStore.clearCartState()
 
     if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
       window.location.href = data.data.paymentUrl
       return
     }
 
-    router.push({
-      path: '/order-success',
-      query: { orderCode: savedOrderCode },
-    })
+    const savedOrderCode = data?.data?.orderCode || data?.orderCode || 'Không xác định'
+    router.push({ path: '/order-success', query: { orderCode: savedOrderCode } })
   } catch (error) {
     showModal(
       'Lỗi đặt hàng',
