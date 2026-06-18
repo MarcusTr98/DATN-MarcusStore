@@ -21,6 +21,7 @@ function mapVoucher(voucher) {
     endDate: formatDateTimeLocal(voucher.endDate),
     quantity: Number(voucher.quantity || 0),
     isActive: Boolean(voucher.isActive),
+    isPrivate: Boolean(voucher.isPrivate),
   }
 }
 

@@ -22,4 +22,5 @@ public class VoucherResponse {
     private LocalDateTime endDate;
     private Integer quantity;
     private Boolean isActive;
+    private Boolean isPrivate;
 }

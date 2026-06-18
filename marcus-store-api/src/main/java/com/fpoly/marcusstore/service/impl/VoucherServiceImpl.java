@@ -35,6 +35,7 @@ public class VoucherServiceImpl implements VoucherService {
             .endDate(voucher.getEndDate())
             .quantity(voucher.getQuantity())
             .isActive(voucher.getIsActive())
+            .isPrivate(voucher.getIsPrivate())
             .build();
     }
     @Override
@@ -105,7 +106,7 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setVoucherCode(voucherCode);
         voucher.setDiscountValue(request.getDiscountValue());
         voucher.setDiscountType(discountType);
-
+        voucher.setIsPrivate(Boolean.TRUE.equals(request.getIsPrivate()));
         if ("AMOUNT".equals(discountType)) {
             voucher.setMaxDiscountAmount(null);
         } else {
@@ -187,7 +188,7 @@ public class VoucherServiceImpl implements VoucherService {
          voucher.setVoucherCode(voucherCode);
          voucher.setDiscountValue(request.getDiscountValue());
          voucher.setDiscountType(discountType);
-
+         voucher.setIsPrivate(Boolean.TRUE.equals(request.getIsPrivate()));
          if ("AMOUNT".equals(discountType)) {
              voucher.setMaxDiscountAmount(null);
          } else {

@@ -103,6 +103,7 @@
               <th>Đơn tối thiểu</th>
               <th>Thời gian</th>
               <th>SL voucher</th>
+              <th>Phạm vi</th>
               <th>Trạng thái</th>
               <th class="text-end">Thao tác</th>
             </tr>
@@ -130,6 +131,11 @@
               <td>
                   <span :class="voucher.quantity === 0 ? 'text-danger fw-bold' : 'fw-bold'">
                     {{ voucher.quantity }}
+                  </span>
+              </td>
+              <td>
+                  <span class="scope-badge" :class="{ private: voucher.isPrivate }">
+                    {{ voucher.isPrivate ? 'Riêng tư' : 'Công khai' }}
                   </span>
               </td>
               <td>
@@ -222,16 +228,22 @@
                 <p>Mã Voucher và trạng thái hiển thị của voucher.</p>
               </div>
             </div>
-            <div class="modal-body-grid compact">
-              <div>
+            <div class="modal-body-grid compact voucher-main-grid">
+              <div class="voucher-code-field">
                 <label class="form-label">Mã voucher <span>*</span></label>
-                <input
-                  v-model.trim="form.voucher_code"
-                  type="text"
-                  class="form-control text-uppercase"
-                  :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
-                  placeholder="VD: SUMMER2026"
-                />
+                <div class="voucher-code-control">
+                  <input
+                    v-model.trim="form.voucher_code"
+                    type="text"
+                    class="form-control text-uppercase voucher-code-input"
+                    :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
+                    placeholder="VD: SUMMER2026"
+                  />
+                  <button type="button" class="generate-code-btn" @click="generateVoucherCode">
+                    <i class="bi bi-stars"></i>
+                    Tạo mã tự động
+                  </button>
+                </div>
                 <div v-if="errors.voucher_code" class="invalid-feedback">
                   {{ errors.voucher_code }}
                 </div>
@@ -247,6 +259,22 @@
                 <small v-if="isZeroQuantity(form.quantity)" class="form-help text-danger">
                   Số lượng voucher = 0 nên trạng thái tự chuyển thành Ngừng sử dụng.
                 </small>
+              </div>
+
+              <div class="scope-field">
+                <label class="form-label label-with-tooltip">
+                  Phạm vi hiển thị
+                  <span class="info-tooltip" tabindex="0">
+                    i
+                    <span class="tooltip-content">
+                      Công khai sẽ hiển thị cho client, riêng tư chỉ dùng khi khách nhập mã.
+                    </span>
+                  </span>
+                </label>
+                <select v-model="form.is_private" class="form-select">
+                  <option :value="false">Công khai</option>
+                  <option :value="true">Riêng tư</option>
+                </select>
               </div>
 
             </div>
@@ -534,6 +562,7 @@ const defaultForm = {
   end_date: '',
   quantity: null,
   is_active: true,
+  is_private: false,
 }
 
 const form = reactive({...defaultForm})
@@ -680,6 +709,12 @@ function isZeroQuantity(quantity) {
   return !Number.isNaN(numberQuantity) && numberQuantity <= 0
 }
 
+function generateVoucherCode() {
+  const datePart = new Date().toISOString().slice(2, 10).replaceAll('-', '')
+  const randomPart = Math.random().toString(36).slice(2, 6).toUpperCase()
+  form.voucher_code = `VC${datePart}${randomPart}`
+}
+
 function showToast({type = 'success', title, message}) {
   toast.show = true
   toast.type = type
@@ -764,6 +799,7 @@ function openEditModal(voucher) {
     end_date: voucher.endDate,
     quantity: voucher.quantity,
     is_active: voucher.isActive,
+    is_private: Boolean(voucher.isPrivate),
   })
 
   isEditing.value = true
@@ -791,6 +827,7 @@ function buildPayload() {
     endDate: form.end_date,
     quantity,
     isActive: quantity > 0 ? Boolean(form.is_active) : false,
+    isPrivate: Boolean(form.is_private),
   }
 }
 

@@ -31,4 +31,5 @@ public class AddVoucherRequest {
     @Min(value = 0, message = "Số lượng không được nhỏ hơn hơn 0")
     private Integer quantity;
     private Boolean isActive;
+    private Boolean isPrivate;
 }

@@ -44,4 +44,8 @@ public class Voucher {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Column(name = "is_private", nullable = false)
+    private Boolean isPrivate = false;
+
 }
