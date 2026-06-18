@@ -126,7 +126,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public OrderDetailResponse getOrderDetailResponse(String orderCode) {
-        // /ấy chi tiết đơn hàng theo mã đơn hàng
+        // Lấy chi tiết đơn hàng theo mã đơn hàng
         Order order = orderRepository.findDetailByOrderCode(orderCode).orElseThrow(() ->
                 new RuntimeException("không tìm thấy đơn hàng "));
         // lấy trạng thái lịch sử đơn hàng
@@ -211,7 +211,7 @@ public class OrderServiceImpl implements OrderService {
 
     }
     // logic đổi trạng thái đơn hàng
-    // những trạng thái có thể đổi-
+    // Những trạng thái có thể đổi
     private boolean canChangeStatus(String currentStatus, String newStatus) {
         if (currentStatus == null || newStatus == null) {
             return false;
@@ -267,5 +267,15 @@ public class OrderServiceImpl implements OrderService {
         orderStatusHistoryRepository.save(history);
 
         return getOrderDetailResponse(orderCode);
+    }
+
+    @Override
+    @Transactional
+    public void hideOrder(String orderCode) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        order.setIsHidden(true);
+        orderRepository.save(order);
     }
 }

@@ -49,4 +49,9 @@ public class AdminOrderController {
     public OrderDetailResponse updateStatusOrder(@PathVariable("orderCode") String orderCode,@RequestBody UpdateOrderStatusRequest request){
         return orderService.updateStatusOrder(orderCode, request);
     }
+
+    @PatchMapping("/order/{orderCode}/hide")
+    public void hideOrder(@PathVariable("orderCode") String orderCode) {
+        orderService.hideOrder(orderCode);
+    }
 }

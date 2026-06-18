@@ -39,7 +39,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     );
     @Query("""
         SELECT COUNT(o) FROM Order o
-        WHERE (:keyword IS NULL
+        WHERE o.isHidden = false
+          AND (:keyword IS NULL
             OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
@@ -53,7 +54,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     );
     @Query("""
         SELECT COUNT(o) FROM Order o
-        WHERE (:keyword IS NULL
+        WHERE o.isHidden = false
+          AND (:keyword IS NULL
             OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
@@ -69,7 +71,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
     @Query("""
         SELECT COUNT(o) FROM Order o
-        WHERE (:keyword IS NULL
+        WHERE o.isHidden = false
+          AND (:keyword IS NULL
             OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
@@ -84,7 +87,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     );
     @Query("""
         SELECT COUNT(o) FROM Order o
-        WHERE (:keyword IS NULL
+        WHERE o.isHidden = false
+          AND (:keyword IS NULL
             OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
@@ -99,7 +103,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     );
     @Query("""
         SELECT COUNT(o) FROM Order o
-        WHERE (:keyword IS NULL
+        WHERE o.isHidden = false
+          AND (:keyword IS NULL
             OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
@@ -114,7 +119,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     );
     @Query("""
         SELECT COUNT(o) FROM Order o
-        WHERE (:keyword IS NULL
+        WHERE o.isHidden = false
+          AND (:keyword IS NULL
             OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
             OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
@@ -150,7 +156,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             ORDER BY sort_order
             """, nativeQuery = true)
     List<String> findDistinctOrderStatuses();
-//  Left join fetch dùng để lấy kèm dữ liệu quan hệ cùng lúc với Orde
+//  Left join fetch dùng để lấy kèm dữ liệu quan hệ cùng lúc với Order
     @Query("""
             SELECT DISTINCT o
             FROM Order o

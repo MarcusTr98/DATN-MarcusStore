@@ -179,7 +179,7 @@
                 </select>
               </div>
 
-              <div v-if="isStatusNoteRequired" class="status-note-box">
+              <div v-if="nextStatuses.length > 0 && isStatusNoteRequired" class="status-note-box">
                 <label class="status-note-label">Ghi chú trạng thái</label>
                 <input
                   v-model="statusNote"
@@ -248,7 +248,7 @@
       Không tìm thấy đơn hàng. Vui lòng quay lại danh sách đơn hàng.
     </div>
 
-    <div class="toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
+    <div class="order-detail-toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
   </section>
 </template>
 

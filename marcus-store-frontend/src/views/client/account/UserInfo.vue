@@ -64,7 +64,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import userApi from '@/api/userApi'
-import BaseModal from '@/components/common/BaseModal.vue'
+import BaseModal from '@/components/BaseModal.vue'
 
 const user = reactive({ username: '', email: '', fullName: '', phoneNumber: '' })
 const isLoading = ref(true)

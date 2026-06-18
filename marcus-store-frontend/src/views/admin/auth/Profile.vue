@@ -431,7 +431,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import api from '@/utils/api'
-import BaseModal from '@/components/common/BaseModal.vue'
+import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/profile-admin.css'
 const lastUpdated = ref('')
 const isLoading = ref(false)

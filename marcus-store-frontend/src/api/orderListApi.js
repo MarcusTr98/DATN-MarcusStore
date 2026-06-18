@@ -8,6 +8,9 @@ const orderApi ={
    },
    getFilterOption(){
     return api.get('/admin/orders/filter-options')
+   },
+   hideOrder(orderCode){
+    return api.patch(`/admin/order/${orderCode}/hide`)
    }
 }
 export default orderApi;

@@ -348,12 +348,16 @@
   white-space: nowrap;
 }
 
-.toast {
+.order-toast {
   position: fixed;
-  right: 26px;
-  bottom: 26px;
-  z-index: 100;
+  top: 24px;
+  right: 24px;
+  bottom: auto;
+  left: auto;
+  z-index: 9999;
+  width: auto;
   max-width: 420px;
+  min-height: 0;
   padding: 14px 16px;
   border: 1px solid #ffd4e4;
   border-radius: 8px;
@@ -363,13 +367,13 @@
   font-weight: 750;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(12px);
+  transform: translateY(-12px);
   transition:
     opacity 0.2s ease,
     transform 0.2s ease;
 }
 
-.toast.show {
+.order-toast.show {
   opacity: 1;
   transform: translateY(0);
 }

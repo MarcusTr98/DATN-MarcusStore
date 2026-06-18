@@ -102,7 +102,7 @@
               <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
               <td>
                 <div class="order-code">{{ orders.orderCode }}</div>
-                <small>{{ orders.itemCount}} sản phẩm</small>
+                <small>{{ orders.itemCount }} sản phẩm</small>
               </td>
               <td>
                 <div class="order-code">{{ orders.recipientName }}</div>
@@ -192,7 +192,7 @@
       </section>
     </div>
 
-    <div class="toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
+    <div class="order-toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
   </div>
 </template>
 
@@ -241,21 +241,21 @@ async function fetchGetAllOrder(){
     totalElements.value = response.data.totalElements
 
   }catch (e) {
-  error.value = "không thể tải được giỏ hàng"
+    error.value = 'Không thể tải được đơn hàng'
     console.error(e)
   }finally {
     loading.value = false
   }
- }
+}
 async function fetchOrderStats(){
   const response = await OrderListApi.getOrderStats()
   orderStats.value = response.data
 }
- onMounted(()=> {
-   fetchGetAllOrder()
-   fetchOrderStats()
-   getFilterOption()
- })
+onMounted(()=> {
+  fetchGetAllOrder()
+  fetchOrderStats()
+  getFilterOption()
+})
 watch([keyword, paymentMethod, orderStatus], () => {
   currentPage.value = 0
   fetchGetAllOrder()
@@ -290,8 +290,6 @@ const formatTime1 = (value) => {
   if (!value) return ''
   return String(value).split(' ')[1] || ''
 }
-const hiddenOrderIds = ref([])
-
 const orderStatusMap = {
   PENDING: { label: 'Chờ xác nhận', className: 'pending' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
@@ -300,8 +298,6 @@ const orderStatusMap = {
   CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
   FAILED: { label: 'Giao thất bại', className: 'failed' },
 }
-
-
 
 const paymentStatusMap = {
   PAID: { label: 'Đã thanh toán', className: 'confirmed' },
@@ -316,9 +312,7 @@ const paymentMethodMap = {
   BankTransfer: 'Chuyển khoản',
 }
 
-const filteredOrders = computed(() =>
-  orders.value.filter((order) => !hiddenOrderIds.value.includes(order.orderId)),
-)
+const filteredOrders = computed(() => orders.value)
 
 const formatCurrency = (value) =>
   new Intl.NumberFormat('vi-VN', {
@@ -339,12 +333,21 @@ const showOrderDetail = (order) => {
   router.push(`/admin/order/${order.orderCode}`)
 }
 
-const hideOrder = (order) => {
-  if (!hiddenOrderIds.value.includes(order.orderId)) {
-    hiddenOrderIds.value.push(order.orderId)
-  }
+const hideOrder = async (order) => {
+  try {
+    await OrderListApi.hideOrder(order.orderCode)
 
-  showToast(`Đã ẩn đơn ${order.orderCode} khỏi danh sách.`)
+    showToast(`Đã ẩn đơn ${order.orderCode} khỏi danh sách.`)
+    if (orders.value.length === 1 && currentPage.value > 0) {
+      currentPage.value -= 1
+    }
+
+    await fetchGetAllOrder()
+    await fetchOrderStats()
+  } catch (e) {
+    console.error(e)
+    showToast('Không thể ẩn đơn hàng.')
+  }
 }
 
 const resetFilters = () => {

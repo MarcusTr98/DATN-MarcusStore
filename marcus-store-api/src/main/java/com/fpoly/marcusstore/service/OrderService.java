@@ -10,7 +10,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface OrderService {
-// get dữ liệu theo keyword, phương thức thanh toán và trạng thái thanh toán
+    // Lấy dữ liệu theo keyword, phương thức thanh toán và trạng thái đơn hàng
     Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus, Pageable pageable);
     OrderStatsResponse getOrderStats(String keyword, String paymentMethod, String orderStatus);
     List<String> getPaymentMethods();
@@ -18,4 +18,5 @@ public interface OrderService {
     List<String> getOrderStatuses();
     OrderDetailResponse getOrderDetailResponse(String orderCode);
     OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request);
+    void hideOrder(String orderCode);
 }
