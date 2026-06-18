@@ -63,6 +63,9 @@ public class Order {
     @Column(name = "order_status", length = 50)
     private String orderStatus = "PENDING";
 
+    @Column(name = "is_hidden", nullable = false)
+    private Boolean isHidden = false;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

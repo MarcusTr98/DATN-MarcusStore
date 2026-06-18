@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.controller.admin;
 
+import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
 import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
@@ -8,7 +9,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -25,7 +25,7 @@ public class AdminOrderController {
                                            @RequestParam(required = false) String keyword,
                                            @RequestParam(required = false) String paymentMethod,
                                            @RequestParam(required = false) String orderStatus) {
-        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1), Sort.by(Sort.Direction.DESC, "orderId"));
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
         return orderService.getOrdersPage(keyword, paymentMethod, orderStatus, pageable);
     }
     @GetMapping("/orders/stats")
@@ -44,5 +44,9 @@ public class AdminOrderController {
     @GetMapping("/order/{orderCode}")
     public OrderDetailResponse getDetailResponse(@PathVariable("orderCode") String orderCode){
         return orderService.getOrderDetailResponse(orderCode);
+    }
+    @PutMapping("/order/{orderCode}")
+    public OrderDetailResponse updateStatusOrder(@PathVariable("orderCode") String orderCode,@RequestBody UpdateOrderStatusRequest request){
+        return orderService.updateStatusOrder(orderCode, request);
     }
 }

@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.service.impl;
 
+import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.*;
 import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
@@ -22,6 +23,7 @@ import java.util.List;
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank()
                 ? null
@@ -208,5 +210,62 @@ public class OrderServiceImpl implements OrderService {
 
 
     }
+    // logic đổi trạng thái đơn hàng
+    // những trạng thái có thể đổi-
+    private boolean canChangeStatus(String currentStatus, String newStatus) {
+        if (currentStatus == null || newStatus == null) {
+            return false;
+        }
 
+        currentStatus = currentStatus.toUpperCase();
+        newStatus = newStatus.toUpperCase();
+
+        return switch (currentStatus) {
+            case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
+            case "CONFIRMED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
+            case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            default -> false;
+        };
+    }
+    private boolean requiresNote(String status) {
+        return "FAILED".equals(status) || "CANCELLED".equals(status);
+    }
+    @Override
+    @Transactional
+    public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        String currentStatus = order.getOrderStatus();
+        String newStatus = request.getStatus();
+        if (newStatus == null || newStatus.isBlank()) {
+            throw new RuntimeException("Trạng thái mới không hợp lệ");
+        }
+
+        newStatus = newStatus.trim().toUpperCase();
+
+        if (!canChangeStatus(currentStatus, newStatus)) {
+            throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
+        }
+
+        String note = request.getNote();
+
+        if (requiresNote(newStatus) && (note == null || note.isBlank())) {
+            throw new RuntimeException("Vui lòng nhập lý do cho trạng thái này");
+        }
+
+        order.setOrderStatus(newStatus);
+        orderRepository.save(order);
+
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(order);
+        history.setStatus(newStatus);
+
+        history.setNote(note);
+        history.setCreatedBy(null);
+
+        orderStatusHistoryRepository.save(history);
+
+        return getOrderDetailResponse(orderCode);
+    }
 }

@@ -19,12 +19,17 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<Order> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
     @Query("""
     SELECT o FROM Order o
-    WHERE (:keyword IS NULL
+    WHERE o.isHidden = false
+      AND (:keyword IS NULL
         OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
         OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
         OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
       AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
       AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+    ORDER BY
+      CASE WHEN o.orderStatus = 'PENDING' THEN 0 ELSE 1 END,
+      o.createdAt DESC,
+      o.orderId DESC
     """)
     Page<Order> searchOrders(
             @Param("keyword") String keyword,
@@ -157,4 +162,5 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             WHERE o.orderCode = :orderCode
             """)
     Optional<Order> findDetailByOrderCode(@Param("orderCode") String orderCode);
+
 }

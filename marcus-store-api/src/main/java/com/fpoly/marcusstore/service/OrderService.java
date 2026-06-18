@@ -1,9 +1,9 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
 import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
-import com.fpoly.marcusstore.dto.response.VoucherStatsResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -17,4 +17,5 @@ public interface OrderService {
 
     List<String> getOrderStatuses();
     OrderDetailResponse getOrderDetailResponse(String orderCode);
+    OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request);
 }

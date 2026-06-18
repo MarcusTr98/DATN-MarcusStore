@@ -134,11 +134,13 @@
                   <span class="timeline-dot">✓</span>
                   <div class="timeline-content">
                     <p class="timeline-title">
-                      {{ item.title }}
+                      {{ item.title || orderStatusMap[item.status]?.label || item.status }}
+
                       <span class="badge" :class="orderStatusMap[item.status].className">
                         {{ orderStatusMap[item.status].label }}
                       </span>
                     </p>
+                    <p v-if="item.note" class="timeline-note">Lý do: {{ item.note }}</p>
                     <p class="timeline-time">{{ formatDateTime(item.time) }}</p>
                   </div>
                 </div>
@@ -166,7 +168,7 @@
               </div>
 
               <div class="form-group">
-                <label class="form-label" for="statusDropdown">Cập nhật trạng thái</label>
+                <label class="form-label" for="statusDropdown">Cập nhật trạng thái đơn hàng</label>
                 <select id="statusDropdown" v-model="selectedStatus" class="control" :disabled="!nextStatuses.length">
                   <option v-if="!nextStatuses.length" :value="orderDetail.orderStatus">
                     {{ orderStatusMap[orderDetail.orderStatus].label }}
@@ -175,11 +177,25 @@
                     {{ item.label }} ({{ item.value }})
                   </option>
                 </select>
-                <p class="helper-text">{{ statusHints[orderDetail.orderStatus] }}</p>
               </div>
 
-              <button class="primary-btn" type="button" :disabled="!nextStatuses.length" @click="saveStatusUpdate">
-                Lưu cập nhật
+              <div v-if="isStatusNoteRequired" class="status-note-box">
+                <label class="status-note-label">Ghi chú trạng thái</label>
+                <input
+                  v-model="statusNote"
+                  type="text"
+                  class="status-note-input"
+                  placeholder="Nhập lý do xử lý trạng thái..."
+                />
+              </div>
+
+              <button
+                class="primary-btn"
+                type="button"
+                :disabled="!nextStatuses.length || updatingStatus"
+                @click="saveStatusUpdate"
+              >
+                {{ updatingStatus ? 'Đang lưu...' : 'Lưu cập nhật' }}
               </button>
             </div>
           </section>
@@ -300,32 +316,34 @@ const allowedTransitions = {
   ],
   COMPLETED: [],
   CANCELLED: [],
-  FAILED: [],
+  FAILED: [
+    { value: 'SHIPPING', label: 'Giao lại' },
+    { value: 'CANCELLED', label: 'Hủy đơn' },
+  ],
 }
 
-const statusHints = {
-  PENDING: 'Đơn mới tạo. Nhân viên có thể xác nhận đơn hoặc hủy đơn nếu chưa xử lý.',
-  CONFIRMED: 'Đơn đã xác nhận. Có thể chuyển sang đang giao hoặc hủy nếu chưa gửi hàng.',
-  SHIPPING: 'Đơn đang giao. Chỉ được ghi nhận giao thành công hoặc giao thất bại.',
-  COMPLETED: 'Đơn đã hoàn thành. Dropdown bị khóa để tránh sửa ngược quy trình.',
-  CANCELLED: 'Đơn đã hủy. Dropdown bị khóa vì đây là trạng thái cuối.',
-  FAILED: 'Đơn giao thất bại. Dropdown bị khóa vì đây là trạng thái cuối.',
-}
 
-const timelineTitleByStatus = {
-  CONFIRMED: 'Nhân viên xác nhận đơn',
-  SHIPPING: 'Đơn chuyển sang đang giao hàng',
-  COMPLETED: 'Giao hàng thành công',
-  CANCELLED: 'Đơn hàng đã bị hủy',
-  FAILED: 'Giao hàng thất bại',
-}
 
 const selectedStatus = ref('')
-const orderHistory = computed(() => orderDetail.value ? [{
-  status: orderDetail.value.orderStatus,
-  title: 'Trạng thái hiện tại',
-  time: orderDetail.value.updatedAt || orderDetail.value.createdAt,
-}] : [])
+const statusNote = ref('')
+const isStatusNoteRequired = computed(() =>
+  selectedStatus.value === 'CANCELLED' || selectedStatus.value === 'FAILED',
+)
+const orderHistory = computed(()=>{
+  if(!orderDetail.value){
+    return []
+  }
+  if(orderDetail.value.history && orderDetail.value.history.length > 0){
+    return orderDetail.value.history.map((item)=>({
+      status: item.status,
+      title: item.title,
+      note: item.note,
+      time:item.createdAt,
+    }))
+  }
+})
+
+
 
 const nextStatuses = computed(() => (orderDetail.value ? allowedTransitions[orderDetail.value.orderStatus] || [] : []))
 const subTotal = computed(() => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0)
@@ -368,19 +386,36 @@ const showToast = (message) => {
     toastMessage.value = ''
   }, 2600)
 }
+const updatingStatus = ref(false)
+const saveStatusUpdate = async () => {
+  try {
+ updatingStatus.value = true
+    if (!orderDetail.value || !selectedStatus.value) return
 
-const saveStatusUpdate = () => {
-  if (!orderDetail.value || !selectedStatus.value) return
+    const isValid = nextStatuses.value.some((item) => item.value === selectedStatus.value)
+    if (!isValid) {
+      showToast('Trạng thái mới không hợp lệ theo luồng xử lý đơn hàng.')
+      return
+    }
 
-  const isValid = nextStatuses.value.some((item) => item.value === selectedStatus.value)
-  if (!isValid) {
-    showToast('Trạng thái mới không hợp lệ theo luồng xử lý đơn hàng.')
-    return
+    if (isStatusNoteRequired.value && !statusNote.value.trim()) {
+      showToast('Vui lòng nhập lý do cho trạng thái này.')
+      return
+    }
+
+  const response = await OrderDetailApi.updateStatusOrder(orderDetail.value.orderCode, {
+    status: selectedStatus.value,
+      note: statusNote.value.trim() || null,
+    })
+    orderDetail.value = response.data
+    statusNote.value = ''
+    showToast(`Đã cập nhật trạng thái đơn sang ${orderStatusMap[orderDetail.value.orderStatus].label}.`)
+  }catch (e){
+    error.value = "cập nhật trạng thái đơn hàng không thành công"
+    console.error(e)
+  }finally {
+    updatingStatus.value = false
   }
-
-  const nextStatus = selectedStatus.value
-  orderDetail.value.orderStatus = nextStatus
-  showToast(`Đã cập nhật trạng thái đơn sang ${orderStatusMap[orderDetail.value.orderStatus].label}.`)
 }
 
 const printPage = () => {
@@ -391,6 +426,3 @@ const printPage = () => {
 <style scoped>
 
 </style>
-
-
-

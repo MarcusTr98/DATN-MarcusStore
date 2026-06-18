@@ -479,7 +479,7 @@
 import {computed, reactive, ref, watch, onMounted} from 'vue'
 import {storeToRefs} from 'pinia'
 import {useVoucherStore} from '@/stores/voucherStore'
-import BaseModal from '@/components/common/BaseModal.vue'
+
 import '@/assets/css/Voucher.css'
 
 const voucherStore = useVoucherStore()

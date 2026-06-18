@@ -4,7 +4,9 @@
 
     <main class="main-content">
       <admin-header />
-      <router-view></router-view>
+      <div class="admin-view">
+        <router-view></router-view>
+      </div>
     </main>
   </div>
 </template>
@@ -17,10 +19,22 @@ import AdminSidebar from '@/components/admin/AdminSidebar.vue'
 <style scoped>
 .admin-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 .main-content {
   flex: 1;
+  min-width: 0;
+  height: 100vh;
   background: #fff7fa;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.admin-view {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

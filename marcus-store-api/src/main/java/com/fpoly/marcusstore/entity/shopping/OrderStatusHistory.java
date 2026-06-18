@@ -27,7 +27,7 @@ public class OrderStatusHistory {
     @Column(name = "status", nullable = false, length = 50)
     private String status;
 
-    @Column(name = "title", nullable = false, length = 255)
+    @Column(name = "title", length = 255)
     private String title;
 
     @Column(name = "note", length = 500)
