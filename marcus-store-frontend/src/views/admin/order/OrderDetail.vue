@@ -8,7 +8,7 @@
           <span>{{ orderDetail?.orderCode || 'Không tìm thấy' }}</span>
         </div>
         <h3>Chi tiết đơn hàng</h3>
-        <p v-if="orderDetail">Đơn {{ orderDetail.orderCode }} - {{ orderStatusMap[orderDetail.orderStatus].label }}</p>
+        <p v-if="orderDetail">Đơn {{ orderDetail.orderCode }} - {{ getOrderStatusLabel(orderDetail.orderStatus) }}</p>
         <p v-else>Không tìm thấy dữ liệu cho đơn hàng này.</p>
       </div>
 
@@ -27,8 +27,8 @@
         <div class="summary-item">
           <span class="summary-label">Trạng thái</span>
           <span class="summary-value">
-            <span class="badge" :class="orderStatusMap[orderDetail.orderStatus].className">
-              {{ orderStatusMap[orderDetail.orderStatus].label }}
+            <span class="badge" :class="getOrderStatusClass(orderDetail.orderStatus)">
+              {{ getOrderStatusLabel(orderDetail.orderStatus) }}
             </span>
           </span>
         </div>
@@ -134,12 +134,13 @@
                   <span class="timeline-dot">✓</span>
                   <div class="timeline-content">
                     <p class="timeline-title">
-                      {{ item.title || orderStatusMap[item.status]?.label || item.status }}
+                      {{ item.title || getOrderStatusLabel(item.status) }}
 
-                      <span class="badge" :class="orderStatusMap[item.status].className">
-                        {{ orderStatusMap[item.status].label }}
+                      <span class="badge" :class="getOrderStatusClass(item.status)">
+                        {{ getOrderStatusLabel(item.status) }}
                       </span>
                     </p>
+                    <p v-if="item.createdByName" class="timeline-note">Người thao tác: {{ item.createdByName }}</p>
                     <p v-if="item.note" class="timeline-note">Lý do: {{ item.note }}</p>
                     <p class="timeline-time">{{ formatDateTime(item.time) }}</p>
                   </div>
@@ -161,8 +162,8 @@
               <div class="current-status-box">
                 <span>Trạng thái hiện tại</span>
                 <strong>
-                  <span class="badge" :class="orderStatusMap[orderDetail.orderStatus].className">
-                    {{ orderStatusMap[orderDetail.orderStatus].label }}
+                  <span class="badge" :class="getOrderStatusClass(orderDetail.orderStatus)">
+                    {{ getOrderStatusLabel(orderDetail.orderStatus) }}
                   </span>
                 </strong>
               </div>
@@ -171,7 +172,7 @@
                 <label class="form-label" for="statusDropdown">Cập nhật trạng thái đơn hàng</label>
                 <select id="statusDropdown" v-model="selectedStatus" class="control" :disabled="!nextStatuses.length">
                   <option v-if="!nextStatuses.length" :value="orderDetail.orderStatus">
-                    {{ orderStatusMap[orderDetail.orderStatus].label }}
+                    {{ getOrderStatusLabel(orderDetail.orderStatus) }}
                   </option>
                   <option v-for="item in nextStatuses" :key="item.value" :value="item.value">
                     {{ item.label }} ({{ item.value }})
@@ -229,12 +230,12 @@
                 <div class="mini-row">
                   <span class="mini-label">Trạng thái</span>
                   <span class="mini-value">
-                    <span class="badge" :class="paymentStatusMap[orderDetail.paymentStatus].className">
-                      {{ paymentStatusMap[orderDetail.paymentStatus].label }}
+                    <span class="badge" :class="getPaymentStatusClass(orderDetail.paymentStatus)">
+                      {{ getPaymentStatusLabel(orderDetail.paymentStatus) }}
                     </span>
                   </span>
                 </div>
-                <div class="mini-row"><span class="mini-label">Phương thức</span><span class="mini-value">{{ paymentMethodMap[orderDetail.paymentMethod] }}</span></div>
+                <div class="mini-row"><span class="mini-label">Phương thức</span><span class="mini-value">{{ getPaymentMethodLabel(orderDetail.paymentMethod) }}</span></div>
                 <div class="mini-row"><span class="mini-label">Mã giao dịch</span><span class="mini-value">{{ orderDetail.transactionId || '---' }}</span></div>
                 <div class="mini-row"><span class="mini-label">Thời gian thanh toán</span><span class="mini-value">{{ orderDetail.paidAt ? formatDateTime(orderDetail.paidAt) : '---' }}</span></div>
               </div>
@@ -253,34 +254,42 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import '@/assets/css/OrderDetails.css'
 import OrderDetailApi from '@/api/orderDetailApi.js'
+
 const route = useRoute()
 const toastMessage = ref('')
-
 const orderDetail = ref(null)
 const loading = ref(false)
 const error = ref(null)
-async function fetchGetDetailOrder(orderCode){
+
+const selectedStatus = ref('')
+const statusNote = ref('')
+const updatingStatus = ref(false)
+
+async function fetchGetDetailOrder(orderCode) {
   try {
     loading.value = true
     error.value = null
-    const response = await  OrderDetailApi.getOrderDetail(orderCode)
+    const response = await OrderDetailApi.getOrderDetail(orderCode)
     orderDetail.value = response.data
-  }catch (e){
-    error.value = "Không tải được chi tiết đơn hàng"
+  } catch (e) {
+    error.value = 'Không tải được chi tiết đơn hàng'
     console.error(e)
-  }finally {
+  } finally {
     loading.value = false
   }
 }
-onMounted(()=>{
+
+onMounted(() => {
   fetchGetDetailOrder(route.params.id)
 })
+
 const orderStatusMap = {
   PENDING: { label: 'Chờ xác nhận', className: 'pending' },
+  PROCESSING: { label: 'Đang xử lý', className: 'confirmed' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
   SHIPPING: { label: 'Đang giao', className: 'shipping' },
   COMPLETED: { label: 'Hoàn thành', className: 'completed' },
@@ -292,10 +301,12 @@ const paymentStatusMap = {
   PAID: { label: 'Đã thanh toán', className: 'confirmed' },
   UNPAID: { label: 'Chưa thanh toán', className: 'pending' },
   REFUNDED: { label: 'Đã hoàn tiền', className: 'cancelled' },
+  FAILED: { label: 'Lỗi thanh toán', className: 'failed' },
 }
 
 const paymentMethodMap = {
-  VNPay: 'VNPay',
+  VNPay: 'VNPAY',
+  VNPAY: 'VNPAY',
   COD: 'COD',
   MoMo: 'MoMo',
   BankTransfer: 'Chuyển khoản',
@@ -303,8 +314,13 @@ const paymentMethodMap = {
 
 const allowedTransitions = {
   PENDING: [
+    { value: 'PROCESSING', label: 'Đang xử lý' },
     { value: 'CONFIRMED', label: 'Xác nhận đơn' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
+  ],
+  PROCESSING: [
+    { value: 'SHIPPING', label: 'Giao hàng (Đã thanh toán)' },
+    { value: 'CANCELLED', label: 'Hủy đơn & Hoàn tiền' },
   ],
   CONFIRMED: [
     { value: 'SHIPPING', label: 'Đang giao hàng' },
@@ -322,34 +338,32 @@ const allowedTransitions = {
   ],
 }
 
+const statusesRequiringNote = ['CANCELLED', 'FAILED']
 
-
-const selectedStatus = ref('')
-const statusNote = ref('')
-const isStatusNoteRequired = computed(() =>
-  selectedStatus.value === 'CANCELLED' || selectedStatus.value === 'FAILED',
+const nextStatuses = computed(() =>
+  orderDetail.value ? allowedTransitions[orderDetail.value.orderStatus] || [] : [],
 )
-const orderHistory = computed(()=>{
-  if(!orderDetail.value){
-    return []
-  }
-  if(orderDetail.value.history && orderDetail.value.history.length > 0){
-    return orderDetail.value.history.map((item)=>({
+
+const subTotal = computed(() =>
+  orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0,
+)
+
+const totalQuantity = computed(() =>
+  orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0,
+)
+
+const finalAmount = computed(() => orderDetail.value?.finalAmount || 0)
+
+const isStatusNoteRequired = computed(() => statusesRequiringNote.includes(selectedStatus.value))
+
+const orderHistory = computed(() =>
+  (orderDetail.value?.history || []).map((item) => ({
       status: item.status,
       title: item.title,
       note: item.note,
-      time:item.createdAt,
-    }))
-  }
-})
-
-
-
-const nextStatuses = computed(() => (orderDetail.value ? allowedTransitions[orderDetail.value.orderStatus] || [] : []))
-const subTotal = computed(() => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0)
-const totalQuantity = computed(() => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0)
-const finalAmount = computed(() =>
-  orderDetail.value?.finalAmount || 0,
+      createdByName: item.createdByName,
+      time: item.createdAt,
+    })),
 )
 
 watch(
@@ -366,6 +380,12 @@ const formatCurrency = (value) =>
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value || 0)
+
+const getOrderStatusLabel = (status) => orderStatusMap[status]?.label || status || '---'
+const getOrderStatusClass = (status) => orderStatusMap[status]?.className || 'pending'
+const getPaymentStatusLabel = (status) => paymentStatusMap[status]?.label || status || '---'
+const getPaymentStatusClass = (status) => paymentStatusMap[status]?.className || 'pending'
+const getPaymentMethodLabel = (method) => paymentMethodMap[method] || method || '---'
 
 const formatDateTime = (value) => {
   if (!value) return '---'
@@ -386,10 +406,10 @@ const showToast = (message) => {
     toastMessage.value = ''
   }, 2600)
 }
-const updatingStatus = ref(false)
+
 const saveStatusUpdate = async () => {
   try {
- updatingStatus.value = true
+    updatingStatus.value = true
     if (!orderDetail.value || !selectedStatus.value) return
 
     const isValid = nextStatuses.value.some((item) => item.value === selectedStatus.value)
@@ -403,17 +423,20 @@ const saveStatusUpdate = async () => {
       return
     }
 
-  const response = await OrderDetailApi.updateStatusOrder(orderDetail.value.orderCode, {
-    status: selectedStatus.value,
+    const response = await OrderDetailApi.updateStatusOrder(orderDetail.value.orderCode, {
+      status: selectedStatus.value,
       note: statusNote.value.trim() || null,
     })
+
     orderDetail.value = response.data
     statusNote.value = ''
-    showToast(`Đã cập nhật trạng thái đơn sang ${orderStatusMap[orderDetail.value.orderStatus].label}.`)
-  }catch (e){
-    error.value = "cập nhật trạng thái đơn hàng không thành công"
+    showToast(`Đã cập nhật trạng thái đơn sang ${getOrderStatusLabel(orderDetail.value.orderStatus)}.`)
+  } catch (e) {
+    const message = e.response?.data?.message || e.response?.data || 'Cập nhật trạng thái đơn hàng không thành công'
+    error.value = message
+    showToast(message)
     console.error(e)
-  }finally {
+  } finally {
     updatingStatus.value = false
   }
 }
