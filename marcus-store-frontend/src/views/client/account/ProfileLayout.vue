@@ -62,7 +62,7 @@
 import { reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import userApi from '@/api/userApi'
-import BaseModal from '@/components/common/BaseModal.vue'
+import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/profile.css'
 
 const router = useRouter()

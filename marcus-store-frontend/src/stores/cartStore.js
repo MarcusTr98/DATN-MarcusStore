@@ -1,4 +1,4 @@
-import {defineStore} from 'pinia'
+import { defineStore } from 'pinia'
 import cartApi from '@/api/cartApi'
 
 // Convert dữ liệu backend trả về sang dữ liệu mà Cart.vue đang dùng
@@ -51,7 +51,7 @@ export const useCartStore = defineStore('cart', {
       return state.cart?.totalAmount || 0
     },
   },
-// xử lý toàn bộ  nghiệp vụ CRUD
+  // xử lý toàn bộ  nghiệp vụ CRUD
   actions: {
     // gọi giỏ hàng từ database
     async fetchCart() {
@@ -102,25 +102,23 @@ export const useCartStore = defineStore('cart', {
         this.loading = false
       }
     },
-     async updateItemQuantity(skuId, Quantity){
+    async updateItemQuantity(skuId, Quantity) {
       try {
-
-        this.error = null;
+        this.error = null
         const res = await cartApi.updateItemQuantity(skuId, Quantity)
-        const  data = res.data
+        const data = res.data
         this.cart = data
-        this.items = (data.items || []).map(mapCartItem);
+        this.items = (data.items || []).map(mapCartItem)
         return true
-      }catch (error){
-        console.error("lỗi cập nhật số lượng: ", error)
+      } catch (error) {
+        console.error('lỗi cập nhật số lượng: ', error)
         this.error =
-          error.response?.data?.message||
-          error.response?.data?.data||
-          "cập nhật số lượng không thành công"
+          error.response?.data?.message ||
+          error.response?.data?.data ||
+          'cập nhật số lượng không thành công'
         return false
-
       }
-     },
+    },
     async removeItemFromCart(skuId) {
       try {
         this.loading = true
@@ -182,6 +180,12 @@ export const useCartStore = defineStore('cart', {
       } finally {
         this.loading = false
       }
+    },
+    // Marcus thêm hàm mới dùng để reset nhanh số tiền trong giỏ hàng
+    clearCartState() {
+      this.cart = null
+      this.items = []
+      this.error = null
     },
   },
 })
