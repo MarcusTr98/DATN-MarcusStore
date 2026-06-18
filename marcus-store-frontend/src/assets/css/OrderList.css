@@ -267,12 +267,97 @@
   color: #6b7280;
 }
 
-.toast {
+.order-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-top: 1px solid #f3d6e3;
+  background: #fffafd;
+}
+
+.pagination-summary {
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.pagination-summary strong,
+.page-indicator strong {
+  color: #111827;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-size-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.page-size-control .form-select {
+  width: 78px;
+  min-height: 38px;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  font-weight: 700;
+}
+
+.pagination-button {
+  min-width: 72px;
+  min-height: 38px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #344054;
+  font-size: 0.9rem;
+  font-weight: 800;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.pagination-button:hover:not(:disabled),
+.pagination-button:focus:not(:disabled) {
+  border-color: #f55d9b;
+  background: #fff0f7;
+  color: #be3f75;
+}
+
+.pagination-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.page-indicator {
+  min-width: 96px;
+  color: #344054;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.order-toast {
   position: fixed;
-  right: 26px;
-  bottom: 26px;
-  z-index: 100;
+  top: 24px;
+  right: 24px;
+  bottom: auto;
+  left: auto;
+  z-index: 9999;
+  width: auto;
   max-width: 420px;
+  min-height: 0;
   padding: 14px 16px;
   border: 1px solid #ffd4e4;
   border-radius: 8px;
@@ -282,13 +367,13 @@
   font-weight: 750;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(12px);
+  transform: translateY(-12px);
   transition:
     opacity 0.2s ease,
     transform 0.2s ease;
 }
 
-.toast.show {
+.order-toast.show {
   opacity: 1;
   transform: translateY(0);
 }
@@ -311,5 +396,15 @@
 
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .order-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pagination-controls {
+    width: 100%;
+    flex-wrap: wrap;
   }
 }

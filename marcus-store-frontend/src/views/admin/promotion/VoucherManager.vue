@@ -49,7 +49,7 @@
 
       <section class="toolbar-panel">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-lg-5">
+          <div class="col-12 col-md-6 col-lg-5">
             <label class="form-label">Tìm kiếm</label>
             <div class="input-group">
               <span class="input-group-text">
@@ -64,7 +64,7 @@
             </div>
           </div>
 
-          <div class="col-12 col-md-6 col-lg-3">
+          <div class="col-12 col-md-6 col-lg">
             <label class="form-label">Loại giảm giá</label>
             <select v-model="filters.discountType" class="form-select">
               <option value="ALL">Tất cả</option>
@@ -73,7 +73,7 @@
             </select>
           </div>
 
-          <div class="col-12 col-md-6 col-lg-3">
+          <div class="col-12 col-md-6 col-lg">
             <label class="form-label">Trạng thái</label>
             <select v-model="filters.status" class="form-select">
               <option value="ALL">Tất cả</option>
@@ -82,7 +82,7 @@
             </select>
           </div>
 
-          <div class="col-12 col-lg-1">
+          <div class="col-12 col-md-6 col-lg-auto">
             <button type="button" class="btn btn-soft w-100" title="Xóa lọc" @click="resetFilters">
               <i class="bi bi-arrow-counterclockwise"></i>
             </button>
@@ -479,7 +479,7 @@
 import {computed, reactive, ref, watch, onMounted} from 'vue'
 import {storeToRefs} from 'pinia'
 import {useVoucherStore} from '@/stores/voucherStore'
-import BaseModal from '@/components/common/BaseModal.vue'
+
 import '@/assets/css/Voucher.css'
 
 const voucherStore = useVoucherStore()
@@ -487,7 +487,7 @@ const voucherStore = useVoucherStore()
 const {vouchers, loading, error, fieldErrors, pagination, stats} = storeToRefs(voucherStore)
 
 const currentPage = ref(0)
-const pageSize = ref(10)
+const pageSize = ref(5)
 
 onMounted(() => {
   loadVouchers()

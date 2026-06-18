@@ -138,7 +138,7 @@
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -300,6 +300,14 @@ tbody tr:hover {
   font-weight: 950;
 }
 
+.timeline-note {
+  margin: 6px 0 0;
+  color: #8a6d7a;
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 700;
+}
+
 .timeline-time {
   margin: 4px 0 0;
   color: #6b5660;
@@ -369,6 +377,7 @@ tbody tr:hover {
 .form-group {
   display: grid;
   gap: 8px;
+  margin-top: 8px;
 }
 
 .form-label {
@@ -408,6 +417,54 @@ tbody tr:hover {
   font-size: 13px;
   line-height: 1.5;
   font-weight: 700;
+}
+
+.status-note-box {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.status-note-label {
+  display: block;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 900;
+  color: #6d5a64;
+  text-transform: uppercase;
+}
+
+.status-note-input {
+  width: 100%;
+  min-height: 52px;
+  border: 1px solid #ffd4e4;
+  border-radius: 16px;
+  padding: 0 16px;
+  font-size: 15px;
+  font-weight: 750;
+  color: #5f4c58;
+  background: #fff;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.status-note-input::placeholder {
+  color: #ad95a0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.status-note-input:focus {
+  border-color: #ff4f9a;
+  box-shadow: 0 0 0 4px rgba(255, 79, 154, 0.12);
+}
+
+.status-note-box + .primary-btn {
+  margin-top: 14px;
+}
+
+.form-group + .primary-btn {
+  margin-top: 14px;
 }
 
 .primary-btn,
@@ -481,11 +538,14 @@ tbody tr:hover {
   font-weight: 800;
 }
 
-.toast {
+.order-detail-toast {
   position: fixed;
+  top: 24px;
   right: 26px;
-  bottom: 26px;
+  bottom: auto;
+  left: auto;
   max-width: 430px;
+  min-height: 0;
   padding: 14px 16px;
   border-radius: 16px;
   background: #ffffff;
@@ -495,12 +555,12 @@ tbody tr:hover {
   font-weight: 800;
   opacity: 0;
   pointer-events: none;
-  transform: translateY(12px);
+  transform: translateY(-12px);
   transition: opacity 0.2s ease, transform 0.2s ease;
-  z-index: 100;
+  z-index: 9999;
 }
 
-.toast.show {
+.order-detail-toast.show {
   opacity: 1;
   transform: translateY(0);
 }
