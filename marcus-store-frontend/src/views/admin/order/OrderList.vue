@@ -292,6 +292,7 @@ const formatTime1 = (value) => {
 }
 const orderStatusMap = {
   PENDING: { label: 'Chờ xác nhận', className: 'pending' },
+  PROCESSING: { label: 'Đang xử lý', className: 'confirmed' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
   SHIPPING: { label: 'Đang giao', className: 'shipping' },
   COMPLETED: { label: 'Hoàn thành', className: 'completed' },
@@ -303,10 +304,12 @@ const paymentStatusMap = {
   PAID: { label: 'Đã thanh toán', className: 'confirmed' },
   UNPAID: { label: 'Chưa thanh toán', className: 'pending' },
   PENDING: { label: 'Chờ thanh toán', className: 'pending' },
+  FAILED: { label: 'Lỗi thanh toán', className: 'failed' },
 }
 
 const paymentMethodMap = {
-  VNPay: 'VNPay',
+  VNPay: 'VNPAY',
+  VNPAY: 'VNPAY',
   COD: 'COD',
   MoMo: 'MoMo',
   BankTransfer: 'Chuyển khoản',

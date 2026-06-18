@@ -147,11 +147,12 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             SELECT status_code
             FROM (VALUES
                 ('PENDING', 1),
-                ('CONFIRMED', 2),
-                ('SHIPPING', 3),
-                ('COMPLETED', 4),
-                ('CANCELLED', 5),
-                ('FAILED', 6)
+                ('PROCESSING', 2),
+                ('CONFIRMED', 3),
+                ('SHIPPING', 4),
+                ('COMPLETED', 5),
+                ('CANCELLED', 6),
+                ('FAILED', 7)
             ) AS statuses(status_code, sort_order)
             ORDER BY sort_order
             """, nativeQuery = true)

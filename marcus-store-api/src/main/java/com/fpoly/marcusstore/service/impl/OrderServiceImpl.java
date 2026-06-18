@@ -2,12 +2,16 @@ package com.fpoly.marcusstore.service.impl;
 
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.*;
+import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
+import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,7 +26,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final UserRepository userRepository;
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank()
@@ -44,6 +50,23 @@ public class OrderServiceImpl implements OrderService {
                 "ALL".equalsIgnoreCase(orderStatus)
                 ? null
                 : orderStatus.trim();
+    }
+
+    private String normalizeStatusValue(String status) {
+        return status == null ? null : status.trim().toUpperCase();
+    }
+
+    private String getUserDisplayName(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+            return user.getFullName();
+        }
+        if (user.getUsername() != null && !user.getUsername().isBlank()) {
+            return user.getUsername();
+        }
+        return user.getEmail();
     }
 
     private OrderResponse toResponse(Order order) {
@@ -129,6 +152,7 @@ public class OrderServiceImpl implements OrderService {
         // Lấy chi tiết đơn hàng theo mã đơn hàng
         Order order = orderRepository.findDetailByOrderCode(orderCode).orElseThrow(() ->
                 new RuntimeException("không tìm thấy đơn hàng "));
+        orderItemRepository.findWithProductItemsByOrderId(order.getOrderId());
         // lấy trạng thái lịch sử đơn hàng
         List<OrderStatusHistory> histories =
                 orderStatusHistoryRepository.findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
@@ -140,11 +164,7 @@ public class OrderServiceImpl implements OrderService {
                         .title(history.getTitle())
                         .note(history.getNote())
                         .createdAt(history.getCreatedAt())
-                        .createdByName(
-                                history.getCreatedBy() != null
-                                        ? history.getCreatedBy().getFullName()
-                                        : null
-                        )
+                        .createdByName(getUserDisplayName(history.getCreatedBy()))
 
                         .build()
                 )
@@ -217,11 +237,12 @@ public class OrderServiceImpl implements OrderService {
             return false;
         }
 
-        currentStatus = currentStatus.toUpperCase();
-        newStatus = newStatus.toUpperCase();
+        currentStatus = normalizeStatusValue(currentStatus);
+        newStatus = normalizeStatusValue(newStatus);
 
         return switch (currentStatus) {
-            case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
+            case "PENDING" -> newStatus.equals("PROCESSING") || newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
+            case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             case "CONFIRMED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
             case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
@@ -231,18 +252,45 @@ public class OrderServiceImpl implements OrderService {
     private boolean requiresNote(String status) {
         return "FAILED".equals(status) || "CANCELLED".equals(status);
     }
+
+    private String getHistoryTitle(String status) {
+        return switch (status) {
+            case "PENDING" -> "Khách hàng tạo đơn";
+            case "PROCESSING" -> "Đơn đang được xử lý";
+            case "CONFIRMED" -> "Nhân viên xác nhận đơn";
+            case "SHIPPING" -> "Đơn chuyển sang đang giao hàng";
+            case "COMPLETED" -> "Đơn giao thành công";
+            case "FAILED" -> "Giao hàng thất bại";
+            case "CANCELLED" -> "Đơn đã hủy";
+            default -> "Cập nhật trạng thái đơn hàng";
+        };
+    }
+
+    private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
+        Integer currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.getReferenceById(currentUserId);
+
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(order);
+        history.setStatus(status);
+        history.setTitle(getHistoryTitle(status));
+        history.setNote(note);
+        history.setCreatedBy(currentUser);
+        return history;
+    }
+
     @Override
     @Transactional
     public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
-        String currentStatus = order.getOrderStatus();
+        String currentStatus = normalizeStatusValue(order.getOrderStatus());
         String newStatus = request.getStatus();
         if (newStatus == null || newStatus.isBlank()) {
             throw new RuntimeException("Trạng thái mới không hợp lệ");
         }
 
-        newStatus = newStatus.trim().toUpperCase();
+        newStatus = normalizeStatusValue(newStatus);
 
         if (!canChangeStatus(currentStatus, newStatus)) {
             throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
@@ -257,13 +305,7 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderStatus(newStatus);
         orderRepository.save(order);
 
-        OrderStatusHistory history = new OrderStatusHistory();
-        history.setOrder(order);
-        history.setStatus(newStatus);
-
-        history.setNote(note);
-        history.setCreatedBy(null);
-
+        OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
 
         return getOrderDetailResponse(orderCode);
