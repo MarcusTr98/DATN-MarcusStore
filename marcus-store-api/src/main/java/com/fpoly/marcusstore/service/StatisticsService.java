@@ -1,7 +1,8 @@
 package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.response.*;
-import com.fpoly.marcusstore.repository.shopping.StatisticsRepository;
+import com.fpoly.marcusstore.repository.statistics.StatisticsRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -73,11 +74,11 @@ public class StatisticsService {
     //Doanh thu theo thương hiệu iphone, samsung, xiaomi, oppo
     @Transactional(readOnly = true)
     public List<BrandRevenueResponseDTO> getRevenueByBrand() {
-        List<com.fpoly.marcusstore.repository.shopping.BrandRevenueProjection> raw =
+        List<com.fpoly.marcusstore.repository.statistics.BrandRevenueProjection> raw =
                 statisticsRepository.getRevenueByBrand();
 
         BigDecimal totalRevenue = raw.stream()
-                .map(com.fpoly.marcusstore.repository.shopping.BrandRevenueProjection::getRevenue)
+                .map(com.fpoly.marcusstore.repository.statistics.BrandRevenueProjection::getRevenue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return raw.stream()

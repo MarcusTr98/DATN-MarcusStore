@@ -1,6 +1,9 @@
-package com.fpoly.marcusstore.repository.shopping;
+package com.fpoly.marcusstore.repository.statistics;
 
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.repository.shopping.TopCustomerProjection;
+import com.fpoly.marcusstore.repository.shopping.TopProductProjection;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

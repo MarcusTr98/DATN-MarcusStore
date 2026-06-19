@@ -1,4 +1,4 @@
-package com.fpoly.marcusstore.repository.shopping;
+package com.fpoly.marcusstore.repository.statistics;
 
 import java.math.BigDecimal;
 import java.sql.Date;

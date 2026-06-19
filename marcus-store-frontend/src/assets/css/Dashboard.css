@@ -90,7 +90,7 @@
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -633,4 +633,27 @@ tbody tr:hover {
   .table-wrap {
     overflow-x: auto;
   }
+}
+/* Thêm vào cuối file Dashboard.css */
+
+.chart-frame {
+  height: 290px;
+  position: relative;
+}
+
+.chart-frame canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.donut-wrap {
+  min-height: 290px;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: center;
+  gap: 20px;
+}
+
+.donut-canvas {
+  height: 240px !important;
 }

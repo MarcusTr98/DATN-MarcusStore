@@ -1,4 +1,4 @@
-package com.fpoly.marcusstore.repository.shopping;
+package com.fpoly.marcusstore.repository.statistics;
 
 public interface OrderByWeekdayProjection {
     Integer getDayOfWeek();

@@ -44,66 +44,47 @@
 
       <section class="dashboard-grid">
         <div class="chart-grid">
+
+          <!-- Chart 1: Xu hướng doanh thu - Line -->
           <article class="dashboard-card">
             <div class="card-header">
               <div>
                 <h2>Xu hướng doanh thu</h2>
-                <p>Theo ngày / tuần / tháng</p>
+                <p>Theo ngày trong kỳ</p>
               </div>
               <span>Line chart</span>
             </div>
             <div class="chart-frame">
-              <svg viewBox="0 0 520 260" role="img" aria-label="Biểu đồ xu hướng doanh thu">
-                <g class="grid-lines">
-                  <line v-for="y in [42, 92, 142, 192, 232]" :key="y" x1="32" :y1="y" x2="500" :y2="y" />
-                </g>
-                <polyline class="area-line" :points="revenueLinePoints" />
-                <polygon class="area-fill" :points="`32,232 ${revenueLinePoints} 500,232`" />
-                <circle
-                  v-for="point in revenuePoints"
-                  :key="`${point.x}-${point.y}`"
-                  :cx="point.x"
-                  :cy="point.y"
-                  r="5"
-                />
-                <text v-for="label in monthLabels" :key="label.text" :x="label.x" y="252">{{ label.text }}</text>
-              </svg>
+              <canvas ref="revenueChartRef"></canvas>
             </div>
           </article>
 
+          <!-- Chart 2: Đơn hàng phát sinh - Bar -->
           <article class="dashboard-card">
             <div class="card-header">
               <div>
                 <h2>Đơn hàng phát sinh</h2>
-                <p>Số lượng đơn theo thời gian</p>
+                <p>Số lượng đơn theo thứ trong tuần</p>
               </div>
               <span>Bar chart</span>
             </div>
             <div class="chart-frame">
-              <svg viewBox="0 0 520 260" role="img" aria-label="Biểu đồ đơn hàng phát sinh">
-                <g class="grid-lines">
-                  <line v-for="y in [42, 92, 142, 192, 232]" :key="y" x1="32" :y1="y" x2="500" :y2="y" />
-                </g>
-                <g v-for="bar in orderBars" :key="bar.label">
-                  <rect :x="bar.x" :y="bar.y" width="42" :height="bar.height" rx="12" />
-                  <text :x="bar.x + 21" y="252">{{ bar.label }}</text>
-                </g>
-              </svg>
+              <canvas ref="orderChartRef"></canvas>
             </div>
           </article>
 
+          <!-- Chart 3: Doanh thu theo thương hiệu - Doughnut -->
           <article class="dashboard-card">
             <div class="card-header">
               <div>
                 <h2>Doanh thu theo thương hiệu</h2>
-                <p>Apple, Samsung, Xiaomi, Oppo</p>
+                <p>Tỷ lệ % theo thương hiệu</p>
               </div>
               <span>Doughnut</span>
             </div>
             <div class="donut-wrap">
-              <div class="donut-chart">
-                <strong>100%</strong>
-                <span>Doanh thu</span>
+              <div class="chart-frame donut-canvas">
+                <canvas ref="brandChartRef"></canvas>
               </div>
               <div class="legend-list">
                 <span v-for="item in brandRevenue" :key="item.label">
@@ -114,29 +95,20 @@
             </div>
           </article>
 
+          <!-- Chart 4: So sánh doanh thu - Bar grouped -->
           <article class="dashboard-card">
             <div class="card-header">
               <div>
                 <h2>So sánh doanh thu</h2>
                 <p>Kỳ này so với kỳ trước</p>
               </div>
-              <span>Area chart</span>
+              <span>Bar chart</span>
             </div>
             <div class="chart-frame">
-              <svg viewBox="0 0 520 260" role="img" aria-label="Biểu đồ so sánh doanh thu">
-                <g class="grid-lines">
-                  <line v-for="y in [42, 92, 142, 192, 232]" :key="y" x1="32" :y1="y" x2="500" :y2="y" />
-                </g>
-                <polyline class="compare-line muted" points="42,190 180,166 318,142 468,112" />
-                <polyline class="compare-line" points="42,176 180,138 318,120 468,74" />
-                <polygon class="area-fill" points="42,232 42,176 180,138 318,120 468,74 468,232" />
-                <text x="42" y="252">Tuan 1</text>
-                <text x="172" y="252">Tuan 2</text>
-                <text x="310" y="252">Tuan 3</text>
-                <text x="450" y="252">Tuan 4</text>
-              </svg>
+              <canvas ref="compareChartRef"></canvas>
             </div>
           </article>
+
         </div>
 
         <aside class="dashboard-card alert-card">
@@ -145,7 +117,7 @@
               <h2>Cảnh báo cần chú ý</h2>
               <p>Các vấn đề cần xử lý nhanh</p>
             </div>
-            <span class="danger-pill">3 mới</span>
+            <span class="danger-pill">{{ inventoryAlerts.length }} mới</span>
           </div>
 
           <div class="alert-list">
@@ -185,11 +157,11 @@
           <select v-model="filters.status">
             <option value="all">Tất cả trạng thái</option>
             <option v-for="status in statusOptions" :key="status.value" :value="status.value">
-  {{ status.label }}
-</option>
+              {{ status.label }}
+            </option>
           </select>
 
-          <select v-model="filters.category">
+          <select v-model="filters.category" v-show="categoryOptions.length > 0">
             <option value="all">Tất cả danh mục / thương hiệu</option>
             <option v-for="category in categoryOptions" :key="category" :value="category">{{ category }}</option>
           </select>
@@ -242,8 +214,9 @@
                   :class="alignClass(column.align)"
                 >
                   <span v-if="column.type === 'money'" class="money">{{ formatCurrency(row[column.key]) }}</span>
+                  <span v-else-if="column.type === 'percent'" class="cell-main">{{ row[column.key] }}%</span>
                   <span v-else-if="column.type === 'status'" class="status-badge" :class="statusClass(row[column.key])">
-                  {{ statusLabel(row[column.key]) }}
+                    {{ statusLabel(row[column.key]) }}
                   </span>
                   <span v-else class="cell-main">{{ row[column.key] }}</span>
                 </td>
@@ -257,10 +230,25 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, watch } from 'vue'
+import { computed, reactive, ref, onMounted, watch, nextTick } from 'vue'
+import { Chart, registerables } from 'chart.js'
 import statisticsApi from '@/api/statisticsApi'
 import '@/assets/css/Dashboard.css'
 
+Chart.register(...registerables)
+
+// ====== Refs cho canvas ======
+const revenueChartRef = ref(null)
+const orderChartRef = ref(null)
+const brandChartRef = ref(null)
+const compareChartRef = ref(null)
+
+let revenueChart = null
+let orderChart = null
+let brandChart = null
+let compareChart = null
+
+// ====== State ======
 const selectedTime = ref('month')
 const currentTab = ref('recentOrders')
 const loading = ref(true)
@@ -272,6 +260,7 @@ const filters = reactive({
   category: 'all',
   date: 'month',
 })
+
 watch(selectedTime, (val) => {
   filters.date = val
 })
@@ -279,6 +268,7 @@ watch(selectedTime, (val) => {
 watch(() => filters.date, (val) => {
   selectedTime.value = val
 })
+
 watch(currentTab, () => {
   filters.status = 'all'
   filters.category = 'all'
@@ -298,6 +288,7 @@ const tabs = [
   { label: 'Khách hàng mua nhiều nhất', value: 'topCustomers' },
 ]
 
+// ====== Data từ API ======
 const dailyStats = ref([])
 const monthlyStats = ref([])
 const weekdayStats = ref([])
@@ -307,6 +298,10 @@ const topProductsData = ref([])
 const lowStockData = ref([])
 const topCustomersData = ref([])
 
+// ====== Chart colors ======
+const DONUT_COLORS = ['#ff4d8d', '#6366f1', '#22c55e', '#f59e0b', '#06b6d4', '#a855f7']
+
+// ====== KPI ======
 const todayStr = new Date().toISOString().split('T')[0]
 
 const todayRevenue = computed(() => {
@@ -396,6 +391,7 @@ const inventoryAlerts = computed(() =>
   })),
 )
 
+// ====== Table ======
 const tableConfig = computed(() => ({
   recentOrders: {
     columns: [
@@ -432,7 +428,7 @@ const tableConfig = computed(() => ({
       { label: 'Email', key: 'email', align: 'left' },
       { label: 'Số đơn', key: 'totalOrders', align: 'center' },
       { label: 'Tổng chi tiêu', key: 'totalSpent', align: 'right', type: 'money' },
-      { label: 'Đóng góp', key: 'contributionPercent', align: 'right' },
+      { label: 'Đóng góp', key: 'contributionPercent', align: 'right', type: 'percent' },
     ],
     data: topCustomersData.value,
   },
@@ -457,7 +453,14 @@ const statusOptions = computed(() => {
   }
   return []
 })
-const categoryOptions = computed(() => brandStats.value.map((b) => b.brand))
+
+const categoryOptions = computed(() => {
+  if (currentTab.value === 'recentOrders' || currentTab.value === 'lowStock') {
+    return brandStats.value.map((b) => b.brand)
+  }
+  return []
+})
+
 const activeTable = computed(() => tableConfig.value[currentTab.value])
 
 const filteredRows = computed(() => {
@@ -500,50 +503,7 @@ const filteredRows = computed(() => {
   })
 })
 
-const sortedDailyStats = computed(() => [...dailyStats.value].reverse())
-const revenueValues = computed(() => sortedDailyStats.value.map((d) => d.totalRevenue))
-const maxRevenue = computed(() => Math.max(...revenueValues.value, 1))
-const minRevenue = computed(() => Math.min(...revenueValues.value, 0))
-
-const revenuePoints = computed(() => {
-  if (!sortedDailyStats.value.length) return []
-  const range = maxRevenue.value - minRevenue.value || 1
-  return sortedDailyStats.value.map((item, index) => ({
-    x: 42 + index * (458 / Math.max(sortedDailyStats.value.length - 1, 1)),
-    y: 222 - ((item.totalRevenue - minRevenue.value) / range) * 160,
-  }))
-})
-
-const revenueLinePoints = computed(() => revenuePoints.value.map((p) => `${p.x},${p.y}`).join(' '))
-
-const monthLabels = computed(() => {
-  const stats = sortedDailyStats.value
-  if (!stats.length) return []
-  const step = Math.max(Math.floor(stats.length / 6), 1)
-  return stats
-    .filter((_, idx) => idx % step === 0)
-    .map((item, idx) => ({
-      text: formatShortDate(item.reportDate),
-      x: 42 + idx * step * (458 / Math.max(stats.length - 1, 1)),
-    }))
-})
-
-const orderBars = computed(() => {
-  if (!weekdayStats.value.length) return []
-  const max = Math.max(...weekdayStats.value.map((item) => item.totalOrders), 1)
-  return weekdayStats.value.map((item, index) => {
-    const height = (item.totalOrders / max) * 170
-    return {
-      label: item.dayLabel.replace('Thứ ', 'T').replace('Chủ nhật', 'CN'),
-      x: 54 + index * 66,
-      y: 232 - height,
-      height,
-    }
-  })
-})
-
-const DONUT_COLORS = ['#ff4d8d', '#6366f1', '#22c55e', '#f59e0b', '#06b6d4', '#a855f7']
-
+// ====== Brand donut legend ======
 const brandRevenue = computed(() =>
   brandStats.value.map((item, idx) => ({
     label: item.brand || 'Khác',
@@ -552,12 +512,253 @@ const brandRevenue = computed(() =>
   })),
 )
 
+// ====== Chart.js helpers ======
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+  },
+}
+
+const gridColor = 'rgba(255, 77, 141, 0.1)'
+const tickColor = '#9ca3af'
+
+function destroyChart(chart) {
+  if (chart) { chart.destroy() }
+  return null
+}
+
+// ====== Chart 1: Xu hướng doanh thu (Line) ======
+function buildRevenueChart() {
+  revenueChart = destroyChart(revenueChart)
+  if (!revenueChartRef.value || !dailyStats.value.length) return
+
+  const sorted = [...dailyStats.value].reverse()
+  const labels = sorted.map((d) => formatShortDate(d.reportDate))
+  const data = sorted.map((d) => d.totalRevenue)
+
+  revenueChart = new Chart(revenueChartRef.value, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#ff4d8d',
+        backgroundColor: 'rgba(255, 77, 141, 0.12)',
+        borderWidth: 3,
+        pointBackgroundColor: '#ff4d8d',
+        pointRadius: 4,
+        tension: 0.4,
+        fill: true,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: {
+          ticks: { color: tickColor, font: { size: 11 } },
+          grid: { color: gridColor },
+        },
+        y: {
+          ticks: {
+            color: tickColor,
+            font: { size: 11 },
+            callback: (val) => formatShortCurrency(val),
+          },
+          grid: { color: gridColor },
+        },
+      },
+      plugins: {
+        ...chartDefaults.plugins,
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${formatCurrency(ctx.parsed.y)}`,
+          },
+        },
+      },
+    },
+  })
+}
+
+// ====== Chart 2: Đơn hàng phát sinh (Bar) ======
+function buildOrderChart() {
+  orderChart = destroyChart(orderChart)
+  if (!orderChartRef.value || !weekdayStats.value.length) return
+
+  const labels = weekdayStats.value.map((d) =>
+    d.dayLabel.replace('Thứ ', 'T').replace('Chủ nhật', 'CN'),
+  )
+  const data = weekdayStats.value.map((d) => d.totalOrders)
+
+  orderChart = new Chart(orderChartRef.value, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: 'rgba(255, 77, 141, 0.8)',
+        borderRadius: 10,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: {
+          ticks: { color: tickColor, font: { size: 11 } },
+          grid: { display: false },
+        },
+        y: {
+          ticks: { color: tickColor, font: { size: 11 }, stepSize: 1 },
+          grid: { color: gridColor },
+          title: { display: true, text: 'Số đơn', color: tickColor, font: { size: 11 } },
+        },
+      },
+      plugins: {
+        ...chartDefaults.plugins,
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.parsed.y} đơn`,
+          },
+        },
+      },
+    },
+  })
+}
+
+// ====== Chart 3: Doanh thu theo thương hiệu (Doughnut) ======
+function buildBrandChart() {
+  brandChart = destroyChart(brandChart)
+  if (!brandChartRef.value || !brandStats.value.length) return
+
+  const labels = brandRevenue.value.map((b) => b.label)
+  const data = brandRevenue.value.map((b) => b.value)
+  const colors = brandRevenue.value.map((b) => b.color)
+
+  brandChart = new Chart(brandChartRef.value, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: colors,
+        borderWidth: 2,
+        borderColor: '#fff',
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.label}: ${ctx.parsed}%`,
+          },
+        },
+      },
+    },
+  })
+}
+
+// ====== Chart 4: So sánh doanh thu (Bar grouped theo tuần) ======
+function buildCompareChart() {
+  compareChart = destroyChart(compareChart)
+  if (!compareChartRef.value || !dailyStats.value.length) return
+
+  const sorted = [...dailyStats.value].reverse()
+
+  // Chia dailyStats thành từng tuần
+  const weeks = [[], [], [], []]
+  sorted.forEach((d, idx) => {
+    const weekIdx = Math.min(Math.floor(idx / 7), 3)
+    weeks[weekIdx].push(d.totalRevenue)
+  })
+
+  const weekTotals = weeks.map((w) => w.reduce((a, b) => a + b, 0))
+
+  // Kỳ trước: dịch trái 1 tuần (nếu không có API riêng thì dùng tuần liền trước)
+  const prevWeekTotals = [0, ...weekTotals.slice(0, 3)]
+
+  const labels = ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4']
+
+  compareChart = new Chart(compareChartRef.value, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Kỳ trước',
+          data: prevWeekTotals,
+          backgroundColor: 'rgba(156, 163, 175, 0.6)',
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+        {
+          label: 'Kỳ này',
+          data: weekTotals,
+          backgroundColor: 'rgba(255, 77, 141, 0.8)',
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      ...chartDefaults,
+      scales: {
+        x: {
+          ticks: { color: tickColor, font: { size: 11 } },
+          grid: { display: false },
+        },
+        y: {
+          ticks: {
+            color: tickColor,
+            font: { size: 11 },
+            callback: (val) => formatShortCurrency(val),
+          },
+          grid: { color: gridColor },
+        },
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: tickColor, font: { size: 11 }, boxWidth: 12 },
+        },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
+          },
+        },
+      },
+    },
+  })
+}
+
+function buildAllCharts() {
+  nextTick(() => {
+    buildRevenueChart()
+    buildOrderChart()
+    buildBrandChart()
+    buildCompareChart()
+  })
+}
+
+// ====== Helpers ======
 function formatCurrency(value) {
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency',
     currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value || 0)
+}
+
+function formatShortCurrency(value) {
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}T`
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}tr`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k`
+  return String(value)
 }
 
 function formatShortDate(dateStr) {
@@ -580,8 +781,8 @@ function statusClass(status) {
     info: ['SHIPPING', 'CONFIRMED'].includes(status),
     danger: ['Hết hàng', 'UNPAID'].includes(status),
   }
-  
 }
+
 const statusLabels = {
   PAID: 'Đã thanh toán',
   UNPAID: 'Chưa thanh toán',
@@ -604,6 +805,7 @@ function resetFilters() {
   filters.date = 'month'
 }
 
+// ====== API ======
 async function fetchDashboardData() {
   loading.value = true
   errorMsg.value = ''
@@ -630,6 +832,8 @@ async function fetchDashboardData() {
     topProductsData.value = topProductsRes.data.data
     lowStockData.value = lowStockRes.data.data
     topCustomersData.value = topCustomersRes.data.data
+
+    buildAllCharts()
   } catch (err) {
     errorMsg.value = err.response?.data?.message || 'Không thể tải dữ liệu thống kê'
   } finally {
