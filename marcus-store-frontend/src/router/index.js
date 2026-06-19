@@ -103,6 +103,11 @@ const routes = [
             name: 'Wishlist',
             component: () => import('@/views/client/account/Wishlist.vue'),
           },
+                {
+      path: "/change-password",
+      name: "change-password",
+      component: () => import("@/views/client/account/ChangePassword.vue")
+      }
         ],
       },
     ],

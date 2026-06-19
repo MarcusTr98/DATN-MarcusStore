@@ -63,6 +63,9 @@ public class Order {
     @Column(name = "order_status", length = 50)
     private String orderStatus = "PENDING";
 
+    @Column(name = "is_hidden", nullable = false)
+    private Boolean isHidden = false;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -70,6 +73,13 @@ public class Order {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Marcus thêm để tính phí GHN
+    @Column(name = "shipping_fee", precision = 18, scale = 2)
+    private BigDecimal shippingFee;
+    // Marcus thêm để tính phí GHN
+    @Column(name = "tracking_code", length = 100)
+    private String trackingCode;
 
     // Khóa ngoại trỏ về người đặt
     @ManyToOne(fetch = FetchType.LAZY)

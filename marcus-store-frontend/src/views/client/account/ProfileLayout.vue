@@ -29,6 +29,9 @@
               <router-link to="/profile/wishlist" active-class="active" class="nav-item">
                 <i class="fas fa-heart"></i> Sản phẩm yêu thích
               </router-link>
+              <router-link to="change-password" active-class="active" class="nav-item">
+                <i class="fas fa-shield-alt"></i>Đổi mật khẩu
+              </router-link>
             </nav>
 
             <hr class="divider" />
@@ -59,7 +62,7 @@
 import { reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import userApi from '@/api/userApi'
-import BaseModal from '@/components/common/BaseModal.vue'
+import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/profile.css'
 
 const router = useRouter()

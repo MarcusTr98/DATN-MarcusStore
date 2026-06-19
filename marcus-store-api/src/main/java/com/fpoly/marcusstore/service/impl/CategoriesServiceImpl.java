@@ -26,6 +26,8 @@ public class CategoriesServiceImpl implements CategoriesService {
                 .categoryName(category.getCategoryName())
                 .status(category.getStatus())
                 .slug(category.getSlug())
+                .parentId(category.getParent() != null ? category.getParent().getCategoryId() : null)
+                .parentName(category.getParent() != null ? category.getParent().getCategoryName() : null)
                 .build();
     }
 
@@ -88,10 +90,10 @@ public class CategoriesServiceImpl implements CategoriesService {
         category.setStatus(updateCategory.getStatus());
         category.setSlug(slug);
 
-        if (updateCategory.getParentId() != null){
+        if (updateCategory.getParentId() != null) {
             if (updateCategory.getParentId().equals(id)) {
-            throw new RuntimeException("Danh mục không thể là cha của chính nó");
-        }
+                throw new RuntimeException("Danh mục không thể là cha của chính nó");
+            }
             Category parent = categoryRepository.findById(updateCategory.getParentId())
                     .orElseThrow(() -> new RuntimeException("ParentId ko tồn tại"));
             category.setParent(parent);

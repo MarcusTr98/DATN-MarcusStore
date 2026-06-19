@@ -302,7 +302,7 @@ import { ref, reactive, onMounted } from 'vue'
 import addressApi from '@/api/addressApi'
 import ghnApi from '@/api/ghnApi'
 import MapLocator from '@/components/common/MapLocator.vue'
-import BaseModal from '@/components/common/BaseModal.vue'
+import BaseModal from '@/components/BaseModal.vue'
 
 const addresses = ref([])
 const isLoading = ref(false)

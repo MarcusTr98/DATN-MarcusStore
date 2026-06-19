@@ -159,9 +159,13 @@ onMounted(() => {
 }
 .sidebar {
   width: 250px;
+  height: 100vh;
+  flex: 0 0 250px;
   background: white;
   border-right: 1px solid #ffdce9;
   padding: 20px 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .logo {
