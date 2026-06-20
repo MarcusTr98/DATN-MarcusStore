@@ -81,6 +81,7 @@ const loadUser = () => {
 // Logic WebSocket
 const connectWebSocket = () => {
   // Thay đổi URL theo cấu hình WebSocket của Spring Boot
+
   const socket = new SockJS('http://localhost:8080/ws-endpoint')
   stompClient = new Client({
     webSocketFactory: () => socket,

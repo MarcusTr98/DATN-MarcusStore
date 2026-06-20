@@ -16,7 +16,6 @@ public class ClientContactController {
 
     @PostMapping
     public ApiResponse<String> submitContactForm(@Valid @RequestBody CreateContactRequest request) {
-        System.out.println("Đã nhận được request tại ClientContactController!"); // log lỗi
         contactService.submitContact(request);
         return ApiResponse.success("Gửi yêu cầu thành công");
     }

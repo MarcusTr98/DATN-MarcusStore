@@ -58,10 +58,10 @@ public class SecurityConfig {
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập
                         .requestMatchers("/api/user/**").authenticated() // Đạt, Đức: Checkout, Giỏ hàng, Wishlist, Đgiá
 
-                        // 3. Nhóm API dành riêng cho Quản trị viên (Phân quyền RBAC)
+                        // 3. Nhóm API dành riêng cho Quản trị viên
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Ngọc, Huy: Quản lý User,Thống
                                                                                        // kê
-                        .requestMatchers("/api/admin/roles/**").hasRole("ADMIN") // Chỉ Admin mới được đổi quyền
+                        .requestMatchers("/api/admin/roles/**").hasRole("ADMIN")
 
                         // Khóa mọi request khác đi lạc
                         .anyRequest().authenticated());
