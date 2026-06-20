@@ -97,7 +97,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-// ... giữ nguyên import icons của ông ...
 import pieChartIcon from '/src/assets/icons/pie-chart.svg'
 import layersIcon from '/src/assets/icons/layers.svg'
 import boxIcon from '/src/assets/icons/box.svg'
