@@ -67,7 +67,7 @@ public UserResponse create(CreateUserRequest request){
     if (userRepository.existsByEmail(request.getEmail())) {
         throw new RuntimeException("Email đã tồn tại");
     }
-    Role role = roleRepository.findByRoleName("STAFF").orElseThrow(()-> new RuntimeException("Không tìm thấy role Staff"));
+    Role role = roleRepository.findById(request.getRoleId()).orElseThrow(()-> new RuntimeException("Không tìm thấy role"));
          User user = new User();
          user.setUsername(request.getUsername());
          user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
@@ -98,7 +98,6 @@ public UserResponse update(Integer Id, UpdateUserRequest request){
          user.setFullName(request.getFullName());
          user.setEmail(request.getEmail());
          user.setPhoneNumber(request.getPhoneNumber());
-         user.setIsActive(true);
          user.setRole(role);
          user.setUpdatedAt(LocalDateTime.now());
          
