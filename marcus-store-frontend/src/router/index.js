@@ -127,6 +127,7 @@ const routes = [
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/Dashboard.vue'),
+        meta: { requiresAuth: true, roles: ['ROLE_ADMIN', 'ROLE_STAFF'] },
       },
       {
         path: 'profile',
@@ -217,6 +218,16 @@ const router = createRouter({
 router.beforeEach((to) => {
   const token = localStorage.getItem('ACCESS_TOKEN')
   const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
+  const isAdminOrStaff = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_STAFF')
+
+  // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào admin
+  if (
+    token &&
+    isAdminOrStaff &&
+    (to.path === '/' || to.path.startsWith('/auth/login'))
+  ) {
+    return '/admin/dashboard'
+  }
 
   // Chưa login mà cố vào admin
   if (to.path.startsWith('/admin') && !token) {
@@ -224,11 +235,7 @@ router.beforeEach((to) => {
   }
 
   // USER cố vào admin
-  if (
-    to.path.startsWith('/admin') &&
-    !roles.includes('ROLE_ADMIN') &&
-    !roles.includes('ROLE_STAFF')
-  ) {
+  if (to.path.startsWith('/admin') && !isAdminOrStaff) {
     return '/'
   }
 
