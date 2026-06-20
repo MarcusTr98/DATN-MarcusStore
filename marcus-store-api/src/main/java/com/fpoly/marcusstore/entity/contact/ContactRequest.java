@@ -21,6 +21,10 @@ public class ContactRequest {
     @Column(name = "contact_id")
     private Integer contactId;
 
+    // Liên kết với tài khoản đang đăng nhập, khách vãng lai thì null
+    @Column(name = "user_id")
+    private Integer userId;
+
     @Column(name = "customer_name", nullable = false, length = 100)
     private String customerName;
 

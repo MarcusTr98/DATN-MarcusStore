@@ -26,6 +26,7 @@
               :key="item.id"
               class="notif-item"
               :class="{ unread: !item.isRead }"
+              @click="handleNotifClick(item)"
             >
               <div class="notif-icon" :class="item.type">
                 <i v-if="item.type === 'ORDER'" class="fa-solid fa-box"></i>
@@ -56,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import SockJS from 'sockjs-client'
 import { Client } from '@stomp/stompjs'
@@ -64,11 +65,11 @@ import { Client } from '@stomp/stompjs'
 import boltIcon from '/src/assets/icons/lightning.svg'
 import personCircleIcon from '/src/assets/icons/person-circle.svg'
 import logoutIcon from '/src/assets/icons/logout.svg'
+import api from '@/utils/api'
 
 const router = useRouter()
 const username = ref('')
 
-// --- State Thông báo ---
 const showNotifDropdown = ref(false)
 const unreadCount = ref(0)
 const notifications = ref([])
@@ -78,17 +79,14 @@ const loadUser = () => {
   username.value = localStorage.getItem('USERNAME') || 'Admin'
 }
 
-// Logic WebSocket
+// Logic kết nối WebSocket
 const connectWebSocket = () => {
-  // Thay đổi URL theo cấu hình WebSocket của Spring Boot
-
   const socket = new SockJS('http://localhost:8080/ws-endpoint')
   stompClient = new Client({
     webSocketFactory: () => socket,
     reconnectDelay: 5000,
     onConnect: () => {
       console.log('Đã kết nối WebSocket!')
-      // kênh thông báo chung của Admin
       stompClient.subscribe('/topic/admin/notifications', (message) => {
         const notifData = JSON.parse(message.body)
         handleNewNotification(notifData)
@@ -101,21 +99,37 @@ const connectWebSocket = () => {
   stompClient.activate()
 }
 
+// Xử lý khi có thông báo mới đẩy về
 const handleNewNotification = (data) => {
-  // data = { id, title, message, type: 'ORDER' | 'CONTACT', time }
   notifications.value.unshift({ ...data, isRead: false })
   unreadCount.value++
-
-  // const audio = new Audio('/ting.mp3'); audio.play();
 }
 
 const toggleNotif = () => {
   showNotifDropdown.value = !showNotifDropdown.value
 }
 
-const markAllAsRead = () => {
-  notifications.value.forEach((n) => (n.isRead = true))
-  unreadCount.value = 0
+const markAllAsRead = async () => {
+  try {
+    await api.put('/admin/notifications/mark-all-read')
+    notifications.value.forEach((n) => (n.isRead = true))
+    unreadCount.value = 0
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+// Xử lý Click vào một thông báo cụ thể
+const handleNotifClick = (item) => {
+  item.isRead = true
+  unreadCount.value = Math.max(0, unreadCount.value - 1)
+  showNotifDropdown.value = false
+
+  if (item.type === 'ORDER' && item.orderCode) {
+    router.push(`/admin/order/${item.orderCode}`)
+  } else if (item.type === 'CONTACT') {
+    router.push('/admin/contact-management')
+  }
 }
 
 const handleLogout = () => {
@@ -127,36 +141,21 @@ const handleLogout = () => {
   router.push('/auth/login')
 }
 
+const fetchUnreadNotifications = async () => {
+  try {
+    const res = await api.get('/admin/notifications/unread')
+    notifications.value = res.data?.data || []
+    unreadCount.value = notifications.value.length
+  } catch (error) {
+    console.error('Lỗi lấy thông báo', error)
+  }
+}
+
 onMounted(() => {
   loadUser()
   window.addEventListener('auth-changed', loadUser)
-
-  // Tạm tạo vài data ảo để ông test giao diện trước khi nối Backend
-  notifications.value = [
-    {
-      id: 1,
-      type: 'ORDER',
-      title: 'Đơn hàng mới!',
-      message: 'Khách hàng Nguyễn Văn A vừa đặt đơn ORD-123',
-      time: 'Vừa xong',
-      isRead: false,
-    },
-    {
-      id: 2,
-      type: 'CONTACT',
-      title: 'Yêu cầu hỗ trợ',
-      message: 'Trần B vừa gửi form liên hệ',
-      time: '10 phút trước',
-      isRead: false,
-    },
-  ]
-  unreadCount.value = 2
+  fetchUnreadNotifications()
   connectWebSocket()
-})
-
-onUnmounted(() => {
-  if (stompClient) stompClient.deactivate()
-  window.removeEventListener('auth-changed', loadUser)
 })
 </script>
 
@@ -172,7 +171,7 @@ onUnmounted(() => {
   margin: 16px;
   border-radius: 16px;
   position: relative;
-  z-index: 50; /* Để dropdown không bị đè */
+  z-index: 50;
 }
 
 .header-left {
@@ -234,7 +233,7 @@ onUnmounted(() => {
   height: 16px;
 }
 
-/* CSS cho Quả chuông và Dropdown */
+/* Chuông & Badge */
 .notification-wrapper {
   position: relative;
 }
@@ -276,6 +275,7 @@ onUnmounted(() => {
   }
 }
 
+/* Dropdown Container */
 .notif-dropdown {
   position: absolute;
   top: 50px;
@@ -319,6 +319,7 @@ onUnmounted(() => {
   font-size: 14px;
 }
 
+/* Dropdown Item */
 .notif-item {
   display: flex;
   gap: 12px;

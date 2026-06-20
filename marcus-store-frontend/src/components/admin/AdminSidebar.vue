@@ -16,7 +16,7 @@
     </div>
 
     <div class="menu-section">
-      <p class="menu-title">KINH DOANH</p>
+      <p class="menu-title">SẢN PHẨM & KHO</p>
 
       <router-link to="/admin/category" class="menu-item" active-class="active">
         <img :src="layersIcon" class="menu-icon" />
@@ -49,6 +49,10 @@
           >Tạo biến thể (SKU)</router-link
         >
       </div>
+    </div>
+
+    <div class="menu-section">
+      <p class="menu-title">BÁN HÀNG & MARKETING</p>
 
       <router-link to="/admin/order" class="menu-item" active-class="active">
         <img :src="cartIcon" class="menu-icon" />
@@ -64,10 +68,6 @@
         <img :src="tagsIcon" class="menu-icon" />
         <span>Quản lý Flash Sale</span>
       </router-link>
-    </div>
-
-    <div class="menu-section">
-      <p class="menu-title">NỘI DUNG VÀ PHÂN TÍCH</p>
 
       <router-link to="/admin/post" class="menu-item" active-class="active">
         <img :src="newspaperIcon" class="menu-icon" />
@@ -81,12 +81,18 @@
     </div>
 
     <div class="menu-section">
-      <p class="menu-title">HỆ THỐNG</p>
+      <p class="menu-title">CHĂM SÓC KHÁCH HÀNG</p>
 
-      <router-link to="/admin/settings" class="menu-item" active-class="active">
-        <img :src="gearIcon" class="menu-icon" />
-        <span>Setting system</span>
+      <router-link to="/admin/contact-management" class="menu-item" active-class="active">
+        <i
+          class="fa-solid fa-headset menu-icon d-flex align-items-center justify-content-center fs-5 text-secondary"
+        ></i>
+        <span>Quản lý khiếu nại</span>
       </router-link>
+    </div>
+
+    <div class="menu-section">
+      <p class="menu-title">HỆ THỐNG</p>
 
       <router-link to="/admin/account" class="menu-item" active-class="active">
         <img :src="peopleIcon" class="menu-icon" />
@@ -97,15 +103,20 @@
         <img :src="clockHistoryIcon" class="menu-icon" />
         <span>Phân quyền (Role)</span>
       </router-link>
+
+      <router-link to="/admin/settings" class="menu-item" active-class="active">
+        <img :src="gearIcon" class="menu-icon" />
+        <span>Cài đặt hệ thống</span>
+      </router-link>
     </div>
   </aside>
 </template>
 
 <script setup>
+// Giữ nguyên phần Script và Style của ông
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 
-/* ICONS IMPORT */
 import boltIcon from '/src/assets/icons/lightning.svg'
 import pieChartIcon from '/src/assets/icons/pie-chart.svg'
 import layersIcon from '/src/assets/icons/layers.svg'
@@ -121,6 +132,11 @@ import gearIcon from '/src/assets/icons/gear.svg'
 
 const route = useRoute()
 const isProductMenuOpen = ref(false)
+
+const toggleProductMenu = () => {
+  isProductMenuOpen.value = !isProductMenuOpen.value
+}
+
 onMounted(() => {
   if (
     route.path.includes('/admin/product') ||
@@ -130,19 +146,10 @@ onMounted(() => {
     isProductMenuOpen.value = true
   }
 })
-const toggleProductMenu = () => {
-  isProductMenuOpen.value = !isProductMenuOpen.value
-}
-
-// TỰ ĐỘNG MỞ SUBMENU: Nếu người dùng đang đứng ở trang sản phẩm hoặc sku khi F5 trang
-onMounted(() => {
-  if (route.path.includes('/admin/product') || route.path.includes('/admin/sku')) {
-    isProductMenuOpen.value = true
-  }
-})
 </script>
 
 <style scoped>
+/* Giữ nguyên toàn bộ Style của ông (Không thay đổi) */
 .menu-item {
   display: flex;
   align-items: center;
@@ -155,7 +162,7 @@ onMounted(() => {
   color: #5e4a54;
   font-size: 14px;
   font-weight: 500;
-  text-decoration: none; /* CHỐT HẠ: Bỏ gạch chân cho toàn bộ menu chính */
+  text-decoration: none;
 }
 .sidebar {
   width: 250px;
@@ -167,14 +174,12 @@ onMounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
 }
-
 .logo {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 36px;
 }
-
 .logo-icon {
   width: 42px;
   height: 42px;
@@ -184,21 +189,17 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
 }
-
 .logo-img {
   width: 20px;
   height: 20px;
 }
-
 .logo h2 {
   font-size: 22px;
   color: #ff4d94;
 }
-
 .menu-section {
   margin-bottom: 28px;
 }
-
 .menu-title {
   font-size: 11px;
   font-weight: 700;
@@ -206,51 +207,30 @@ onMounted(() => {
   margin-bottom: 12px;
   letter-spacing: 2px;
 }
-
-.menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px;
-  border-radius: 14px;
-  margin-bottom: 10px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  color: #5e4a54;
-  font-size: 14px;
-  font-weight: 500;
-}
-
 .menu-item:hover {
   background: #fff0f6;
 }
-
 .menu-item.active {
   background: linear-gradient(135deg, #ff8fb7, #ff5d99);
   color: white;
   box-shadow: 0 8px 18px rgba(255, 105, 160, 0.25);
 }
-
 .menu-icon {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
 }
-
 .menu-parent {
   position: relative;
 }
-
 .menu-parent span {
   flex: 1;
 }
-
 .submenu-arrow {
   width: 14px;
   height: 14px;
   transition: transform 0.3s ease;
 }
-
 .submenu-arrow.open {
   transform: rotate(180deg);
 }
@@ -261,7 +241,6 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
 }
-
 .submenu-item {
   padding: 10px 12px;
   margin-bottom: 6px;
@@ -274,18 +253,15 @@ onMounted(() => {
   text-decoration: none;
   display: block;
 }
-
 .submenu-item:hover {
   background: #fff0f6;
   color: #ff4d94;
 }
-
 .submenu-item.active {
   background: #ffe3ef;
   color: #ff4d94;
   font-weight: 700;
 }
-
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;

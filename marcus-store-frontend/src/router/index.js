@@ -129,6 +129,12 @@ const routes = [
     children: [
       { path: '', redirect: '/admin/dashboard' },
       {
+        path: '/admin/contact-management',
+        name: 'AdminContact',
+        component: () => import('@/views/admin/contact/ContactManagement.vue'),
+        meta: { requiresAuth: true, role: 'ADMIN' },
+      },
+      {
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/Dashboard.vue'),
