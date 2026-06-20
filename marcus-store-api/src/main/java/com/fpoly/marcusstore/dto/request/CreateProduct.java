@@ -23,7 +23,6 @@ public class CreateProduct {
     @NotBlank(message = "Ko được để trống thương hiệu sản phẩm")
     private String brand;
 
-    @NotBlank(message = "Ko được để trống đường dẫn ảnh")
     private String thumbnailUrl;
 
     @NotNull(message = "Ko được để trống CategoryId")

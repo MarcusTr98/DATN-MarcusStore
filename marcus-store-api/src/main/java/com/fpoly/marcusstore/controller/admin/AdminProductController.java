@@ -14,6 +14,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -28,9 +29,10 @@ public class AdminProductController {
     public ApiResponse<Page<ProductResponse>> findAllProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false, defaultValue = "all") String filter,
+            @RequestParam(required = false) String brand,
             @PageableDefault(page = 0, size = 10) Pageable pageable) {
         // Chuyển các tham số này xuống Service xử lý
-        return ApiResponse.success(productsService.findAllProducts(keyword, filter, pageable));
+        return ApiResponse.success(productsService.findAllProducts(keyword, filter, brand, pageable));
     }
 
     @PostMapping
@@ -51,7 +53,12 @@ public class AdminProductController {
     }
 
     @PutMapping("/hidden/{id}")
-    public ApiResponse<Product> hiddenProduct(@PathVariable Integer id) {
+    public ApiResponse<ProductResponse> hiddenProduct(@PathVariable Integer id) {
         return ApiResponse.success(productsService.hiddenProduct(id));
+    }
+
+    @GetMapping("/brands")
+    public ResponseEntity<List<String>> getAllBrands() {
+        return ResponseEntity.ok(productsService.getAllDistinctBrands());
     }
 }
