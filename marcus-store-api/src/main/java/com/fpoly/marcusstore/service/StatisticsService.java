@@ -236,31 +236,42 @@ public class StatisticsService {
     }
 
     private List<RevenueCompareResponseDTO.PeriodData> groupByPeriod(
-            List<RevenueCompareProjection> raw, String period, LocalDate periodStart) {
+        List<RevenueCompareProjection> raw, String period, LocalDate periodStart) {
 
-        if ("today".equals(period) || "week".equals(period)) {
-            // Nhóm theo từng ngày
-            return raw.stream()
-                    .map(p -> RevenueCompareResponseDTO.PeriodData.builder()
-                            .label(LocalDate.parse(p.getDateLabel().toString())
-                                    .format(SHORT_DATE))
-                            .revenue(p.getTotalRevenue().doubleValue())
-                            .build())
-                    .collect(Collectors.toList());
-        } else {
-            // Nhóm theo tuần trong kỳ
-            Map<Integer, Double> weekMap = new LinkedHashMap<>();
-            for (RevenueCompareProjection p : raw) {
-                LocalDate date = LocalDate.parse(p.getDateLabel().toString());
-                int weekNum = (int)(ChronoUnit.DAYS.between(periodStart, date) / 7) + 1;
-                weekMap.merge(weekNum, p.getTotalRevenue().doubleValue(), Double::sum);
-            }
-            return weekMap.entrySet().stream()
-                    .map(e -> RevenueCompareResponseDTO.PeriodData.builder()
-                            .label("Tuần " + e.getKey())
-                            .revenue(e.getValue())
-                            .build())
-                    .collect(Collectors.toList());
+    if ("today".equals(period) || "week".equals(period)) {
+        return raw.stream()
+                .map(p -> RevenueCompareResponseDTO.PeriodData.builder()
+                        .label(LocalDate.parse(p.getDateLabel().toString())
+                                .format(SHORT_DATE))
+                        .revenue(p.getTotalRevenue().doubleValue())
+                        .build())
+                .collect(Collectors.toList());
+    } else {
+        // Nhóm theo tuần, label dạng "01/05 - 07/05"
+        Map<Integer, Double> weekRevenueMap = new LinkedHashMap<>();
+        Map<Integer, LocalDate> weekStartMap = new LinkedHashMap<>();
+
+        for (RevenueCompareProjection p : raw) {
+            LocalDate date = LocalDate.parse(p.getDateLabel().toString());
+            int weekNum = (int)(ChronoUnit.DAYS.between(periodStart, date) / 7);
+            weekRevenueMap.merge(weekNum, p.getTotalRevenue().doubleValue(), Double::sum);
+            weekStartMap.putIfAbsent(weekNum, date);
         }
+
+        return weekRevenueMap.entrySet().stream()
+                .map(e -> {
+                    LocalDate weekStart = weekStartMap.get(e.getKey());
+                    LocalDate weekEnd = weekStart.plusDays(6);
+                    String label = weekStart.format(SHORT_DATE) + " - " + weekEnd.format(SHORT_DATE);
+                    return RevenueCompareResponseDTO.PeriodData.builder()
+                            .label(label)
+                            .revenue(e.getValue())
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
+}
+public Long countPendingOrders() {
+    return statisticsRepository.countPendingOrders();
+}
 }

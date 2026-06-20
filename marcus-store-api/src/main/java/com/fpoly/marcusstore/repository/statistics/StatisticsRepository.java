@@ -168,4 +168,9 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
     List<RevenueCompareProjection> getRevenueByDateRange(
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+            @Query(value = """
+    SELECT COUNT(*) FROM Orders
+    WHERE order_status = 'PENDING'
+    """, nativeQuery = true)
+    Long countPendingOrders();
 }

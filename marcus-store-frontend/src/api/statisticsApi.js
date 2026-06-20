@@ -29,6 +29,9 @@ const statisticsApi = {
   getRevenueCompare(period = 'month') {
     return api.get(`/admin/statistics/revenue/compare?period=${period}`)
   },
+  getPendingOrdersCount() {
+  return api.get('/admin/statistics/pending-orders/count')
+},
 }
 
 export default statisticsApi

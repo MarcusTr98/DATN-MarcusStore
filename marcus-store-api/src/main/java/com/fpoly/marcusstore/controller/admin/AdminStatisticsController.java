@@ -95,4 +95,9 @@ public class AdminStatisticsController {
             @RequestParam(required = false, defaultValue = "month") String period) {
         return ApiResponse.success(statisticsService.getRevenueCompare(period));
     }
+    
+    @GetMapping("/pending-orders/count")
+public ApiResponse<Long> countPendingOrders() {
+    return ApiResponse.success(statisticsService.countPendingOrders());
+}
 }

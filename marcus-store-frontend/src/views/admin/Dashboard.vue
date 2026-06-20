@@ -291,6 +291,7 @@ const tabs = [
 
 //Data từ API
 const dailyStats = ref([])
+const pendingOrdersCount = ref(0)
 const monthlyStats = ref([])
 const weekdayStats = ref([])
 const brandStats = ref([])
@@ -320,7 +321,7 @@ const kpiOverview = computed(() => {
   const monthRevenue = monthlyStats.value[0]?.totalRevenue || 0
   const monthOrders = monthlyStats.value[0]?.totalOrders || 0
   const monthProductsSold = monthlyStats.value[0]?.totalProductsSold || 0
-  const pendingCount = recentOrdersData.value.filter((o) => o.status === 'PENDING').length
+  const pendingCount = pendingOrdersCount.value
 
   return [
     {
@@ -353,7 +354,7 @@ const kpiOverview = computed(() => {
     {
       key: 'pendingOrders',
       title: 'Đơn mới chưa xử lý',
-      value: String(pendingCount),
+      value: String(pendingOrdersCount.value),
       growth: 'Ưu tiên',
       note: 'Ưu tiên duyệt để tránh trễ SLA',
       icon: 'bi bi-exclamation-triangle',
@@ -803,7 +804,7 @@ async function fetchDashboardData(period = 'month') {
     const [
       dailyRes, monthlyRes, weekdayRes, brandRes,
       recentOrdersRes, topProductsRes, lowStockRes, topCustomersRes,
-      compareRes,
+      compareRes,pendingres,
     ] = await Promise.all([
       statisticsApi.getRevenueByDay(period),
       statisticsApi.getRevenueByMonth(),
@@ -814,6 +815,7 @@ async function fetchDashboardData(period = 'month') {
       statisticsApi.getLowStockProducts(),
       statisticsApi.getTopCustomers(10, period),
       statisticsApi.getRevenueCompare(period),
+      statisticsApi.getPendingOrdersCount(),
     ])
 
     dailyStats.value = dailyRes.data.data
@@ -825,7 +827,7 @@ async function fetchDashboardData(period = 'month') {
     lowStockData.value = lowStockRes.data.data
     topCustomersData.value = topCustomersRes.data.data
     compareData.value = compareRes.data.data
-
+    pendingOrdersCount.value = pendingres.data.data
     buildAllCharts()
   } catch (err) {
     errorMsg.value = err.response?.data?.message || 'Không thể tải dữ liệu thống kê'
