@@ -2,8 +2,14 @@
   <div class="page-wrapper">
     <div class="page-header">
       <div class="header-left">
-        <p class="breadcrumb-text">Sản phẩm</p>
-        <h1 class="page-title">Tạo Biến thể SKU</h1>
+        <div class="header-icon-box">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div class="header-text-group">
+          <p class="breadcrumb-text">Sản phẩm</p>
+          <h1 class="page-title">Tạo Biến thể SKU</h1>
+          <p class="page-subtitle">Tạo và quản lý các biến thể SKU theo thuộc tính sản phẩm</p>
+        </div>
       </div>
       <div class="header-right">
         <div class="step-indicator">
@@ -650,4 +656,56 @@ const getColorStyle = (valueStr) => {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #ff4d94, #ff7eb3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 22px;
+  flex-shrink: 0;
+  box-shadow: 0 8px 18px rgba(255, 77, 148, 0.35);
+}
+
+.header-text-group .breadcrumb-text {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #ff4d94;
+  margin: 0 0 4px 0;
+}
+
+.header-text-group .page-title {
+  font-size: 26px;
+  font-weight: 900;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.header-text-group .page-subtitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  margin: 0;
+}
+</style>
