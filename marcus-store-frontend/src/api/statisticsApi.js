@@ -1,29 +1,33 @@
 import api from '@/utils/api'
 
 const statisticsApi = {
-  getRevenueByDay() {
-    return api.get('/admin/statistics/revenue/daily')
+  getRevenueByDay(period = 'month') {
+    return api.get(`/admin/statistics/revenue/daily?period=${period}`)
   },
   getRevenueByMonth() {
-    return api.get('/admin/statistics/revenue/monthly')
+    const year = new Date().getFullYear()
+    return api.get(`/admin/statistics/revenue/monthly?year=${year}`)
   },
-  getTopProducts(topN = 5) {
-    return api.get(`/admin/statistics/top-products?topN=${topN}`)
+  getOrdersByWeekday(period = 'month') {
+    return api.get(`/admin/statistics/orders/weekday?period=${period}`)
   },
-  getOrdersByWeekday() {
-    return api.get('/admin/statistics/orders/weekday')
+  getRevenueByBrand(period = 'month') {
+    return api.get(`/admin/statistics/revenue/by-brand?period=${period}`)
   },
-  getRevenueByBrand() {
-    return api.get('/admin/statistics/revenue/by-brand')
+  getTopProducts(topN = 10, period = 'month') {
+    return api.get(`/admin/statistics/top-products?topN=${topN}&period=${period}`)
+  },
+  getTopCustomers(topN = 10, period = 'month') {
+    return api.get(`/admin/statistics/top-customers?topN=${topN}&period=${period}`)
+  },
+  getRecentOrders(limit = 10, period = 'month') {
+    return api.get(`/admin/statistics/recent-orders?limit=${limit}&period=${period}`)
   },
   getLowStockProducts() {
     return api.get('/admin/statistics/low-stock')
   },
-  getTopCustomers(topN = 10) {
-    return api.get(`/admin/statistics/top-customers?topN=${topN}`)
-  },
-  getRecentOrders(limit = 10) {
-    return api.get(`/admin/statistics/recent-orders?limit=${limit}`)
+  getRevenueCompare(period = 'month') {
+    return api.get(`/admin/statistics/revenue/compare?period=${period}`)
   },
 }
 

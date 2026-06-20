@@ -237,7 +237,6 @@ import '@/assets/css/Dashboard.css'
 
 Chart.register(...registerables)
 
-// ====== Refs cho canvas ======
 const revenueChartRef = ref(null)
 const orderChartRef = ref(null)
 const brandChartRef = ref(null)
@@ -248,7 +247,7 @@ let orderChart = null
 let brandChart = null
 let compareChart = null
 
-// ====== State ======
+//State 
 const selectedTime = ref('month')
 const currentTab = ref('recentOrders')
 const loading = ref(true)
@@ -263,7 +262,9 @@ const filters = reactive({
 
 watch(selectedTime, (val) => {
   filters.date = val
+  fetchDashboardData(val)
 })
+onMounted(() => fetchDashboardData(selectedTime.value))
 
 watch(() => filters.date, (val) => {
   selectedTime.value = val
@@ -288,7 +289,7 @@ const tabs = [
   { label: 'Khách hàng mua nhiều nhất', value: 'topCustomers' },
 ]
 
-// ====== Data từ API ======
+//Data từ API
 const dailyStats = ref([])
 const monthlyStats = ref([])
 const weekdayStats = ref([])
@@ -297,11 +298,12 @@ const recentOrdersData = ref([])
 const topProductsData = ref([])
 const lowStockData = ref([])
 const topCustomersData = ref([])
+const compareData = ref({ current: [], previous: [], currentLabel: '', previousLabel: '' })
 
-// ====== Chart colors ======
+//Chart colors
 const DONUT_COLORS = ['#ff4d8d', '#6366f1', '#22c55e', '#f59e0b', '#06b6d4', '#a855f7']
 
-// ====== KPI ======
+//KPI
 const todayStr = new Date().toISOString().split('T')[0]
 
 const todayRevenue = computed(() => {
@@ -391,7 +393,7 @@ const inventoryAlerts = computed(() =>
   })),
 )
 
-// ====== Table ======
+//Table
 const tableConfig = computed(() => ({
   recentOrders: {
     columns: [
@@ -443,6 +445,8 @@ const statusOptions = computed(() => {
       { value: 'CONFIRMED', label: 'Đã xác nhận' },
       { value: 'SHIPPING',  label: 'Đang giao hàng' },
       { value: 'COMPLETED', label: 'Hoàn thành' },
+      { value: 'CANCELLED', label: 'Đã hủy' },
+      { value: 'PROCESSING', label: 'Đang xử lý' },
     ]
   }
   if (currentTab.value === 'lowStock') {
@@ -503,7 +507,6 @@ const filteredRows = computed(() => {
   })
 })
 
-// ====== Brand donut legend ======
 const brandRevenue = computed(() =>
   brandStats.value.map((item, idx) => ({
     label: item.brand || 'Khác',
@@ -512,7 +515,6 @@ const brandRevenue = computed(() =>
   })),
 )
 
-// ====== Chart.js helpers ======
 const chartDefaults = {
   responsive: true,
   maintainAspectRatio: false,
@@ -529,7 +531,6 @@ function destroyChart(chart) {
   return null
 }
 
-// ====== Chart 1: Xu hướng doanh thu (Line) ======
 function buildRevenueChart() {
   revenueChart = destroyChart(revenueChart)
   if (!revenueChartRef.value || !dailyStats.value.length) return
@@ -581,7 +582,6 @@ function buildRevenueChart() {
   })
 }
 
-// ====== Chart 2: Đơn hàng phát sinh (Bar) ======
 function buildOrderChart() {
   orderChart = destroyChart(orderChart)
   if (!orderChartRef.value || !weekdayStats.value.length) return
@@ -665,23 +665,11 @@ function buildBrandChart() {
 // ====== Chart 4: So sánh doanh thu (Bar grouped theo tuần) ======
 function buildCompareChart() {
   compareChart = destroyChart(compareChart)
-  if (!compareChartRef.value || !dailyStats.value.length) return
+  if (!compareChartRef.value || !compareData.value.current?.length) return
 
-  const sorted = [...dailyStats.value].reverse()
-
-  // Chia dailyStats thành từng tuần
-  const weeks = [[], [], [], []]
-  sorted.forEach((d, idx) => {
-    const weekIdx = Math.min(Math.floor(idx / 7), 3)
-    weeks[weekIdx].push(d.totalRevenue)
-  })
-
-  const weekTotals = weeks.map((w) => w.reduce((a, b) => a + b, 0))
-
-  // Kỳ trước: dịch trái 1 tuần (nếu không có API riêng thì dùng tuần liền trước)
-  const prevWeekTotals = [0, ...weekTotals.slice(0, 3)]
-
-  const labels = ['Tuần 1', 'Tuần 2', 'Tuần 3', 'Tuần 4']
+  const labels = compareData.value.current.map((d) => d.label)
+  const currentValues = compareData.value.current.map((d) => d.revenue)
+  const previousValues = compareData.value.previous.map((d) => d.revenue)
 
   compareChart = new Chart(compareChartRef.value, {
     type: 'bar',
@@ -689,16 +677,16 @@ function buildCompareChart() {
       labels,
       datasets: [
         {
-          label: 'Kỳ trước',
-          data: prevWeekTotals,
+          label: compareData.value.previousLabel || 'Kỳ trước',
+          data: previousValues,
           backgroundColor: 'rgba(156, 163, 175, 0.6)',
           borderRadius: 8,
           borderSkipped: false,
         },
         {
-          label: 'Kỳ này',
-          data: weekTotals,
-          backgroundColor: 'rgba(255, 77, 141, 0.8)',
+          label: compareData.value.currentLabel || 'Kỳ này',
+          data: currentValues,
+          backgroundColor: 'rgba(255, 77, 141, 0.85)',
           borderRadius: 8,
           borderSkipped: false,
         },
@@ -724,7 +712,7 @@ function buildCompareChart() {
         legend: {
           display: true,
           position: 'top',
-          labels: { color: tickColor, font: { size: 11 }, boxWidth: 12 },
+          labels: { color: '#6b7280', font: { size: 11 }, boxWidth: 12 },
         },
         tooltip: {
           callbacks: {
@@ -777,20 +765,22 @@ function alignClass(align) {
 function statusClass(status) {
   return {
     success: ['COMPLETED', 'PAID'].includes(status),
-    warning: ['PENDING', 'Sắp hết hàng'].includes(status),
-    info: ['SHIPPING', 'CONFIRMED'].includes(status),
-    danger: ['Hết hàng', 'UNPAID'].includes(status),
+    warning: ['PENDING', 'PROCESSING', 'Sắp hết hàng'].includes(status),
+    info:    ['SHIPPING', 'CONFIRMED'].includes(status),
+    danger:  ['CANCELLED', 'Hết hàng', 'UNPAID'].includes(status),
   }
 }
 
 const statusLabels = {
-  PAID: 'Đã thanh toán',
-  UNPAID: 'Chưa thanh toán',
-  PENDING: 'Chờ xử lý',
-  CONFIRMED: 'Đã xác nhận',
-  SHIPPING: 'Đang giao hàng',
-  COMPLETED: 'Hoàn thành',
-  'Hết hàng': 'Hết hàng',
+  PENDING:    'Chờ xử lý',
+  CONFIRMED:  'Đã xác nhận',
+  SHIPPING:   'Đang giao hàng',
+  COMPLETED:  'Hoàn thành',
+  CANCELLED:  'Đã hủy',
+  PROCESSING: 'Đang xử lý',
+  PAID:       'Đã thanh toán',
+  UNPAID:     'Chưa thanh toán',
+  'Hết hàng':     'Hết hàng',
   'Sắp hết hàng': 'Sắp hết hàng',
 }
 
@@ -806,22 +796,24 @@ function resetFilters() {
 }
 
 // ====== API ======
-async function fetchDashboardData() {
+async function fetchDashboardData(period = 'month') {
   loading.value = true
   errorMsg.value = ''
   try {
     const [
       dailyRes, monthlyRes, weekdayRes, brandRes,
       recentOrdersRes, topProductsRes, lowStockRes, topCustomersRes,
+      compareRes,
     ] = await Promise.all([
-      statisticsApi.getRevenueByDay(),
+      statisticsApi.getRevenueByDay(period),
       statisticsApi.getRevenueByMonth(),
-      statisticsApi.getOrdersByWeekday(),
-      statisticsApi.getRevenueByBrand(),
-      statisticsApi.getRecentOrders(10),
-      statisticsApi.getTopProducts(10),
+      statisticsApi.getOrdersByWeekday(period),
+      statisticsApi.getRevenueByBrand(period),
+      statisticsApi.getRecentOrders(10, period),
+      statisticsApi.getTopProducts(10, period),
       statisticsApi.getLowStockProducts(),
-      statisticsApi.getTopCustomers(10),
+      statisticsApi.getTopCustomers(10, period),
+      statisticsApi.getRevenueCompare(period),
     ])
 
     dailyStats.value = dailyRes.data.data
@@ -832,6 +824,7 @@ async function fetchDashboardData() {
     topProductsData.value = topProductsRes.data.data
     lowStockData.value = lowStockRes.data.data
     topCustomersData.value = topCustomersRes.data.data
+    compareData.value = compareRes.data.data
 
     buildAllCharts()
   } catch (err) {
@@ -840,6 +833,4 @@ async function fetchDashboardData() {
     loading.value = false
   }
 }
-
-onMounted(fetchDashboardData)
 </script>
