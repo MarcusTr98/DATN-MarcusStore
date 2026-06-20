@@ -53,6 +53,7 @@ public class ProductImgServiceImpl implements ProductImgService {
     }
 
     @Override
+    @Transactional
     public ProductImgResponse createProductImg(Integer productId, MultipartFile file, ProductImgRequest imgRequest) {
         Product product = productRepo.findById(productId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với id: " + productId));
@@ -64,22 +65,29 @@ public class ProductImgServiceImpl implements ProductImgService {
             throw new RuntimeException("Upload ảnh thất bại");
         }
 
+        List<ProductImage> images = imgRepo.findByProduct_ProductId(productId);
+
         if (Boolean.TRUE.equals(imgRequest.getIsPrimary())) {
-            List<ProductImage> images = imgRepo.findByProduct_ProductId(productId);
             images.forEach(img -> img.setIsPrimary(false));
             imgRepo.saveAll(images);
+
+            product.setThumbnailUrl(imageUrl);
+            productRepo.save(product);
         }
+
+        int displayOrder = images.size() + 1;
 
         ProductImage productImage = new ProductImage();
         productImage.setImageUrl(imageUrl);
         productImage.setIsPrimary(imgRequest.getIsPrimary() != null ? imgRequest.getIsPrimary() : false);
-        productImage.setDisplayOrder(imgRequest.getDisplayOrder() != null ? imgRequest.getDisplayOrder() : 0);
+        productImage.setDisplayOrder(displayOrder);
         productImage.setProduct(product);
 
         return toImgResponse(imgRepo.save(productImage));
     }
 
     @Override
+    @Transactional
     public ProductImgResponse updateProductImg(MultipartFile file, ProductImgRequest imgRequest, Integer id) {
         ProductImage productImage = imgRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với id: " + id));
@@ -103,6 +111,10 @@ public class ProductImgServiceImpl implements ProductImgService {
                 List<ProductImage> images = imgRepo.findByProduct_ProductId(productImage.getProduct().getProductId());
                 images.forEach(img -> img.setIsPrimary(false));
                 imgRepo.saveAll(images);
+
+                Product product = productImage.getProduct();
+                product.setThumbnailUrl(productImage.getImageUrl());
+                productRepo.save(product);
             }
             productImage.setIsPrimary(imgRequest.getIsPrimary());
         }

@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -147,11 +148,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderDetailResponse getOrderDetailResponse(String orderCode) {
         // Lấy chi tiết đơn hàng theo mã đơn hàng
         Order order = orderRepository.findDetailByOrderCode(orderCode).orElseThrow(() ->
                 new RuntimeException("không tìm thấy đơn hàng "));
+        if (ensureTrackingCodeForShipping(order)) {
+            orderRepository.saveAndFlush(order);
+        }
         orderItemRepository.findWithProductItemsByOrderId(order.getOrderId());
         // lấy trạng thái lịch sử đơn hàng
         List<OrderStatusHistory> histories =
@@ -266,6 +270,26 @@ public class OrderServiceImpl implements OrderService {
         };
     }
 
+    private String generateTrackingCode(Order order) {
+        String randomPart = UUID.randomUUID().toString()
+                .replace("-", "")
+                .substring(0, 10)
+                .toUpperCase();
+        return "GHN" + randomPart;
+    }
+
+    private boolean ensureTrackingCodeForShipping(Order order) {
+        boolean isShipping = "SHIPPING".equals(normalizeStatusValue(order.getOrderStatus()));
+        boolean missingTrackingCode = order.getTrackingCode() == null || order.getTrackingCode().isBlank();
+
+        if (isShipping && missingTrackingCode) {
+            order.setTrackingCode(generateTrackingCode(order));
+            return true;
+        }
+
+        return false;
+    }
+
     private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
         Integer currentUserId = SecurityUtils.getCurrentUserId();
         User currentUser = userRepository.getReferenceById(currentUserId);
@@ -303,6 +327,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setOrderStatus(newStatus);
+        ensureTrackingCodeForShipping(order);
         orderRepository.save(order);
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
@@ -319,5 +344,24 @@ public class OrderServiceImpl implements OrderService {
 
         order.setIsHidden(true);
         orderRepository.save(order);
+    }
+    // lấy danh sách đơn hàng của user theo ID
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getUserOrder() {
+        Integer userId = SecurityUtils.getCurrentUserId();
+        return orderRepository.findByUserUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public OrderDetailResponse getUserOrderDetail(String orderCode) {
+        Integer userId = SecurityUtils.getCurrentUserId();
+        orderRepository.findByOrderCodeAndUserUserId(orderCode, userId).orElseThrow(() ->
+                new RuntimeException("không tìm thấy đơn hàng theo yêu cầu"));
+        return getOrderDetailResponse(orderCode);
     }
 }

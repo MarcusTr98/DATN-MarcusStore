@@ -85,7 +85,7 @@ onUnmounted(() => {
               <span>Hệ thống cửa hàng</span>
             </router-link>
             <span class="topbar-divider">|</span>
-            <router-link to="/theo-doi-don-hang" class="topbar-item topbar-link">
+            <router-link to="/profile/orders" class="topbar-item topbar-link">
               <i class="fas fa-truck"></i>
               <span>Theo dõi đơn hàng</span>
             </router-link>

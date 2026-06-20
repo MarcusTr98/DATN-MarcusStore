@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.repository.shopping;
 
+import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.entity.shopping.Order;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -170,4 +171,5 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             """)
     Optional<Order> findDetailByOrderCode(@Param("orderCode") String orderCode);
 
+    Optional<Order> findByOrderCodeAndUserUserId(String OrderCode, Integer userId);
 }
