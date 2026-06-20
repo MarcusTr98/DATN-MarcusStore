@@ -56,7 +56,8 @@ public class HomeProductService {
                         Pageable pageable) {
 
                 Page<HomeProductRawProjection> rawPage = homeRepo.findHomeProductRawData(
-                                sortBy, brandCategoryId, parentCategoryId, minPrice, maxPrice, valueIdsCsv, brandIdsCsv, pageable);
+                                sortBy, brandCategoryId, parentCategoryId, minPrice, maxPrice, valueIdsCsv, brandIdsCsv,
+                                pageable);
 
                 if (rawPage.isEmpty()) {
                         return Page.empty(pageable);

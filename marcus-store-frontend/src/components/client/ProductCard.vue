@@ -21,6 +21,16 @@
           >
             ✕
           </button>
+          <!-- Nút x reset filter: chỉ hiện khi đang áp dụng filter (giữ nguyên brand) -->
+          <button
+            v-if="getActiveFilterCount(block) > 0"
+            type="button"
+            class="reset-btn"
+            title="Xóa hết lọc, về danh sách ban đầu"
+            @click="resetFilterAndBrand(block)"
+          >
+            ✕
+          </button>
         </div>
 
         <div class="sort-options">
@@ -38,10 +48,15 @@
         </div>
       </div>
 
-      <!-- Brand bar: luôn hiện (ít nhất có nút Lọc), thêm logo hãng nếu có -->
+      <!-- Brand bar: ẩn logo brand khi filter active (vẫn hiện nút Lọc); ẩn nút Lọc khi đang chọn brand -->
       <div class="brand-grid mb-3">
-        <!-- Nút Lọc: phần tử grid đầu tiên -->
-        <button type="button" class="filter-btn" @click="openFilter(block)">
+        <!-- Nút Lọc: chỉ ẩn khi đang chọn brand để tránh lọc đè brand -->
+        <button
+          v-if="block.selectedBrandId == null"
+          type="button"
+          class="filter-btn"
+          @click="openFilter(block)"
+        >
           <i class="fa-solid fa-sliders"></i>
           Lọc
           <span v-if="getActiveFilterCount(block) > 0" class="filter-badge">
@@ -49,17 +64,19 @@
           </span>
         </button>
 
-        <!-- Logo các hãng con (nếu có) -->
-        <button
-          v-for="brand in block.brands"
-          :key="brand.categoryId"
-          type="button"
-          class="brand-item"
-          :class="{ active: block.selectedBrandId === brand.categoryId }"
-          @click="onBrandClick(block, brand)"
-        >
-          <img :src="brand.categoryImg" :alt="brand.categoryName" class="brand-logo" />
-        </button>
+        <!-- Logo các hãng con: ẩn khi filter active -->
+        <template v-if="getActiveFilterCount(block) === 0">
+          <button
+            v-for="brand in block.brands"
+            :key="brand.categoryId"
+            type="button"
+            class="brand-item"
+            :class="{ active: block.selectedBrandId === brand.categoryId }"
+            @click="onBrandClick(block, brand)"
+          >
+            <img :src="brand.categoryImg" :alt="brand.categoryName" class="brand-logo" />
+          </button>
+        </template>
       </div>
 
       <!-- Loading state -->
@@ -141,7 +158,7 @@
                   {{ spec }}
                 </span>
               </div>
-
+                           
               <!-- Khuyến mãi / ưu đãi (sửa nội dung trong PromotionCard.vue) -->
               <VoucherCard />
 
@@ -190,6 +207,15 @@
     @close="filterModal.visible = false"
     @apply="onFilterApply"
   />
+
+  <!-- Notification Modal -->
+  <BaseModal
+    :visible="notifyModal.visible"
+    :type="notifyModal.type"
+    :title="notifyModal.title"
+    :message="notifyModal.message"
+    @close="notifyModal.visible = false"
+  />
 </template>
 
 <script setup>
@@ -197,6 +223,8 @@ import { ref, reactive, onMounted, watch } from 'vue'
 import api from '@/utils/api'
 import FilterModal from '@/layouts/home/FilterModal.vue'
 import VoucherCard from '@/layouts/home/VoucherCard.vue'
+import { useCartStore } from '@/stores/cartStore'
+import BaseModal from '@/components/BaseModal.vue'
 
 const props = defineProps({
   mode: {
@@ -236,11 +264,9 @@ function openFilter(block) {
 }
 
 function getActiveFilterCount(block) {
-  return (
-    (block.selectedMinPrice != null || block.selectedMaxPrice != null ? 1 : 0) +
-    (block.selectedValueIds?.length ?? 0) +
-    (block.selectedBrandIds?.length ?? 0)
-  )
+  return (block.selectedMinPrice != null || block.selectedMaxPrice != null ? 1 : 0)
+    + (block.selectedValueIds?.length ?? 0)
+    + (block.selectedBrandIds?.length ?? 0)
 }
 
 function onFilterApply({ brandIds, minPrice, maxPrice, valueIds }) {
@@ -305,10 +331,7 @@ async function fetchBrands(block) {
   try {
     const res = await api.get(`/client/categories/${block.categoryId}/children`)
     block.brands = res.data?.data ?? []
-    console.log(
-      `[brand] cate=${block.categoryName} (id=${block.categoryId}) -> ${block.brands.length} brands`,
-      block.brands,
-    )
+    console.log(`[brand] cate=${block.categoryName} (id=${block.categoryId}) -> ${block.brands.length} brands`, block.brands)
   } catch (err) {
     console.error('Lỗi khi tải danh sách hãng:', err)
     block.brands = []
@@ -329,6 +352,19 @@ function onBrandClick(block, brand) {
 }
 
 function resetBrand(block) {
+  block.selectedBrandId = null
+  block.selectedBrandName = null
+  block.sectionTitle = 'Sắp xếp theo'
+  block.page = 0
+  fetchProducts(block)
+}
+
+// Reset cả filter lẫn brand: về trạng thái mặc định (danh sách SP ban đầu)
+function resetFilterAndBrand(block) {
+  block.selectedBrandIds = []
+  block.selectedMinPrice = null
+  block.selectedMaxPrice = null
+  block.selectedValueIds = []
   block.selectedBrandId = null
   block.selectedBrandName = null
   block.sectionTitle = 'Sắp xếp theo'
@@ -474,10 +510,35 @@ function toggleWishlist(productId) {
   // TODO: nối API wishlist sau (POST/DELETE /api/wishlist/:productId)
 }
 
-// ---- ADD TO CART (chỉ FE, chưa nối BE) ----
-function addToCart(product) {
-  // TODO: nối API giỏ hàng sau (POST /api/cart/items { skuId: product.skuId, quantity: 1 })
-  console.log('Thêm vào giỏ:', product.productName)
+// ---- ADD TO CART (gọi cartStore + cartApi, backend đã sẵn sàng) ----
+const cartStore = useCartStore()
+
+const notifyModal = reactive({
+  visible: false,
+  type: 'info', // 'success' | 'error' | 'info'
+  title: 'Thông báo',
+  message: '',
+})
+
+function showNotify(type, title, message) {
+  notifyModal.type = type
+  notifyModal.title = title
+  notifyModal.message = message
+  notifyModal.visible = true
+}
+
+async function addToCart(product) {
+  if (!product?.skuId) {
+    console.warn('Sản phẩm không có skuId, bỏ qua:', product)
+    return
+  }
+
+  const ok = await cartStore.addToCart(product.skuId, 1)
+  if (ok) {
+    showNotify('success', 'Thêm vào giỏ hàng', `Đã thêm "${product.productName}" vào giỏ hàng`)
+  } else {
+    showNotify('error', 'Thêm thất bại', cartStore.error || 'Thêm vào giỏ hàng thất bại')
+  }
 }
 
 // ---- UTILS ----
@@ -713,7 +774,7 @@ function formatPrice(value) {
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  margin: 0 0 4px;
+  margin: 0 0 8px;
 }
 
 .card-price {
@@ -825,9 +886,7 @@ function formatPrice(value) {
   font-weight: 600;
   color: #d70018;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .load-more-btn:hover:not(:disabled) {

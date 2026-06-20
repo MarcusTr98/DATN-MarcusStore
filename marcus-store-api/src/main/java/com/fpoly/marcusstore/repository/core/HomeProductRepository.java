@@ -33,22 +33,42 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
             ) sku ON sku.product_id = p.product_id AND sku.rn = 1
             WHERE p.status = 1
               AND (
-                  :brandCategoryId IS NOT NULL AND p.category_id = :brandCategoryId
-                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NULL AND (
-                      :brandIdsCsv IS NULL OR :brandIdsCsv = ''
-                      OR p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
-                  )
-                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NOT NULL AND (
-                      p.category_id = :parentCategoryId
+                  :brandCategoryId IS NOT NULL AND (
+                      p.category_id = :brandCategoryId
                       OR p.category_id IN (
-                          SELECT child.category_id FROM Categories child WHERE child.parent_id = :parentCategoryId
+                          SELECT child.category_id FROM Categories child WHERE child.parent_id = :brandCategoryId
                       )
-                      OR :brandIdsCsv IS NOT NULL AND :brandIdsCsv != ''
-                         AND p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                  )
+                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NULL AND :brandIdsCsv IS NOT NULL AND :brandIdsCsv != ''
+                     AND (
+                         p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                         OR p.category_id IN (
+                             SELECT child.category_id FROM Categories child
+                             WHERE child.parent_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                         )
+                     )
+                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NULL AND (:brandIdsCsv IS NULL OR :brandIdsCsv = '')
+                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NOT NULL AND (
+                      (:brandIdsCsv IS NULL OR :brandIdsCsv = '') AND (
+                          p.category_id = :parentCategoryId
+                          OR p.category_id IN (
+                              SELECT child.category_id FROM Categories child WHERE child.parent_id = :parentCategoryId
+                          )
+                      )
+                      OR (:brandIdsCsv IS NOT NULL AND :brandIdsCsv != '') AND (
+                          p.category_id IN (
+                              SELECT child.category_id FROM Categories child
+                              WHERE child.parent_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                          )
+                          OR p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                      )
                   )
                   OR :brandCategoryId IS NOT NULL AND :brandIdsCsv IS NOT NULL AND :brandIdsCsv != ''
                      AND p.category_id IN (
                          SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ',')
+                         UNION
+                         SELECT child.category_id FROM Categories child
+                         WHERE child.parent_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
                          UNION
                          SELECT :brandCategoryId
                      )
@@ -57,12 +77,30 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
               AND (:maxPrice IS NULL OR sku.price <= :maxPrice OR :maxPrice = -1)
               AND (
                   :valueIdsCsv IS NULL OR :valueIdsCsv = ''
-                  OR (
-                      SELECT COUNT(DISTINCT sav.value_id)
-                      FROM Sku_Attribute_Values sav
-                      WHERE sav.sku_id = sku.sku_id
-                        AND sav.value_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:valueIdsCsv, ','))
-                  ) = (SELECT COUNT(*) FROM STRING_SPLIT(:valueIdsCsv, ','))
+                  OR NOT EXISTS (
+                      SELECT 1
+                      FROM (
+                          SELECT av_inner.attribute_id AS aid
+                          FROM Attribute_Values av_inner
+                          WHERE av_inner.value_id IN (
+                              SELECT CAST(value AS INT) FROM STRING_SPLIT(:valueIdsCsv, ',')
+                          )
+                          GROUP BY av_inner.attribute_id
+                      ) req_attr
+                      WHERE NOT EXISTS (
+                          SELECT 1
+                          FROM Product_Skus ps
+                          JOIN Sku_Attribute_Values sav2 ON sav2.sku_id = ps.sku_id
+                          WHERE ps.product_id = p.product_id
+                            AND ps.is_active = 1
+                            AND sav2.value_id IN (
+                                SELECT CAST(value AS INT) FROM STRING_SPLIT(:valueIdsCsv, ',')
+                            )
+                            AND sav2.value_id IN (
+                                SELECT av2.value_id FROM Attribute_Values av2 WHERE av2.attribute_id = req_attr.aid
+                            )
+                      )
+                  )
               )
             ORDER BY
                 CASE WHEN :sortBy = 'price_asc'  THEN sku.price END ASC,
@@ -84,22 +122,42 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
             ) sku ON sku.product_id = p.product_id AND sku.rn = 1
             WHERE p.status = 1
               AND (
-                  :brandCategoryId IS NOT NULL AND p.category_id = :brandCategoryId
-                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NULL AND (
-                      :brandIdsCsv IS NULL OR :brandIdsCsv = ''
-                      OR p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
-                  )
-                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NOT NULL AND (
-                      p.category_id = :parentCategoryId
+                  :brandCategoryId IS NOT NULL AND (
+                      p.category_id = :brandCategoryId
                       OR p.category_id IN (
-                          SELECT child.category_id FROM Categories child WHERE child.parent_id = :parentCategoryId
+                          SELECT child.category_id FROM Categories child WHERE child.parent_id = :brandCategoryId
                       )
-                      OR :brandIdsCsv IS NOT NULL AND :brandIdsCsv != ''
-                         AND p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                  )
+                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NULL AND :brandIdsCsv IS NOT NULL AND :brandIdsCsv != ''
+                     AND (
+                         p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                         OR p.category_id IN (
+                             SELECT child.category_id FROM Categories child
+                             WHERE child.parent_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                         )
+                     )
+                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NULL AND (:brandIdsCsv IS NULL OR :brandIdsCsv = '')
+                  OR :brandCategoryId IS NULL AND :parentCategoryId IS NOT NULL AND (
+                      (:brandIdsCsv IS NULL OR :brandIdsCsv = '') AND (
+                          p.category_id = :parentCategoryId
+                          OR p.category_id IN (
+                              SELECT child.category_id FROM Categories child WHERE child.parent_id = :parentCategoryId
+                          )
+                      )
+                      OR (:brandIdsCsv IS NOT NULL AND :brandIdsCsv != '') AND (
+                          p.category_id IN (
+                              SELECT child.category_id FROM Categories child
+                              WHERE child.parent_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                          )
+                          OR p.category_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
+                      )
                   )
                   OR :brandCategoryId IS NOT NULL AND :brandIdsCsv IS NOT NULL AND :brandIdsCsv != ''
                      AND p.category_id IN (
                          SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ',')
+                         UNION
+                         SELECT child.category_id FROM Categories child
+                         WHERE child.parent_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:brandIdsCsv, ','))
                          UNION
                          SELECT :brandCategoryId
                      )
@@ -108,12 +166,30 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
               AND (:maxPrice IS NULL OR sku.price <= :maxPrice OR :maxPrice = -1)
               AND (
                   :valueIdsCsv IS NULL OR :valueIdsCsv = ''
-                  OR (
-                      SELECT COUNT(DISTINCT sav.value_id)
-                      FROM Sku_Attribute_Values sav
-                      WHERE sav.sku_id = sku.sku_id
-                        AND sav.value_id IN (SELECT CAST(value AS INT) FROM STRING_SPLIT(:valueIdsCsv, ','))
-                  ) = (SELECT COUNT(*) FROM STRING_SPLIT(:valueIdsCsv, ','))
+                  OR NOT EXISTS (
+                      SELECT 1
+                      FROM (
+                          SELECT av_inner.attribute_id AS aid
+                          FROM Attribute_Values av_inner
+                          WHERE av_inner.value_id IN (
+                              SELECT CAST(value AS INT) FROM STRING_SPLIT(:valueIdsCsv, ',')
+                          )
+                          GROUP BY av_inner.attribute_id
+                      ) req_attr
+                      WHERE NOT EXISTS (
+                          SELECT 1
+                          FROM Product_Skus ps
+                          JOIN Sku_Attribute_Values sav2 ON sav2.sku_id = ps.sku_id
+                          WHERE ps.product_id = p.product_id
+                            AND ps.is_active = 1
+                            AND sav2.value_id IN (
+                                SELECT CAST(value AS INT) FROM STRING_SPLIT(:valueIdsCsv, ',')
+                            )
+                            AND sav2.value_id IN (
+                                SELECT av2.value_id FROM Attribute_Values av2 WHERE av2.attribute_id = req_attr.aid
+                            )
+                      )
+                  )
               )
             """, nativeQuery = true)
     Page<HomeProductRawProjection> findHomeProductRawData(
