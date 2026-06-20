@@ -72,6 +72,11 @@ const routes = [
         name: 'Policy',
         component: () => import('@/views/client/cms/Policy.vue'),
       },
+      {
+        path: 'contact-store',
+        name: 'Contact',
+        component: () => import('@/views/client/shop/Contact.vue'),
+      },
 
       //PROFILE
       {
@@ -103,11 +108,11 @@ const routes = [
             name: 'Wishlist',
             component: () => import('@/views/client/account/Wishlist.vue'),
           },
-                {
-      path: "/change-password",
-      name: "change-password",
-      component: () => import("@/views/client/account/ChangePassword.vue")
-      }
+          {
+            path: '/change-password',
+            name: 'change-password',
+            component: () => import('@/views/client/account/ChangePassword.vue'),
+          },
         ],
       },
     ],
@@ -221,11 +226,7 @@ router.beforeEach((to) => {
   const isAdminOrStaff = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_STAFF')
 
   // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào admin
-  if (
-    token &&
-    isAdminOrStaff &&
-    (to.path === '/' || to.path.startsWith('/auth/login'))
-  ) {
+  if (token && isAdminOrStaff && (to.path === '/' || to.path.startsWith('/auth/login'))) {
     return '/admin/dashboard'
   }
 

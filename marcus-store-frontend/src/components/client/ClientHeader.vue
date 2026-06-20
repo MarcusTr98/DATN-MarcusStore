@@ -89,9 +89,9 @@ onUnmounted(() => {
               >
             </a>
             <span class="topbar-divider">|</span>
-            <router-link to="/he-thong-cua-hang" class="topbar-item topbar-link">
+            <router-link to="/contact-store" class="topbar-item topbar-link">
               <i class="fas fa-map-marker-alt"></i>
-              <span>Hệ thống cửa hàng</span>
+              <span>Liên hệ cửa hàng</span>
             </router-link>
             <span class="topbar-divider">|</span>
             <router-link to="/theo-doi-don-hang" class="topbar-item topbar-link">
@@ -257,7 +257,7 @@ onUnmounted(() => {
       </div>
     </nav>
   </header>
-    <BaseModal
+  <BaseModal
     :visible="showLogoutModal"
     type="confirm"
     title="Đăng xuất"
