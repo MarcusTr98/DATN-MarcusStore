@@ -55,7 +55,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/public/**").permitAll() // Đức, Đạt, Huy: Lấy SP Home, Banner, Bài
                         // viết SEO
                         .requestMatchers("/api/vnpay/**").permitAll() // Marcus test môi trường Ngrok webhook Vnpay
-
+                        .requestMatchers("/ws-endpoint/**").permitAll() // Marcus thêm để làm websocket
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập
                         .requestMatchers("/api/user/**").authenticated() // Đạt, Đức: Checkout, Giỏ hàng, Wishlist, Đgiá
 
