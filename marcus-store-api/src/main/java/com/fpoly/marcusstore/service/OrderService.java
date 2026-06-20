@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderService {
     // Lấy dữ liệu theo keyword, phương thức thanh toán và trạng thái đơn hàng
@@ -19,4 +20,7 @@ public interface OrderService {
     OrderDetailResponse getOrderDetailResponse(String orderCode);
     OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request);
     void hideOrder(String orderCode);
+     List<OrderResponse> getUserOrder();
+     OrderDetailResponse getUserOrderDetail(String orderCode);
+
 }

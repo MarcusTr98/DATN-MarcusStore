@@ -8,7 +8,9 @@
           <span>{{ orderDetail?.orderCode || 'Không tìm thấy' }}</span>
         </div>
         <h3>Chi tiết đơn hàng</h3>
-        <p v-if="orderDetail">Đơn {{ orderDetail.orderCode }} - {{ getOrderStatusLabel(orderDetail.orderStatus) }}</p>
+        <p v-if="orderDetail">
+          Đơn {{ orderDetail.orderCode }} - {{ getOrderStatusLabel(orderDetail.orderStatus) }}
+        </p>
         <p v-else>Không tìm thấy dữ liệu cho đơn hàng này.</p>
       </div>
 
@@ -77,7 +79,10 @@
             <div class="section-header">
               <div>
                 <h4>Sản phẩm trong đơn</h4>
-                <p>{{ orderDetail.items?.length || 0 }} dòng sản phẩm, tổng {{ totalQuantity }} sản phẩm.</p>
+                <p>
+                  {{ orderDetail.items?.length || 0 }} dòng sản phẩm, tổng {{ totalQuantity }} sản
+                  phẩm.
+                </p>
               </div>
             </div>
             <div class="section-body">
@@ -99,24 +104,37 @@
                           <span class="product-thumb">📦</span>
                           <span>
                             <span class="main-line">{{ item.productName }}</span>
-
                           </span>
                         </div>
                       </td>
                       <td>{{ item.skuCode }}</td>
                       <td>{{ item.quantity }}</td>
-                      <td><span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span></td>
-                      <td><span class="money">{{ formatCurrency(item.lineTotal) }}</span></td>
+                      <td>
+                        <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
+                      </td>
+                      <td>
+                        <span class="money">{{ formatCurrency(item.lineTotal) }}</span>
+                      </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
               <div class="table-summary">
-                <div class="summary-row"><span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong></div>
-                <div class="summary-row"><span>Giảm giá</span><strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong></div>
-                <div class="summary-row"><span>Phí vận chuyển</span><strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong></div>
-                <div class="summary-row total"><span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong></div>
+                <div class="summary-row">
+                  <span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Giảm giá</span
+                  ><strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
+                </div>
+                <div class="summary-row">
+                  <span>Phí vận chuyển</span
+                  ><strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong>
+                </div>
+                <div class="summary-row total">
+                  <span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong>
+                </div>
               </div>
             </div>
           </section>
@@ -130,7 +148,11 @@
             </div>
             <div class="section-body">
               <div class="timeline">
-                <div v-for="item in orderHistory" :key="`${item.status}-${item.time}`" class="timeline-item">
+                <div
+                  v-for="item in orderHistory"
+                  :key="`${item.status}-${item.time}`"
+                  class="timeline-item"
+                >
                   <span class="timeline-dot">✓</span>
                   <div class="timeline-content">
                     <p class="timeline-title">
@@ -140,7 +162,9 @@
                         {{ getOrderStatusLabel(item.status) }}
                       </span>
                     </p>
-                    <p v-if="item.createdByName" class="timeline-note">Người thao tác: {{ item.createdByName }}</p>
+                    <p v-if="item.createdByName" class="timeline-note">
+                      Người thao tác: {{ item.createdByName }}
+                    </p>
                     <p v-if="item.note" class="timeline-note">Lý do: {{ item.note }}</p>
                     <p class="timeline-time">{{ formatDateTime(item.time) }}</p>
                   </div>
@@ -170,7 +194,12 @@
 
               <div class="form-group">
                 <label class="form-label" for="statusDropdown">Cập nhật trạng thái đơn hàng</label>
-                <select id="statusDropdown" v-model="selectedStatus" class="control" :disabled="!nextStatuses.length">
+                <select
+                  id="statusDropdown"
+                  v-model="selectedStatus"
+                  class="control"
+                  :disabled="!nextStatuses.length"
+                >
                   <option v-if="!nextStatuses.length" :value="orderDetail.orderStatus">
                     {{ getOrderStatusLabel(orderDetail.orderStatus) }}
                   </option>
@@ -210,10 +239,21 @@
             </div>
             <div class="section-body">
               <div class="mini-list">
-                <div class="mini-row"><span class="mini-label">Mã hóa đơn</span><span class="mini-value">{{ orderDetail.orderCode }}</span></div>
-                <div class="mini-row"><span class="mini-label">Hình thức vận chuyển</span><span class="mini-value">{{ orderDetail.trackingCode || '---' }}</span></div>
-                <div class="mini-row"><span class="mini-label">Phí ship</span><span class="mini-value">{{ formatCurrency(orderDetail.shippingFee) }}</span></div>
-                <div class="mini-row"><span class="mini-label">Ghi chú</span><span class="mini-value">{{ '---' }}</span></div>
+                <div class="mini-row">
+                  <span class="mini-label">Mã hóa đơn</span
+                  ><span class="mini-value">{{ orderDetail.orderCode }}</span>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Mã vận đơn</span
+                  ><span class="mini-value">{{ orderDetail.trackingCode || '---' }}</span>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Phí ship</span
+                  ><span class="mini-value">{{ formatCurrency(orderDetail.shippingFee) }}</span>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Ghi chú</span><span class="mini-value">{{ '---' }}</span>
+                </div>
               </div>
             </div>
           </section>
@@ -235,9 +275,22 @@
                     </span>
                   </span>
                 </div>
-                <div class="mini-row"><span class="mini-label">Phương thức</span><span class="mini-value">{{ getPaymentMethodLabel(orderDetail.paymentMethod) }}</span></div>
-                <div class="mini-row"><span class="mini-label">Mã giao dịch</span><span class="mini-value">{{ orderDetail.transactionId || '---' }}</span></div>
-                <div class="mini-row"><span class="mini-label">Thời gian thanh toán</span><span class="mini-value">{{ orderDetail.paidAt ? formatDateTime(orderDetail.paidAt) : '---' }}</span></div>
+                <div class="mini-row">
+                  <span class="mini-label">Phương thức</span
+                  ><span class="mini-value">{{
+                    getPaymentMethodLabel(orderDetail.paymentMethod)
+                  }}</span>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Mã giao dịch</span
+                  ><span class="mini-value">{{ orderDetail.transactionId || '---' }}</span>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Thời gian thanh toán</span
+                  ><span class="mini-value">{{
+                    orderDetail.paidAt ? formatDateTime(orderDetail.paidAt) : '---'
+                  }}</span>
+                </div>
               </div>
             </div>
           </section>
@@ -344,12 +397,12 @@ const nextStatuses = computed(() =>
   orderDetail.value ? allowedTransitions[orderDetail.value.orderStatus] || [] : [],
 )
 
-const subTotal = computed(() =>
-  orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0,
+const subTotal = computed(
+  () => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0,
 )
 
-const totalQuantity = computed(() =>
-  orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0,
+const totalQuantity = computed(
+  () => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0,
 )
 
 const finalAmount = computed(() => orderDetail.value?.finalAmount || 0)
@@ -358,12 +411,12 @@ const isStatusNoteRequired = computed(() => statusesRequiringNote.includes(selec
 
 const orderHistory = computed(() =>
   (orderDetail.value?.history || []).map((item) => ({
-      status: item.status,
-      title: item.title,
-      note: item.note,
-      createdByName: item.createdByName,
-      time: item.createdAt,
-    })),
+    status: item.status,
+    title: item.title,
+    note: item.note,
+    createdByName: item.createdByName,
+    time: item.createdAt,
+  })),
 )
 
 watch(
@@ -423,16 +476,23 @@ const saveStatusUpdate = async () => {
       return
     }
 
-    const response = await OrderDetailApi.updateStatusOrder(orderDetail.value.orderCode, {
+    const orderCode = orderDetail.value.orderCode
+    const response = await OrderDetailApi.updateStatusOrder(orderCode, {
       status: selectedStatus.value,
       note: statusNote.value.trim() || null,
     })
 
     orderDetail.value = response.data
+    await fetchGetDetailOrder(orderCode)
     statusNote.value = ''
-    showToast(`Đã cập nhật trạng thái đơn sang ${getOrderStatusLabel(orderDetail.value.orderStatus)}.`)
+    showToast(
+      `Đã cập nhật trạng thái đơn sang ${getOrderStatusLabel(orderDetail.value.orderStatus)}.`,
+    )
   } catch (e) {
-    const message = e.response?.data?.message || e.response?.data || 'Cập nhật trạng thái đơn hàng không thành công'
+    const message =
+      e.response?.data?.message ||
+      e.response?.data ||
+      'Cập nhật trạng thái đơn hàng không thành công'
     error.value = message
     showToast(message)
     console.error(e)
@@ -446,6 +506,4 @@ const printPage = () => {
 }
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>
