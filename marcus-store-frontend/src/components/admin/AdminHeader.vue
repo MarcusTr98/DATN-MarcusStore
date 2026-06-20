@@ -87,7 +87,7 @@ const connectWebSocket = () => {
     reconnectDelay: 5000,
     onConnect: () => {
       console.log('Đã kết nối WebSocket!')
-      // Lắng nghe kênh thông báo chung của Admin
+      // kênh thông báo chung của Admin
       stompClient.subscribe('/topic/admin/notifications', (message) => {
         const notifData = JSON.parse(message.body)
         handleNewNotification(notifData)
@@ -105,7 +105,6 @@ const handleNewNotification = (data) => {
   notifications.value.unshift({ ...data, isRead: false })
   unreadCount.value++
 
-  // Có thể gắn thêm tiếng "Ting" ở đây
   // const audio = new Audio('/ting.mp3'); audio.play();
 }
 

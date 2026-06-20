@@ -160,7 +160,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '@/utils/api'
 
-// --- Cấu hình Icon Leaflet ---
+//Cấu hình Icon Leaflet
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
@@ -236,7 +236,7 @@ const initMap = async (loc) => {
     .openPopup()
 }
 
-// --- Logic Form ---
+// Logic Form
 const showToast = (msg) => {
   toastMessage.value = msg
   setTimeout(() => {
@@ -247,18 +247,17 @@ const showToast = (msg) => {
 const submitContact = async () => {
   isSubmitting.value = true
   try {
-    // Chỗ này sau này ráp API thực tế: await api.post('/contact', form)
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // Giả lập call API 1s
+    await api.post('/public/contact', form)
 
     showToast('Cảm ơn bạn! Yêu cầu đã được gửi thành công.')
-    // Clear form
     form.name = ''
     form.phone = ''
     form.email = ''
     form.message = ''
   } catch (error) {
     console.error(error)
-    alert('Có lỗi xảy ra, vui lòng thử lại sau.')
+    const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại sau.'
+    alert(errorMsg)
   } finally {
     isSubmitting.value = false
   }
