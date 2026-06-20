@@ -1,167 +1,248 @@
 <template>
-  <div class="page-content">
-    <div class="page-heading">
-      <h3 class="page-title-text mb-4">Quản lý Biến thể Sản phẩm (SKUs)</h3>
+  <div class="page-wrapper">
+    <div class="page-header">
+      <div class="header-left">
+        <div class="header-icon-box">
+          <i class="fa-solid fa-tags"></i>
+        </div>
+        <div class="header-text-group">
+          <p class="breadcrumb-text">Sản phẩm</p>
+          <h1 class="page-title">
+            Quản lý Thuộc tính
+            <span class="page-badge"> <span class="page-badge-dot"></span>MASTER DATA </span>
+          </h1>
+          <p class="page-subtitle">Quản lý các thuộc tính và giá trị dùng để tạo biến thể SKU</p>
+        </div>
+      </div>
     </div>
 
-    <div class="row">
-      <div class="col-md-4">
-        <div class="card shadow-sm">
-          <div class="card-header bg-white py-3">
-            <h6 class="m-0 font-weight-bold text-primary">1. Thiết lập Thuộc tính</h6>
+    <div class="manage-grid">
+      <!-- ───────── CỘT TRÁI: THIẾT LẬP THUỘC TÍNH ───────── -->
+      <div class="card config-card">
+        <div class="card-header-row no-pointer">
+          <div class="card-title-group">
+            <span class="step-badge">01</span>
+            <div>
+              <h3 class="card-title">Thiết lập Thuộc tính</h3>
+              <p class="card-subtitle">Chọn sản phẩm gốc và khai báo thuộc tính biến thể</p>
+            </div>
           </div>
-          <div class="card-body">
-            <div class="form-group mb-3">
-              <label class="fw-bold mb-2">Chọn Sản Phẩm Gốc:</label>
-              <select v-model="selectedProductId" class="form-select">
-                <option value="" disabled>-- Chọn sản phẩm --</option>
-                <option v-for="p in products" :key="p.id" :value="p.id">
-                  {{ p.name }}
-                </option>
-              </select>
+        </div>
+
+        <div class="card-body">
+          <div class="field-group">
+            <label class="field-label">Sản phẩm gốc</label>
+            <select v-model="selectedProductId" class="status-select full-width">
+              <option value="" disabled>-- Chọn sản phẩm --</option>
+              <option v-for="p in products" :key="p.id" :value="p.id">
+                {{ p.name }}
+              </option>
+            </select>
+          </div>
+
+          <p class="hint-text">Thêm các thuộc tính như Màu sắc, Bộ nhớ...</p>
+
+          <div v-for="(opt, index) in options" :key="index" class="option-block">
+            <div class="option-block-header">
+              <span class="option-block-title">Thuộc tính {{ index + 1 }}</span>
+              <button class="btn-row-del" @click="removeOption(index)" title="Xóa thuộc tính này">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <path
+                    d="M2 3.5h9M5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M4 3.5l.667 7h3.666L9 3.5H4z"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </button>
             </div>
+            <input
+              v-model="opt.name"
+              placeholder="Tên (VD: Màu sắc)"
+              class="table-input option-input"
+            />
+            <input
+              v-model="opt.rawValues"
+              placeholder="Giá trị (VD: Đỏ, Xanh, Đen)"
+              class="table-input option-input"
+            />
+          </div>
 
-            <hr />
-            <p class="text-muted small">Thêm các thuộc tính như Màu sắc, Bộ nhớ...</p>
+          <button class="btn-cancel full-width" @click="addOption">+ Thêm Thuộc Tính</button>
 
-            <div
-              v-for="(opt, index) in options"
-              :key="index"
-              class="border p-3 rounded mb-3 bg-light"
-            >
-              <div class="d-flex justify-content-between mb-2">
-                <label class="fw-bold">Thuộc tính {{ index + 1 }}</label>
-                <button class="btn btn-sm btn-danger" @click="removeOption(index)">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </div>
-              <input v-model="opt.name" placeholder="Tên (VD: Màu sắc)" class="form-control mb-2" />
-              <input
-                v-model="opt.rawValues"
-                placeholder="Giá trị (VD: Đỏ, Xanh, Đen)"
-                class="form-control"
-              />
-            </div>
-
-            <button class="btn btn-outline-primary w-100 mb-2" @click="addOption">
-              <i class="bi bi-plus"></i> Thêm Thuộc Tính
-            </button>
+          <div class="card-footer-row column-footer">
             <button
-              class="btn btn-success w-100"
+              class="btn-primary full-width"
               :disabled="!selectedProductId || options.length === 0"
               @click="generateVariants"
             >
-              <i class="bi bi-magic"></i> Tạo Ma Trận SKU
+              Tạo Ma Trận SKU →
             </button>
           </div>
         </div>
       </div>
 
-      <div class="col-md-8">
-        <div class="card shadow-sm">
-          <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">2. Danh sách SKUs Sinh Ra</h6>
-            <button
-              v-if="generatedSkus.length > 0"
-              class="btn btn-primary btn-sm"
-              @click="saveAllSkus"
-            >
-              <i class="bi bi-cloud-arrow-up"></i> Lưu toàn bộ SKU lên DB
-            </button>
+      <!-- ───────── CỘT PHẢI: DANH SÁCH SKU SINH RA ───────── -->
+      <div class="card results-card">
+        <div class="card-header-row no-pointer">
+          <div class="card-title-group">
+            <span class="step-badge">02</span>
+            <div>
+              <h3 class="card-title">
+                Danh sách SKU sinh ra
+                <span v-if="generatedSkus.length" class="count-pill"
+                  >{{ generatedSkus.length }} biến thể</span
+                >
+              </h3>
+              <p class="card-subtitle">Điền giá bán, tồn kho và chỉnh sửa mã SKU trước khi lưu</p>
+            </div>
+          </div>
+          <button
+            v-if="generatedSkus.length > 0"
+            class="btn-primary btn-save"
+            :disabled="isSaving"
+            @click="saveAllSkus"
+          >
+            <span v-if="isSaving" class="spinner"></span>
+            {{ isSaving ? 'Đang lưu...' : 'Lưu toàn bộ SKU lên DB' }}
+          </button>
+        </div>
+
+        <div class="card-body" v-if="generatedSkus.length === 0">
+          <div class="empty-state">
+            <p>Vui lòng thiết lập thuộc tính và bấm "Tạo Ma Trận SKU"</p>
+          </div>
+        </div>
+
+        <div class="card-body no-pad-top" v-else>
+          <div class="bulk-bar">
+            <div class="bulk-bar-label">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path
+                  d="M7 1.5L8.8 5.1l4 .6-2.9 2.8.7 3.9L7 10.5l-3.6 1.9.7-3.9L1.2 5.7l4-.6L7 1.5z"
+                  fill="#f472b6"
+                />
+              </svg>
+              Áp dụng hàng loạt
+            </div>
+            <div class="bulk-inputs">
+              <div class="bulk-field">
+                <label>Giá thấp nhất (₫)</label>
+                <input
+                  v-model="bulkPrice"
+                  type="number"
+                  placeholder="VD: 25000000"
+                  class="bulk-input"
+                />
+              </div>
+              <div class="bulk-field">
+                <label>Tồn kho chung</label>
+                <input v-model="bulkStock" type="number" placeholder="VD: 100" class="bulk-input" />
+              </div>
+              <button class="btn-bulk-apply" @click="applyBulkSettings">Áp dụng tất cả</button>
+            </div>
+            <small class="bulk-note">
+              * Sẽ ghi đè giá và tồn kho cho toàn bộ {{ generatedSkus.length }} biến thể bên dưới.
+            </small>
           </div>
 
-          <div class="card-body p-0">
-            <div v-if="generatedSkus.length === 0" class="text-center text-muted p-5">
-              Vui lòng thiết lập thuộc tính và bấm "Tạo Ma Trận SKU"
-            </div>
-
-            <template v-if="generatedSkus.length > 0">
-              <div class="bg-light border-bottom p-3">
-                <div class="row align-items-end g-2">
-                  <div class="col-md-4">
-                    <label class="form-label fw-bold text-sm mb-1">Giá thấp nhất (₫)</label>
+          <div class="sku-table-wrapper">
+            <table class="sku-table">
+              <thead>
+                <tr>
+                  <th class="th-variant">Biến thể</th>
+                  <th class="th-sku">Mã SKU</th>
+                  <th class="th-price">Giá bán (₫)</th>
+                  <th class="th-stock">Tồn kho</th>
+                  <th class="th-del"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(sku, index) in generatedSkus" :key="index" class="sku-row">
+                  <td>
+                    <div class="variant-name-cell">
+                      <div class="variant-dots">
+                        <span
+                          v-for="(val, vi) in sku.comboValues"
+                          :key="vi"
+                          class="variant-dot"
+                          :style="getColorStyle(val)"
+                          :title="val"
+                        ></span>
+                      </div>
+                      <span class="variant-label">{{ sku.variantName }}</span>
+                    </div>
+                  </td>
+                  <td>
                     <input
-                      v-model="bulkPrice"
-                      type="number"
-                      class="form-control form-control-sm"
-                      placeholder="VD: 25000000"
+                      v-model="sku.skuCode"
+                      class="table-input mono"
+                      placeholder="VD: IPH-RED-128"
                     />
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label fw-bold text-sm mb-1">Tồn kho chung</label>
+                  </td>
+                  <td>
                     <input
-                      v-model="bulkStock"
+                      v-model="sku.price"
                       type="number"
-                      class="form-control form-control-sm"
-                      placeholder="VD: 100"
+                      class="table-input"
+                      placeholder="0"
+                      min="0"
                     />
-                  </div>
-                  <div class="col-md-4">
-                    <button class="btn btn-sm btn-warning w-100 fw-bold" @click="applyBulkSettings">
-                      <i class="bi bi-lightning-charge-fill"></i> Áp dụng hàng loạt
+                  </td>
+                  <td>
+                    <input
+                      v-model="sku.stock"
+                      type="number"
+                      class="table-input narrow"
+                      placeholder="0"
+                      min="0"
+                    />
+                  </td>
+                  <td>
+                    <button
+                      class="btn-row-del"
+                      @click="generatedSkus.splice(index, 1)"
+                      title="Xóa dòng này"
+                    >
+                      <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                        <path
+                          d="M2 3.5h9M5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M4 3.5l.667 7h3.666L9 3.5H4z"
+                          stroke="currentColor"
+                          stroke-width="1.5"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
                     </button>
-                  </div>
-                </div>
-                <small class="text-muted mt-2 d-block">
-                  * Chức năng này sẽ ghi đè giá và tồn kho cho toàn bộ
-                  {{ generatedSkus.length }} biến thể bên dưới.
-                </small>
-              </div>
-
-              <div class="table-responsive p-3">
-                <table class="table table-bordered align-middle mb-0">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Biến thể</th>
-                      <th>Mã SKU</th>
-                      <th width="150">Giá bán (₫)</th>
-                      <th width="120">Tồn kho</th>
-                      <th width="50">Xóa</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="(sku, index) in generatedSkus" :key="index">
-                      <td class="fw-bold text-primary">{{ sku.variantName }}</td>
-                      <td>
-                        <input
-                          v-model="sku.skuCode"
-                          class="form-control form-control-sm"
-                          placeholder="VD: IPH-RED-128"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model="sku.price"
-                          type="number"
-                          class="form-control form-control-sm"
-                          min="0"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          v-model="sku.stock"
-                          type="number"
-                          class="form-control form-control-sm"
-                          min="0"
-                        />
-                      </td>
-                      <td class="text-center">
-                        <button
-                          class="btn btn-sm btn-outline-danger"
-                          @click="generatedSkus.splice(index, 1)"
-                        >
-                          <i class="bi bi-trash"></i>
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
     </div>
+
+    <Transition name="modal">
+      <div class="modal-backdrop" v-if="alertModal.show" @click.self="alertModal.show = false">
+        <div class="modal-box alert-modal-box">
+          <div class="modal-body text-center">
+            <div class="alert-icon" :class="alertModal.type">
+              <span v-if="alertModal.type === 'success'">✓</span>
+              <span v-else>✕</span>
+            </div>
+            <h4 class="alert-title">
+              {{ alertModal.type === 'success' ? 'Thành công' : 'Thông báo lỗi' }}
+            </h4>
+            <p class="alert-message">{{ alertModal.message }}</p>
+          </div>
+          <div class="modal-footer justify-center">
+            <button class="btn-primary" @click="alertModal.show = false">Đóng</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -169,6 +250,7 @@
 import { ref, onMounted } from 'vue'
 // TODO: Thay đổi đường dẫn import này cho khớp với file cấu hình Axios của bạn
 import api from '@/utils/api'
+import '@/assets/css/sku.css'
 
 //1. STATE DỮ LIỆU
 const products = ref([])
@@ -177,6 +259,8 @@ const options = ref([{ name: '', rawValues: '' }])
 const generatedSkus = ref([])
 const bulkPrice = ref('')
 const bulkStock = ref('')
+const isSaving = ref(false)
+const alertModal = ref({ show: false, message: '', type: 'success' })
 
 // 2. API CALLS
 const fetchProducts = async () => {
@@ -261,7 +345,8 @@ const cartesian = (args) =>
 //5. SINH TỔ HỢP MA TRẬN
 const generateVariants = () => {
   const validOptions = getValidOptions()
-  if (validOptions.length === 0) return alert('Vui lòng nhập ít nhất 1 thuộc tính hợp lệ!')
+  if (validOptions.length === 0)
+    return showAlert('Vui lòng nhập ít nhất 1 thuộc tính hợp lệ!', 'error')
 
   const product = products.value.find((p) => p.id === selectedProductId.value)
   const baseCode = product ? getInitials(product.name) : 'PRD'
@@ -288,9 +373,10 @@ const applyBulkSettings = () => {
 
 //7. LƯU VÀO BACKEND
 const saveAllSkus = async () => {
-  if (!selectedProductId.value) return alert('Chưa chọn sản phẩm gốc!')
-  if (generatedSkus.value.length === 0) return alert('Chưa có biến thể nào được tạo!')
+  if (!selectedProductId.value) return showAlert('Chưa chọn sản phẩm gốc!', 'error')
+  if (generatedSkus.value.length === 0) return showAlert('Chưa có biến thể nào được tạo!', 'error')
 
+  isSaving.value = true
   try {
     //Lưu Options lên DB & lập Value ID
     const globalValueIdMap = {}
@@ -315,23 +401,55 @@ const saveAllSkus = async () => {
       ),
     )
 
-    alert('Tuyệt vời! Đã lưu toàn bộ ma trận SKU vào Database thành công!')
+    showAlert(
+      `Đã lưu toàn bộ ${generatedSkus.value.length} SKU vào Database thành công!`,
+      'success',
+    )
     generatedSkus.value = []
     options.value = [{ name: '', rawValues: '' }]
   } catch (error) {
     console.error('Lỗi khi lưu dữ liệu:', error)
-    alert('Hệ thống từ chối lưu: ' + (error.response?.data?.message || error.message))
+    showAlert('Hệ thống từ chối lưu: ' + (error.response?.data?.message || error.message), 'error')
+  } finally {
+    isSaving.value = false
   }
+}
+
+const showAlert = (msg, type = 'success') => {
+  alertModal.value = { show: true, message: msg, type }
+}
+
+// 8. MÀU GỢI Ý CHO CHẤM TRÒN BIẾN THỂ (đồng bộ với màn Tạo SKU)
+const colorKeywords = {
+  đen: '#1a1a2e',
+  black: '#1a1a2e',
+  trắng: '#f0f0f0',
+  white: '#f0f0f0',
+  hồng: '#f472b6',
+  pink: '#f472b6',
+  đỏ: '#ef4444',
+  red: '#ef4444',
+  'xanh lam': '#3b82f6',
+  blue: '#3b82f6',
+  'xanh lá': '#22c55e',
+  green: '#22c55e',
+  vàng: '#eab308',
+  gold: '#eab308',
+  titan: '#8b8fa8',
+  titanium: '#8b8fa8',
+  xám: '#6b7280',
+  gray: '#6b7280',
+  tím: '#a855f7',
+  purple: '#a855f7',
+}
+const getColorStyle = (valueStr) => {
+  if (!valueStr) return {}
+  const lower = valueStr.toLowerCase()
+  for (const [key, color] of Object.entries(colorKeywords)) {
+    if (lower.includes(key)) return { background: color }
+  }
+  return { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)' }
 }
 </script>
 
-<style scoped>
-.page-content {
-  padding: 20px;
-  background-color: #f8f9fc;
-  min-height: 100vh;
-}
-.text-sm {
-  font-size: 0.875rem;
-}
-</style>
+<style scoped></style>

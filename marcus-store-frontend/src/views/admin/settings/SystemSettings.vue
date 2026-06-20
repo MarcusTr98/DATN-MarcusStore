@@ -1,10 +1,10 @@
 <template>
   <div class="container-fluid px-4 py-3">
     <h3 class="fw-bold text-dark mb-4">
-      <i class="fas fa-cogs me-2"></i>Cấu hình hệ thống Website
+      <i class="fas fa-cogs me-2 text-primary"></i>Cấu hình hệ thống Website
     </h3>
 
-    <div class="card shadow-sm border-0 rounded-3">
+    <div class="card shadow-sm border-0 rounded-4">
       <div class="card-body p-4">
         <div v-if="isLoading" class="text-center py-5 text-muted">
           <div class="spinner-border text-primary" role="status"></div>
@@ -64,31 +64,108 @@
             </div>
           </div>
 
-          <div class="text-end mt-4">
+          <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
+            4. Cấu hình Bản đồ & Cửa hàng (Store Location)
+          </h5>
+          <div class="row g-3 mb-4 bg-light p-3 rounded-3 border">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tên cửa hàng trên Map</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="mapData.name"
+                required
+                placeholder="VD: Marcus Store Hải Phòng"
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Địa chỉ chi tiết trên Map</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="mapData.address"
+                required
+                placeholder="VD: 118 Cát Bi..."
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tọa độ Vĩ độ (Latitude)</label>
+              <input
+                type="number"
+                step="any"
+                class="form-control"
+                v-model="mapData.lat"
+                required
+                placeholder="VD: 20.82716"
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tọa độ Kinh độ (Longitude)</label>
+              <input
+                type="number"
+                step="any"
+                class="form-control"
+                v-model="mapData.lng"
+                required
+                placeholder="VD: 106.70466"
+              />
+            </div>
+            <div class="col-12 text-muted small">
+              <i class="fa-solid fa-circle-info text-primary"></i>
+              Mẹo: Lên Google Maps, nhấp chuột phải vào địa điểm của bạn để lấy tọa độ Vĩ độ, Kinh
+              độ.
+            </div>
+          </div>
+
+          <div class="text-end mt-5">
             <button
               type="submit"
-              class="btn btn-warning text-white fw-bold px-4 rounded-pill shadow-sm"
-              style="background-color: #ff6b00; border: none; transition: 0.3s"
+              class="btn text-white fw-bold px-5 py-2 rounded-pill shadow-sm btn-save-custom"
               :disabled="isSaving"
             >
               <i class="fas" :class="isSaving ? 'fa-spinner fa-spin' : 'fa-save'"></i>
               <span class="ms-2">{{
-                isSaving ? 'Đang lưu dữ liệu...' : 'Cập nhật toàn bộ nội dung Web'
+                isSaving ? 'Đang đồng bộ dữ liệu...' : 'Lưu toàn bộ thay đổi'
               }}</span>
             </button>
           </div>
         </form>
       </div>
     </div>
+    <BaseModal
+      :visible="localModal.visible"
+      :type="localModal.type"
+      :title="localModal.title"
+      :message="localModal.message"
+      @close="localModal.visible = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import api from '@/utils/api'
+import BaseModal from '@/components/BaseModal.vue'
 
 const isLoading = ref(true)
 const isSaving = ref(false)
+
+// State Modal
+const localModal = reactive({
+  visible: false,
+  type: 'info',
+  title: '',
+  message: '',
+})
+
+const showAlert = (type, title, msg) => {
+  localModal.type = type
+  localModal.title = title
+  localModal.message = msg
+  localModal.visible = true
+}
+
+const mapData = ref({ lat: '', lng: '', name: '', address: '' })
 
 const settings = ref({
   HOTLINE: '',
@@ -100,37 +177,45 @@ const settings = ref({
   TIKTOK_URL: '',
   INSTAGRAM_URL: '',
   YOUTUBE_URL: '',
+  STORE_LOCATION: '',
 })
 
-// Gọi API lấy dữ liệu lúc vừa vào trang
 const loadSettings = async () => {
   try {
     isLoading.value = true
     const res = await api.get('/public/settings')
 
-    // Đổ dữ liệu từ DB vào Object Setting
     Object.keys(settings.value).forEach((key) => {
       if (res.data[key] !== undefined) {
         settings.value[key] = res.data[key]
       }
     })
+
+    if (settings.value.STORE_LOCATION) {
+      const parsedMap = JSON.parse(settings.value.STORE_LOCATION)
+      mapData.value = { ...mapData.value, ...parsedMap }
+    }
   } catch (error) {
     console.error('Lỗi tải cấu hình:', error)
-    alert('Không thể tải cấu hình hệ thống!')
+    showAlert('error', 'Lỗi', 'Không thể tải cấu hình hệ thống!')
   } finally {
     isLoading.value = false
   }
 }
 
-// Gọi API Cập nhật
 const saveSettings = async () => {
   try {
     isSaving.value = true
-    const res = await api.put('/admin/settings/bulk-update', settings.value)
-    alert('🎉 ' + res.data.message)
+    settings.value.STORE_LOCATION = JSON.stringify(mapData.value)
+
+    // ĐÃ FIX: Bỏ "const res =" đi
+    await api.put('/admin/settings/bulk-update', settings.value)
+
+    // ĐÃ FIX: Dùng Modal thay cho alert()
+    showAlert('success', 'Thành công', 'Đã cập nhật cấu hình hệ thống thành công!')
   } catch (error) {
     console.error('Lỗi khi cập nhật:', error)
-    alert('Lưu thất bại: ' + (error.response?.data?.message || 'Lỗi hệ thống'))
+    showAlert('error', 'Cập nhật thất bại', error.response?.data?.message || 'Lỗi hệ thống')
   } finally {
     isSaving.value = false
   }
@@ -144,15 +229,21 @@ onMounted(() => {
 <style scoped>
 .form-control {
   border-radius: 8px;
-  padding: 10px 15px;
+  padding: 12px 15px;
   border: 1px solid #dee2e6;
+  font-size: 14px;
 }
 .form-control:focus {
   border-color: #ff6b00;
-  box-shadow: 0 0 0 0.25rem rgba(255, 107, 0, 0.25);
+  box-shadow: 0 0 0 0.25rem rgba(255, 107, 0, 0.15);
 }
-.btn:hover {
+.btn-save-custom {
+  background: linear-gradient(135deg, #ff6b00, #ff8e3c);
+  border: none;
+  transition: all 0.3s ease;
+}
+.btn-save-custom:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(255, 107, 0, 0.3) !important;
+  box-shadow: 0 6px 15px rgba(255, 107, 0, 0.4) !important;
 }
 </style>
