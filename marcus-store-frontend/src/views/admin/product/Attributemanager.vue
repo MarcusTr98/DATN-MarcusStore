@@ -1,12 +1,20 @@
 <template>
   <div class="page-wrapper">
     <div class="page-header">
-      <div class="header-content">
-        <div>
-          <p class="breadcrumb-text">Sản phẩm</p>
-          <h1 class="page-title">Quản lý Thuộc tính</h1>
+      <div class="header-left">
+        <div class="header-icon-box">
+          <i class="fa-solid fa-tags"></i>
         </div>
-        <div class="header-badge"><span class="badge-dot"></span> Master Data</div>
+        <div class="header-text-group">
+          <p class="breadcrumb-text">Sản phẩm</p>
+          <h1 class="page-title">
+            Quản lý Thuộc tính
+            <span class="header-badge"><span class="badge-dot"></span>Master Data</span>
+          </h1>
+          <p class="page-subtitle">
+            Quản lý các thuộc tính và giá trị áp dụng cho biến thể sản phẩm
+          </p>
+        </div>
       </div>
     </div>
 
@@ -369,4 +377,5 @@ const getColorStyle = (valueStr) => {
   return { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)' }
 }
 </script>
+
 <style scoped></style>

@@ -52,17 +52,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 1. Nhóm API mở tự do (Không cần Token)
                         .requestMatchers("/api/auth/**").permitAll() // Ngọc: Đăng nhập, Đăng ký, Quên MK
-                        .requestMatchers("/api/public/**").permitAll() // Đức, Đạt, Huy: Lấy SP Home, Banner, Bài
-                        // viết SEO
+                        .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/vnpay/**").permitAll() // Marcus test môi trường Ngrok webhook Vnpay
-
+                        .requestMatchers("/ws-endpoint/**").permitAll() // Marcus thêm để làm websocket
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập
                         .requestMatchers("/api/user/**").authenticated() // Đạt, Đức: Checkout, Giỏ hàng, Wishlist, Đgiá
 
-                        // 3. Nhóm API dành riêng cho Quản trị viên (Phân quyền RBAC)
+                        // 3. Nhóm API dành riêng cho Quản trị viên
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Ngọc, Huy: Quản lý User,Thống
                                                                                        // kê
-                        .requestMatchers("/api/admin/roles/**").hasRole("ADMIN") // Chỉ Admin mới được đổi quyền
+                        .requestMatchers("/api/admin/roles/**").hasRole("ADMIN")
 
                         // Khóa mọi request khác đi lạc
                         .anyRequest().authenticated());
