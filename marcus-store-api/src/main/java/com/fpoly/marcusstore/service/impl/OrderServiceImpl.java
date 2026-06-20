@@ -190,6 +190,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .transactionId(order.getTransactionId())
                 .trackingCode(order.getTrackingCode())
+                .userId(order.getUser().getUserId())
                 .fullName(order.getUser().getFullName())
                 .email(order.getUser().getEmail())
                 .phoneNumber(order.getUser().getPhoneNumber())
@@ -360,8 +361,12 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderDetailResponse getUserOrderDetail(String orderCode) {
         Integer userId = SecurityUtils.getCurrentUserId();
-        orderRepository.findByOrderCodeAndUserUserId(orderCode, userId).orElseThrow(() ->
-                new RuntimeException("không tìm thấy đơn hàng theo yêu cầu"));
-        return getOrderDetailResponse(orderCode);
+        OrderDetailResponse response = getOrderDetailResponse(orderCode);
+
+        if (!userId.equals(response.getUserId())) {
+            throw new RuntimeException("Không có quyền xem");
+        }
+
+        return response;
     }
 }

@@ -170,9 +170,7 @@ onUnmounted(() => {
                       </router-link>
                     </li>
                     <li>
-                      <router-link class="dropdown-item" to="/my-orders">
-                        <i class="fas fa-box-open me-2"></i>Đơn mua
-                      </router-link>
+                     
                     </li>
                     <li>
                       <router-link class="dropdown-item" to="/wishlist">

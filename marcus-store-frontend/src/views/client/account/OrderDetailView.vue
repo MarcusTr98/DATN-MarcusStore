@@ -149,8 +149,8 @@
 
                   <div class="history-list">
                     <div
-                      v-for="item in selectedOrder.history || []"
-                      :key="`${item.status}-${item.createdAt}`"
+                      v-for="item in displayHistory"
+                      :key="`${item.status}-${item.title}-${item.createdAt}`"
                       class="history-item"
                     >
                       <div class="history-icon">
@@ -162,7 +162,7 @@
                       <div>
                         <div class="history-title">{{ item.title }}</div>
                         <div class="history-meta">
-                          {{ item.status }} · {{ formatDateTime(item.createdAt) }}
+                          {{ statusConfig[item.status]?.label || item.status }} · {{ formatDateTime(item.createdAt) }}
                         </div>
                         <div v-if="item.note" class="history-note">
                           <span>Lý do:</span> {{ item.note }}
@@ -290,6 +290,7 @@ async function fetchOrderDetail() {
 onMounted(fetchOrderDetail)
 
 const statusConfig = {
+  CREATED: { label: 'Tạo đơn', className: 'pending', icon: 'fa-file-circle-plus' },
   PENDING: { label: 'Chờ xác nhận', className: 'pending', icon: 'fa-clock' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed', icon: 'fa-circle-check' },
   PROCESSING: { label: 'Đang chuẩn bị', className: 'processing', icon: 'fa-boxes-packing' },
@@ -310,37 +311,41 @@ const defaultTimelineSteps = [
 const visibleTimelineSteps = computed(() => {
   if (!selectedOrder.value) return []
 
-  const historySteps = (selectedOrder.value.history || []).map((item, index) =>
-    createTimelineStep(item.status, index, item.createdAt, item.note),
-  )
-
-  if (historySteps.length > 0) {
-    const lastStep = historySteps[historySteps.length - 1]
-    if (lastStep.status !== selectedOrder.value.orderStatus) {
-      historySteps.push(createTimelineStep(selectedOrder.value.orderStatus, historySteps.length))
-    }
-    historySteps[historySteps.length - 1].isCurrent = true
-    return historySteps
-  }
-
   const currentStatus = selectedOrder.value.orderStatus
+  const historyByStatus = new Map(
+    (selectedOrder.value.history || []).map((item) => [item.status, item]),
+  )
   const currentIndex = defaultTimelineSteps.findIndex((step) => step.status === currentStatus)
-  const visibleDefaultSteps =
+  const flowStatuses =
     currentIndex >= 0
-      ? defaultTimelineSteps.slice(0, currentIndex + 1)
-      : [{ status: currentStatus }]
+      ? defaultTimelineSteps.slice(0, currentIndex + 1).map((step) => step.status)
+      : ['PENDING', currentStatus]
+  const statuses = ['CREATED', ...new Set(flowStatuses)]
 
-  return visibleDefaultSteps.map((step, index) => {
+  return statuses.map((status, index) => {
+    const historyItem = historyByStatus.get(status)
     const timelineStep = createTimelineStep(
-      step.status,
+      status,
       index,
-      currentStatus === step.status
-        ? selectedOrder.value.updatedAt || selectedOrder.value.createdAt
-        : null,
+      status === 'CREATED' ? selectedOrder.value.createdAt : historyItem?.createdAt,
+      historyItem?.note,
     )
-    timelineStep.isCurrent = currentStatus === step.status
+    timelineStep.isCurrent = currentStatus === status
     return timelineStep
   })
+})
+
+const displayHistory = computed(() => {
+  if (!selectedOrder.value) return []
+
+  const createdItem = {
+    status: 'CREATED',
+    title: 'Tạo đơn',
+    createdAt: selectedOrder.value.createdAt,
+    note: null,
+  }
+
+  return [createdItem, ...(selectedOrder.value.history || [])]
 })
 
 const timelineProgress = computed(() => {
