@@ -246,9 +246,9 @@ public class OrderServiceImpl implements OrderService {
         newStatus = normalizeStatusValue(newStatus);
 
         return switch (currentStatus) {
-            case "PENDING" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
-            case "PROCESSING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
-            case "CONFIRMED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
+            case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
+            case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
             case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             default -> false;
@@ -261,7 +261,7 @@ public class OrderServiceImpl implements OrderService {
     private String getHistoryTitle(String status) {
         return switch (status) {
             case "PENDING" -> "Khách hàng tạo đơn";
-            case "PROCESSING" -> "Đơn đang được xử lý";
+            case "PROCESSING" -> "Đơn đang chuẩn bị hàng";
             case "CONFIRMED" -> "Nhân viên xác nhận đơn";
             case "SHIPPING" -> "Đơn chuyển sang đang giao hàng";
             case "COMPLETED" -> "Đơn giao thành công";
@@ -289,6 +289,12 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return false;
+    }
+
+    private void markPaymentPaidWhenCompleted(Order order) {
+        if ("COMPLETED".equals(normalizeStatusValue(order.getOrderStatus()))) {
+            order.setPaymentStatus("PAID");
+        }
     }
 
     private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
@@ -329,6 +335,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setOrderStatus(newStatus);
         ensureTrackingCodeForShipping(order);
+        markPaymentPaidWhenCompleted(order);
         orderRepository.save(order);
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);

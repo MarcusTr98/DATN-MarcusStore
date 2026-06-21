@@ -302,8 +302,8 @@ const statusConfig = {
 
 const defaultTimelineSteps = [
   { status: 'PENDING' },
-  { status: 'PROCESSING' },
   { status: 'CONFIRMED' },
+  { status: 'PROCESSING' },
   { status: 'SHIPPING' },
   { status: 'COMPLETED' },
 ]
@@ -338,6 +338,11 @@ const visibleTimelineSteps = computed(() => {
 const displayHistory = computed(() => {
   if (!selectedOrder.value) return []
 
+  const history = selectedOrder.value.history || []
+  const hasCreated = history.some((item) => item.status === 'CREATED')
+
+  if (hasCreated) return history
+
   const createdItem = {
     status: 'CREATED',
     title: 'Tạo đơn',
@@ -345,7 +350,7 @@ const displayHistory = computed(() => {
     note: null,
   }
 
-  return [createdItem, ...(selectedOrder.value.history || [])]
+  return [createdItem, ...history]
 })
 
 const timelineProgress = computed(() => {
