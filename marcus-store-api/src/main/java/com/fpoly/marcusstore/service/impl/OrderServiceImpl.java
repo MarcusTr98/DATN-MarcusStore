@@ -246,8 +246,8 @@ public class OrderServiceImpl implements OrderService {
         newStatus = normalizeStatusValue(newStatus);
 
         return switch (currentStatus) {
-            case "PENDING" -> newStatus.equals("PROCESSING") || newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
-            case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            case "PENDING" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
+            case "PROCESSING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
             case "CONFIRMED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
             case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");

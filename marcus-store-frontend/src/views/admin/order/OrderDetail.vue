@@ -368,11 +368,10 @@ const paymentMethodMap = {
 const allowedTransitions = {
   PENDING: [
     { value: 'PROCESSING', label: 'Đang xử lý' },
-    { value: 'CONFIRMED', label: 'Xác nhận đơn' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],
   PROCESSING: [
-    { value: 'SHIPPING', label: 'Giao hàng (Đã thanh toán)' },
+    { value: 'CONFIRMED', label: 'Xác nhận đơn' },
     { value: 'CANCELLED', label: 'Hủy đơn & Hoàn tiền' },
   ],
   CONFIRMED: [

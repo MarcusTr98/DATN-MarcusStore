@@ -302,8 +302,8 @@ const statusConfig = {
 
 const defaultTimelineSteps = [
   { status: 'PENDING' },
-  { status: 'CONFIRMED' },
   { status: 'PROCESSING' },
+  { status: 'CONFIRMED' },
   { status: 'SHIPPING' },
   { status: 'COMPLETED' },
 ]
