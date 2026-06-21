@@ -1,0 +1,258 @@
+<template>
+
+<div class="table-card">
+
+<table class="table">
+
+<thead>
+  <tr>
+    <th>ID</th>
+    <th>Khách hàng</th>
+    <th>Email</th>
+    <th>SĐT</th>
+    <th>Email Verify</th>
+    <th>Trạng thái</th>
+    <th v-if="canManage">Thao tác</th>
+  </tr>
+</thead>
+
+<tbody>
+
+<tr v-if="!users.length">
+  <td :colspan="canManage ? 7 : 6" class="empty-state">
+    <i class="bi bi-person-x"></i>
+    <h3>Không có khách hàng nào</h3>
+    <p>Hãy thay đổi từ khóa tìm kiếm.</p>
+  </td>
+</tr>
+
+<tr
+v-for="item in users"
+:key="item.userId"
+>
+
+<td class="user-id">#{{ item.userId }}</td>
+
+<td class="user-name">{{ item.fullName }}</td>
+
+<td>{{ item.email }}</td>
+
+<td>{{ item.phoneNumber }}</td>
+
+<td>
+  <span
+    class="status-badge"
+    :class="item.emailVerified ? 'active' : 'warning'"
+  >
+    {{ item.emailVerified ? 'Đã xác thực' : 'Chưa xác thực' }}
+  </span>
+</td>
+
+<td>
+  <span
+    class="status-badge"
+    :class="item.active ? 'active' : 'locked'"
+  >
+    {{ item.active ? 'Hoạt động' : 'Đã khóa' }}
+  </span>
+</td>
+
+<td v-if="canManage">
+  <div class="action-group">
+
+    <button
+      class="btn-action btn-edit"
+      title="Chỉnh sửa"
+      @click="$emit('edit', item)"
+    >
+      <i class="bi bi-pencil-square"></i>
+    </button>
+
+    <button
+      v-if="item.active"
+      class="btn-action btn-lock"
+      title="Khóa tài khoản"
+      @click="$emit('lock', item.userId)"
+    >
+      <i class="bi bi-lock"></i>
+    </button>
+
+    <button
+      v-else
+      class="btn-action btn-unlock"
+      title="Mở khóa tài khoản"
+      @click="$emit('unlock', item.userId)"
+    >
+      <i class="bi bi-unlock"></i>
+    </button>
+
+  </div>
+</td>
+
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+</template>
+
+<script setup>
+defineProps({
+  users: Array,
+  canManage: {
+    type: Boolean,
+    default: false
+  }
+})
+
+defineEmits([
+  'edit',
+  'lock',
+  'unlock'
+])
+</script>
+
+<style scoped>
+.table-card{
+  background:#ffffff;
+  border:1px solid #f3d6e3;
+  border-radius:8px;
+  overflow:hidden;
+  box-shadow:0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.table{
+  margin-bottom:0;
+}
+
+.table thead th{
+  background:#fff0f7;
+  color:#b4557d;
+  font-size:0.74rem;
+  font-weight:800;
+  letter-spacing:0;
+  text-transform:uppercase;
+  white-space:nowrap;
+  border-bottom:1px solid #f3d6e3 !important;
+  padding:14px 16px !important;
+}
+
+.table tbody td{
+  padding:14px 16px !important;
+  vertical-align:middle;
+  color:#4b5563;
+  font-size:0.9rem;
+  border-bottom:1px solid #f3d6e3;
+}
+
+.table tbody tr:last-child td{
+  border-bottom:none;
+}
+
+.user-id,
+.user-name{
+  color:#202636;
+  font-weight:800;
+}
+
+/* ===== Badges ===== */
+.status-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:26px;
+  border-radius:999px;
+  padding:4px 10px;
+  font-size:0.76rem;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.status-badge.active{
+  background:#dcfce7;
+  color:#15803d;
+}
+
+.status-badge.locked{
+  background:#ffe2e8;
+  color:#c72250;
+}
+
+.status-badge.warning{
+  background:#fff0d9;
+  color:#9a5b00;
+}
+
+/* ===== Action buttons ===== */
+.action-group{
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+
+.btn-action{
+  display:inline-grid;
+  width:36px;
+  height:36px;
+  place-items:center;
+  border:1px solid #f3d6e3;
+  border-radius:8px;
+  background:#ffffff;
+  cursor:pointer;
+  transition:.18s;
+}
+
+.btn-edit{
+  color:#d63384;
+}
+
+.btn-edit:hover{
+  background:#ffe4ef;
+  border-color:#efbdd2;
+}
+
+.btn-lock{
+  border-color:#f5c2c7;
+  background:#fff5f6;
+  color:#dc3545;
+}
+
+.btn-lock:hover{
+  background:#f8d7da;
+}
+
+.btn-unlock{
+  color:#15803d;
+}
+
+.btn-unlock:hover{
+  background:#f0fdf4;
+}
+
+/* ===== Empty state ===== */
+.empty-state{
+  text-align:center;
+  padding:42px 16px !important;
+}
+
+.empty-state i{
+  color:#f55d9b;
+  font-size:2.4rem;
+  display:block;
+  margin-bottom:12px;
+}
+
+.empty-state h3{
+  margin:0 0 4px;
+  font-size:1.1rem;
+  font-weight:800;
+  color:#202636;
+}
+
+.empty-state p{
+  margin:0;
+  color:#6b7280;
+}
+</style>

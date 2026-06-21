@@ -72,11 +72,6 @@ const routes = [
         name: 'Policy',
         component: () => import('@/views/client/cms/Policy.vue'),
       },
-      {
-        path: 'contact-store',
-        name: 'Contact',
-        component: () => import('@/views/client/shop/Contact.vue'),
-      },
 
       //PROFILE
       {
@@ -108,11 +103,11 @@ const routes = [
             name: 'Wishlist',
             component: () => import('@/views/client/account/Wishlist.vue'),
           },
-          {
-            path: '/change-password',
-            name: 'change-password',
-            component: () => import('@/views/client/account/ChangePassword.vue'),
-          },
+                {
+      path: "/change-password",
+      name: "change-password",
+      component: () => import("@/views/client/account/ChangePassword.vue")
+      }
         ],
       },
     ],
@@ -129,16 +124,9 @@ const routes = [
     children: [
       { path: '', redirect: '/admin/dashboard' },
       {
-        path: '/admin/contact-management',
-        name: 'AdminContact',
-        component: () => import('@/views/admin/contact/ContactManagement.vue'),
-        meta: { requiresAuth: true, role: 'ADMIN' },
-      },
-      {
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/Dashboard.vue'),
-        meta: { requiresAuth: true, roles: ['ROLE_ADMIN', 'ROLE_STAFF'] },
       },
       {
         path: 'profile',
@@ -203,9 +191,14 @@ const routes = [
         component: () => import('@/views/admin/settings/SystemSettings.vue'),
       },
       {
-        path: 'account',
-        name: 'AccountManager',
-        component: () => import('@/views/admin/auth/AccountManager.vue'),
+        path: 'employee',
+        name: 'EmployeeManagement',
+        component: () => import('@/views/admin/auth/EmployeeManagement.vue'),
+      },
+            {
+        path: 'customer',
+        name: 'CustomerManagement',
+        component: () => import('@/views/admin/auth/CustomerManagement.vue'),
       },
       {
         path: 'role',
@@ -232,7 +225,11 @@ router.beforeEach((to) => {
   const isAdminOrStaff = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_STAFF')
 
   // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào admin
-  if (token && isAdminOrStaff && (to.path === '/' || to.path.startsWith('/auth/login'))) {
+  if (
+    token &&
+    isAdminOrStaff &&
+    (to.path === '/' || to.path.startsWith('/auth/login'))
+  ) {
     return '/admin/dashboard'
   }
 
