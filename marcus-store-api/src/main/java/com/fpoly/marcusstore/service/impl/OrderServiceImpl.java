@@ -249,7 +249,7 @@ public class OrderServiceImpl implements OrderService {
             case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
             case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
-            case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.ельse("CANCELLED");
             default -> false;
         };
     }
