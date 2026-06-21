@@ -18,5 +18,5 @@ public interface CategoriesService {
 
     CategoryResponse updateCategory(Integer id ,UpdateCategory updateCategory);
 
-    Category hiddenCategory(Integer id);
+    CategoryResponse hiddenCategory(Integer id);
 }
