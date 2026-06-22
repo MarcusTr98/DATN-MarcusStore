@@ -32,4 +32,5 @@ public class AddVoucherRequest {
     private Integer quantity;
     private Boolean isActive;
     private Boolean isPrivate;
+    private String description;
 }

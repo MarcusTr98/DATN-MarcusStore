@@ -23,4 +23,5 @@ public class VoucherResponse {
     private Integer quantity;
     private Boolean isActive;
     private Boolean isPrivate;
+    private String description;
 }

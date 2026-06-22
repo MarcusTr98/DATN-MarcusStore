@@ -36,6 +36,7 @@ public class VoucherServiceImpl implements VoucherService {
             .quantity(voucher.getQuantity())
             .isActive(voucher.getIsActive())
             .isPrivate(voucher.getIsPrivate())
+            .description(voucher.getDescription())
             .build();
     }
     @Override
@@ -119,6 +120,7 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setIsActive(
                 request.getQuantity() > 0 && Boolean.TRUE.equals(request.getIsActive())
         );
+        voucher.setDescription(request.getDescription());
         Voucher saveVoucher = voucherRepository.save(voucher);
         return toResponse(saveVoucher);
     }
@@ -197,10 +199,16 @@ public class VoucherServiceImpl implements VoucherService {
          voucher.setMinOrderValue(request.getMinOrderValue());
          voucher.setStartDate(request.getStartDate());
          voucher.setEndDate(request.getEndDate());
-         voucher.setQuantity(request.getQuantity());
-         voucher.setIsActive(
-                 request.getQuantity() > 0 && Boolean.TRUE.equals(request.getIsActive())
-         );
-         return toResponse(voucherRepository.save(voucher));
-     }
+        voucher.setQuantity(request.getQuantity());
+        voucher.setIsActive(
+                request.getQuantity() > 0 && Boolean.TRUE.equals(request.getIsActive())
+        );
+        voucher.setDescription(request.getDescription());
+        return toResponse(voucherRepository.save(voucher));
+    }
+//    @Override
+//    @Transactional
+//    public VoucherResponse getVoucherClient(){
+//
+//     }
 }

@@ -48,4 +48,6 @@ public class Voucher {
     @Column(name = "is_private", nullable = false)
     private Boolean isPrivate = false;
 
+    @Column(name = "description", length = 500)
+    private String description;
 }

@@ -22,6 +22,7 @@ function mapVoucher(voucher) {
     quantity: Number(voucher.quantity || 0),
     isActive: Boolean(voucher.isActive),
     isPrivate: Boolean(voucher.isPrivate),
+    description: voucher.description || '',
   }
 }
 

@@ -3,6 +3,8 @@ package com.fpoly.marcusstore.repository.promotion;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -79,4 +81,14 @@ public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
 
     // MArcus Bổ sung hàm tìm Voucher
     Optional<Voucher> findByVoucherCode(String voucherCode);
+    // logic lấy voucher hiển thị client
+    @Query("""
+    SELECT v FROM Voucher v
+    WHERE v.isActive = true
+      AND v.quantity > 0
+      AND v.startDate <= CURRENT_TIMESTAMP
+      AND v.endDate >= CURRENT_TIMESTAMP
+    ORDER BY v.endDate ASC
+""")
+    List<Voucher> findAvailableVouchers();
 }

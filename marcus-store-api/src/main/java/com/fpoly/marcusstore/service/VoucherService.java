@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.request.AddVoucherRequest;
 import com.fpoly.marcusstore.dto.response.VoucherResponse;
 import com.fpoly.marcusstore.dto.response.VoucherStatsResponse;
+import com.fpoly.marcusstore.entity.shopping.Voucher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -13,4 +14,5 @@ public interface VoucherService {
     void deleteVoucherById(Integer voucherId);
     VoucherResponse addVoucher(AddVoucherRequest request);
     VoucherResponse updateVoucher(Integer voucherId, AddVoucherRequest request);
+//    VoucherResponse getVoucherClient();
 }

@@ -358,7 +358,7 @@
 }
 
 .voucher-table {
-  min-width: 1060px;
+  min-width: 960px;
 }
 
 .voucher-table thead th {
@@ -380,7 +380,6 @@
   color: #202636;
   font-weight: 800;
 }
-
 .voucher-table small,
 .date-line {
   color: #6b7280;
