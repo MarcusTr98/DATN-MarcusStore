@@ -10,11 +10,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
+import java.time.temporal.IsoFields;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -46,7 +48,7 @@ public class StatisticsService {
                 start = now.withMonth(firstMonth).withDayOfMonth(1);
             }
             case "year"    -> start = now.withDayOfYear(1);
-            default        -> start = now.withDayOfMonth(1); // month
+            default        -> start = now.withDayOfMonth(1);
         }
         return new LocalDate[]{start, end};
     }
@@ -178,7 +180,7 @@ public class StatisticsService {
                 .collect(Collectors.toList());
     }
 
-    //So sánh doanh thu kỳ này với kỳ trước
+    // So sánh doanh thu kỳ này với kỳ trước
     @Transactional(readOnly = true)
     public RevenueCompareResponseDTO getRevenueCompare(String period) {
         LocalDate today = LocalDate.now();
@@ -214,8 +216,10 @@ public class StatisticsService {
                 currentStart  = today.withDayOfMonth(1);
                 currentEnd    = today;
                 previousStart = today.minusMonths(1).withDayOfMonth(1);
-                previousEnd   = today.minusMonths(1)
-                        .withDayOfMonth(today.minusMonths(1).lengthOfMonth());
+                // Chỉ lấy đến cùng ngày tháng trước để so sánh công bằng
+                int lastDayOfPrevMonth = today.minusMonths(1).lengthOfMonth();
+                int comparableDay = Math.min(today.getDayOfMonth(), lastDayOfPrevMonth);
+                previousEnd = today.minusMonths(1).withDayOfMonth(comparableDay);
                 currentLabel  = "Tháng " + today.getMonthValue() + "/" + today.getYear();
                 previousLabel = "Tháng " + today.minusMonths(1).getMonthValue()
                         + "/" + today.minusMonths(1).getYear();
@@ -236,42 +240,79 @@ public class StatisticsService {
     }
 
     private List<RevenueCompareResponseDTO.PeriodData> groupByPeriod(
-        List<RevenueCompareProjection> raw, String period, LocalDate periodStart) {
+            List<RevenueCompareProjection> raw, String period, LocalDate periodStart) {
 
-    if ("today".equals(period) || "week".equals(period)) {
-        return raw.stream()
-                .map(p -> RevenueCompareResponseDTO.PeriodData.builder()
-                        .label(LocalDate.parse(p.getDateLabel().toString())
-                                .format(SHORT_DATE))
-                        .revenue(p.getTotalRevenue().doubleValue())
-                        .build())
-                .collect(Collectors.toList());
-    } else {
-        // Nhóm theo tuần, label dạng "01/05 - 07/05"
-        Map<Integer, Double> weekRevenueMap = new LinkedHashMap<>();
-        Map<Integer, LocalDate> weekStartMap = new LinkedHashMap<>();
+        if ("today".equals(period) || "week".equals(period)) {
+            // FIX: tách label (thứ) và sublabel (ngày) riêng để frontend dùng đúng cho từng dataset
+            DateTimeFormatter dayFmt  = DateTimeFormatter.ofPattern("EEE", new Locale("vi", "VN"));
+            DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM");
+            return raw.stream()
+                    .map(p -> {
+                        LocalDate date = LocalDate.parse(p.getDateLabel().toString());
+                        return RevenueCompareResponseDTO.PeriodData.builder()
+                                .label(date.format(dayFmt))       // "T2", "T3", ..., "CN"
+                                .sublabel(date.format(dateFmt))   // "01/06", "02/06"...
+                                .revenue(p.getTotalRevenue().doubleValue())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
 
-        for (RevenueCompareProjection p : raw) {
-            LocalDate date = LocalDate.parse(p.getDateLabel().toString());
-            int weekNum = (int)(ChronoUnit.DAYS.between(periodStart, date) / 7);
-            weekRevenueMap.merge(weekNum, p.getTotalRevenue().doubleValue(), Double::sum);
-            weekStartMap.putIfAbsent(weekNum, date);
-        }
+        } else if ("month".equals(period)) {
+            // Group by ngày trong tháng → label "Ngày 1" + sublabel "01/06"
+            Map<Integer, Double>    dayRevenueMap = new LinkedHashMap<>();
+            Map<Integer, LocalDate> dayDateMap    = new LinkedHashMap<>();
 
-        return weekRevenueMap.entrySet().stream()
-                .map(e -> {
-                    LocalDate weekStart = weekStartMap.get(e.getKey());
-                    LocalDate weekEnd = weekStart.plusDays(6);
-                    String label = weekStart.format(SHORT_DATE) + " - " + weekEnd.format(SHORT_DATE);
-                    return RevenueCompareResponseDTO.PeriodData.builder()
-                            .label(label)
+            for (RevenueCompareProjection p : raw) {
+                LocalDate date = LocalDate.parse(p.getDateLabel().toString());
+                int dayOfMonth = date.getDayOfMonth();
+                dayRevenueMap.merge(dayOfMonth, p.getTotalRevenue().doubleValue(), Double::sum);
+                dayDateMap.putIfAbsent(dayOfMonth, date);
+            }
+
+            return dayRevenueMap.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(e -> RevenueCompareResponseDTO.PeriodData.builder()
+                            .label("Ngày " + e.getKey())
+                            .sublabel(dayDateMap.get(e.getKey()).format(SHORT_DATE))
                             .revenue(e.getValue())
-                            .build();
-                })
-                .collect(Collectors.toList());
+                            .build())
+                    .collect(Collectors.toList());
+
+        } else {
+            // year: ISO Week chuẩn, tuần bắt đầu Thứ 2 → label "Tuần 23" + sublabel "02/06–08/06"
+            Map<Integer, Double>    weekRevenueMap = new LinkedHashMap<>();
+            Map<Integer, LocalDate> weekStartMap   = new LinkedHashMap<>();
+
+            for (RevenueCompareProjection p : raw) {
+                LocalDate date  = LocalDate.parse(p.getDateLabel().toString());
+                int isoWeek     = date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
+
+                weekRevenueMap.merge(isoWeek, p.getTotalRevenue().doubleValue(), Double::sum);
+
+                // Luôn tính đúng ngày Thứ 2 đầu tuần ISO
+                if (!weekStartMap.containsKey(isoWeek)) {
+                    LocalDate monday = date.with(DayOfWeek.MONDAY);
+                    weekStartMap.put(isoWeek, monday);
+                }
+            }
+
+            return weekRevenueMap.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(e -> {
+                        LocalDate wStart    = weekStartMap.get(e.getKey());
+                        LocalDate wEnd      = wStart.plusDays(6); // Chủ nhật
+                        String    dateRange = wStart.format(SHORT_DATE) + "–" + wEnd.format(SHORT_DATE);
+                        return RevenueCompareResponseDTO.PeriodData.builder()
+                                .label("Tuần " + e.getKey())
+                                .sublabel(dateRange)
+                                .revenue(e.getValue())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        }
     }
-}
-public Long countPendingOrders() {
-    return statisticsRepository.countPendingOrders();
-}
+
+    public Long countPendingOrders() {
+        return statisticsRepository.countPendingOrders();
+    }
 }

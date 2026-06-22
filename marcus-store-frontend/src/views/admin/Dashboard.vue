@@ -13,11 +13,19 @@
             v-for="item in timeFilters"
             :key="item.value"
             type="button"
-            :class="{ active: selectedTime === item.value }"
-            @click="selectedTime = item.value"
+            :class="{ active: selectedTime === item.value && !customDate }"
+            @click="selectPreset(item.value)"
           >
             {{ item.label }}
           </button>
+          <input
+            type="date"
+            class="date-picker"
+            :class="{ active: !!customDate }"
+            :max="todayStr"
+            v-model="customDate"
+            @change="selectCustomDate"
+          />
         </div>
       </header>
 
@@ -43,100 +51,71 @@
       </section>
 
       <section class="dashboard-grid">
-        <div class="chart-grid">
 
-          <!-- Chart 1: Xu hướng doanh thu - Line -->
-          <article class="dashboard-card">
-            <div class="card-header">
-              <div>
-                <h2>Xu hướng doanh thu</h2>
-                <p>Theo ngày trong kỳ</p>
-              </div>
-              <span>Line chart</span>
-            </div>
-            <div class="chart-frame">
-              <canvas ref="revenueChartRef"></canvas>
-            </div>
-          </article>
-
-          <!-- Chart 2: Đơn hàng phát sinh - Bar -->
-          <article class="dashboard-card">
-            <div class="card-header">
-              <div>
-                <h2>Đơn hàng phát sinh</h2>
-                <p>Số lượng đơn theo thứ trong tuần</p>
-              </div>
-              <span>Bar chart</span>
-            </div>
-            <div class="chart-frame">
-              <canvas ref="orderChartRef"></canvas>
-            </div>
-          </article>
-
-          <!-- Chart 3: Doanh thu theo thương hiệu - Doughnut -->
-          <article class="dashboard-card">
-            <div class="card-header">
-              <div>
-                <h2>Doanh thu theo thương hiệu</h2>
-                <p>Tỷ lệ % theo thương hiệu</p>
-              </div>
-              <span>Doughnut</span>
-            </div>
-            <div class="donut-wrap">
-              <div class="chart-frame donut-canvas">
-                <canvas ref="brandChartRef"></canvas>
-              </div>
-              <div class="legend-list">
-                <span v-for="item in brandRevenue" :key="item.label">
-                  <i :style="{ backgroundColor: item.color }"></i>
-                  {{ item.label }} {{ item.value }}%
-                </span>
-              </div>
-            </div>
-          </article>
-
-          <!-- Chart 4: So sánh doanh thu - Bar grouped -->
-          <article class="dashboard-card">
-            <div class="card-header">
-              <div>
-                <h2>So sánh doanh thu</h2>
-                <p>Kỳ này so với kỳ trước</p>
-              </div>
-              <span>Bar chart</span>
-            </div>
-            <div class="chart-frame">
-              <canvas ref="compareChartRef"></canvas>
-            </div>
-          </article>
-
-        </div>
-
-        <aside class="dashboard-card alert-card">
+        <!-- Chart 1: Xu hướng doanh thu - Line -->
+        <article class="dashboard-card">
           <div class="card-header">
             <div>
-              <h2>Cảnh báo cần chú ý</h2>
-              <p>Các vấn đề cần xử lý nhanh</p>
+              <h2>Xu hướng doanh thu</h2>
+              <p>Theo ngày trong kỳ</p>
             </div>
-            <span class="danger-pill">{{ inventoryAlerts.length }} mới</span>
+            <span>Line chart</span>
           </div>
+          <div class="chart-frame">
+            <canvas ref="revenueChartRef"></canvas>
+          </div>
+        </article>
 
-          <div class="alert-list">
-            <button
-              v-for="alert in inventoryAlerts"
-              :key="alert.id"
-              type="button"
-              class="alert-item"
-              :class="alert.tone"
-            >
-              <span></span>
-              <div>
-                <strong>{{ alert.title }}</strong>
-                <p>{{ alert.description }}</p>
-                <small>{{ alert.actionLabel }}</small>
-              </div>
-            </button>
+        <!-- Chart 2: Đơn hàng phát sinh - Bar -->
+        <article class="dashboard-card">
+          <div class="card-header">
+            <div>
+              <h2>Đơn hàng phát sinh</h2>
+              <p>Số lượng đơn theo thứ trong tuần</p>
+            </div>
+            <span>Bar chart</span>
           </div>
-        </aside>
+          <div class="chart-frame">
+            <canvas ref="orderChartRef"></canvas>
+          </div>
+        </article>
+
+        <!-- Chart 3: Doanh thu theo thương hiệu - Doughnut -->
+        <article class="dashboard-card">
+          <div class="card-header">
+            <div>
+              <h2>Doanh thu theo thương hiệu</h2>
+              <p>Tỷ lệ % theo thương hiệu</p>
+            </div>
+            <span>Doughnut</span>
+          </div>
+          <div class="donut-wrap">
+            <div class="chart-frame donut-canvas">
+              <canvas ref="brandChartRef"></canvas>
+            </div>
+            <div class="legend-list">
+              <span v-for="item in brandRevenue" :key="item.label">
+                <i :style="{ backgroundColor: item.color }"></i>
+                {{ item.label }} {{ item.value }}%
+              </span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Chart 4: So sánh doanh thu - Bar grouped -->
+        <article class="dashboard-card">
+          <div class="card-header">
+            <div>
+              <h2>So sánh doanh thu</h2>
+              <p>Kỳ này so với kỳ trước</p>
+            </div>
+            <span>Bar chart</span>
+          </div>
+          <div class="chart-frame">
+            <canvas ref="compareChartRef"></canvas>
+          </div>
+        </article>
+
       </section>
 
       <section class="dashboard-card data-card">
@@ -247,8 +226,9 @@ let orderChart = null
 let brandChart = null
 let compareChart = null
 
-//State 
+// State
 const selectedTime = ref('month')
+const customDate = ref('')
 const currentTab = ref('recentOrders')
 const loading = ref(true)
 const errorMsg = ref('')
@@ -261,6 +241,7 @@ const filters = reactive({
 })
 
 watch(selectedTime, (val) => {
+  if (!val) return
   filters.date = val
   fetchDashboardData(val)
 })
@@ -289,7 +270,7 @@ const tabs = [
   { label: 'Khách hàng mua nhiều nhất', value: 'topCustomers' },
 ]
 
-//Data từ API
+// Data từ API
 const dailyStats = ref([])
 const pendingOrdersCount = ref(0)
 const monthlyStats = ref([])
@@ -301,10 +282,10 @@ const lowStockData = ref([])
 const topCustomersData = ref([])
 const compareData = ref({ current: [], previous: [], currentLabel: '', previousLabel: '' })
 
-//Chart colors
+// Chart colors
 const DONUT_COLORS = ['#ff4d8d', '#6366f1', '#22c55e', '#f59e0b', '#06b6d4', '#a855f7']
 
-//KPI
+// KPI
 const todayStr = new Date().toISOString().split('T')[0]
 
 const todayRevenue = computed(() => {
@@ -317,11 +298,42 @@ const todayOrders = computed(() => {
   return todayData?.totalOrders || 0
 })
 
+const periodTotals = computed(() => {
+  return dailyStats.value.reduce(
+    (acc, item) => {
+      acc.totalRevenue += item.totalRevenue || 0
+      acc.totalOrders += item.totalOrders || 0
+      acc.totalProductsSold += item.totalProductsSold || 0
+      return acc
+    },
+    { totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 },
+  )
+})
+
+const periodNoteLabel = computed(() => {
+  switch (selectedTime.value) {
+    case 'today': return 'hôm nay'
+    case 'week':  return 'tuần này'
+    case 'year':  return 'năm nay'
+    default:      return 'tháng này'
+  }
+})
+
+const inventoryAlerts = computed(() =>
+  lowStockData.value.slice(0, 3).map((item, idx) => ({
+    id: idx + 1,
+    tone: item.status === 'Hết hàng' ? 'pink' : 'orange',
+    title:
+      item.status === 'Hết hàng'
+        ? `Hết hàng: ${item.productName} (${item.skuCode})`
+        : `Sắp hết hàng: ${item.productName} chỉ còn ${item.stockQuantity} sản phẩm`,
+    description: item.brand,
+    actionLabel: 'Xem tồn kho',
+  })),
+)
+
 const kpiOverview = computed(() => {
-  const monthRevenue = monthlyStats.value[0]?.totalRevenue || 0
-  const monthOrders = monthlyStats.value[0]?.totalOrders || 0
-  const monthProductsSold = monthlyStats.value[0]?.totalProductsSold || 0
-  const pendingCount = pendingOrdersCount.value
+  const { totalRevenue: monthRevenue, totalOrders: monthOrders, totalProductsSold: monthProductsSold } = periodTotals.value
 
   return [
     {
@@ -329,7 +341,7 @@ const kpiOverview = computed(() => {
       title: 'Doanh thu',
       value: formatCurrency(monthRevenue),
       growth: '',
-      note: 'Tổng doanh thu tháng này',
+      note: `Tổng doanh thu ${periodNoteLabel.value}`,
       icon: 'bi bi-currency-dollar',
       type: 'normal',
     },
@@ -338,7 +350,7 @@ const kpiOverview = computed(() => {
       title: 'Tổng đơn hàng',
       value: String(monthOrders),
       growth: '',
-      note: 'Đơn hàng đã ghi nhận trong tháng',
+      note: `Đơn hàng đã ghi nhận ${periodNoteLabel.value}`,
       icon: 'bi bi-bag-check',
       type: 'normal',
     },
@@ -347,7 +359,7 @@ const kpiOverview = computed(() => {
       title: 'Sản phẩm đã bán',
       value: String(monthProductsSold),
       growth: '',
-      note: 'Số lượng SKU đã bán trong tháng',
+      note: `Số lượng SKU đã bán ${periodNoteLabel.value}`,
       icon: 'bi bi-box-seam',
       type: 'normal',
     },
@@ -378,23 +390,22 @@ const kpiOverview = computed(() => {
       icon: 'bi bi-people',
       type: lowStockData.value.length > 0 ? 'warning' : 'normal',
     },
+    {
+      key: 'alerts',
+      title: 'Cảnh báo tồn kho',
+      value: String(inventoryAlerts.value.length),
+      growth: inventoryAlerts.value.length > 0 ? 'Mới' : '',
+      note:
+        inventoryAlerts.value.length > 0
+          ? inventoryAlerts.value[0].title
+          : 'Không có cảnh báo',
+      icon: 'bi bi-bell',
+      type: inventoryAlerts.value.length > 0 ? 'warning' : 'normal',
+    },
   ]
 })
 
-const inventoryAlerts = computed(() =>
-  lowStockData.value.slice(0, 3).map((item, idx) => ({
-    id: idx + 1,
-    tone: item.status === 'Hết hàng' ? 'pink' : 'orange',
-    title:
-      item.status === 'Hết hàng'
-        ? `Hết hàng: ${item.productName} (${item.skuCode})`
-        : `Sắp hết hàng: ${item.productName} chỉ còn ${item.stockQuantity} sản phẩm`,
-    description: item.brand,
-    actionLabel: 'Xem tồn kho',
-  })),
-)
-
-//Table
+// Table
 const tableConfig = computed(() => ({
   recentOrders: {
     columns: [
@@ -440,13 +451,13 @@ const tableConfig = computed(() => ({
 const statusOptions = computed(() => {
   if (currentTab.value === 'recentOrders') {
     return [
-      { value: 'PAID',      label: 'Đã thanh toán' },
-      { value: 'UNPAID',    label: 'Chưa thanh toán' },
-      { value: 'PENDING',   label: 'Chờ xử lý' },
-      { value: 'CONFIRMED', label: 'Đã xác nhận' },
-      { value: 'SHIPPING',  label: 'Đang giao hàng' },
-      { value: 'COMPLETED', label: 'Hoàn thành' },
-      { value: 'CANCELLED', label: 'Đã hủy' },
+      { value: 'PAID',       label: 'Đã thanh toán' },
+      { value: 'UNPAID',     label: 'Chưa thanh toán' },
+      { value: 'PENDING',    label: 'Chờ xử lý' },
+      { value: 'CONFIRMED',  label: 'Đã xác nhận' },
+      { value: 'SHIPPING',   label: 'Đang giao hàng' },
+      { value: 'COMPLETED',  label: 'Hoàn thành' },
+      { value: 'CANCELLED',  label: 'Đã hủy' },
       { value: 'PROCESSING', label: 'Đang xử lý' },
     ]
   }
@@ -536,9 +547,29 @@ function buildRevenueChart() {
   revenueChart = destroyChart(revenueChart)
   if (!revenueChartRef.value || !dailyStats.value.length) return
 
-  const sorted = [...dailyStats.value].reverse()
-  const labels = sorted.map((d) => formatShortDate(d.reportDate))
-  const data = sorted.map((d) => d.totalRevenue)
+  let labels = []
+  let data = []
+
+  if (selectedTime.value === 'year') {
+    // Xem theo Năm: gộp dữ liệu theo tháng
+    const monthlyRevenue = Array(12).fill(0)
+    dailyStats.value.forEach((d) => {
+      const date = new Date(d.reportDate)
+      const monthIndex = date.getMonth() // 0 -> 11
+      monthlyRevenue[monthIndex] += d.totalRevenue || 0
+    })
+
+    labels = [
+      'Tháng 1','Tháng 2','Tháng 3','Tháng 4',
+      'Tháng 5','Tháng 6','Tháng 7','Tháng 8',
+      'Tháng 9','Tháng 10','Tháng 11','Tháng 12',
+    ]
+    data = monthlyRevenue
+  } else {
+    // Hôm nay / Tuần / Tháng: giữ nguyên độ phân giải theo ngày
+    labels = dailyStats.value.map((d) => formatShortDate(d.reportDate))
+    data = dailyStats.value.map((d) => d.totalRevenue)
+  }
 
   revenueChart = new Chart(revenueChartRef.value, {
     type: 'line',
@@ -628,7 +659,6 @@ function buildOrderChart() {
   })
 }
 
-// ====== Chart 3: Doanh thu theo thương hiệu (Doughnut) ======
 function buildBrandChart() {
   brandChart = destroyChart(brandChart)
   if (!brandChartRef.value || !brandStats.value.length) return
@@ -663,13 +693,16 @@ function buildBrandChart() {
   })
 }
 
-// ====== Chart 4: So sánh doanh thu (Bar grouped theo tuần) ======
+// ====== Chart 4: So sánh doanh thu (Bar grouped) ======
 function buildCompareChart() {
   compareChart = destroyChart(compareChart)
   if (!compareChartRef.value || !compareData.value.current?.length) return
 
+  // Trục X chỉ hiện label gốc ("Ngày 1" / "Tuần 23" / "T2")
+  // sublabel chỉ dùng trong tooltip để phân biệt ngày của từng kỳ
   const labels = compareData.value.current.map((d) => d.label)
-  const currentValues = compareData.value.current.map((d) => d.revenue)
+
+  const currentValues  = compareData.value.current.map((d) => d.revenue)
   const previousValues = compareData.value.previous.map((d) => d.revenue)
 
   compareChart = new Chart(compareChartRef.value, {
@@ -697,7 +730,11 @@ function buildCompareChart() {
       ...chartDefaults,
       scales: {
         x: {
-          ticks: { color: tickColor, font: { size: 11 } },
+          ticks: {
+            color: tickColor,
+            font: { size: 11 },
+            maxRotation: 0,
+          },
           grid: { display: false },
         },
         y: {
@@ -717,6 +754,18 @@ function buildCompareChart() {
         },
         tooltip: {
           callbacks: {
+            // FIX: lấy sublabel đúng theo dataset (0 = kỳ trước, 1 = kỳ này)
+            title: (items) => {
+              const idx        = items[0].dataIndex
+              const datasetIdx = items[0].datasetIndex
+              const source     = datasetIdx === 0
+                ? compareData.value.previous[idx]
+                : compareData.value.current[idx]
+              if (!source) return ''
+              return source.sublabel
+                ? `${source.label} (${source.sublabel})`
+                : source.label
+            },
             label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
           },
         },
@@ -796,38 +845,50 @@ function resetFilters() {
   filters.date = 'month'
 }
 
+function selectPreset(val) {
+  customDate.value = ''
+  selectedTime.value = val
+}
+
+function selectCustomDate() {
+  if (!customDate.value) return
+  selectedTime.value = ''
+  fetchDashboardData('today', customDate.value, customDate.value)
+}
+
 // ====== API ======
-async function fetchDashboardData(period = 'month') {
+async function fetchDashboardData(period = 'month', startDate = '', endDate = '') {
   loading.value = true
   errorMsg.value = ''
   try {
     const [
       dailyRes, monthlyRes, weekdayRes, brandRes,
       recentOrdersRes, topProductsRes, lowStockRes, topCustomersRes,
-      compareRes,pendingres,
+      compareRes, pendingRes,
     ] = await Promise.all([
-      statisticsApi.getRevenueByDay(period),
+      statisticsApi.getRevenueByDay(period, startDate, endDate),
       statisticsApi.getRevenueByMonth(),
-      statisticsApi.getOrdersByWeekday(period),
-      statisticsApi.getRevenueByBrand(period),
-      statisticsApi.getRecentOrders(10, period),
-      statisticsApi.getTopProducts(10, period),
+      statisticsApi.getOrdersByWeekday(period, startDate, endDate),
+      statisticsApi.getRevenueByBrand(period, startDate, endDate),
+      statisticsApi.getRecentOrders(10, period, startDate, endDate),
+      statisticsApi.getTopProducts(10, period, startDate, endDate),
       statisticsApi.getLowStockProducts(),
-      statisticsApi.getTopCustomers(10, period),
+      statisticsApi.getTopCustomers(10, period, startDate, endDate),
       statisticsApi.getRevenueCompare(period),
       statisticsApi.getPendingOrdersCount(),
     ])
 
-    dailyStats.value = dailyRes.data.data
-    monthlyStats.value = monthlyRes.data.data
-    weekdayStats.value = weekdayRes.data.data
-    brandStats.value = brandRes.data.data
-    recentOrdersData.value = recentOrdersRes.data.data
-    topProductsData.value = topProductsRes.data.data
-    lowStockData.value = lowStockRes.data.data
-    topCustomersData.value = topCustomersRes.data.data
-    compareData.value = compareRes.data.data
-    pendingOrdersCount.value = pendingres.data.data
+    dailyStats.value         = dailyRes.data.data
+    monthlyStats.value       = monthlyRes.data.data
+    weekdayStats.value       = weekdayRes.data.data
+    brandStats.value         = brandRes.data.data
+    recentOrdersData.value   = recentOrdersRes.data.data
+    topProductsData.value    = topProductsRes.data.data
+    lowStockData.value       = lowStockRes.data.data
+    topCustomersData.value   = topCustomersRes.data.data
+    compareData.value        = compareRes.data.data
+    pendingOrdersCount.value = pendingRes.data.data
+
     buildAllCharts()
   } catch (err) {
     errorMsg.value = err.response?.data?.message || 'Không thể tải dữ liệu thống kê'

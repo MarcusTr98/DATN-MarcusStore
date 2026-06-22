@@ -9,29 +9,38 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
 @Repository
 public interface StatisticsRepository extends JpaRepository<Order, Integer> {
 
-    @Query(value = """
-        SELECT
-            CAST(o.created_at AS DATE) AS reportDate,
-            COUNT(DISTINCT o.order_id) AS totalOrders,
-            SUM(oi.quantity) AS totalProductsSold,
-            SUM(o.final_amount) AS totalRevenue
-        FROM Orders o
-        INNER JOIN Order_Items oi ON o.order_id = oi.order_id
-        WHERE o.payment_status = 'PAID'
-            AND (:startDate IS NULL OR CAST(o.created_at AS DATE) >= :startDate)
-            AND (:endDate IS NULL OR CAST(o.created_at AS DATE) <= :endDate)
-        GROUP BY CAST(o.created_at AS DATE)
-        ORDER BY reportDate ASC
-        """, nativeQuery = true)
-    List<RevenueByDayProjection> getRevenueByDay(
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate);
+   @Query(value = """
+    WITH DateSeries AS (
+        SELECT CAST(:startDate AS DATE) AS reportDate
+        UNION ALL
+        SELECT DATEADD(DAY, 1, reportDate)
+        FROM DateSeries
+        WHERE reportDate < CAST(:endDate AS DATE)
+    )
+    SELECT
+        ds.reportDate AS reportDate,
+        COUNT(DISTINCT o.order_id) AS totalOrders,
+        ISNULL(SUM(oi.quantity), 0) AS totalProductsSold,
+        ISNULL(SUM(o.final_amount), 0) AS totalRevenue
+    FROM DateSeries ds
+    LEFT JOIN Orders o
+        ON CAST(o.created_at AS DATE) = ds.reportDate
+        AND o.payment_status = 'PAID'
+    LEFT JOIN Order_Items oi ON o.order_id = oi.order_id
+    GROUP BY ds.reportDate
+    ORDER BY ds.reportDate ASC
+    OPTION (MAXRECURSION 366)
+    """, nativeQuery = true)
+List<RevenueByDayProjection> getRevenueByDay(
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate") LocalDate endDate);
 
     @Query(value = """
         SELECT
@@ -134,6 +143,15 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("topN") int topN,
             @Param("startDate") LocalDate startDate,
             @Param("endDate") LocalDate endDate);
+            @Query(value = """
+        SELECT COALESCE(SUM(o.final_amount), 0)
+        FROM Orders o
+        WHERE o.payment_status = 'PAID'
+            AND CAST(o.created_at AS DATE) >= :startDate
+            AND CAST(o.created_at AS DATE) <= :endDate
+        """, nativeQuery = true)
+BigDecimal getTotalRevenue(@Param("startDate") LocalDate startDate,
+                            @Param("endDate") LocalDate endDate);
 
     @Query(value = """
         SELECT TOP (:limit)

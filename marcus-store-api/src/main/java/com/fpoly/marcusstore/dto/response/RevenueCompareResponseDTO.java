@@ -23,6 +23,7 @@ public class RevenueCompareResponseDTO {
     @AllArgsConstructor
     public static class PeriodData {
         private String label;
+        private String sublabel;
         private double revenue;
     }
 }
