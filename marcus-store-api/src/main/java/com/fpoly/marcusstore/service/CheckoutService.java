@@ -7,6 +7,7 @@ import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.CartItem;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
+import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
@@ -14,6 +15,7 @@ import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,9 @@ public class CheckoutService {
 
     @Autowired
     private OrderRepository orderRepository;
+
+    @Autowired
+    private OrderStatusHistoryRepository orderStatusHistoryRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -212,6 +217,13 @@ public class CheckoutService {
 
         // Lưu đơn hàng & dọn Giỏ hàng
         Order savedOrder = orderRepository.save(order);
+        OrderStatusHistory createdHistory = new OrderStatusHistory();
+        createdHistory.setOrder(savedOrder);
+        createdHistory.setStatus("CREATED");
+        createdHistory.setTitle("Tạo đơn");
+        createdHistory.setCreatedBy(user);
+        orderStatusHistoryRepository.save(createdHistory);
+
         cartItemRepository.deleteAll(cartItems);
 
         return savedOrder;

@@ -28,6 +28,7 @@ public class OrderDetailResponse {
     private String paymentStatus;
     private String transactionId;
     private String trackingCode;
+    private Integer userId;
     private String fullName;
     private String email;
     private String phoneNumber;

@@ -94,7 +94,7 @@ onUnmounted(() => {
               <span>Liên hệ cửa hàng</span>
             </router-link>
             <span class="topbar-divider">|</span>
-            <router-link to="/theo-doi-don-hang" class="topbar-item topbar-link">
+            <router-link to="/profile/orders" class="topbar-item topbar-link">
               <i class="fas fa-truck"></i>
               <span>Theo dõi đơn hàng</span>
             </router-link>
@@ -170,9 +170,7 @@ onUnmounted(() => {
                       </router-link>
                     </li>
                     <li>
-                      <router-link class="dropdown-item" to="/my-orders">
-                        <i class="fas fa-box-open me-2"></i>Đơn mua
-                      </router-link>
+
                     </li>
                     <li>
                       <router-link class="dropdown-item" to="/wishlist">

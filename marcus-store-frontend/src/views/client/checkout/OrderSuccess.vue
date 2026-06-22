@@ -23,7 +23,7 @@
           <router-link to="/" class="btn btn-outline-secondary rounded-pill px-4"
             >Trang chủ</router-link
           >
-          <router-link to="/account/orders" class="btn btn-danger rounded-pill px-4"
+          <router-link to="/profile/orders" class="btn btn-danger rounded-pill px-4"
             >Xem đơn hàng</router-link
           >
         </div>

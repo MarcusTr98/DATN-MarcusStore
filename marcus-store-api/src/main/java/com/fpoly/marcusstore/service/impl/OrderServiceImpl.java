@@ -6,11 +6,15 @@ import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
+import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.OrderService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +36,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
+    private final ProductSkuRepository productSkuRepository;
+    private final VoucherRepository voucherRepository;
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank()
@@ -147,11 +156,14 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public OrderDetailResponse getOrderDetailResponse(String orderCode) {
         // Lấy chi tiết đơn hàng theo mã đơn hàng
         Order order = orderRepository.findDetailByOrderCode(orderCode).orElseThrow(() ->
                 new RuntimeException("không tìm thấy đơn hàng "));
+        if (ensureTrackingCodeForShipping(order)) {
+            orderRepository.saveAndFlush(order);
+        }
         orderItemRepository.findWithProductItemsByOrderId(order.getOrderId());
         // lấy trạng thái lịch sử đơn hàng
         List<OrderStatusHistory> histories =
@@ -186,6 +198,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .transactionId(order.getTransactionId())
                 .trackingCode(order.getTrackingCode())
+                .userId(order.getUser().getUserId())
                 .fullName(order.getUser().getFullName())
                 .email(order.getUser().getEmail())
                 .phoneNumber(order.getUser().getPhoneNumber())
@@ -241,9 +254,9 @@ public class OrderServiceImpl implements OrderService {
         newStatus = normalizeStatusValue(newStatus);
 
         return switch (currentStatus) {
-            case "PENDING" -> newStatus.equals("PROCESSING") || newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
+            case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
+            case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
             case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
-            case "CONFIRMED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
             case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             default -> false;
@@ -255,15 +268,41 @@ public class OrderServiceImpl implements OrderService {
 
     private String getHistoryTitle(String status) {
         return switch (status) {
-            case "PENDING" -> "Khách hàng tạo đơn";
-            case "PROCESSING" -> "Đơn đang được xử lý";
-            case "CONFIRMED" -> "Nhân viên xác nhận đơn";
-            case "SHIPPING" -> "Đơn chuyển sang đang giao hàng";
-            case "COMPLETED" -> "Đơn giao thành công";
-            case "FAILED" -> "Giao hàng thất bại";
-            case "CANCELLED" -> "Đơn đã hủy";
-            default -> "Cập nhật trạng thái đơn hàng";
+            case "PENDING" -> "Đơn hàng đã đặt";
+            case "CONFIRMED" -> "Đơn hàng đã được xác nhận";
+            case "PROCESSING" -> "Đơn hàng đang được chuẩn bị";
+            case "SHIPPING" -> "Đơn hàng đang được giao";
+            case "COMPLETED" -> "Giao hàng thành công";
+            case "FAILED" -> "Giao hàng không thành công";
+            case "CANCELLED" -> "Đơn hàng đã hủy";
+            default -> "Cập nhật trạng thái";
         };
+    }
+
+    private String generateTrackingCode(Order order) {
+        String randomPart = UUID.randomUUID().toString()
+                .replace("-", "")
+                .substring(0, 10)
+                .toUpperCase();
+        return "GHN" + randomPart;
+    }
+
+    private boolean ensureTrackingCodeForShipping(Order order) {
+        boolean isShipping = "SHIPPING".equals(normalizeStatusValue(order.getOrderStatus()));
+        boolean missingTrackingCode = order.getTrackingCode() == null || order.getTrackingCode().isBlank();
+
+        if (isShipping && missingTrackingCode) {
+            order.setTrackingCode(generateTrackingCode(order));
+            return true;
+        }
+
+        return false;
+    }
+
+    private void markPaymentPaidWhenCompleted(Order order) {
+        if ("COMPLETED".equals(normalizeStatusValue(order.getOrderStatus()))) {
+            order.setPaymentStatus("PAID");
+        }
     }
 
     private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
@@ -302,7 +341,33 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Vui lòng nhập lý do cho trạng thái này");
         }
 
+        boolean wasCancelled = "CANCELLED".equals(newStatus);
+
+        if (wasCancelled) {
+            List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+            List<Integer> skuIds = orderItems.stream()
+                    .map(item -> item.getSku().getSkuId())
+                    .toList();
+            List<ProductSku> lockedSkus = productSkuRepository.findByIdsForUpdate(skuIds);
+            Map<Integer, ProductSku> skuMap = lockedSkus.stream()
+                    .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
+
+            for (OrderItem item : orderItems) {
+                ProductSku sku = skuMap.get(item.getSku().getSkuId());
+                if (sku != null) {
+                    sku.setStockQuantity(sku.getStockQuantity() + item.getQuantity());
+                }
+            }
+
+            if (order.getVoucher() != null) {
+                Voucher voucher = order.getVoucher();
+                voucher.setQuantity(voucher.getQuantity() + 1);
+            }
+        }
+
         order.setOrderStatus(newStatus);
+        ensureTrackingCodeForShipping(order);
+        markPaymentPaidWhenCompleted(order);
         orderRepository.save(order);
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
@@ -311,13 +376,27 @@ public class OrderServiceImpl implements OrderService {
         return getOrderDetailResponse(orderCode);
     }
 
+    // lấy danh sách đơn hàng của user theo ID
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getUserOrder() {
+        Integer userId = SecurityUtils.getCurrentUserId();
+        return orderRepository.findByUserUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Override
     @Transactional
-    public void hideOrder(String orderCode) {
-        Order order = orderRepository.findByOrderCode(orderCode)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+    public OrderDetailResponse getUserOrderDetail(String orderCode) {
+        Integer userId = SecurityUtils.getCurrentUserId();
+        OrderDetailResponse response = getOrderDetailResponse(orderCode);
 
-        order.setIsHidden(true);
-        orderRepository.save(order);
+        if (!userId.equals(response.getUserId())) {
+            throw new RuntimeException("Không có quyền xem");
+        }
+
+        return response;
     }
 }
