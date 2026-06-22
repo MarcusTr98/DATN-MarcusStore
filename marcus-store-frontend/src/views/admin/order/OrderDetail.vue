@@ -342,7 +342,7 @@ onMounted(() => {
 
 const orderStatusMap = {
   PENDING: { label: 'Chờ xác nhận', className: 'pending' },
-  PROCESSING: { label: 'Đang xử lý', className: 'confirmed' },
+  PROCESSING: { label: 'Đang chuẩn bị hàng', className: 'processing' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
   SHIPPING: { label: 'Đang giao', className: 'shipping' },
   COMPLETED: { label: 'Hoàn thành', className: 'completed' },
@@ -367,15 +367,14 @@ const paymentMethodMap = {
 
 const allowedTransitions = {
   PENDING: [
-    { value: 'PROCESSING', label: 'Đang xử lý' },
     { value: 'CONFIRMED', label: 'Xác nhận đơn' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],
-  PROCESSING: [
-    { value: 'SHIPPING', label: 'Giao hàng (Đã thanh toán)' },
+  CONFIRMED: [
+    { value: 'PROCESSING', label: 'Đang chuẩn bị hàng' },
     { value: 'CANCELLED', label: 'Hủy đơn & Hoàn tiền' },
   ],
-  CONFIRMED: [
+  PROCESSING: [
     { value: 'SHIPPING', label: 'Đang giao hàng' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],

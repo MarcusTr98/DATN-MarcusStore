@@ -3,11 +3,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useCartStore } from '@/stores/cartStore'
 import { useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
+import BaseModal from '../BaseModal.vue'
 
 const router = useRouter()
 const cartStore = useCartStore()
 
-const totalMoney = computed(() => cartStore.totalAmount || 0)
+const totalMoney = computed(() => cartStore.totalAmount)
 const totalQuantity = computed(() => cartStore.totalQuantity)
 const isLoggedIn = ref(false)
 const userName = ref('')
@@ -27,9 +28,12 @@ const checkAuth = () => {
     userName.value = ''
   }
 }
-
+const showLogoutModal = ref(false)
 const handleLogout = () => {
-  if (!confirm('Bạn có chắc chắn muốn đăng xuất?')) return
+  showLogoutModal.value = true
+}
+
+const confirmLogout = () => {
   localStorage.removeItem('ACCESS_TOKEN')
   localStorage.removeItem('USER_ROLE')
   localStorage.removeItem('USERNAME')
@@ -39,7 +43,12 @@ const handleLogout = () => {
   cartStore.error = null
 
   isLoggedIn.value = false
+  showLogoutModal.value = false
   router.push('/login')
+}
+
+const cancelLogout = () => {
+  showLogoutModal.value = false
 }
 
 onMounted(() => {
@@ -80,9 +89,9 @@ onUnmounted(() => {
               >
             </a>
             <span class="topbar-divider">|</span>
-            <router-link to="/he-thong-cua-hang" class="topbar-item topbar-link">
+            <router-link to="/contact-store" class="topbar-item topbar-link">
               <i class="fas fa-map-marker-alt"></i>
-              <span>Hệ thống cửa hàng</span>
+              <span>Liên hệ cửa hàng</span>
             </router-link>
             <span class="topbar-divider">|</span>
             <router-link to="/profile/orders" class="topbar-item topbar-link">
@@ -161,9 +170,7 @@ onUnmounted(() => {
                       </router-link>
                     </li>
                     <li>
-                      <router-link class="dropdown-item" to="/my-orders">
-                        <i class="fas fa-box-open me-2"></i>Đơn mua
-                      </router-link>
+
                     </li>
                     <li>
                       <router-link class="dropdown-item" to="/wishlist">
@@ -248,4 +255,13 @@ onUnmounted(() => {
       </div>
     </nav>
   </header>
+  <BaseModal
+    :visible="showLogoutModal"
+    type="confirm"
+    title="Đăng xuất"
+    message="Bạn có chắc chắn muốn đăng xuất?"
+    :show-confirm="true"
+    @close="cancelLogout"
+    @confirm="confirmLogout"
+  />
 </template>

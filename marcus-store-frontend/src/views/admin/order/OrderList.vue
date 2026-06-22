@@ -134,14 +134,6 @@
                   >
                     <i class="bi bi-eye"></i>
                   </button>
-                  <button
-                    type="button"
-                    class="icon-button danger"
-                    title="Ẩn đơn hàng"
-                    @click="hideOrder(orders)"
-                  >
-                    <i class="bi bi-eye-slash"></i>
-                  </button>
                 </div>
               </td>
             </tr>
@@ -334,23 +326,6 @@ const showToast = (message) => {
 
 const showOrderDetail = (order) => {
   router.push(`/admin/order/${order.orderCode}`)
-}
-
-const hideOrder = async (order) => {
-  try {
-    await OrderListApi.hideOrder(order.orderCode)
-
-    showToast(`Đã ẩn đơn ${order.orderCode} khỏi danh sách.`)
-    if (orders.value.length === 1 && currentPage.value > 0) {
-      currentPage.value -= 1
-    }
-
-    await fetchGetAllOrder()
-    await fetchOrderStats()
-  } catch (e) {
-    console.error(e)
-    showToast('Không thể ẩn đơn hàng.')
-  }
 }
 
 const resetFilters = () => {

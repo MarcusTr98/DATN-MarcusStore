@@ -2,8 +2,14 @@
   <div class="page-wrapper">
     <div class="page-header">
       <div class="header-left">
-        <p class="breadcrumb-text">Sản phẩm</p>
-        <h1 class="page-title">Tạo Biến thể SKU</h1>
+        <div class="header-icon-box">
+          <i class="fa-solid fa-layer-group"></i>
+        </div>
+        <div class="header-text-group">
+          <p class="breadcrumb-text">Sản phẩm</p>
+          <h1 class="page-title">Tạo Biến thể SKU</h1>
+          <p class="page-subtitle">Tạo và quản lý các biến thể SKU theo thuộc tính sản phẩm</p>
+        </div>
       </div>
       <div class="header-right">
         <div class="step-indicator">

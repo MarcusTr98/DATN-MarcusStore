@@ -19,7 +19,6 @@ public interface OrderService {
     List<String> getOrderStatuses();
     OrderDetailResponse getOrderDetailResponse(String orderCode);
     OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request);
-    void hideOrder(String orderCode);
      List<OrderResponse> getUserOrder();
      OrderDetailResponse getUserOrderDetail(String orderCode);
 
