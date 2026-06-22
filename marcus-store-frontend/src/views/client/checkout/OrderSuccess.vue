@@ -53,7 +53,7 @@
             >Trang chủ</router-link
           >
           <router-link
-            to="/account/orders"
+            to="/profile/orders"
             class="btn btn-warning text-dark fw-bold rounded-pill px-4"
             >Xem đơn chờ thanh toán</router-link
           >
