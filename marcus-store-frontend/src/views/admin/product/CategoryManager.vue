@@ -37,14 +37,14 @@
               type="text"
               class="form-control f-input"
               placeholder="Tìm theo tên danh mục..."
-              @input="page = 1"
+              @input="onSearch"
             />
           </div>
         </div>
 
         <div class="col-12 col-md-4">
           <label class="filter-label">TRẠNG THÁI</label>
-          <select v-model="filter.status" class="form-select f-input" @change="page = 1">
+          <select v-model="filter.status" class="form-select f-input" @change="onSearch">
             <option value="">Tất cả</option>
             <option value="true">Đang hiển thị</option>
             <option value="false">Đã ẩn</option>
@@ -86,11 +86,10 @@
                 </td>
               </tr>
               <tr v-for="(item, i) in pagedRows" :key="item.categoryId">
-                <td class="text-muted small">{{ (page - 1) * PAGE_SIZE + i + 1 }}</td>
+                <td class="text-muted small">{{ currentPage * pageSize + i + 1 }}</td>
 
                 <td>
                   <div class="cat-name" :style="{ paddingLeft: item.level * 28 + 'px' }">
-
                     <i
                       v-if="item.hasChildren"
                       class="bi bi-folder2-open cat-toggle"
@@ -144,56 +143,56 @@
           </table>
         </div>
 
-        <div
-          v-if="totalPages > 1"
-          class="d-flex justify-content-between align-items-center px-3 pt-3 pb-2"
-        >
-          <span class="text-muted small">
-            Hiển thị {{ pagedRows.length }} / {{ filteredList.length }} danh mục
-          </span>
-          <nav>
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item" :class="{ disabled: page === 1 }">
-                <button class="page-link pg" @click="page--">‹</button>
-              </li>
-              <li
-                v-for="p in totalPages"
-                :key="p"
-                class="page-item"
-                :class="{ active: p === page }"
-              >
-                <button class="page-link pg" @click="page = p">{{ p }}</button>
-              </li>
-              <li class="page-item" :class="{ disabled: page === totalPages }">
-                <button class="page-link pg" @click="page++">›</button>
-              </li>
-            </ul>
-          </nav>
+        <!-- Pagination theo chuẩn mẫu -->
+        <div v-if="totalElements > 0" class="pagination-bar">
+          <div class="pagination-total">
+            Tổng <strong>{{ totalElements }}</strong> danh mục
+          </div>
+
+          <div class="pagination-actions">
+            <label class="page-size-box">
+              <span>Hiển thị</span>
+              <select v-model.number="pageSize">
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+            </label>
+
+            <button
+              type="button"
+              class="page-btn"
+              :disabled="currentPage === 0"
+              @click="goToPage(currentPage - 1)"
+            >
+              Trước
+            </button>
+
+            <span class="page-current"> Trang {{ currentPage + 1 }} / {{ totalPages }} </span>
+
+            <button
+              type="button"
+              class="page-btn"
+              :disabled="currentPage + 1 >= totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </template>
     </div>
 
-    <div class="toast-container position-fixed top-0 end-0 p-3 mt-3" style="z-index: 9999">
-      <div
-        id="cateToast"
-        class="toast align-items-center text-white border-0"
-        :class="toast.type === 'success' ? 'bg-success' : 'bg-danger'"
-        role="alert"
-        aria-live="assertive"
-        aria-atomic="true"
-      >
-        <div class="d-flex">
-          <div class="toast-body fw-500">
-            <i
-              class="bi me-2"
-              :class="toast.type === 'success' ? 'bi-check-circle' : 'bi-x-circle'"
-            ></i>
-            {{ toast.msg }}
-          </div>
-          <button type="button" class="btn-close btn-close-white me-2 m-auto"></button>
-        </div>
-      </div>
-    </div>
+    <BaseModal
+      :visible="baseModal.visible"
+      :show-confirm="baseModal.type === 'confirm'"
+      :type="baseModal.type"
+      :title="baseModal.title"
+      :message="baseModal.message"
+      @close="onModalClose"
+      @confirm="onModalConfirm"
+    />
 
     <div class="modal fade" id="cateModal" tabindex="-1" ref="modalEl">
       <div class="modal-dialog modal-dialog-centered">
@@ -270,8 +269,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
-import { Modal, Toast } from 'bootstrap'
+import { ref, computed, watch, onMounted } from 'vue'
+import BaseModal from '@/components/BaseModal.vue'
+import { Modal } from 'bootstrap'
 import api from '@/utils/api'
 import '@/assets/css/Category.css'
 
@@ -287,20 +287,29 @@ const categoryApi = {
   hide: (id) => api.put(`${BASE_URL}/hidden/${id}`),
 }
 
-const PAGE_SIZE = 5
 const allCategories = ref([])
 const loading = ref(false)
 const saving = ref(false)
-const page = ref(1)
 const filter = ref({ search: '', status: '' })
 const isEdit = ref(false)
 const editId = ref(null)
 const form = ref({ categoryName: '', parentId: null, status: true })
 const err = ref({})
-const toast = ref({ msg: '', type: 'success' })
 const modalEl = ref(null)
 let bsModal = null
-let bsToast = null
+
+const currentPage = ref(0)
+const pageSize = ref(5)
+const totalElements = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(totalElements.value / pageSize.value)))
+
+const baseModal = ref({
+  visible: false,
+  type: 'error',
+  title: '',
+  message: '',
+  onConfirm: null,
+})
 
 const stats = computed(() => [
   { label: 'Tổng danh mục', value: allCategories.value.length, highlight: false },
@@ -330,8 +339,8 @@ const filteredList = computed(() => {
 function buildTree(list) {
   const map = new Map()
   const roots = []
-  list.forEach(c => map.set(c.categoryId, { ...c, children: [] }))
-  list.forEach(c => {
+  list.forEach((c) => map.set(c.categoryId, { ...c, children: [] }))
+  list.forEach((c) => {
     const node = map.get(c.categoryId)
     if (c.parentId != null && map.has(c.parentId)) {
       map.get(c.parentId).children.push(node)
@@ -339,12 +348,12 @@ function buildTree(list) {
       roots.push(node)
     }
   })
-  const sort = arr => arr.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'vi'))
+  const sort = (arr) => arr.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'vi'))
   sort(roots)
-  roots.forEach(r => sort(r.children))
+  roots.forEach((r) => sort(r.children))
   return roots
 }
-// 2. Flatten cây → mảng phẳng, có level + hasChildren
+
 function flattenTree(nodes, level = 0, out = []) {
   for (const n of nodes) {
     out.push({ ...n, level, hasChildren: n.children.length > 0 })
@@ -352,23 +361,55 @@ function flattenTree(nodes, level = 0, out = []) {
   }
   return out
 }
-// 3. Đếm tổng con cháu (đệ quy)
+
 function countAllChildren(node) {
   let total = node.children.length
   for (const child of node.children) total += countAllChildren(child)
   return total
 }
-// 4. Tree rows đã flatten theo thứ tự cây
+
 const treeRows = computed(() => flattenTree(buildTree(filteredList.value)))
 const parentOptions = computed(() =>
   allCategories.value.filter((c) => c.categoryId !== editId.value),
 )
-// 5. Phân trang trên treeRows (thay thế computed cũ)
-const totalPages = computed(() => Math.max(1, Math.ceil(treeRows.value.length / PAGE_SIZE)))
-const pagedRows = computed(() => {
-  const start = (page.value - 1) * PAGE_SIZE
-  return treeRows.value.slice(start, start + PAGE_SIZE)
+
+watch(filteredList, () => {
+  totalElements.value = treeRows.value.length
 })
+
+const pagedRows = computed(() => {
+  const start = currentPage.value * pageSize.value
+  return treeRows.value.slice(start, start + pageSize.value)
+})
+
+watch(pageSize, () => {
+  currentPage.value = 0
+})
+
+function goToPage(page) {
+  if (page < 0 || page >= totalPages.value) return
+  currentPage.value = page
+}
+
+function onSearch() {
+  currentPage.value = 0
+}
+
+function showModal(type, title, message, onConfirm = null) {
+  baseModal.value.type = type
+  baseModal.value.title = title
+  baseModal.value.message = message
+  baseModal.value.onConfirm = onConfirm
+  baseModal.value.visible = true
+}
+
+function onModalClose() {
+  baseModal.value.visible = false
+}
+
+function onModalConfirm() {
+  if (baseModal.value.onConfirm) baseModal.value.onConfirm()
+}
 
 async function fetchAll() {
   loading.value = true
@@ -376,8 +417,9 @@ async function fetchAll() {
     const res = await categoryApi.getAll()
     const payload = res.data?.data ?? res.data
     allCategories.value = Array.isArray(payload) ? payload : (payload.content ?? [])
+    totalElements.value = treeRows.value.length
   } catch {
-    showToast('Không thể tải danh sách danh mục', 'error')
+    showModal('error', 'Lỗi', 'Không thể tải danh sách danh mục')
   } finally {
     loading.value = false
   }
@@ -390,11 +432,11 @@ async function doCreate() {
       categoryName: form.value.categoryName,
       parentId: form.value.parentId,
     })
-    showToast('Thêm danh mục thành công!', 'success')
+    showModal('success', 'Thành công', 'Thêm danh mục thành công!')
     bsModal.hide()
     await fetchAll()
   } catch (e) {
-    showToast(e.response?.data?.message ?? 'Lỗi khi thêm danh mục', 'error')
+    showModal('error', 'Lỗi', e.response?.data?.message ?? 'Lỗi khi thêm danh mục')
   } finally {
     saving.value = false
   }
@@ -408,25 +450,31 @@ async function doUpdate() {
       parentId: form.value.parentId,
       status: form.value.status,
     })
-    showToast('Cập nhật thành công!', 'success')
+    showModal('success', 'Thành công', 'Cập nhật thành công!')
     bsModal.hide()
     await fetchAll()
   } catch (e) {
-    showToast(e.response?.data?.message ?? 'Lỗi khi cập nhật', 'error')
+    showModal('error', 'Lỗi', e.response?.data?.message ?? 'Lỗi khi cập nhật')
   } finally {
     saving.value = false
   }
 }
 
 async function onHide(item) {
-  if (!confirm(`Ẩn danh mục "${item.categoryName}"?`)) return
-  try {
-    await categoryApi.hide(item.categoryId)
-    showToast('Đã ẩn danh mục', 'success')
-    await fetchAll()
-  } catch (e) {
-    showToast(e.response?.data?.message ?? 'Lỗi khi ẩn danh mục', 'error')
-  }
+  showModal(
+    'confirm',
+    'Xác nhận ẩn danh mục',
+    `Bạn có chắc muốn ẩn danh mục "${item.categoryName}"?`,
+    async () => {
+      try {
+        await categoryApi.hide(item.categoryId)
+        showModal('success', 'Thành công', 'Đã ẩn danh mục')
+        await fetchAll()
+      } catch (e) {
+        showModal('error', 'Lỗi', e.response?.data?.message ?? 'Lỗi khi ẩn danh mục')
+      }
+    },
+  )
 }
 
 function openCreate() {
@@ -463,17 +511,10 @@ function onSubmit() {
   isEdit.value ? doUpdate() : doCreate()
 }
 
-function showToast(msg, type = 'success') {
-  toast.value = { msg, type }
-  nextTick(() => {
-    if (!bsToast) bsToast = new Toast(document.getElementById('cateToast'), { delay: 3000 })
-    bsToast.show()
-  })
-}
-
 function onReset() {
   filter.value = { search: '', status: '' }
-  page.value = 1
+  currentPage.value = 0
+  pageSize.value = 5
 }
 
 onMounted(async () => {

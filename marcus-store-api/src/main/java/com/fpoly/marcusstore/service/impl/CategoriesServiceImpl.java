@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -32,12 +33,14 @@ public class CategoriesServiceImpl implements CategoriesService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<CategoryResponse> findAllCategory(Pageable pageable) {
         Page<Category> categories = categoryRepository.findAll(pageable);
         return categories.map(this::toCateResponse);
     }
 
     @Override
+    @Transactional
     public CategoryResponse createCategory(CreateCategory createCategory) {
         if (categoryRepository.existsByCategoryName((createCategory.getCategoryName()))) {
             throw new RuntimeException("Tên danh mục đã tồn tại");
@@ -63,12 +66,14 @@ public class CategoriesServiceImpl implements CategoriesService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<CategoryResponse> getCategoryById(Integer id) {
         Optional<Category> category = categoryRepository.findById(id);
         return category.map(this::toCateResponse);
     }
 
     @Override
+    @Transactional
     public CategoryResponse updateCategory(Integer id, UpdateCategory updateCategory) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Id ko tồn tại"));
@@ -104,7 +109,8 @@ public class CategoriesServiceImpl implements CategoriesService {
     }
 
     @Override
-    public Category hiddenCategory(Integer id) {
+    @Transactional
+    public CategoryResponse hiddenCategory(Integer id) {
         Category category = categoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Id danh mục ko tồn tại"));
 
@@ -112,6 +118,6 @@ public class CategoriesServiceImpl implements CategoriesService {
             throw new RuntimeException("Danh mục đã bị ẩn");
         }
         category.setStatus(false);
-        return categoryRepository.save(category);
+        return toCateResponse(categoryRepository.save(category));
     }
 }

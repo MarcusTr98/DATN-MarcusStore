@@ -43,7 +43,7 @@ public class AdminCategoryController {
     }
 
     @PutMapping("/hidden/{id}")
-    public ApiResponse<Category> hiddenCategory(@PathVariable Integer id) {
+    public ApiResponse<CategoryResponse> hiddenCategory(@PathVariable Integer id) {
         return ApiResponse.success(categoriesService.hiddenCategory(id));
     }
 }
