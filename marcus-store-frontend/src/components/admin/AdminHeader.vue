@@ -105,21 +105,31 @@ const fetchNotifications = async () => {
     notifications.value = res.data || []
     unreadCount.value = notifications.value.filter((n) => !n.isRead).length
   } catch (error) {
-    console.error('Không thể tải thông báo:', error)
+    console.error('Lỗi tải thông báo (Do Backend 500):', error)
   } finally {
     isLoadingNotif.value = false
   }
 }
 
 const connectWebSocket = () => {
-  const socket = new SockJS(`${WS_BASE_URL}/ws-endpoint`)
+  const token = localStorage.getItem('ACCESS_TOKEN')
+
   stompClient = new Client({
-    webSocketFactory: () => socket,
+    // FIX: Khởi tạo SockJS mới mỗi lần reconnect
+    webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws-endpoint`),
     reconnectDelay: 5000,
+    // FIX: Truyền JWT token để Backend xác thực (nếu cần)
+    connectHeaders: {
+      Authorization: token ? `Bearer ${token}` : '',
+    },
     onConnect: () => {
       stompClient.subscribe('/topic/admin/notifications', (message) => {
         handleNewNotification(JSON.parse(message.body))
       })
+    },
+    onStompError: (frame) => {
+      console.error('Broker reported error: ' + frame.headers['message'])
+      console.error('Additional details: ' + frame.body)
     },
   })
   stompClient.activate()
@@ -150,12 +160,20 @@ const markAllAsRead = async () => {
   }
 }
 
-const handleNotifClick = (item) => {
+const handleNotifClick = async (item) => {
   if (!item.isRead) {
-    item.isRead = true
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
+    try {
+      // Đánh dấu đọc từng tin nếu có API tương ứng (Tuỳ chọn bổ sung)
+      // await api.put(`/admin/notifications/${item.id}/read`)
+      item.isRead = true
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+    } catch (e) {
+      console.error(e)
+    }
   }
+
   showNotifDropdown.value = false
+
   if (item.type === 'ORDER' && item.referenceId) {
     router.push(`/admin/order/${item.referenceId}`)
   } else if (item.type === 'CONTACT') {
