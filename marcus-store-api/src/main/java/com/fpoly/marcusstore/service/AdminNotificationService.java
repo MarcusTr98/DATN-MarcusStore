@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -20,9 +21,34 @@ public class AdminNotificationService {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
+    @Transactional(readOnly = true)
+    public Map<String, Object> getNotificationsForAdmin() {
+        List<AdminNotification> list = notificationRepository.findTop20ByIsReadFalseOrderByCreatedAtDesc();
+        long unreadCount = notificationRepository.countByIsReadFalse();
+
+        return Map.of(
+                "list", list,
+                "unreadCount", unreadCount);
+    }
+
+    // 2. Logic đọc thông báo đơn lẻ
+    @Transactional
+    public void markAsRead(Integer id) {
+        notificationRepository.findById(id).ifPresent(notif -> {
+            notif.setIsRead(true);
+            notificationRepository.save(notif);
+        });
+    }
+
+    // 3. Logic đọc toàn bộ thông báo
+    @Transactional
+    public void markAllAsRead() {
+        notificationRepository.markAllAsRead();
+    }
+
+    // 4. Logic bắn Real-time cũ
     @Transactional
     public void createAndSendNotification(String type, String title, String message, String referenceId) {
-        // 1. Lưu thông báo vào Database
         AdminNotification notification = new AdminNotification();
         notification.setType(type);
         notification.setTitle(title);
@@ -30,11 +56,8 @@ public class AdminNotificationService {
         notification.setReferenceId(referenceId);
         notification.setIsRead(false);
 
-        AdminNotification savedNotification = notificationRepository.saveAndFlush(notification); // Dùng saveAndFlush để
-                                                                                                 // ép ID sinh ra ngay
-                                                                                                 // lập tức
+        AdminNotification savedNotification = notificationRepository.saveAndFlush(notification);
 
-        // 2. TẠO DTO (MAP) ĐỂ GỬI QUA WEBSOCKET (Đóng gói sạch sẽ, an toàn)
         Map<String, Object> payload = new HashMap<>();
         payload.put("id", savedNotification.getId());
         payload.put("type", savedNotification.getType());
@@ -43,7 +66,6 @@ public class AdminNotificationService {
         payload.put("referenceId", savedNotification.getReferenceId());
         payload.put("isRead", savedNotification.getIsRead());
 
-        // Format thời gian thành chuỗi thân thiện cho Frontend
         if (savedNotification.getCreatedAt() != null) {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm - dd/MM/yyyy");
             payload.put("time", savedNotification.getCreatedAt().format(formatter));
@@ -51,7 +73,6 @@ public class AdminNotificationService {
             payload.put("time", "Vừa xong");
         }
 
-        // 3. Bắn thông báo an toàn qua WebSocket
         messagingTemplate.convertAndSend("/topic/admin/notifications", payload);
     }
 }
