@@ -468,9 +468,37 @@ const handleModalConfirm = () => {
 }
 
 // ─── Order & Cart Data
-const cartData = ref({ items: [], totalQuantity: 0, totalAmount: 0 })
-const appliedVoucherCode = ref('')
-const discountAmount = ref(0)
+// Ưu tiên lấy từ localStorage (sản phẩm đã chọn), không thì fetch từ API
+const getInitialCartData = () => {
+  const savedItems = localStorage.getItem('selectedCartItems')
+  const savedSubtotal = localStorage.getItem('selectedSubtotal')
+
+  if (savedItems) {
+    try {
+      const items = JSON.parse(savedItems)
+      if (Array.isArray(items) && items.length > 0) {
+        return {
+          items,
+          totalQuantity: items.reduce((sum, i) => sum + (i.quantity || 0), 0),
+          totalAmount: items.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
+        }
+      }
+    } catch (e) {
+      console.warn('Lỗi parse selectedCartItems:', e)
+    }
+  }
+
+  // Fallback: sẽ fetch từ API
+  return { items: [], totalQuantity: 0, totalAmount: 0 }
+}
+
+const cartData = ref(getInitialCartData())
+
+// Khôi phục voucher đã chọn từ localStorage
+const savedVoucherCode = localStorage.getItem('selectedVoucherCode')
+const appliedVoucherCode = ref(savedVoucherCode || '')
+const savedDiscountAmount = localStorage.getItem('selectedVoucherDiscount')
+const discountAmount = ref(savedDiscountAmount ? parseInt(savedDiscountAmount) : 0)
 const shippingFee = ref(0)
 const estimatedDelivery = ref('')
 
@@ -651,9 +679,14 @@ const fetchCart = async () => {
   try {
     const res = await cartApi.getCart()
     const data = res.data
-    cartData.value = data?.data ?? data
-    if (!cartData.value.items?.length)
-      showModal('Giỏ hàng trống', 'Bạn chưa có sản phẩm nào trong giỏ hàng!', 'redirect_cart')
+    const fetchedCart = data?.data ?? data
+
+    // Chỉ cập nhật nếu không có dữ liệu từ localStorage
+    // hoặc nếu API trả về items khác với items đã chọn
+    if (!cartData.value.items?.length && fetchedCart.items?.length) {
+      // Không có dữ liệu localStorage, dùng từ API
+      cartData.value = fetchedCart
+    }
   } catch (error) {
     if (error.response?.status === 401) {
       showModal('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để tiếp tục thanh toán.', 'redirect_login')
@@ -754,6 +787,11 @@ const handleCheckout = async () => {
   isProcessing.value = true
   try {
     const { data } = await api.post('/checkout', payload)
+
+    // Dọn dẹp localStorage sau khi checkout thành công
+    localStorage.removeItem('selectedCartItems')
+    localStorage.removeItem('selectedSubtotal')
+    localStorage.removeItem('selectedVoucherCode')
 
     cartStore.clearCartState()
 

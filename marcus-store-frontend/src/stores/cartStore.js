@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import cartApi from '@/api/cartApi'
 
+
 // Convert dữ liệu backend trả về sang dữ liệu mà Cart.vue đang dùng
 function mapCartItem(item) {
   // convert dữ liệu   từ BE sang FE

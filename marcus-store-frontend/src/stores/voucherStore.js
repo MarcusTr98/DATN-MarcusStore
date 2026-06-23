@@ -21,8 +21,11 @@ function mapVoucher(voucher) {
     endDate: formatDateTimeLocal(voucher.endDate),
     quantity: Number(voucher.quantity || 0),
     isActive: Boolean(voucher.isActive),
-    isPrivate: Boolean(voucher.isPrivate),
     description: voucher.description || '',
+    // Đối tượng sử dụng
+    targetType: voucher.targetType || 'ALL',
+    targetUserIds: voucher.targetUserIds || [],
+    targetUserCount: voucher.targetUserCount || null,
   }
 }
 

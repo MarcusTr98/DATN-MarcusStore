@@ -1,5 +1,7 @@
 package com.fpoly.marcusstore.service.impl;
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -138,5 +140,22 @@ public void UnLockUser(Integer Id) {
     user.setIsActive(true);
 
     userRepository.save(user);
+}
+
+@Override
+@Transactional(readOnly = true)
+public List<UserResponse> getAllUsers() {
+    return userRepository.findAll().stream()
+            .map(this::toResponse)
+            .collect(Collectors.toList());
+}
+
+@Override
+@Transactional(readOnly = true)
+public List<UserResponse> getCustomers() {
+    // roleId = 3 là CUSTOMER
+    return userRepository.findByRoleRoleId(3).stream()
+            .map(this::toResponse)
+            .collect(Collectors.toList());
 }
 }

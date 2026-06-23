@@ -1,0 +1,164 @@
+package com.fpoly.marcusstore.service.impl;
+
+import com.fpoly.marcusstore.dto.response.VoucherResponse;
+import com.fpoly.marcusstore.entity.shopping.UserVoucher;
+import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
+import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
+import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.service.UserVoucherService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class UserVoucherServiceImpl implements UserVoucherService {
+
+    private final UserVoucherRepository userVoucherRepository;
+    private final VoucherRepository voucherRepository;
+    private final UserRepository userRepository;
+
+    @Override
+    public List<VoucherResponse> getAvailableVouchersForUser() {
+        Integer userId = SecurityUtils.getCurrentUserId();
+        LocalDateTime now = LocalDateTime.now();
+        Set<VoucherResponse> result = new HashSet<>();
+
+        // 1. Lấy voucher ALL (ai cũng dùng được)
+        List<Voucher> allVouchers = voucherRepository.findAvailableVouchers();
+        for (Voucher v : allVouchers) {
+            if ("ALL".equalsIgnoreCase(v.getTargetType())) {
+                result.add(toResponseFromVoucher(v));
+            }
+        }
+
+        // 2. Lấy voucher SPECIFIC đã gán cho user
+        List<UserVoucher> userVouchers = userVoucherRepository.findAvailableVouchersByUserId(userId, now);
+        for (UserVoucher uv : userVouchers) {
+            result.add(toResponse(uv));
+        }
+
+        return new ArrayList<>(result);
+    }
+
+    @Override
+    public List<VoucherResponse> getUserVouchersByVoucherId(Integer voucherId) {
+        return userVoucherRepository.findByVoucherVoucherId(voucherId)
+                .stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public void assignVoucherToUsers(Integer voucherId, List<Integer> userIds) {
+        Voucher voucher = voucherRepository.findById(voucherId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy voucher với id: " + voucherId));
+
+        List<UserVoucher> userVouchers = new ArrayList<>();
+
+        for (Integer userId : userIds) {
+            if (!userVoucherRepository.existsByVoucherVoucherIdAndUserUserId(voucherId, userId)) {
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + userId));
+
+                UserVoucher userVoucher = UserVoucher.builder()
+                        .voucher(voucher)
+                        .user(user)
+                        .assignedAt(LocalDateTime.now())
+                        .isUsed(false)
+                        .build();
+
+                userVouchers.add(userVoucher);
+            }
+        }
+
+        if (!userVouchers.isEmpty()) {
+            userVoucherRepository.saveAll(userVouchers);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void reassignVoucherUsers(Integer voucherId, List<Integer> newUserIds) {
+        Voucher voucher = voucherRepository.findById(voucherId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy voucher với id: " + voucherId));
+
+        List<UserVoucher> currentUserVouchers = userVoucherRepository.findByVoucherVoucherId(voucherId);
+        List<Integer> currentUserIds = currentUserVouchers.stream()
+                .map(uv -> uv.getUser().getUserId())
+                .collect(Collectors.toList());
+
+        // Xóa user không còn trong danh sách mới
+        for (Integer userId : currentUserIds) {
+            if (!newUserIds.contains(userId)) {
+                userVoucherRepository.findByVoucherVoucherIdAndUserUserId(voucherId, userId)
+                        .ifPresent(userVoucherRepository::delete);
+            }
+        }
+
+        // Thêm user mới
+        for (Integer userId : newUserIds) {
+            if (!currentUserIds.contains(userId)) {
+                User user = userRepository.findById(userId).orElse(null);
+                if (user != null) {
+                    UserVoucher userVoucher = UserVoucher.builder()
+                            .voucher(voucher)
+                            .user(user)
+                            .assignedAt(LocalDateTime.now())
+                            .isUsed(false)
+                            .build();
+                    userVoucherRepository.save(userVoucher);
+                }
+            }
+        }
+    }
+
+    private VoucherResponse toResponse(UserVoucher userVoucher) {
+        Voucher voucher = userVoucher.getVoucher();
+        return VoucherResponse.builder()
+                .userVoucherId(userVoucher.getId())
+                .voucherId(voucher.getVoucherId())
+                .voucherCode(voucher.getVoucherCode())
+                .discountType(voucher.getDiscountType())
+                .discountValue(voucher.getDiscountValue())
+                .maxDiscountAmount(voucher.getMaxDiscountAmount())
+                .minOrderValue(voucher.getMinOrderValue())
+                .startDate(voucher.getStartDate())
+                .endDate(voucher.getEndDate())
+                .isUsed(userVoucher.getIsUsed())
+                .usedAt(userVoucher.getUsedAt())
+                .assignedAt(userVoucher.getAssignedAt())
+                .isActive(voucher.getIsActive())
+                .region(voucher.getRegion())
+                .description(voucher.getDescription())
+                .build();
+    }
+
+    private VoucherResponse toResponseFromVoucher(Voucher voucher) {
+        return VoucherResponse.builder()
+                .voucherId(voucher.getVoucherId())
+                .voucherCode(voucher.getVoucherCode())
+                .discountType(voucher.getDiscountType())
+                .discountValue(voucher.getDiscountValue())
+                .maxDiscountAmount(voucher.getMaxDiscountAmount())
+                .minOrderValue(voucher.getMinOrderValue())
+                .startDate(voucher.getStartDate())
+                .endDate(voucher.getEndDate())
+                .isUsed(false)
+                .isActive(voucher.getIsActive())
+                .region(voucher.getRegion())
+                .description(voucher.getDescription())
+                .build();
+    }
+}

@@ -4,6 +4,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 
 @Getter
@@ -22,6 +23,17 @@ public class VoucherResponse {
     private LocalDateTime endDate;
     private Integer quantity;
     private Boolean isActive;
-    private Boolean isPrivate;
     private String description;
+    private String region;
+
+    // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
+    private String targetType;
+    private List<Integer> targetUserIds;
+    private Integer targetUserCount;
+
+    // Thông tin UserVoucher (khi trả về voucher của user)
+    private Integer userVoucherId;
+    private Boolean isUsed;
+    private LocalDateTime usedAt;
+    private LocalDateTime assignedAt;
 }

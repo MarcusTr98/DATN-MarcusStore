@@ -14,11 +14,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
 public class VoucherController {
     private final VoucherService voucherService;
+
     @GetMapping("/vouchers")
     public Page<VoucherResponse> getAllVoucher(
             @RequestParam(defaultValue = "0") int page,
@@ -26,7 +29,7 @@ public class VoucherController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String discountType,
             @RequestParam(required = false) Boolean isActive
-    ){
+    ) {
         Pageable pageable = PageRequest.of(
                 Math.max(page, 0),
                 Math.max(size, 1),
@@ -41,26 +44,29 @@ public class VoucherController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String discountType,
             @RequestParam(required = false) Boolean isActive
-    ){
+    ) {
         return voucherService.getVoucherStats(keyword, discountType, isActive);
     }
 
     @GetMapping("/voucher/{voucherId}")
-    public VoucherResponse getVoucherById(@PathVariable("voucherId") Integer voucherId){
+    public VoucherResponse getVoucherById(@PathVariable("voucherId") Integer voucherId) {
         return voucherService.getVoucherById(voucherId);
     }
+
     @DeleteMapping("/voucher/{voucherId}")
-    public ResponseEntity<Void> removeVoucher(@PathVariable("voucherId") Integer voucherId){
+    public ResponseEntity<Void> removeVoucher(@PathVariable("voucherId") Integer voucherId) {
         voucherService.deleteVoucherById(voucherId);
         return ResponseEntity.noContent().build();
     }
+
     @PostMapping("/voucher")
-    public ResponseEntity<VoucherResponse> addVoucher(@Valid @RequestBody AddVoucherRequest request){
-        VoucherResponse response =  voucherService.addVoucher(request);
+    public ResponseEntity<VoucherResponse> addVoucher(@Valid @RequestBody AddVoucherRequest request) {
+        VoucherResponse response = voucherService.addVoucher(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
     @PutMapping("/voucher/{voucherId}")
-    public ResponseEntity<VoucherResponse> updateVoucher( @PathVariable("voucherId") Integer voucherId,@Valid @RequestBody AddVoucherRequest request){
+    public ResponseEntity<VoucherResponse> updateVoucher(@PathVariable("voucherId") Integer voucherId, @Valid @RequestBody AddVoucherRequest request) {
         VoucherResponse voucher = voucherService.updateVoucher(voucherId, request);
         return ResponseEntity.status(HttpStatus.OK).body(voucher);
     }

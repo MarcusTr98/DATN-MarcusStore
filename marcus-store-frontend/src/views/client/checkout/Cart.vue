@@ -365,11 +365,88 @@
 import { computed, onMounted, ref } from 'vue'
 import { useCartStore } from '@/stores/cartStore'
 import '@/assets/css/cart.css'
+import voucherApiClient from "@/api/voucherApiClient.js"
 const cartStore = useCartStore()
 
-onMounted(() => {
-  cartStore.fetchCart()
+onMounted(async () => {
+  // Xóa dữ liệu checkout cũ nếu có
+  localStorage.removeItem('selectedCartItems')
+  localStorage.removeItem('selectedSubtotal')
+  // Giữ lại selectedVoucherCode để user vẫn thấy voucher đã chọn
+
+  // Khôi phục voucher từ localStorage (nếu có)
+  const savedVoucherCode = localStorage.getItem('selectedVoucherCode')
+  if (savedVoucherCode) {
+    voucherCode.value = savedVoucherCode
+  }
+
+  await cartStore.fetchCart()
+  await fetchVoucherApiClient()
+
+  // Khôi phục trạng thái checkbox từ localStorage (nếu có)
+  restoreSelectedItems()
+
+  // Khôi phục voucher đã chọn nếu có trong localStorage (sau khi voucherClient đã load)
+  restoreSelectedVoucher()
 })
+
+// Khôi phục trạng thái checkbox từ localStorage
+function restoreSelectedItems() {
+  const savedItems = localStorage.getItem('selectedCartItems')
+  if (!savedItems) return
+
+  try {
+    const selectedItems = JSON.parse(savedItems)
+    const selectedIds = new Set(selectedItems.map(i => i.cartItemId))
+
+    // Uncheck các sản phẩm không có trong danh sách đã chọn
+    cartStore.items.forEach(item => {
+      if (item.cartItemId && !selectedIds.has(item.cartItemId)) {
+        item.checked = false
+      }
+    })
+  } catch (e) {
+    console.warn('Lỗi restoreSelectedItems:', e)
+  }
+}
+
+// Khôi phục voucher đã chọn từ localStorage
+function restoreSelectedVoucher() {
+  const savedVoucherCode = localStorage.getItem('selectedVoucherCode')
+  if (!savedVoucherCode) return
+
+  try {
+    // Tìm voucher trong danh sách voucherClient
+    const voucher = voucherClient.value.find(v => v.voucherCode === savedVoucherCode)
+    if (voucher) {
+      // Tự động chọn voucher này
+      v2SelectedId.value = voucher.voucherId
+      applySelectedVoucher()
+    } else {
+      // Không tìm thấy voucher, xóa localStorage
+      localStorage.removeItem('selectedVoucherCode')
+    }
+  } catch (e) {
+    console.warn('Lỗi restoreSelectedVoucher:', e)
+  }
+}
+
+const loading = ref(false)
+const error = ref(null)
+const voucherClient = ref([])
+async function fetchVoucherApiClient (){
+  try {
+    loading.value = true
+    error.value = null
+    const response = await voucherApiClient.getAllVoucherClient();
+    voucherClient.value = response.data
+  }catch (e) {
+    error.value = "không thể lấy voucher"
+    console.error(e)
+  }finally {
+    loading.value = false
+  }
+}
 
 const cartItems = computed(() => cartStore.items)
 const isLoadingCart = computed(() => cartStore.loading)
@@ -380,6 +457,7 @@ const cartError = computed(() => cartStore.error)
 // }
 const isVoucherModalOpen = ref(false)
 const selectedVoucher = ref(0)
+const selectedVoucherType = ref('AMOUNT') // 'AMOUNT', 'PERCENT', 'FREESHIP'
 const voucherCode = ref('')
 const isAlertModalOpen = ref(false)
 const alertModalMessage = ref('')
@@ -391,83 +469,97 @@ const suggestedTrack = ref(null)
 
 const v2SelectedId = ref(null)
 
-const v2Vouchers = [
-  {
-    id: 'v-free',
-    title: 'Freeship Giảm 20k',
-    minOrder: 0,
-    discountValue: 20000,
-    expiryLabel: 'Sắp hết hạn: Còn 1 giờ',
-    expiryUrgent: true,
-    icon: 'ti ti-truck',
-    iconClass: 'accent-type',
-    tag: 'Freeship',
-    active: true,
-    disabledReason: '',
-    isBest: true,
-  },
-  {
-    id: 'v-50k',
-    title: 'Giảm 50.000đ toàn sàn',
-    minOrder: 500000,
-    discountValue: 50000,
-    expiryLabel: 'Hạn dùng đến: 31/12',
-    expiryUrgent: false,
-    icon: 'ti ti-shopping-cart',
-    iconClass: '',
-    tag: 'Marcus Store',
-    active: true,
-    disabledReason: '',
-    isBest: false,
-  },
-  {
-    id: 'v-100k',
-    title: 'Giảm 100.000đ toàn sàn',
-    minOrder: 1000000,
-    discountValue: 100000,
-    expiryLabel: 'Hạn dùng đến: 31/12',
-    expiryUrgent: false,
-    icon: 'ti ti-shopping-cart',
-    iconClass: '',
-    tag: 'Marcus Store',
-    active: true,
-    disabledReason: '',
-    isBest: false,
-  },
-  {
-    id: 'v-disabled',
-    title: 'Giảm 150.000đ toàn sàn',
-    minOrder: 1500000,
-    discountValue: 150000,
-    expiryLabel: 'Hạn dùng đến: 31/12',
-    expiryUrgent: false,
-    icon: 'ti ti-shopping-cart',
-    iconClass: '',
-    tag: 'Marcus Store',
-    active: false,
-    disabledReason: 'Chưa đủ điều kiện: Mua thêm 150.000đ',
-    isBest: false,
-  },
-]
+// Thêm computed cho voucher từ API
+const v2Vouchers = computed(() => {
+  return voucherClient.value.map((v) => {
+    // Xử lý discountType - đảm bảo so sánh đúng
+    const discountType = (v.discountType || '').toUpperCase()
+    const isAmount = discountType === 'AMOUNT'
+    const isPercent = discountType === 'PERCENT'
+    const isFreeship = discountType === 'FREESHIP'
+
+    // Tính giá trị giảm dựa trên loại
+    let title = ''
+    let discountValue = 0
+    let discountPercent = 0
+
+    if (isAmount) {
+      title = `Giảm ${formatPriceVnd(v.discountValue)} toàn sàn`
+      discountValue = v.discountValue
+    } else if (isPercent) {
+      title = `Giảm ${v.discountValue}% toàn sàn`
+      discountPercent = v.discountValue
+    } else if (isFreeship) {
+      title = `Miễn phí vận chuyển ${formatPriceVnd(v.discountValue)}`
+      discountValue = v.discountValue
+    } else {
+      // Fallback - coi như AMOUNT nếu không xác định được
+      title = `Giảm ${formatPriceVnd(v.discountValue)} toàn sàn`
+      discountValue = v.discountValue
+    }
+
+    return {
+      id: v.voucherId,
+      voucherCode: v.voucherCode,
+      title,
+      discountType,
+      minOrder: v.minOrderValue,
+      discountValue,
+      discountPercent,
+      expiryLabel: `Hạn dùng đến: ${new Date(v.endDate).toLocaleDateString('vi-VN')}`,
+      expiryUrgent: false,
+      icon: 'ti ti-shopping-cart',
+      iconClass: '',
+      tag: 'Marcus Store',
+      active: isVoucherActive(v),
+      disabledReason: getDisabledReason(v),
+      isBest: false,
+    }
+  })
+})
+
+// Kiểm tra voucher có thể dùng không
+function isVoucherActive(voucher) {
+  const cartTotal = subtotal.value
+  return voucher.isActive 
+    && !voucher.isUsed 
+    && cartTotal >= (voucher.minOrderValue || 0)
+}
+
+// Lý do voucher bị disable
+function getDisabledReason(voucher) {
+  const cartTotal = subtotal.value
+  if (!voucher.isActive) return 'Voucher không còn hoạt động'
+  if (voucher.isUsed) return 'Voucher đã được sử dụng'
+  if (cartTotal < (voucher.minOrderValue || 0)) {
+    const needed = (voucher.minOrderValue || 0) - cartTotal
+    return `Chưa đủ điều kiện: Mua thêm ${formatPriceVnd(needed)}`
+  }
+  return ''
+}
 
 const v2ActiveVouchers = computed(() =>
-  v2Vouchers
+  v2Vouchers.value
     .filter((v) => v.active)
     .sort((a, b) => b.discountValue - a.discountValue),
 )
 
-const v2DisabledVouchers = computed(() => v2Vouchers.filter((v) => !v.active))
+const v2DisabledVouchers = computed(() => v2Vouchers.value.filter((v) => !v.active))
 
 function selectVoucher(id) {
   v2SelectedId.value = v2SelectedId.value === id ? null : id
 }
 
 function applySelectedVoucher() {
-  const picked = v2Vouchers.find((v) => v.id === v2SelectedId.value)
+  const picked = v2Vouchers.value.find((v) => v.id === v2SelectedId.value)
   if (picked) {
-    selectedVoucher.value = picked.discountValue
+    selectedVoucher.value = picked.discountPercent > 0 ? picked.discountPercent : picked.discountValue
+    selectedVoucherType.value = picked.discountType
+    voucherCode.value = picked.voucherCode
   } else if (!voucherCode.value.trim()) {
     selectedVoucher.value = 0
+    selectedVoucherType.value = 'AMOUNT'
+    voucherCode.value = ''
   }
   isVoucherModalOpen.value = false
 }
@@ -540,7 +632,22 @@ const subtotal = computed(() =>
 )
 
 const productDiscount = computed(() => Math.max(originalTotal.value - subtotal.value, 0))
-const voucherDiscount = computed(() => selectedVoucher.value || 0)
+
+// Tính giảm giá voucher dựa trên loại
+const voucherDiscount = computed(() => {
+  if (!selectedVoucher.value || !selectedVoucherType.value) return 0
+
+  if (selectedVoucherType.value === 'PERCENT') {
+    // PERCENT: giảm theo % của subtotal
+    const discount = subtotal.value * (selectedVoucher.value / 100)
+    // Có thể áp dụng maxDiscountAmount nếu backend trả về
+    return Math.floor(discount)
+  }
+
+  // AMOUNT hoặc FREESHIP: giảm trực tiếp số tiền
+  return selectedVoucher.value || 0
+})
+
 const totalPayment = computed(() => Math.max(subtotal.value - voucherDiscount.value, 0))
 
 const allSelected = computed({
@@ -685,6 +792,36 @@ function handleCheckout(){
     showAlert("Vui lòng chọn ít nhất một sản phẩm để thanh toán");
     return;
   }
+
+  // Lưu voucher đã chọn
+  if (voucherCode.value) {
+    localStorage.setItem('selectedVoucherCode', voucherCode.value)
+    localStorage.setItem('selectedVoucherType', selectedVoucherType.value)
+    localStorage.setItem('selectedVoucherValue', selectedVoucher.value.toString())
+    localStorage.setItem('selectedVoucherDiscount', voucherDiscount.value.toString())
+  } else {
+    localStorage.removeItem('selectedVoucherCode')
+    localStorage.removeItem('selectedVoucherType')
+    localStorage.removeItem('selectedVoucherValue')
+    localStorage.removeItem('selectedVoucherDiscount')
+  }
+
+  // Lưu danh sách sản phẩm đã chọn để checkout hiển thị đúng
+  const selectedItemsData = selectedItems.value.map(item => ({
+    cartItemId: item.id,
+    productName: item.name,
+    variantName: item.variant,
+    skuCode: item.skuCode,
+    imageUrl: item.imageUrl,
+    quantity: item.quantity,
+    price: item.price,
+    totalPrice: item.price * item.quantity
+  }))
+  localStorage.setItem('selectedCartItems', JSON.stringify(selectedItemsData))
+
+  // Lưu thông tin tổng tiền
+  localStorage.setItem('selectedSubtotal', subtotal.value.toString())
+
   window.location.href='/checkout';
 }
 </script>

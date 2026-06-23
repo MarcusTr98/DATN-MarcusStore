@@ -15,7 +15,7 @@
           </div>
           <div>
             <h1>Quản lý Voucher</h1>
-            <p>Quản lý mã giảm giá, thời gian áp dụng và số lượng còn lại.</p>
+            <p>Quản lý mã giảm giá, thời gian áp dụng và đối tượng sử dụng.</p>
           </div>
         </div>
 
@@ -102,8 +102,7 @@
               <th>Giảm tối đa</th>
               <th>Đơn tối thiểu</th>
               <th>Thời gian</th>
-              <th>SL voucher</th>
-              <th>Phạm vi</th>
+              <th>Đối tượng</th>
               <th>Trạng thái</th>
               <th class="text-end">Thao tác</th>
             </tr>
@@ -114,12 +113,11 @@
               <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
               <td>
                 <div class="voucher-code">{{ voucher.voucherCode }}</div>
-
               </td>
               <td>
-                  <span class="type-badge" :class="voucher.discountType.toLowerCase()">
-                    {{ formatDiscountType(voucher.discountType) }}
-                  </span>
+                <span class="type-badge" :class="voucher.discountType.toLowerCase()">
+                  {{ formatDiscountType(voucher.discountType) }}
+                </span>
               </td>
               <td class="fw-semibold">{{ formatDiscountValue(voucher) }}</td>
               <td>{{ formatCurrency(voucher.maxDiscountAmount) }}</td>
@@ -129,19 +127,15 @@
                 <div class="date-line">Đến: {{ formatDateTime(voucher.endDate) }}</div>
               </td>
               <td>
-                  <span :class="voucher.quantity === 0 ? 'text-danger fw-bold' : 'fw-bold'">
-                    {{ voucher.quantity }}
-                  </span>
+                <span class="scope-badge target-badge">
+                  <i :class="voucher.targetType === 'ALL' ? 'bi bi-globe' : 'bi bi-people'"></i>
+                  {{ formatTargetType(voucher) }}
+                </span>
               </td>
               <td>
-                  <span class="scope-badge" :class="{ private: voucher.isPrivate }">
-                    {{ voucher.isPrivate ? 'Riêng tư' : 'Công khai' }}
-                  </span>
-              </td>
-              <td>
-                  <span class="status-badge" :class="{ inactive: !voucher.isActive }">
-                    {{ voucher.isActive ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
-                  </span>
+                <span class="status-badge" :class="{ inactive: !voucher.isActive }">
+                  {{ voucher.isActive ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
+                </span>
               </td>
               <td>
                 <div class="d-flex justify-content-end gap-2">
@@ -207,12 +201,13 @@
       </section>
     </div>
 
-    <div v-if="isModalOpen" class="modal-backdrop-custom" @click.self="closeModal">
+    <!-- Modal Thêm/Sửa Voucher -->
+    <div v-if="isModalOpen" class="modal-backdrop-custom">
       <div class="voucher-modal">
         <div class="modal-head">
           <div>
             <h2>{{ isEditing ? 'Sửa Voucher' : 'Thêm Voucher' }}</h2>
-            <p>Voucher mới mặc định ở trạng thái đang sử dụng.</p>
+            <p>Voucher mới mặc định ở trạng thái đang sử dụng. Mỗi tài khoản chỉ dùng được 1 lần.</p>
           </div>
           <button type="button" class="icon-button" title="Đóng" @click="closeModal">
             <i class="bi bi-x-lg"></i>
@@ -220,156 +215,154 @@
         </div>
 
         <form class="voucher-form" novalidate @submit.prevent="saveVoucher">
-          <section class="form-section">
-            <div class="section-title">
-              <span>1</span>
-              <div>
-                <h3>Thông tin Voucher chính</h3>
-                <p>Mã Voucher và trạng thái hiển thị của voucher.</p>
-              </div>
-            </div>
-            <div class="modal-body-grid compact voucher-main-grid">
-              <div class="voucher-code-field">
-                <label class="form-label">Mã voucher <span>*</span></label>
-                <div class="voucher-code-control">
-                  <input
-                    v-model.trim="form.voucher_code"
-                    type="text"
-                    class="form-control text-uppercase voucher-code-input"
-                    :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
-                    placeholder="VD: SUMMER2026"
-                  />
-                  <button type="button" class="generate-code-btn" @click="generateVoucherCode">
-                    <i class="bi bi-stars"></i>
-                    Tạo mã tự động
-                  </button>
+          <!-- Segmented Control chọn loại voucher -->
+          <div class="voucher-type-selector">
+            <label
+              class="voucher-type-option"
+              :class="{ active: form.voucher_type === 'DISCOUNT' }"
+            >
+              <input
+                v-model="form.voucher_type"
+                type="radio"
+                value="DISCOUNT"
+                name="voucher_type"
+              />
+              <i class="bi bi-percent"></i>
+              <span>Voucher thường</span>
+            </label>
+
+            <label
+              class="voucher-type-option"
+              :class="{ active: form.voucher_type === 'FREESHIP' }"
+            >
+              <input
+                v-model="form.voucher_type"
+                type="radio"
+                value="FREESHIP"
+                name="voucher_type"
+              />
+              <i class="bi bi-truck"></i>
+              <span>Free Ship</span>
+            </label>
+          </div>
+
+          <!-- ==================== DISCOUNT FORM ==================== -->
+          <template v-if="form.voucher_type === 'DISCOUNT'">
+            <section class="form-section">
+              <div class="section-title">
+                <span>1</span>
+                <div>
+                  <h3>Thông tin Voucher chính</h3>
+                  <p>Mã Voucher và trạng thái hiển thị của voucher.</p>
                 </div>
-                <div v-if="errors.voucher_code" class="invalid-feedback">
-                  {{ errors.voucher_code }}
+              </div>
+              <div class="modal-body-grid compact voucher-main-grid">
+                <div class="voucher-code-field">
+                  <label class="form-label">Mã voucher <span>*</span></label>
+                  <div class="voucher-code-control">
+                    <input
+                      v-model.trim="form.voucher_code"
+                      type="text"
+                      class="form-control text-uppercase voucher-code-input"
+                      :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
+                      placeholder="VD: SUMMER2026"
+                    />
+                    <button type="button" class="generate-code-btn" @click="generateVoucherCode">
+                      <i class="bi bi-stars"></i>
+                      Tạo mã tự động
+                    </button>
+                  </div>
+                  <div v-if="errors.voucher_code" class="invalid-feedback">
+                    {{ errors.voucher_code }}
+                  </div>
+                </div>
+
+                <div>
+                  <label class="form-label">Trạng thái</label>
+                  <select v-model="form.is_active" class="form-select">
+                    <option :value="true">Đang sử dụng</option>
+                    <option :value="false">Ngừng sử dụng</option>
+                  </select>
+                </div>
+
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="section-title">
+                <span>2</span>
+                <div>
+                  <h3>Chi tiết Giảm giá</h3>
+                  <p>Chọn loại giảm giá theo % hoặc theo giá cố định.</p>
                 </div>
               </div>
 
-              <div>
-                <label class="form-label">Trạng thái</label>
-                <select v-model="form.is_active" :disabled="isZeroQuantity(form.quantity)"
-                        class="form-select">
-                  <option :value="true">Đang sử dụng</option>
-                  <option :value="false">Ngừng sử dụng</option>
-                </select>
-                <small v-if="isZeroQuantity(form.quantity)" class="form-help text-danger">
-                  Số lượng voucher = 0 nên trạng thái tự chuyển thành Ngừng sử dụng.
-                </small>
-              </div>
-
-              <div class="scope-field">
-                <label class="form-label label-with-tooltip">
-                  Phạm vi hiển thị
-                  <span class="info-tooltip" tabindex="0">
-                    i
-                    <span class="tooltip-content">
-                      Công khai sẽ hiển thị cho client, riêng tư chỉ dùng khi khách nhập mã.
-                    </span>
+              <div class="wide-field">
+                <label class="form-label">Loại giảm giá <span>*</span></label>
+                <div class="discount-choice-grid">
+                  <label class="discount-choice"
+                         :class="{ active: form.discount_type === 'PERCENT' }">
+                    <input v-model="form.discount_type" type="radio" value="PERCENT"/>
+                    <span class="discount-choice-text">
+                    <strong>Giảm theo phần trăm</strong>
                   </span>
-                </label>
-                <select v-model="form.is_private" class="form-select">
-                  <option :value="false">Công khai</option>
-                  <option :value="true">Riêng tư</option>
-                </select>
-              </div>
+                  </label>
 
-            </div>
-          </section>
-
-          <section class="form-section">
-            <div class="section-title">
-              <span>2</span>
-              <div>
-                <h3>Chi tiết Giảm giá</h3>
-                <p>Chọn loại giảm giá theo % hoặc theo giá cố định.</p>
-              </div>
-            </div>
-
-            <div class="wide-field">
-              <label class="form-label">Loại giảm giá <span>*</span></label>
-              <div class="discount-choice-grid">
-                <label class="discount-choice"
-                       :class="{ active: form.discount_type === 'PERCENT' }">
-                  <input v-model="form.discount_type" type="radio" value="PERCENT"/>
-                  <span class="discount-choice-text">
-                  <strong>Giảm theo phần trăm</strong>
-
-                </span>
-                </label>
-
-                <label class="discount-choice" :class="{ active: form.discount_type === 'AMOUNT' }">
-                  <input v-model="form.discount_type" type="radio" value="AMOUNT"/>
-                  <span class="discount-choice-text">
-                  <strong>Giảm tiền trực tiếp</strong>
-
-                </span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label class="form-label">
-                {{
-                  form.discount_type === 'PERCENT' ? 'Giá trị giảm (%)' : 'Số tiền giảm trực tiếp'
-                }}
-                <span>*</span>
-              </label>
-              <div class="input-group">
-                <input
-                  v-model.number="form.discount_value"
-                  type="number"
-                  min="0"
-                  :max="form.discount_type === 'PERCENT' ? 100 : undefined"
-                  :step="form.discount_type === 'PERCENT' ? 1 : 1000"
-                  class="form-control"
-                  :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
-                  :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000đ'"
-
-                />
-                <span class="input-group-text">{{
-                    form.discount_type === 'PERCENT' ? '%' : 'đ'
-                  }}</span>
-                <div v-if="errors.discount_value" class="invalid-feedback">
-                  {{ errors.discount_value }}
+                  <label class="discount-choice" :class="{ active: form.discount_type === 'AMOUNT' }">
+                    <input v-model="form.discount_type" type="radio" value="AMOUNT"/>
+                    <span class="discount-choice-text">
+                    <strong>Giảm tiền trực tiếp</strong>
+                  </span>
+                  </label>
                 </div>
               </div>
-            </div>
 
-            <div v-if="form.discount_type === 'PERCENT'">
-              <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
-              <div class="input-group">
-                <input
-                  v-model.number="form.max_discount_amount"
-                  type="number"
-                  min="0"
-                  step="1000"
-                  class="form-control"
-                  :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
-                  placeholder="Nhập số tiền giảm tối đa"
-                />
-                <span class="input-group-text">đ</span>
-                <div v-if="isSubmitted && errors.max_discount_amount" class="invalid-feedback">
-                  {{ errors.max_discount_amount }}
+              <div>
+                <label class="form-label">
+                  {{
+                    form.discount_type === 'PERCENT' ? 'Giá trị giảm (%)' : 'Số tiền giảm trực tiếp'
+                  }}
+                  <span>*</span>
+                </label>
+                <div class="input-group">
+                  <input
+                    v-model.number="form.discount_value"
+                    type="number"
+                    min="0"
+                    :max="form.discount_type === 'PERCENT' ? 100 : undefined"
+                    :step="form.discount_type === 'PERCENT' ? 1 : 1000"
+                    class="form-control"
+                    :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
+                    :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000đ'"
+                  />
+                  <span class="input-group-text">{{
+                      form.discount_type === 'PERCENT' ? '%' : 'đ'
+                    }}</span>
+                  <div v-if="errors.discount_value" class="invalid-feedback">
+                    {{ errors.discount_value }}
+                  </div>
                 </div>
               </div>
-            </div>
 
-          </section>
-
-          <section class="form-section">
-            <div class="section-title">
-              <span>3</span>
-              <div>
-                <h3>Điều kiện Sử dụng</h3>
-                <p>Giá trị đơn hàng tối thiểu và số lượt có thể dùng.</p>
+              <div v-if="form.discount_type === 'PERCENT'">
+                <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
+                <div class="input-group">
+                  <input
+                    v-model.number="form.max_discount_amount"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    class="form-control"
+                    :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
+                    placeholder="Nhập số tiền giảm tối đa"
+                  />
+                  <span class="input-group-text">đ</span>
+                  <div v-if="isSubmitted && errors.max_discount_amount" class="invalid-feedback">
+                    {{ errors.max_discount_amount }}
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div class="modal-body-grid compact">
               <div>
                 <label class="form-label with-help">
                   Đơn tối thiểu
@@ -392,73 +385,381 @@
                   </div>
                 </div>
               </div>
+            </section>
 
-              <div>
-                <label class="form-label">Số lượng voucher / lượt dùng <span>*</span></label>
-                <input
-                  v-model.number="form.quantity"
-                  type="number"
-                  min="0"
-                  step="1"
-                  class="form-control"
-                  :class="{ 'is-invalid': isSubmitted && errors.quantity }"
-                  placeholder="Nhập số lượt dùng"
-                />
-
-                <div v-if="errors.quantity" class="invalid-feedback">
-                  {{ errors.quantity }}
+            <section class="form-section">
+              <div class="section-title">
+                <span>3</span>
+                <div>
+                  <h3>Đối tượng sử dụng</h3>
+                  <p>Chọn voucher áp dụng cho tất cả khách hoặc khách hàng cụ thể.</p>
                 </div>
               </div>
 
-            </div>
-          </section>
+              <div class="modal-body-grid compact">
+                <div class="target-scope-field">
+                  <label class="form-label">Áp dụng cho <span>*</span></label>
+                  <div class="target-choice-grid">
+                    <label class="target-choice" :class="{ active: form.target_type === 'ALL' }">
+                      <input v-model="form.target_type" type="radio" value="ALL"/>
+                      <span class="target-choice-icon">
+                        <i class="bi bi-globe"></i>
+                      </span>
+                      <span class="target-choice-text">
+                        <strong>Tất cả khách hàng</strong>
+                        <small>Mọi tài khoản đều có thể dùng</small>
+                      </span>
+                    </label>
 
-          <section class="form-section">
-            <div class="section-title">
-              <span>4</span>
-              <div>
-                <h3>Thời gian Sử dụng</h3>
-                <p>Ngày kết thúc phải lớn hơn ngày bắt đầu.</p>
+                    <label class="target-choice" :class="{ active: form.target_type === 'SPECIFIC' }">
+                      <input v-model="form.target_type" type="radio" value="SPECIFIC"/>
+                      <span class="target-choice-icon specific">
+                        <i class="bi bi-people"></i>
+                      </span>
+                      <span class="target-choice-text">
+                        <strong>Khách hàng cụ thể</strong>
+                        <small>Chỉ những người được chọn mới dùng được</small>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <div v-if="form.target_type === 'SPECIFIC'" class="specific-users-field">
+                  <label class="form-label">
+                    Chọn khách hàng <span>*</span>
+                    <span class="selected-count" v-if="form.selected_user_ids.length > 0">
+                      ({{ form.selected_user_ids.length }} khách đã chọn)
+                    </span>
+                  </label>
+                  <div class="user-search-wrapper">
+                    <input
+                      v-model="userSearchQuery"
+                      type="text"
+                      class="form-control"
+                      placeholder="Tìm kiếm khách hàng..."
+                      @focus="showUserDropdown = true"
+                    />
+                    <div v-if="showUserDropdown" class="user-dropdown">
+                      <div v-if="loadingUsers" class="user-dropdown-loading">
+                        <i class="bi bi-hourglass-split"></i> Đang tải...
+                      </div>
+                      <div v-else-if="filteredUsers.length === 0" class="user-dropdown-empty">
+                        Không tìm thấy khách hàng
+                      </div>
+                      <div v-else class="user-dropdown-list">
+                        <label
+                          v-for="user in filteredUsers"
+                          :key="user.userId"
+                          class="user-option"
+                          :class="{ selected: form.selected_user_ids.includes(user.userId) }"
+                        >
+                          <input
+                            type="checkbox"
+                            :value="user.userId"
+                            v-model="form.selected_user_ids"
+                            @change="onUserSelectionChange"
+                          />
+                          <div class="user-option-info">
+                            <span class="user-name">{{ user.fullName || user.username }}</span>
+                            <span class="user-email">{{ user.email }}</span>
+                          </div>
+                          <i v-if="form.selected_user_ids.includes(user.userId)" class="bi bi-check-circle-fill"></i>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="form.selected_user_ids.length > 0" class="selected-users-preview">
+                    <span
+                      v-for="userId in form.selected_user_ids.slice(0, 3)"
+                      :key="userId"
+                      class="selected-user-tag"
+                    >
+                      {{ getUserDisplayName(userId) }}
+                      <button type="button" @click="removeUser(userId)" class="remove-user-btn">
+                        <i class="bi bi-x"></i>
+                      </button>
+                    </span>
+                    <span v-if="form.selected_user_ids.length > 3" class="more-users-tag">
+                      +{{ form.selected_user_ids.length - 3 }} khách khác
+                    </span>
+                  </div>
+                  <div v-if="isSubmitted && errors.selected_user_ids" class="invalid-feedback d-block">
+                    {{ errors.selected_user_ids }}
+                  </div>
+                </div>
               </div>
-            </div>
+            </section>
 
-            <div class="modal-body-grid compact">
-              <div>
-                <label class="form-label">Ngày bắt đầu <span>*</span></label>
-                <input
-                  v-model="form.start_date"
-                  type="datetime-local"
-                  class="form-control"
-                  :min="todayDateTime"
-                  :class="{ 'is-invalid': isSubmitted && errors.start_date }"
-                />
-                <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
-                <div v-if="errors.start_date" class="invalid-feedback">
-                  {{ errors.start_date }}
+            <section class="form-section">
+              <div class="section-title">
+                <span>4</span>
+                <div>
+                  <h3>Thời gian Sử dụng</h3>
+                  <p>Ngày kết thúc phải lớn hơn ngày bắt đầu.</p>
+                </div>
+              </div>
+
+              <div class="modal-body-grid compact">
+                <div>
+                  <label class="form-label">Ngày bắt đầu <span>*</span></label>
+                  <input
+                    v-model="form.start_date"
+                    type="datetime-local"
+                    class="form-control"
+                    :min="todayDateTime"
+                    :class="{ 'is-invalid': isSubmitted && errors.start_date }"
+                  />
+                  <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
+                  <div v-if="errors.start_date" class="invalid-feedback">
+                    {{ errors.start_date }}
+                  </div>
+                </div>
+
+                <div>
+                  <label class="form-label">Ngày kết thúc <span>*</span></label>
+                  <input
+                    v-model="form.end_date"
+                    type="datetime-local"
+                    class="form-control"
+                    :min="form.start_date || todayDateTime"
+                    :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
+                  />
+                  <small class="form-help">Không được trước ngày bắt đầu.</small>
+                  <div v-if="errors.end_date" class="invalid-feedback">
+                    {{ errors.end_date }}
+                  </div>
+                  <div v-if="errors.time" class="invalid-feedback d-block">
+                    {{ errors.time }}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <!-- ==================== FREESHIP FORM ==================== -->
+          <template v-if="form.voucher_type === 'FREESHIP'">
+            <section class="form-section">
+              <div class="section-title">
+                <span>1</span>
+                <div>
+                  <h3>Thông tin Voucher Free Ship</h3>
+                  <p>Mã Voucher và trạng thái hiển thị.</p>
+                </div>
+              </div>
+              <div class="modal-body-grid compact voucher-main-grid">
+                <div class="voucher-code-field">
+                  <label class="form-label">Mã voucher <span>*</span></label>
+                  <div class="voucher-code-control">
+                    <input
+                      v-model.trim="form.voucher_code"
+                      type="text"
+                      class="form-control text-uppercase voucher-code-input"
+                      :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
+                      placeholder="VD: FREESHIP50K"
+                    />
+                    <button type="button" class="generate-code-btn" @click="generateVoucherCode">
+                      <i class="bi bi-stars"></i>
+                      Tạo mã tự động
+                    </button>
+                  </div>
+                  <div v-if="errors.voucher_code" class="invalid-feedback">
+                    {{ errors.voucher_code }}
+                  </div>
+                </div>
+
+                <div>
+                  <label class="form-label">Trạng thái</label>
+                  <select v-model="form.is_active" class="form-select">
+                    <option :value="true">Đang sử dụng</option>
+                    <option :value="false">Ngừng sử dụng</option>
+                  </select>
+                </div>
+
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="section-title">
+                <span>2</span>
+                <div>
+                  <h3>Chi tiết Free Ship</h3>
+                  <p>Cấu hình phí ship được miễn phí và khu vực áp dụng.</p>
                 </div>
               </div>
 
               <div>
-                <label class="form-label">Ngày kết thúc <span>*</span></label>
-                <input
-                  v-model="form.end_date"
-                  type="datetime-local"
-                  class="form-control"
-                  :min="form.start_date || todayDateTime"
-                  :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
-                />
-                <small class="form-help">Không được trước ngày bắt đầu.</small>
-                <div v-if="errors.end_date" class="invalid-feedback">
-                  {{ errors.end_date }}
+                <label class="form-label">Phí ship được miễn phí <span>*</span></label>
+                <div class="input-group">
+                  <input
+                    v-model.number="form.freeship_value"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    class="form-control"
+                    :class="{ 'is-invalid': isSubmitted && errors.freeship_value }"
+                    placeholder="Nhập số tiền ship được miễn phí, VD: 25000"
+                  />
+                  <span class="input-group-text">đ</span>
+                  <div v-if="errors.freeship_value" class="invalid-feedback">
+                    {{ errors.freeship_value }}
+                  </div>
                 </div>
-                <div v-if="errors.time" class="invalid-feedback d-block">
-                  {{ errors.time }}
+                <small class="form-help">
+                  Khách hàng sẽ được miễn phí vận chuyển với đơn hàng có phí ship từ số tiền này trở xuống.
+                </small>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="section-title">
+                <span>3</span>
+                <div>
+                  <h3>Đối tượng sử dụng</h3>
+                  <p>Chọn voucher áp dụng cho tất cả khách hoặc khách hàng cụ thể.</p>
                 </div>
               </div>
 
-            </div>
-          </section>
+              <div class="modal-body-grid compact">
+                <div class="target-scope-field">
+                  <label class="form-label">Áp dụng cho <span>*</span></label>
+                  <div class="target-choice-grid">
+                    <label class="target-choice" :class="{ active: form.target_type === 'ALL' }">
+                      <input v-model="form.target_type" type="radio" value="ALL"/>
+                      <span class="target-choice-icon">
+                        <i class="bi bi-globe"></i>
+                      </span>
+                      <span class="target-choice-text">
+                        <strong>Tất cả khách hàng</strong>
+                        <small>Mọi tài khoản đều có thể dùng</small>
+                      </span>
+                    </label>
 
+                    <label class="target-choice" :class="{ active: form.target_type === 'SPECIFIC' }">
+                      <input v-model="form.target_type" type="radio" value="SPECIFIC"/>
+                      <span class="target-choice-icon specific">
+                        <i class="bi bi-people"></i>
+                      </span>
+                      <span class="target-choice-text">
+                        <strong>Khách hàng cụ thể</strong>
+                        <small>Chỉ những người được chọn mới dùng được</small>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
+                <div v-if="form.target_type === 'SPECIFIC'" class="specific-users-field">
+                  <label class="form-label">
+                    Chọn khách hàng <span>*</span>
+                    <span class="selected-count" v-if="form.selected_user_ids.length > 0">
+                      ({{ form.selected_user_ids.length }} khách đã chọn)
+                    </span>
+                  </label>
+                  <div class="user-search-wrapper">
+                    <input
+                      v-model="userSearchQuery"
+                      type="text"
+                      class="form-control"
+                      placeholder="Tìm kiếm khách hàng..."
+                      @focus="showUserDropdown = true"
+                    />
+                    <div v-if="showUserDropdown" class="user-dropdown">
+                      <div v-if="loadingUsers" class="user-dropdown-loading">
+                        <i class="bi bi-hourglass-split"></i> Đang tải...
+                      </div>
+                      <div v-else-if="filteredUsers.length === 0" class="user-dropdown-empty">
+                        Không tìm thấy khách hàng
+                      </div>
+                      <div v-else class="user-dropdown-list">
+                        <label
+                          v-for="user in filteredUsers"
+                          :key="user.userId"
+                          class="user-option"
+                          :class="{ selected: form.selected_user_ids.includes(user.userId) }"
+                        >
+                          <input
+                            type="checkbox"
+                            :value="user.userId"
+                            v-model="form.selected_user_ids"
+                            @change="onUserSelectionChange"
+                          />
+                          <div class="user-option-info">
+                            <span class="user-name">{{ user.fullName || user.username }}</span>
+                            <span class="user-email">{{ user.email }}</span>
+                          </div>
+                          <i v-if="form.selected_user_ids.includes(user.userId)" class="bi bi-check-circle-fill"></i>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-if="form.selected_user_ids.length > 0" class="selected-users-preview">
+                    <span
+                      v-for="userId in form.selected_user_ids.slice(0, 3)"
+                      :key="userId"
+                      class="selected-user-tag"
+                    >
+                      {{ getUserDisplayName(userId) }}
+                      <button type="button" @click="removeUser(userId)" class="remove-user-btn">
+                        <i class="bi bi-x"></i>
+                      </button>
+                    </span>
+                    <span v-if="form.selected_user_ids.length > 3" class="more-users-tag">
+                      +{{ form.selected_user_ids.length - 3 }} khách khác
+                    </span>
+                  </div>
+                  <div v-if="isSubmitted && errors.selected_user_ids" class="invalid-feedback d-block">
+                    {{ errors.selected_user_ids }}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="form-section">
+              <div class="section-title">
+                <span>4</span>
+                <div>
+                  <h3>Thời gian Sử dụng</h3>
+                  <p>Ngày kết thúc phải lớn hơn ngày bắt đầu.</p>
+                </div>
+              </div>
+
+              <div class="modal-body-grid compact">
+                <div>
+                  <label class="form-label">Ngày bắt đầu <span>*</span></label>
+                  <input
+                    v-model="form.start_date"
+                    type="datetime-local"
+                    class="form-control"
+                    :min="todayDateTime"
+                    :class="{ 'is-invalid': isSubmitted && errors.start_date }"
+                  />
+                  <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
+                  <div v-if="errors.start_date" class="invalid-feedback">
+                    {{ errors.start_date }}
+                  </div>
+                </div>
+
+                <div>
+                  <label class="form-label">Ngày kết thúc <span>*</span></label>
+                  <input
+                    v-model="form.end_date"
+                    type="datetime-local"
+                    class="form-control"
+                    :min="form.start_date || todayDateTime"
+                    :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
+                  />
+                  <small class="form-help">Không được trước ngày bắt đầu.</small>
+                  <div v-if="errors.end_date" class="invalid-feedback">
+                    {{ errors.end_date }}
+                  </div>
+                  <div v-if="errors.time" class="invalid-feedback d-block">
+                    {{ errors.time }}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </template>
+
+          <!-- Preview Section -->
           <section v-if="isPreviewVisible" class="voucher-preview">
             <div>
               <span class="preview-eyebrow">Xem trước</span>
@@ -472,11 +773,18 @@
             <button type="button" class="btn btn-soft" @click="resetForm">
               Làm mới
             </button>
-            <button type="button" class="btn btn-preview"
-                    @click="isPreviewVisible = !isPreviewVisible">
+            <button
+              type="button"
+              class="btn btn-preview"
+              @click="isPreviewVisible = !isPreviewVisible"
+            >
               Xem trước
             </button>
-            <button type="submit" class="btn btn-primary-action" :disabled="loading">
+            <button
+              type="submit"
+              class="btn btn-primary-action"
+              :disabled="loading"
+            >
               {{ loading ? 'Đang lưu...' : 'Lưu Voucher' }}
             </button>
           </div>
@@ -504,9 +812,10 @@
 </template>
 
 <script setup>
-import {computed, reactive, ref, watch, onMounted} from 'vue'
+import {computed, reactive, ref, watch, onMounted, onUnmounted} from 'vue'
 import {storeToRefs} from 'pinia'
 import {useVoucherStore} from '@/stores/voucherStore'
+import api from '@/utils/api'
 
 import '@/assets/css/Voucher.css'
 
@@ -517,9 +826,31 @@ const {vouchers, loading, error, fieldErrors, pagination, stats} = storeToRefs(v
 const currentPage = ref(0)
 const pageSize = ref(5)
 
+// User list for dropdown
+const allUsers = ref([])
+const loadingUsers = ref(false)
+const userSearchQuery = ref('')
+const showUserDropdown = ref(false)
+
 onMounted(() => {
   loadVouchers()
+  loadUsers()
+  
+  // Close dropdown when clicking outside
+  document.addEventListener('click', handleClickOutside)
 })
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
+
+function handleClickOutside(event) {
+  const dropdown = document.querySelector('.user-search-wrapper')
+  if (dropdown && !dropdown.contains(event.target)) {
+    showUserDropdown.value = false
+  }
+}
+
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const isSubmitted = ref(false)
@@ -550,9 +881,9 @@ const filters = reactive({
   status: 'ALL',
 })
 
-
 const defaultForm = {
   voucher_id: null,
+  voucher_type: 'DISCOUNT',
   voucher_code: '',
   discount_value: null,
   discount_type: 'PERCENT',
@@ -560,9 +891,11 @@ const defaultForm = {
   min_order_value: 0,
   start_date: '',
   end_date: '',
-  quantity: null,
   is_active: true,
-  is_private: false,
+  freeship_value: null,
+  // Đối tượng sử dụng
+  target_type: 'ALL', // 'ALL' hoặc 'SPECIFIC'
+  selected_user_ids: [], // Danh sách user IDs khi chọn cụ thể
 }
 
 const form = reactive({...defaultForm})
@@ -579,6 +912,14 @@ const previewVoucher = computed(() => {
   const maxDiscount = Number(form.max_discount_amount || 0)
   const minOrder = Number(form.min_order_value || 0)
 
+  if (form.voucher_type === 'FREESHIP') {
+    return {
+      code,
+      discountText: `Miễn phí vận chuyển lên đến ${formatCurrency(form.freeship_value || 0)}`,
+      conditionText: minOrder > 0 ? `Áp dụng cho đơn từ ${formatCurrency(minOrder)}` : 'Áp dụng cho mọi đơn hàng',
+    }
+  }
+
   return {
     code,
     discountText:
@@ -591,6 +932,20 @@ const previewVoucher = computed(() => {
 
 const filteredVouchers = computed(() => {
   return vouchers.value
+})
+
+// Filter users based on search query
+const filteredUsers = computed(() => {
+  if (!userSearchQuery.value) {
+    return allUsers.value
+  }
+  const query = userSearchQuery.value.toLowerCase()
+  return allUsers.value.filter(user => {
+    const fullName = (user.fullName || '').toLowerCase()
+    const username = (user.username || '').toLowerCase()
+    const email = (user.email || '').toLowerCase()
+    return fullName.includes(query) || username.includes(query) || email.includes(query)
+  })
 })
 
 const errors = computed(() => {
@@ -616,33 +971,40 @@ const errors = computed(() => {
     result.voucher_code = 'Mã voucher đã tồn tại'
   }
 
-  if (form.discount_value === null || form.discount_value === '' || Number(form.discount_value) <= 0) {
-    result.discount_value = 'Giá trị giảm phải lớn hơn 0'
+  // Validation cho DISCOUNT
+  if (form.voucher_type === 'DISCOUNT') {
+    if (form.discount_value === null || form.discount_value === '' || Number(form.discount_value) <= 0) {
+      result.discount_value = 'Giá trị giảm phải lớn hơn 0'
+    }
+
+    if (form.discount_type === 'PERCENT' && Number(form.discount_value) > 100) {
+      result.discount_value = 'Giảm theo phần trăm không nên vượt quá 100%'
+    }
+
+    if (form.discount_type === 'PERCENT' &&
+        (form.max_discount_amount === null || form.max_discount_amount === '' || Number(form.max_discount_amount) <= 0)) {
+      result.max_discount_amount = 'Bắt buộc nhập số tiền giảm tối đa'
+    }
+
+    if (form.discount_type === 'AMOUNT' && form.max_discount_amount !== null) {
+      result.max_discount_amount = 'Với AMOUNT, max_discount_amount phải là null'
+    }
   }
 
-  if (form.discount_type === 'PERCENT' && Number(form.discount_value) > 100) {
-    result.discount_value = 'Giảm theo phần trăm không nên vượt quá 100%'
+  // Validation cho FREESHIP
+  if (form.voucher_type === 'FREESHIP') {
+    if (form.freeship_value === null || form.freeship_value === '' || Number(form.freeship_value) <= 0) {
+      result.freeship_value = 'Phí ship được miễn phí phải lớn hơn 0'
+    }
+  }
+
+  // Validation cho đối tượng sử dụng
+  if (form.target_type === 'SPECIFIC' && form.selected_user_ids.length === 0) {
+    result.selected_user_ids = 'Vui lòng chọn ít nhất 1 khách hàng'
   }
 
   if (Number(form.min_order_value) < 0) {
     result.min_order_value = 'Đơn tối thiểu không được âm'
-  }
-
-  if (
-    form.discount_type === 'PERCENT' &&
-    (form.max_discount_amount === null ||
-      form.max_discount_amount === '' ||
-      Number(form.max_discount_amount) <= 0)
-  ) {
-    result.max_discount_amount = 'Bắt buộc nhập số tiền giảm tối đa'
-  }
-
-  if (form.discount_type === 'AMOUNT' && form.max_discount_amount !== null) {
-    result.max_discount_amount = 'Với AMOUNT, max_discount_amount phải là null'
-  }
-
-  if (form.quantity === null || form.quantity === '' || Number(form.quantity) < 0) {
-    result.quantity = 'Số lượng phải lớn hơn hoặc bằng 0'
   }
 
   if (!form.start_date) {
@@ -668,6 +1030,44 @@ const errors = computed(() => {
   }
 })
 
+// Load users for dropdown
+async function loadUsers() {
+  try {
+    loadingUsers.value = true
+    // Chỉ lấy users có role_id = 3 (CUSTOMER)
+    const res = await api.get('/admin/user/customers')
+    allUsers.value = res.data || []
+  } catch (error) {
+    console.error('Lỗi khi tải danh sách users:', error)
+    allUsers.value = []
+  } finally {
+    loadingUsers.value = false
+  }
+}
+
+function getUserDisplayName(userId) {
+  const user = allUsers.value.find(u => u.userId === userId)
+  return user ? (user.fullName || user.username) : `User #${userId}`
+}
+
+function onUserSelectionChange() {
+  // Force reactivity update
+}
+
+function removeUser(userId) {
+  form.selected_user_ids = form.selected_user_ids.filter(id => id !== userId)
+}
+
+function formatTargetType(voucher) {
+  if (voucher.targetType === 'ALL') {
+    return 'Tất cả'
+  }
+  if (voucher.targetUserCount) {
+    return `${voucher.targetUserCount} khách`
+  }
+  return 'Cụ thể'
+}
+
 watch(
   () => form.discount_type,
   (newType) => {
@@ -678,12 +1078,20 @@ watch(
 )
 
 watch(
-  () => form.quantity,
-  (newQuantity) => {
-    if (isZeroQuantity(newQuantity)) {
-      form.is_active = false
+  () => form.voucher_type,
+  () => {
+    isSubmitted.value = false
+    voucherStore.fieldErrors = {}
+  }
+)
+
+watch(
+  () => form.target_type,
+  (newType) => {
+    if (newType === 'ALL') {
+      form.selected_user_ids = []
     }
-  },
+  }
 )
 
 watch(
@@ -699,20 +1107,15 @@ watch(pageSize, () => {
   loadVouchers()
 })
 
-function isZeroQuantity(quantity) {
-  if (quantity === null || quantity === '') {
-    return false
-  }
-
-  const numberQuantity = Number(quantity)
-
-  return !Number.isNaN(numberQuantity) && numberQuantity <= 0
-}
-
 function generateVoucherCode() {
+  const prefixes = {
+    DISCOUNT: 'VC',
+    FREESHIP: 'FS',
+  }
+  const prefix = prefixes[form.voucher_type] || 'VC'
   const datePart = new Date().toISOString().slice(2, 10).replaceAll('-', '')
   const randomPart = Math.random().toString(36).slice(2, 6).toUpperCase()
-  form.voucher_code = `VC${datePart}${randomPart}`
+  form.voucher_code = `${prefix}${datePart}${randomPart}`
 }
 
 function showToast({type = 'success', title, message}) {
@@ -777,6 +1180,8 @@ function resetForm() {
   Object.assign(form, {...defaultForm})
   isEditing.value = false
   isSubmitted.value = false
+  userSearchQuery.value = ''
+  showUserDropdown.value = false
 }
 
 function openCreateModal() {
@@ -788,8 +1193,14 @@ function openEditModal(voucher) {
   isSubmitted.value = false
   voucherStore.fieldErrors = {}
 
+  let voucherType = 'DISCOUNT'
+  if (voucher.discountType === 'FREESHIP') {
+    voucherType = 'FREESHIP'
+  }
+
   Object.assign(form, {
     voucher_id: voucher.voucherId,
+    voucher_type: voucherType,
     voucher_code: voucher.voucherCode,
     discount_value: voucher.discountValue,
     discount_type: voucher.discountType,
@@ -797,9 +1208,11 @@ function openEditModal(voucher) {
     min_order_value: voucher.minOrderValue,
     start_date: voucher.startDate,
     end_date: voucher.endDate,
-    quantity: voucher.quantity,
     is_active: voucher.isActive,
-    is_private: Boolean(voucher.isPrivate),
+    freeship_value: voucher.freeshipValue || null,
+    // Đối tượng sử dụng
+    target_type: voucher.targetType || 'ALL',
+    selected_user_ids: voucher.targetUserIds || [],
   })
 
   isEditing.value = true
@@ -812,22 +1225,36 @@ function closeModal() {
 }
 
 function buildPayload() {
-  const quantity = Number(form.quantity)
-
-  return {
+  const basePayload = {
     voucherCode: form.voucher_code.trim().toUpperCase(),
-    discountValue: Number(form.discount_value),
-    discountType: form.discount_type,
-    maxDiscountAmount:
-      form.discount_type === 'AMOUNT'
-        ? null
-        : Number(form.max_discount_amount),
     minOrderValue: Number(form.min_order_value || 0),
     startDate: form.start_date,
     endDate: form.end_date,
-    quantity,
-    isActive: quantity > 0 ? Boolean(form.is_active) : false,
-    isPrivate: Boolean(form.is_private),
+    isActive: Boolean(form.is_active),
+    targetType: form.target_type,
+  }
+
+  if (form.target_type === 'SPECIFIC') {
+    basePayload.targetUserIds = form.selected_user_ids
+  }
+
+  if (form.voucher_type === 'DISCOUNT') {
+    return {
+      ...basePayload,
+      discountValue: Number(form.discount_value),
+      discountType: form.discount_type,
+      maxDiscountAmount: form.discount_type === 'AMOUNT' ? null : Number(form.max_discount_amount),
+      // Không gửi quantity nữa - mặc định 1 lần/user
+    }
+  }
+
+  if (form.voucher_type === 'FREESHIP') {
+    return {
+      ...basePayload,
+      discountType: 'FREESHIP',
+      discountValue: Number(form.freeship_value),
+      // Không gửi quantity nữa - mặc định 1 lần/user
+    }
   }
 }
 
@@ -890,10 +1317,7 @@ async function saveVoucher() {
 
   showSuccessModal({
     title: 'Thêm voucher thành công',
-    message:
-      voucherData.quantity <= 0
-        ? 'Voucher đã được thêm và tự chuyển sang Ngừng sử dụng vì số lượng bằng 0.'
-        : `Voucher ${voucherData.voucherCode} đã được thêm.`,
+    message: `Voucher ${voucherData.voucherCode} đã được thêm. Mỗi tài khoản chỉ dùng được 1 lần.`,
   })
 }
 
@@ -947,6 +1371,10 @@ function formatDiscountType(discountType) {
 
   if (discountType === 'AMOUNT') {
     return 'Giảm tiền'
+  }
+
+  if (discountType === 'FREESHIP') {
+    return 'Free Ship'
   }
 
   return discountType || '-'

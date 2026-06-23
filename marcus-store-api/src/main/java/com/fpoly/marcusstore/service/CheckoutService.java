@@ -17,6 +17,7 @@ import com.fpoly.marcusstore.repository.shopping.CartRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.service.VoucherService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +54,9 @@ public class CheckoutService {
 
     @Autowired
     private VoucherRepository voucherRepository;
+
+    @Autowired
+    private VoucherService voucherService;
 
     @Autowired
     private GhnService ghnService;
@@ -155,54 +159,59 @@ public class CheckoutService {
 
         // 3. XỬ LÝ VOUCHER
         BigDecimal discountAmount = BigDecimal.ZERO;
+        BigDecimal freeshipAmount = BigDecimal.ZERO; // Tiền ship được miễn phí
         if (req.getVoucherCode() != null && !req.getVoucherCode().trim().isEmpty()) {
             Voucher voucher = voucherRepository.findByVoucherCode(req.getVoucherCode())
                     .orElseThrow(() -> new RuntimeException("Mã giảm giá không tồn tại."));
 
-            LocalDateTime now = LocalDateTime.now();
-
-            // Validate Trạng thái & Thời gian
-            if (!Boolean.TRUE.equals(voucher.getIsActive()) ||
-                    (voucher.getStartDate() != null && now.isBefore(voucher.getStartDate())) ||
-                    (voucher.getEndDate() != null && now.isAfter(voucher.getEndDate()))) {
-                throw new RuntimeException("Mã giảm giá đã hết hạn hoặc không hoạt động.");
-            }
-
-            // Validate Số lượng
-            if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
-                throw new RuntimeException("Mã giảm giá đã hết lượt sử dụng.");
-            }
-
-            // Validate Đơn tối thiểu
+            // Validate Đơn tối thiểu (check trước khi gọi usage check)
             if (voucher.getMinOrderValue() != null && totalAmount.compareTo(voucher.getMinOrderValue()) < 0) {
                 throw new RuntimeException("Đơn hàng chưa đạt giá trị tối thiểu để sử dụng mã này.");
             }
 
-            // Tính số tiền giảm
-            if ("PERCENT".equalsIgnoreCase(voucher.getDiscountType())) {
-                // Giảm theo %
-                BigDecimal percent = voucher.getDiscountValue().divide(BigDecimal.valueOf(100), 2,
-                        RoundingMode.HALF_UP);
-                discountAmount = totalAmount.multiply(percent);
+            // Kiểm tra và ghi nhận việc sử dụng voucher
+            // Method này sẽ throw exception nếu không hợp lệ
+            voucherService.checkAndRecordVoucherUsage(voucher.getVoucherId(), currentUserId);
 
-                // Giới hạn số tiền giảm tối đa (Nếu có)
-                if (voucher.getMaxDiscountAmount() != null
-                        && discountAmount.compareTo(voucher.getMaxDiscountAmount()) > 0) {
-                    discountAmount = voucher.getMaxDiscountAmount();
+            // Xử lý theo loại voucher
+            if ("FREESHIP".equalsIgnoreCase(voucher.getDiscountType())) {
+                // FREESHIP - miễn phí ship
+                BigDecimal freeshipCover = voucher.getDiscountValue();
+                if (shippingFeeDecimal.compareTo(freeshipCover) <= 0) {
+                    freeshipAmount = shippingFeeDecimal;
+                } else {
+                    freeshipAmount = freeshipCover;
                 }
-            } else if ("AMOUNT".equalsIgnoreCase(voucher.getDiscountType())) {
-                // Giảm tiền mặt
-                discountAmount = voucher.getDiscountValue();
-            }
 
-            // Tránh trường hợp tiền giảm lớn hơn tiền hàng
-            if (discountAmount.compareTo(totalAmount) > 0) {
-                discountAmount = totalAmount;
-            }
+                order.setVoucher(voucher);
 
-            // Ghi nhận Voucher vào Order và TRỪ LÙI số lượng
-            order.setVoucher(voucher);
-            voucher.setQuantity(voucher.getQuantity() - 1);
+            } else {
+                // === XỬ LÝ DISCOUNT (PERCENT, AMOUNT) ===
+                if ("PERCENT".equalsIgnoreCase(voucher.getDiscountType())) {
+                    // Giảm theo %
+                    BigDecimal percent = voucher.getDiscountValue().divide(BigDecimal.valueOf(100), 2,
+                            RoundingMode.HALF_UP);
+                    discountAmount = totalAmount.multiply(percent);
+
+                    // Giới hạn số tiền giảm tối đa (Nếu có)
+                    if (voucher.getMaxDiscountAmount() != null
+                            && discountAmount.compareTo(voucher.getMaxDiscountAmount()) > 0) {
+                        discountAmount = voucher.getMaxDiscountAmount();
+                    }
+                } else if ("AMOUNT".equalsIgnoreCase(voucher.getDiscountType())) {
+                    // Giảm tiền mặt
+                    discountAmount = voucher.getDiscountValue();
+                }
+
+                // Tránh trường hợp tiền giảm lớn hơn tiền hàng
+                if (discountAmount.compareTo(totalAmount) > 0) {
+                    discountAmount = totalAmount;
+                }
+
+                // Ghi nhận Voucher vào Order
+                // Số lượng đã được trừ trong checkAndRecordVoucherUsage
+                order.setVoucher(voucher);
+            }
         }
 
         // 4. CHỐT SỔ ĐƠN HÀNG
@@ -210,8 +219,11 @@ public class CheckoutService {
         order.setShippingFee(shippingFeeDecimal);
         order.setDiscountAmount(discountAmount);
 
-        // Final Amount = (Tiền hàng + Phí Ship) - Khuyến mãi
-        BigDecimal finalAmount = totalAmount.add(shippingFeeDecimal).subtract(discountAmount);
+        // Final Amount = (Tiền hàng + Phí Ship - Giảm giá) - Miễn phí ship
+        BigDecimal finalAmount = totalAmount.add(shippingFeeDecimal)
+                .subtract(discountAmount)
+                .subtract(freeshipAmount);
+
         // Đảm bảo không bị số âm
         order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
