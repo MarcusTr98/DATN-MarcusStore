@@ -76,7 +76,7 @@
       </router-link>
       <router-link to="/admin/contact-management" class="menu-item" active-class="active">
         <i class="fa-solid fa-headset menu-icon" style="font-size: 16px"></i>
-        <span>Khiếu nại khách hàng</span>
+        <span>Quản lý liên hệ</span>
       </router-link>
     </div>
 
