@@ -1,13 +1,12 @@
 package com.fpoly.marcusstore.controller.admin;
 
 import com.fpoly.marcusstore.dto.response.ApiResponse;
-import com.fpoly.marcusstore.entity.contact.AdminNotification;
-import com.fpoly.marcusstore.repository.contact.AdminNotificationRepository;
+import com.fpoly.marcusstore.service.AdminNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/notifications")
@@ -15,19 +14,25 @@ import java.util.List;
 @RequiredArgsConstructor
 public class NotificationController {
 
-    private final AdminNotificationRepository notifRepo;
+    private final AdminNotificationService notificationService;
 
-    // danh sách 20 thông báo chưa đọc mới nhất để hiển thị lên Dropdown chuông
-    @GetMapping("/unread")
-    public ApiResponse<List<AdminNotification>> getUnreadNotifications() {
-        List<AdminNotification> unreadList = notifRepo.findTop20ByIsReadFalseOrderByCreatedAtDesc();
-        return ApiResponse.success(unreadList);
+    // Lấy danh sách thông báo
+    @GetMapping
+    public ApiResponse<Map<String, Object>> getNotifications() {
+        return ApiResponse.success(notificationService.getNotificationsForAdmin());
     }
 
-    // đánh dấu tất cả thông báo là đã đọc
+    // Đánh dấu đọc 1 thông báo
+    @PutMapping("/{id}/read")
+    public ApiResponse<Void> markAsRead(@PathVariable("id") Integer id) {
+        notificationService.markAsRead(id);
+        return ApiResponse.success(null);
+    }
+
+    // Đánh dấu đọc tất cả
     @PutMapping("/mark-all-read")
     public ApiResponse<Void> markAllAsRead() {
-        notifRepo.markAllAsRead();
+        notificationService.markAllAsRead();
         return ApiResponse.success(null);
     }
 }

@@ -35,27 +35,17 @@
         style="max-width: 500px; width: 100%"
       >
         <div class="icon-wrap mb-4">
-          <i class="fas fa-exclamation-triangle text-warning" style="font-size: 72px"></i>
+          <i class="fas fa-times-circle text-danger" style="font-size: 72px"></i>
         </div>
-        <h2 class="fw-bold text-danger mb-3">Chưa hoàn tất thanh toán</h2>
+        <h2 class="fw-bold text-danger mb-3">Thanh toán không thành công</h2>
         <p class="text-muted mb-2">
-          Giao dịch trực tuyến bị hủy hoặc xảy ra lỗi. Đơn hàng của bạn đã được tạo nhưng đang ở
-          trạng thái <strong>Chờ thanh toán</strong>.
+          Giao dịch không hoàn tất do lỗi thanh toán hoặc bạn đã hủy. Đơn hàng {{ orderCode }} đã
+          được hủy để đảm bảo quyền lợi sản phẩm.
         </p>
 
-        <div class="p-3 mb-4 mt-3 bg-light rounded-3 border border-warning border-opacity-25">
-          <span class="text-muted d-block mb-1" style="font-size: 13px">Mã đơn hàng:</span>
-          <span class="fw-bold fs-4 text-danger">{{ orderCode }}</span>
-        </div>
-
-        <div class="d-flex justify-content-center gap-3">
-          <router-link to="/" class="btn btn-outline-secondary rounded-pill px-4"
-            >Trang chủ</router-link
-          >
-          <router-link
-            to="/account/orders"
-            class="btn btn-warning text-dark fw-bold rounded-pill px-4"
-            >Xem đơn chờ thanh toán</router-link
+        <div class="d-flex justify-content-center gap-3 mt-4">
+          <router-link to="/" class="btn btn-outline-danger rounded-pill px-4"
+            >Về trang chủ đặt hàng lại</router-link
           >
         </div>
       </div>

@@ -13,35 +13,40 @@
 
     <div class="header-right">
       <div class="notification-wrapper" ref="notifWrapperRef">
-        <button class="header-btn notif-btn" @click="toggleNotif">
+        <button class="header-btn notif-btn" @click.stop="toggleNotif">
           <i class="fa-regular fa-bell"></i>
           <span v-if="unreadCount > 0" class="badge-pulse">{{ displayUnreadCount }}</span>
         </button>
 
         <div v-if="showNotifDropdown" class="notif-dropdown card-shadow">
           <div class="notif-header">
-            <strong>Thông báo mới</strong>
+            <strong>Thông báo hệ thống</strong>
             <button @click="markAllAsRead" class="btn-read-all">Đánh dấu đã đọc</button>
           </div>
           <div class="notif-body">
-            <div v-if="isLoadingNotif" class="empty-notif">Đang tải...</div>
-            <div v-else-if="notifications.length === 0" class="empty-notif">
-              Không có thông báo nào.
+            <div v-if="isLoadingNotif" class="empty-notif">Đang tải dữ liệu...</div>
+
+            <div v-else-if="displayNotifications.length === 0" class="empty-notif">
+              Bạn không còn thông báo nào cần xử lý.
             </div>
+
             <div
-              v-for="item in notifications"
+              v-for="item in displayNotifications"
               :key="item.id"
               class="notif-item"
-              :class="{ unread: !item.isRead }"
               @click="handleNotifClick(item)"
             >
-              <div class="notif-icon" :class="item.type">
-                <i v-if="item.type === 'ORDER'" class="fa-solid fa-box"></i>
-                <i v-else-if="item.type === 'CONTACT'" class="fa-solid fa-envelope-open-text"></i>
-                <i v-else class="fa-solid fa-bell"></i>
+              <div class="notif-icon-wrapper">
+                <div class="notif-icon" :class="item.type">
+                  <i v-if="item.type === 'ORDER'" class="fa-solid fa-box"></i>
+                  <i v-else-if="item.type === 'CONTACT'" class="fa-solid fa-envelope-open-text"></i>
+                  <i v-else class="fa-solid fa-bell"></i>
+                </div>
+                <span v-if="!item.isRead" class="unread-dot"></span>
               </div>
+
               <div class="notif-content">
-                <p class="notif-title">{{ item.title }}</p>
+                <p class="notif-title" :class="{ 'font-bold': !item.isRead }">{{ item.title }}</p>
                 <p class="notif-desc">{{ item.message }}</p>
                 <span class="notif-time">{{ item.time }}</span>
               </div>
@@ -86,6 +91,11 @@ let stompClient = null
 
 const displayUnreadCount = computed(() => (unreadCount.value > 99 ? '99+' : unreadCount.value))
 
+// LỌC ra những cái chưa đọc trước, rồi mới lấy 5 cái trên cùng
+const displayNotifications = computed(() => {
+  return notifications.value.filter((item) => !item.isRead).slice(0, 5)
+})
+
 const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080'
 
 const loadUser = () => {
@@ -102,20 +112,26 @@ const fetchNotifications = async () => {
   isLoadingNotif.value = true
   try {
     const res = await api.get('/admin/notifications')
-    notifications.value = res.data || []
-    unreadCount.value = notifications.value.filter((n) => !n.isRead).length
+
+    //FIX: Thêm .data.data vì bọc qua ApiResponse của Backend
+    notifications.value = res.data.data.list || []
+    unreadCount.value = res.data.data.unreadCount || 0
   } catch (error) {
-    console.error('Không thể tải thông báo:', error)
+    console.error('Lỗi hệ thống tải thông báo:', error)
   } finally {
     isLoadingNotif.value = false
   }
 }
 
 const connectWebSocket = () => {
-  const socket = new SockJS(`${WS_BASE_URL}/ws-endpoint`)
+  const token = localStorage.getItem('ACCESS_TOKEN')
+
   stompClient = new Client({
-    webSocketFactory: () => socket,
+    webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws-endpoint`),
     reconnectDelay: 5000,
+    connectHeaders: {
+      Authorization: token ? `Bearer ${token}` : '',
+    },
     onConnect: () => {
       stompClient.subscribe('/topic/admin/notifications', (message) => {
         handleNewNotification(JSON.parse(message.body))
@@ -126,7 +142,15 @@ const connectWebSocket = () => {
 }
 
 const handleNewNotification = (data) => {
+  // Có tin mới qua WebSocket => Đẩy vào đầu danh sách lịch sử
   notifications.value.unshift({ ...data, isRead: false })
+
+  // Giới hạn mảng client-side 20 tin cho nhẹ bộ nhớ trình duyệt
+  if (notifications.value.length > 20) {
+    notifications.value = notifications.value.slice(0, 20)
+  }
+
+  // Tăng số lượng CHƯA ĐỌC ở quả chuông lên 1
   unreadCount.value++
 }
 
@@ -146,16 +170,26 @@ const markAllAsRead = async () => {
     notifications.value.forEach((n) => (n.isRead = true))
     unreadCount.value = 0
   } catch (error) {
-    console.error('Không thể đánh dấu đã đọc:', error)
+    console.error('Thao tác thất bại:', error)
   }
 }
 
-const handleNotifClick = (item) => {
+const handleNotifClick = async (item) => {
   if (!item.isRead) {
-    item.isRead = true
-    unreadCount.value = Math.max(0, unreadCount.value - 1)
+    try {
+      await api.put(`/admin/notifications/${item.id}/read`)
+      item.isRead = true
+      unreadCount.value = Math.max(0, unreadCount.value - 1)
+      if (unreadCount.value > 0) {
+        fetchNotifications()
+      }
+    } catch (error) {
+      console.error('Lỗi thực thi:', error)
+    }
   }
+
   showNotifDropdown.value = false
+
   if (item.type === 'ORDER' && item.referenceId) {
     router.push(`/admin/order/${item.referenceId}`)
   } else if (item.type === 'CONTACT') {
@@ -195,11 +229,12 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 4px 12px rgba(255, 105, 160, 0.08);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05); /* Shadow xám sang trọng */
   margin: 16px;
   border-radius: 16px;
   position: relative;
   z-index: 50;
+  border: 1px solid #e2e8f0;
 }
 
 .header-left {
@@ -216,17 +251,17 @@ onUnmounted(() => {
   margin: 0 0 4px 0;
   font-size: 20px;
   font-weight: 800;
-  color: #111827;
+  color: #0f172a; /* Midnight Blue */
 }
 
 .greeting-title span {
-  color: #ff4d94;
+  color: #3b82f6; /* Đổi text span sang tông xanh Công nghệ quyền lực */
 }
 
 .greeting-sub {
   margin: 0;
   font-size: 13px;
-  color: #374151;
+  color: #64748b; /* Slate Gray */
   font-weight: 600;
 }
 
@@ -238,23 +273,23 @@ onUnmounted(() => {
 
 .header-btn {
   padding: 8px 16px;
-  border: 1px solid #f3d6e3;
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
   background: white;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #111827;
+  color: #334155;
   font-size: 14px;
   font-weight: 700;
   transition: all 0.2s ease;
 }
 
 .header-btn:hover {
-  background: #fff0f5;
-  color: #d63384;
-  border-color: #efbdd2;
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
 }
 
 .avatar {
@@ -267,7 +302,7 @@ onUnmounted(() => {
   height: 18px;
 }
 
-/* Chuông & Badge */
+/* Chuông & Badge thông báo */
 .notification-wrapper {
   position: relative;
 }
@@ -276,15 +311,23 @@ onUnmounted(() => {
   font-size: 18px;
   position: relative;
 }
+/* Chuông & Badge thông báo */
 .notif-btn i {
-  color: #f55d9b;
+  color: #f59e0b; /* Màu vàng cam (Amber) rực rỡ, quyền lực */
+  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3)); /* Thêm độ bóng nhẹ cho chuông sáng lên */
+  transition: all 0.2s ease;
+}
+
+.notif-btn:hover i {
+  color: #d97706; /* Sậm màu lại một chút khi trỏ chuột vào */
+  transform: scale(1.1); /* Hơi to lên khi trỏ chuột */
 }
 
 .badge-pulse {
   position: absolute;
   top: -4px;
   right: -4px;
-  background: #dc3545;
+  background: #ef4444; /* Đỏ Crimson */
   color: white;
   font-size: 10px;
   font-weight: bold;
@@ -297,15 +340,15 @@ onUnmounted(() => {
 @keyframes pulse {
   0% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
   }
   70% {
     transform: scale(1);
-    box-shadow: 0 0 0 6px rgba(220, 53, 69, 0);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
   }
   100% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
   }
 }
 
@@ -314,38 +357,42 @@ onUnmounted(() => {
   position: absolute;
   top: 50px;
   right: 0;
-  width: 340px;
+  width: 360px;
   background: white;
   border-radius: 12px;
-  border: 1px solid #f3d6e3;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 
 .notif-header {
   padding: 14px 16px;
-  border-bottom: 1px solid #f3d6e3;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #fffafd;
+  background: #f8fafc; /* Nền Header xám sạch sẽ */
 }
 .notif-header strong {
-  color: #b4557d;
-  font-size: 14px;
+  color: #1e293b;
+  font-size: 13px;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .btn-read-all {
   border: none;
   background: none;
-  color: #0984e3;
+  color: #2563eb;
   font-size: 12px;
   cursor: pointer;
   font-weight: 700;
 }
 .btn-read-all:hover {
   text-decoration: underline;
+  color: #1d4ed8;
 }
 
 .notif-body {
@@ -353,9 +400,9 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 .empty-notif {
-  padding: 24px;
+  padding: 32px 24px;
   text-align: center;
-  color: #374151;
+  color: #64748b;
   font-size: 14px;
   font-weight: 500;
 }
@@ -365,28 +412,44 @@ onUnmounted(() => {
   display: flex;
   gap: 14px;
   padding: 14px 16px;
-  border-bottom: 1px solid #f9fafb;
+  border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
-  transition: 0.2s;
+  transition: background 0.15s ease;
 }
 .notif-item:hover {
   background: #f8fafc;
 }
-.notif-item.unread {
-  background: #fff0f5;
+
+.notif-icon-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-self: flex-start;
+}
+
+.unread-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  background-color: #ef4444; /* Chấm đỏ rực khi chưa đọc */
+  border: 2px solid #fff;
+  border-radius: 50%;
 }
 
 .notif-icon {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: 14px;
 }
+
+/* Tông màu icon hiện đại */
 .notif-icon.ORDER {
   background: #10b981;
 }
@@ -400,19 +463,23 @@ onUnmounted(() => {
 .notif-title {
   margin: 0;
   font-size: 14px;
-  font-weight: 700;
-  color: #111827;
+  font-weight: 500;
+  color: #475569;
 }
+.notif-title.font-bold {
+  color: #0f172a;
+  font-weight: 800; /* Đậm vượt trội khẳng định quyền lực */
+}
+
 .notif-desc {
   margin: 4px 0 6px;
   font-size: 13px;
-  color: #374151;
+  color: #334155;
   line-height: 1.4;
-  font-weight: 500;
 }
 .notif-time {
   font-size: 11px;
-  color: #6b7280;
+  color: #94a3b8;
   font-weight: 600;
 }
 </style>

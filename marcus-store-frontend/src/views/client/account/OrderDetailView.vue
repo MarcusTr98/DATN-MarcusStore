@@ -61,9 +61,13 @@
                 </div>
                 <div class="meta-item">
                   <span class="meta-label"><i class="fa-solid fa-clock"></i>Cập nhật</span>
-                  <strong class="meta-value">{{
-                    formatDateTime(selectedOrder.updatedAt) || '---'
-                  }}</strong>
+                  <strong class="meta-value">{{ selectedOrder.updatedAt || '---' }}</strong>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label"
+                    ><i class="fa-solid fa-calendar-check"></i>Thời gian TT</span
+                  >
+                  <strong class="meta-value">{{ selectedOrder.paymentDate || '---' }}</strong>
                 </div>
               </div>
 
@@ -162,7 +166,8 @@
                       <div>
                         <div class="history-title">{{ item.title }}</div>
                         <div class="history-meta">
-                          {{ statusConfig[item.status]?.label || item.status }} · {{ formatDateTime(item.createdAt) }}
+                          {{ statusConfig[item.status]?.label || item.status }} ·
+                          {{ formatDateTime(item.createdAt) }}
                         </div>
                         <div v-if="item.note" class="history-note">
                           <span>Lý do:</span> {{ item.note }}
@@ -264,6 +269,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+
+// 1. Đổi lại đúng API của Client (chứ không dùng AdminOrderApi nữa)
 import UserOrderApi from '@/api/userOrder.js'
 import '@/assets/css/OrderDetailView.css'
 
@@ -277,7 +284,10 @@ async function fetchOrderDetail() {
     loading.value = true
     error.value = null
     const orderCode = route.params.id
+
+    // 2. Gọi đúng hàm lấy chi tiết đơn của User
     const response = await UserOrderApi.userOrderDetail(orderCode)
+
     selectedOrder.value = response.data
   } catch (e) {
     error.value = 'Không thể lấy chi tiết đơn hàng'

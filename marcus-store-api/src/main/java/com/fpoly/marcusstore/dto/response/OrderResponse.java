@@ -22,8 +22,15 @@ public class OrderResponse {
     private String paymentStatus;
     private String orderStatus;
     private Integer itemCount;
+
+    // Marcus bổ sung
+    private String transactionId;
+
     // format ngày giờ về dạng dd/MM/yyyy HH:mm
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy HH:mm")
     private LocalDateTime createdAt;
+    // Marcus bổ sung
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy HH:mm")
+    private LocalDateTime paymentDate;
 
 }
