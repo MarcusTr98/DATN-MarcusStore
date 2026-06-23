@@ -49,16 +49,16 @@ public class OrderServiceImpl implements OrderService {
         return paymentMethod == null ||
                 paymentMethod.isBlank() ||
                 "ALL".equalsIgnoreCase(paymentMethod)
-                ? null
-                : paymentMethod.trim();
+                        ? null
+                        : paymentMethod.trim();
     }
 
     private String normalizeOrderStatus(String orderStatus) {
         return orderStatus == null ||
                 orderStatus.isBlank() ||
                 "ALL".equalsIgnoreCase(orderStatus)
-                ? null
-                : orderStatus.trim();
+                        ? null
+                        : orderStatus.trim();
     }
 
     private String normalizeStatusValue(String status) {
@@ -94,7 +94,8 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus, Pageable pageable) {
+    public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus,
+            Pageable pageable) {
         String normalizeKeyword = normalizeKeyword(keyword);
         String normalizePaymentMethod = normalizePaymentMethod(paymentMethod);
         String normalizeOrderStatus = normalizeOrderStatus(orderStatus);
@@ -115,33 +116,27 @@ public class OrderServiceImpl implements OrderService {
                 .total(orderRepository.countOrders(
                         normalizedKeyword,
                         normalizedPaymentMethod,
-                        normalizedOrderStatus
-                ))
+                        normalizedOrderStatus))
                 .pending(orderRepository.countPendingOrders(
                         normalizedKeyword,
                         normalizedPaymentMethod,
-                        normalizedOrderStatus
-                ))
+                        normalizedOrderStatus))
                 .confirmed(orderRepository.countConfirmedOrders(
                         normalizedKeyword,
                         normalizedPaymentMethod,
-                        normalizedOrderStatus
-                ))
+                        normalizedOrderStatus))
                 .shipping(orderRepository.countShippingOrders(
                         normalizedKeyword,
                         normalizedPaymentMethod,
-                        normalizedOrderStatus
-                ))
+                        normalizedOrderStatus))
                 .completed(orderRepository.countCompletedOrders(
                         normalizedKeyword,
                         normalizedPaymentMethod,
-                        normalizedOrderStatus
-                ))
+                        normalizedOrderStatus))
                 .cancelled(orderRepository.countCancelledOrders(
                         normalizedKeyword,
                         normalizedPaymentMethod,
-                        normalizedOrderStatus
-                ))
+                        normalizedOrderStatus))
                 .build();
     }
 
@@ -159,17 +154,18 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public OrderDetailResponse getOrderDetailResponse(String orderCode) {
         // Lấy chi tiết đơn hàng theo mã đơn hàng
-        Order order = orderRepository.findDetailByOrderCode(orderCode).orElseThrow(() ->
-                new RuntimeException("không tìm thấy đơn hàng "));
+        Order order = orderRepository.findDetailByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("không tìm thấy đơn hàng "));
         if (ensureTrackingCodeForShipping(order)) {
             orderRepository.saveAndFlush(order);
         }
         orderItemRepository.findWithProductItemsByOrderId(order.getOrderId());
         // lấy trạng thái lịch sử đơn hàng
-        List<OrderStatusHistory> histories =
-                orderStatusHistoryRepository.findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
+        List<OrderStatusHistory> histories = orderStatusHistoryRepository
+                .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
         // map từ Entity sang DTO
-        // mỗi dòng khi được tách ra sẽ là một trạng thái của đơn hàng khi hiển thị lên FE
+        // mỗi dòng khi được tách ra sẽ là một trạng thái của đơn hàng khi hiển thị lên
+        // FE
         List<OrderStatusHistoryResponse> historyResponses = histories.stream()
                 .map(history -> OrderStatusHistoryResponse.builder()
                         .status(history.getStatus())
@@ -178,8 +174,7 @@ public class OrderServiceImpl implements OrderService {
                         .createdAt(history.getCreatedAt())
                         .createdByName(getUserDisplayName(history.getCreatedBy()))
 
-                        .build()
-                )
+                        .build())
                 .toList();
         // map từ Entity sang DTO
         return OrderDetailResponse.builder()
@@ -197,6 +192,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentMethod(order.getPaymentMethod())
                 .paymentStatus(order.getPaymentStatus())
                 .transactionId(order.getTransactionId())
+                .paymentDate(order.getPaymentDate()) // marcus thêm
                 .trackingCode(order.getTrackingCode())
                 .userId(order.getUser().getUserId())
                 .fullName(order.getUser().getFullName())
@@ -205,44 +201,39 @@ public class OrderServiceImpl implements OrderService {
                 .voucherCode(order.getVoucher() != null ? order.getVoucher().getVoucherCode() : null)
                 .items(
                         order.getOrderItems().stream().map(orderItem -> {
-                                    ProductSku sku = orderItem.getSku();
-                                    Product product = sku.getProduct();
-                                    return OrderItemDetailResponse.builder()
-                                            .skuId(sku.getSkuId())
-                                            .skuCode(sku.getSkuCode())
-                                            .productId(product.getProductId())
-                                            .productName(product.getProductName())
-                                            .productImage(
-                                                    sku.getSkuImageUrl() != null
-                                                            ? sku.getSkuImageUrl()
-                                                            : product.getThumbnailUrl()
-                                            )
-                                            .quantity(orderItem.getQuantity())
-                                            .priceAtPurchase(orderItem.getPriceAtPurchase())
-                                            .lineTotal(
-                                                    orderItem.getPriceAtPurchase()
-                                                            .multiply(BigDecimal.valueOf(orderItem.getQuantity()))
-                                            )
-                                            .imeis(
-                                                    orderItem.getProductItems().stream()
-                                                            .map(item -> ImeiResponse.builder()
-                                                                    .imeiCode(item.getImeiCode())
+                            ProductSku sku = orderItem.getSku();
+                            Product product = sku.getProduct();
+                            return OrderItemDetailResponse.builder()
+                                    .skuId(sku.getSkuId())
+                                    .skuCode(sku.getSkuCode())
+                                    .productId(product.getProductId())
+                                    .productName(product.getProductName())
+                                    .productImage(
+                                            sku.getSkuImageUrl() != null
+                                                    ? sku.getSkuImageUrl()
+                                                    : product.getThumbnailUrl())
+                                    .quantity(orderItem.getQuantity())
+                                    .priceAtPurchase(orderItem.getPriceAtPurchase())
+                                    .lineTotal(
+                                            orderItem.getPriceAtPurchase()
+                                                    .multiply(BigDecimal.valueOf(orderItem.getQuantity())))
+                                    .imeis(
+                                            orderItem.getProductItems().stream()
+                                                    .map(item -> ImeiResponse.builder()
+                                                            .imeiCode(item.getImeiCode())
 
-                                                                    .build()
-                                                            )
-                                                            .toList()
-                                            )
+                                                            .build())
+                                                    .toList())
 
-                                            .build();
-                                })
-                                .toList()
-                )
+                                    .build();
+                        })
+                                .toList())
                 // ghép dto orderDetail và dto History
                 .history(historyResponses)
                 .build();
 
-
     }
+
     // logic đổi trạng thái đơn hàng
     // Những trạng thái có thể đổi
     private boolean canChangeStatus(String currentStatus, String newStatus) {
@@ -262,6 +253,7 @@ public class OrderServiceImpl implements OrderService {
             default -> false;
         };
     }
+
     private boolean requiresNote(String status) {
         return "FAILED".equals(status) || "CANCELLED".equals(status);
     }

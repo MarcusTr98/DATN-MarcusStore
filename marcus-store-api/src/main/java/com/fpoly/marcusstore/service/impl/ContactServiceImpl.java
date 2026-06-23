@@ -1,14 +1,13 @@
 package com.fpoly.marcusstore.service.impl;
 
 import com.fpoly.marcusstore.dto.request.CreateContactRequest;
-import com.fpoly.marcusstore.entity.contact.AdminNotification;
 import com.fpoly.marcusstore.entity.contact.ContactRequest;
-import com.fpoly.marcusstore.repository.contact.AdminNotificationRepository;
 import com.fpoly.marcusstore.repository.contact.ContactRequestRepository;
+import com.fpoly.marcusstore.security.CustomUserDetails;
 import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.service.AdminNotificationService;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,34 +15,36 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ContactServiceImpl {
     private final ContactRequestRepository contactRepo;
-    private final AdminNotificationRepository notifRepo;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final AdminNotificationService notificationService;
 
     @Transactional
     public void submitContact(CreateContactRequest request) {
-        // 1. Lưu form liên hệ
-        Integer currentUserId = SecurityUtils.getCurrentUserId(); // trả về null nếu là khách vãng lai
+        // 1. Kiểm tra User ID một cách an toàn (Guest thì để null)
+        Integer currentUserId = null;
+        CustomUserDetails currentUser = SecurityUtils.getCurrentUserPrincipal();
+        if (currentUser != null) {
+            currentUserId = currentUser.getUserId();
+        }
 
+        // 2. Lưu form liên hệ
         ContactRequest contact = new ContactRequest();
-        contact.setUserId(currentUserId);
+        contact.setUserId(currentUserId); // Có user thì lưu ID, không có thì null
         contact.setCustomerName(request.getName());
         contact.setPhoneNumber(request.getPhone());
         contact.setEmail(request.getEmail());
         contact.setMessage(request.getMessage());
         contact.setStatus("PENDING");
-        contactRepo.save(contact);
+        ContactRequest savedContact = contactRepo.save(contact);
 
-        // 2. Lưu vào bảng Admin_Notifications để chống mất thông báo khi admin ko onl
-        AdminNotification notif = new AdminNotification();
-        notif.setType("CONTACT");
-        notif.setTitle("Yêu cầu hỗ trợ mới");
-        notif.setMessage("Khách hàng " + contact.getCustomerName() + " vừa gửi form liên hệ.");
-        notif.setReferenceId(String.valueOf(contact.getContactId()));
-        notif.setIsRead(false);
-        notifRepo.save(notif);
+        // 3. Gọi Service để tạo, dọn dẹp và bắn thông báo qua WebSocket chuẩn luồng
+        String notifTitle = "Yêu cầu hỗ trợ mới";
+        String notifMessage = "Khách hàng " + savedContact.getCustomerName() + " vừa gửi form liên hệ.";
 
-        // 3. đẩy WebSocket cho admin đang onl (đẩy luôn ID của notification vừa lưu)
-        messagingTemplate.convertAndSend("/topic/admin/notifications", notif);
+        notificationService.createAndSendNotification(
+                "CONTACT",
+                notifTitle,
+                notifMessage,
+                String.valueOf(savedContact.getContactId()));
     }
 
     // Admin đổi trạng thái PENDING => RESOLVED

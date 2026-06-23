@@ -81,6 +81,10 @@ public class Order {
     @Column(name = "tracking_code", length = 100)
     private String trackingCode;
 
+    // Marcus thêm để webhook thời gian thanh toán
+    @Column(name = "payment_date")
+    private LocalDateTime paymentDate;
+
     // Khóa ngoại trỏ về người đặt
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

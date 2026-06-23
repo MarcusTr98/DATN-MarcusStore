@@ -286,10 +286,8 @@
                   ><span class="mini-value">{{ orderDetail.transactionId || '---' }}</span>
                 </div>
                 <div class="mini-row">
-                  <span class="mini-label">Thời gian thanh toán</span
-                  ><span class="mini-value">{{
-                    orderDetail.paidAt ? formatDateTime(orderDetail.paidAt) : '---'
-                  }}</span>
+                  <span class="mini-label">Thời gian TT</span
+                  ><span class="mini-value">{{ orderDetail.paymentDate || '---' }}</span>
                 </div>
               </div>
             </div>

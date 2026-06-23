@@ -35,7 +35,6 @@ public class CheckoutService {
     @Autowired
     private CartItemRepository cartItemRepository;
 
-    // ĐÃ FIX: Thêm CartRepository vào đây để giải quyết lỗi "cannot be resolved"
     @Autowired
     private CartRepository cartRepository;
 
@@ -56,6 +55,10 @@ public class CheckoutService {
 
     @Autowired
     private GhnService ghnService;
+
+    // Bổ sung Inject Notification Service để bắn thông báo
+    @Autowired
+    private AdminNotificationService notificationService;
 
     // Hàm tính phí ship cho Frontend gọi real-time
     @Transactional(readOnly = true)
@@ -217,6 +220,7 @@ public class CheckoutService {
 
         // Lưu đơn hàng & dọn Giỏ hàng
         Order savedOrder = orderRepository.save(order);
+
         OrderStatusHistory createdHistory = new OrderStatusHistory();
         createdHistory.setOrder(savedOrder);
         createdHistory.setStatus("CREATED");
@@ -225,6 +229,27 @@ public class CheckoutService {
         orderStatusHistoryRepository.save(createdHistory);
 
         cartItemRepository.deleteAll(cartItems);
+
+        // BẮN THÔNG BÁO CHO ADMIN KHI CÓ ĐƠN HÀNG MỚI
+        try {
+            String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
+
+            // Format số tiền theo chuẩn Việt Nam (VD: 36.540.500)
+            java.text.NumberFormat formatVN = java.text.NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
+            String formattedAmount = formatVN.format(savedOrder.getFinalAmount());
+
+            String notifMessage = "Khách hàng " + savedOrder.getRecipientName() + " vừa đặt một đơn hàng trị giá "
+                    + formattedAmount + "đ.";
+
+            notificationService.createAndSendNotification(
+                    "ORDER",
+                    notifTitle,
+                    notifMessage,
+                    savedOrder.getOrderCode());
+        } catch (Exception e) {
+            System.err.println("[Cảnh báo] Lỗi khi bắn thông báo WebSocket, đơn hàng vẫn được tạo thành công.");
+            e.printStackTrace();
+        }
 
         return savedOrder;
     }

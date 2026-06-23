@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -111,11 +112,15 @@ public class VnPayController {
         }
 
         // ── Bước 7: Cập nhật trạng thái theo kết quả giao dịch
+        // Trong VnPayController.receiveIPN (phần Bước 7)
         if ("00".equals(responseCode)) {
-            // Giao dịch thành công
             order.setPaymentStatus("PAID");
             order.setOrderStatus("PROCESSING");
-            order.setTransactionId(transactionId); // lưu mã GD để đối soát
+            order.setTransactionId(transactionId);
+
+            // Ghi lại thời điểm thanh toán thành công từ VNPAY
+            order.setPaymentDate(LocalDateTime.now());
+
             log.info("[VNPAY IPN] Thanh toán thành công. Order={}, TxnNo={}", orderCode, transactionId);
         } else {
             // Khách hủy hoặc giao dịch thất bại
