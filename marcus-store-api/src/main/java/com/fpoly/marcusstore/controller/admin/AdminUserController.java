@@ -2,7 +2,10 @@ package com.fpoly.marcusstore.controller.admin;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -15,9 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.fpoly.marcusstore.dto.request.CreateUserRequest;
 import com.fpoly.marcusstore.dto.request.UpdateUserRequest;
+import com.fpoly.marcusstore.dto.request.VerifyOtpRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
-
 import com.fpoly.marcusstore.dto.response.UserResponse;
+import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.service.impl.UserServiceImpl;
 
 import jakarta.validation.Valid;
@@ -26,10 +30,10 @@ import lombok.RequiredArgsConstructor;
 @RestController
 @RequestMapping("/api/admin/user")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
 public class AdminUserController {
     private final UserServiceImpl userServiceImpl;
 @GetMapping
+@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
   public ApiResponse<Page<UserResponse>> getAll(
           @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "0") int page,
@@ -59,10 +63,25 @@ public ApiResponse<String> lockUser(@PathVariable Integer id){
     userServiceImpl.lockUser(id);
     return ApiResponse.success("Khóa tài khoản thành công");
 }
+
 @PutMapping("/{id}/unLock")
 @PreAuthorize("hasRole('ADMIN')")
 public ApiResponse<String> unLockUser(@PathVariable Integer id){
     userServiceImpl.UnLockUser(id);
     return ApiResponse.success("Mở khóa tài khoản thành công");
 }
+    @PostMapping("/{id}/send-verify-email")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<String> sendVerifyEmail(@PathVariable Integer id) {
+        userServiceImpl.sendVerifyEmail(id);
+        return ApiResponse.success("Email xác thực đã được gửi đến khách hàng");
+    }
+ 
+    // Khách submit OTP (không cần ADMIN)
+    @PostMapping("/verify-email")
+    @PreAuthorize("permitAll()")
+    public ApiResponse<String> verifyEmail(@RequestBody @Valid VerifyOtpRequest request) {
+        userServiceImpl.verifyEmailByOtp(request.getEmail(), request.getOtp());
+        return ApiResponse.success("Xác thực email thành công");
+    }
 }

@@ -2,7 +2,7 @@
   <div class="profile-page">
     <div class="container py-5">
       <div class="row g-4">
-        <div v-if="showSidebar" class="col-lg-3">
+        <div class="col-lg-3">
           <div class="sidebar-card">
             <div class="avt-ring">
               <div class="avt-inner">
@@ -41,7 +41,7 @@
           </div>
         </div>
 
-        <div :class="showSidebar ? 'col-lg-9' : 'col-12'">
+        <div class="col-lg-9">
           <router-view />
         </div>
       </div>
@@ -60,16 +60,14 @@
 
 <script setup>
 import { reactive, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import userApi from '@/api/userApi'
 import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/profile.css'
 
 const router = useRouter()
-const route = useRoute()
 
 const user = reactive({ username: '', fullName: '' })
-const showSidebar = computed(() => route.name !== 'OrderDetail')
 
 const initials = computed(() =>
   (user.fullName || 'U')

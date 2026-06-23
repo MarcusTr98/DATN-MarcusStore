@@ -12,44 +12,61 @@
       <span>Đang tải thông tin...</span>
     </div>
 
-    <form v-else @submit.prevent="updateProfile">
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="field-lbl">Tài khoản đăng nhập</label>
-          <div class="input-wrap">
-            <input type="text" class="f-input f-input--locked" :value="user.username" disabled />
-            <i class="fas fa-lock lock-icon"></i>
+    <template v-else>
+
+      <!-- Banner xác thực email — chỉ hiện khi chưa verify -->
+      <Emailverifybanner
+        :email="user.email"
+        :email-verified="user.emailVerified"
+        @error="(msg) => showAlert('error', 'Lỗi', msg)"
+      />
+
+      <form @submit.prevent="updateProfile">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="field-lbl">Tài khoản đăng nhập</label>
+            <div class="input-wrap">
+              <input type="text" class="f-input f-input--locked" :value="user.username" disabled />
+              <i class="fas fa-lock lock-icon"></i>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="field-lbl">Email liên hệ</label>
+            <div class="input-wrap">
+              <input type="email" class="f-input f-input--locked" :value="user.email" disabled />
+              <i class="fas fa-lock lock-icon"></i>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="field-lbl field-lbl--req">Họ và tên</label>
+            <input
+              v-model="user.fullName"
+              type="text"
+              class="f-input"
+              placeholder="Nhập họ và tên"
+            />
+          </div>
+          <div class="col-md-6">
+            <label class="field-lbl field-lbl--req">Số điện thoại</label>
+            <input
+              v-model="user.phoneNumber"
+              type="tel"
+              class="f-input"
+              placeholder="Nhập số điện thoại"
+            />
           </div>
         </div>
-        <div class="col-md-6">
-          <label class="field-lbl">Email liên hệ</label>
-          <div class="input-wrap">
-            <input type="email" class="f-input f-input--locked" :value="user.email" disabled />
-            <i class="fas fa-lock lock-icon"></i>
-          </div>
+
+        <div class="card-foot">
+          <button type="submit" class="btn-red" :disabled="isSaving">
+            <i class="fas fa-save me-2" v-if="!isSaving"></i>
+            <i class="fas fa-spinner fa-spin me-2" v-else></i>
+            {{ isSaving ? 'Đang lưu...' : 'Lưu thay đổi' }}
+          </button>
         </div>
-        <div class="col-md-6">
-          <label class="field-lbl field-lbl--req">Họ và tên</label>
-          <input v-model="user.fullName" type="text" class="f-input" placeholder="Nhập họ và tên" />
-        </div>
-        <div class="col-md-6">
-          <label class="field-lbl field-lbl--req">Số điện thoại</label>
-          <input
-            v-model="user.phoneNumber"
-            type="tel"
-            class="f-input"
-            placeholder="Nhập số điện thoại"
-          />
-        </div>
-      </div>
-      <div class="card-foot">
-        <button type="submit" class="btn-red" :disabled="isSaving">
-          <i class="fas fa-save me-2" v-if="!isSaving"></i>
-          <i class="fas fa-spinner fa-spin me-2" v-else></i>
-          {{ isSaving ? 'Đang lưu...' : 'Lưu thay đổi' }}
-        </button>
-      </div>
-    </form>
+      </form>
+
+    </template>
 
     <BaseModal
       :visible="modal.visible"
@@ -65,15 +82,25 @@
 import { ref, reactive, onMounted } from 'vue'
 import userApi from '@/api/userApi'
 import BaseModal from '@/components/BaseModal.vue'
+import Emailverifybanner from '@/components/Emailverifybanner.vue'
 
-const user = reactive({ username: '', email: '', fullName: '', phoneNumber: '' })
+
+const user = reactive({
+  username     : '',
+  email        : '',
+  fullName     : '',
+  phoneNumber  : '',
+  emailVerified: false  // ← quan trọng
+})
+
 const isLoading = ref(true)
-const isSaving = ref(false)
+const isSaving  = ref(false)
 
 const modal = reactive({ visible: false, type: 'info', title: '', message: '' })
+
 const showAlert = (type, title, msg) => {
-  modal.type = type
-  modal.title = title
+  modal.type    = type
+  modal.title   = title
   modal.message = msg
   modal.visible = true
 }
@@ -86,7 +113,7 @@ const fetchProfile = async () => {
   isLoading.value = true
   try {
     const res = await userApi.getMyProfile()
-    if (res.data && res.data.data) {
+    if (res.data?.data) {
       Object.assign(user, res.data.data)
     }
   } catch {
@@ -103,10 +130,13 @@ const updateProfile = async () => {
   }
   isSaving.value = true
   try {
-    await userApi.updateProfile({ fullName: user.fullName, phoneNumber: user.phoneNumber })
+    await userApi.updateProfile({
+      fullName   : user.fullName,
+      phoneNumber: user.phoneNumber
+    })
     showAlert('success', 'Thành công', 'Cập nhật hồ sơ thành công!')
     localStorage.setItem('USERNAME', user.fullName)
-    window.dispatchEvent(new Event('auth-changed')) // Gửi event đổi tên lên Header
+    window.dispatchEvent(new Event('auth-changed'))
   } catch (error) {
     showAlert('error', 'Thất bại', error.response?.data?.message || 'Có lỗi xảy ra')
   } finally {

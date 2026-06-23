@@ -18,11 +18,13 @@
         placeholder="••••••"
       />
 
-      <button class="otp-btn" @click="verifyOtp">
-        Xác nhận
+      <button class="otp-btn" :disabled="loading" @click="verifyOtp">
+        {{ loading ? 'Đang xác nhận...' : 'Xác nhận' }}
       </button>
+
     </div>
-     <BaseModal
+
+    <BaseModal
       :visible="modal.visible"
       :type="modal.type"
       :title="modal.title"
@@ -33,17 +35,18 @@
 </template>
 
 <script setup>
-import { onMounted, ref, reactive } from 'vue' 
+import { onMounted, ref, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 
-const route = useRoute()
+const route  = useRoute()
 const router = useRouter()
-const otp = ref('')
-const email = route.query.email
-const type = route.query.type
-const loading = ref(false)
+
+const otp       = ref('')
+const email     = route.query.email
+const type      = route.query.type  // 'register' | 'forgot-password' | 'verify-email'
+const loading   = ref(false)
 const failCount = ref(0)
 const MAX_ATTEMPTS = 3
 
@@ -54,121 +57,88 @@ const modal = reactive({
   message: '',
 })
 
-
 const showModal = (type, title, message) => {
-  modal.type = type
-  modal.title = title
+  modal.type    = type
+  modal.title   = title
   modal.message = message
   modal.visible = true
 }
-
 
 const onModalClose = () => {
   modal.visible = false
 
   if (modal.type === 'success') {
-
     if (type === 'forgot-password') {
-
       router.push('/auth/reset-password')
-
+    } else if (type === 'verify-email') {
+      router.push('/profile') // quay về profile, trang sẽ mount lại và fetchProfile()
     } else {
-
       router.push('/auth/login')
-
     }
 
   } else if (failCount.value >= MAX_ATTEMPTS) {
-
     if (type === 'forgot-password') {
-
       router.push('/auth/forgot-password')
-
+    } else if (type === 'verify-email') {
+      router.push('/profile')
     } else {
-
       router.push('/auth/register')
-
     }
-
   }
 }
+
 const verifyOtp = async () => {
   if (loading.value) return
-
   loading.value = true
 
   try {
 
     if (type === 'forgot-password') {
 
-      await api.post('/auth/verify-otp', {
-        email,
-        otp: otp.value,
-      })
-     sessionStorage.setItem('allowResetPassword', 'true')
-      showModal(
-        'success',
-        'Thành công',
-        'OTP hợp lệ. Vui lòng đặt lại mật khẩu.'
-      )
+      await api.post('/auth/verify-otp', { email, otp: otp.value })
+      sessionStorage.setItem('allowResetPassword', 'true')
+      showModal('success', 'Thành công', 'OTP hợp lệ. Vui lòng đặt lại mật khẩu.')
+
+    } else if (type === 'verify-email') {
+
+      await api.post('/admin/user/verify-email', { email, otp: otp.value })
+      showModal('success', 'Xác thực thành công', 'Email của bạn đã được xác thực thành công!')
 
     } else {
 
-      await api.post('/auth/register/verify', {
-        email,
-        otp: otp.value,
-      })
+      await api.post('/auth/register/verify', { email, otp: otp.value })
+      showModal('success', 'Thành công', 'Tài khoản đã được xác thực. Bạn có thể đăng nhập ngay!')
 
-      showModal(
-        'success',
-        'Thành công',
-        'Tài khoản đã được xác thực. Bạn có thể đăng nhập ngay!'
-      )
     }
 
   } catch (e) {
-
     failCount.value++
-
-    const msg =
-      e.response?.data?.message ||
-      'OTP không hợp lệ!'
+    const msg = e.response?.data?.message || 'OTP không hợp lệ!'
 
     if (failCount.value >= MAX_ATTEMPTS) {
-
-      showModal(
-        'error',
-        'Sai quá nhiều lần',
-        'Bạn đã nhập sai OTP quá 3 lần.'
-      )
-
+      showModal('error', 'Sai quá nhiều lần', 'Bạn đã nhập sai OTP quá 3 lần.')
     } else {
-
-      showModal(
-        'error',
-        'Xác thực thất bại',
-        `${msg} (Còn ${
-          MAX_ATTEMPTS - failCount.value
-        } lần thử)`
-      )
+      showModal('error', 'Xác thực thất bại', `${msg} (Còn ${MAX_ATTEMPTS - failCount.value} lần thử)`)
     }
 
   } finally {
     loading.value = false
   }
 }
+
 onMounted(() => {
   if (!email) {
-
     if (type === 'forgot-password') {
       router.replace('/auth/forgot-password')
+    } else if (type === 'verify-email') {
+      router.replace('/profile')
     } else {
       router.replace('/auth/register')
     }
-
   }
 })
 </script>
+
 <style scoped>
 .otp-page {
   height: 100vh;
@@ -241,20 +211,17 @@ onMounted(() => {
   transition: 0.2s;
 }
 
-.otp-btn:hover {
+.otp-btn:hover:not(:disabled) {
   transform: translateY(-2px);
 }
 
-
+.otp-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 
 @keyframes pop {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1);   }
 }
 </style>
