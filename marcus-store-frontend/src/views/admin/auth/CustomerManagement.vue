@@ -76,6 +76,7 @@
       @lock="lockUser"
       @unlock="unlockUser"
       @edit="openEdit"
+      @send-verify="sendVerifyEmail"
       @page-change="goToPage"
       @page-size-change="onPageSizeChange"
     />
@@ -167,7 +168,6 @@ const filteredCustomers = computed(() => {
   )
 })
  
-// Reset về trang 0 khi keyword thay đổi
 watch(keyword, () => {
   currentPage.value = 0
 })
@@ -198,6 +198,24 @@ const onPageSizeChange = (size) => {
 const verifiedCount = computed(() => users.value.filter(x =>  x.emailVerified).length)
 const activeCount   = computed(() => users.value.filter(x =>  x.active).length)
 const lockedCount   = computed(() => users.value.filter(x => !x.active).length)
+ 
+// ── Gửi email xác thực (Admin gửi mail, khách tự xác thực) ──
+const sendVerifyEmail = async (id) => {
+  try {
+    await Use.sendVerifyEmail(id)
+    showModal(
+      'success',
+      'Đã gửi email xác thực',
+      'Email xác thực đã được gửi đến khách hàng. Khách hàng cần kiểm tra hộp thư và làm theo hướng dẫn.'
+    )
+  } catch (e) {
+    showModal(
+      'error',
+      'Gửi email thất bại',
+      e.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.'
+    )
+  }
+}
  
 // ── Lock / Unlock ──────────────────────────────────────
 const lockUser = async (id) => {
@@ -451,3 +469,4 @@ const saveUser = async (payload) => {
   background: #ec4d8d;
 }
 </style>
+ 

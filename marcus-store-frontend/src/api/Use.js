@@ -27,5 +27,12 @@ export default {
 
   unlock(id) {
     return api.put(`${API_URL}/${id}/unLock`)
+  },
+  sendVerifyEmail(id) {
+    return api.post(`${API_URL}/${id}/send-verify-email`)
+  },
+
+  verifyEmail(email, otp) {
+    return api.post(`${API_URL}/verify-email`, { email, otp })
   }
 }

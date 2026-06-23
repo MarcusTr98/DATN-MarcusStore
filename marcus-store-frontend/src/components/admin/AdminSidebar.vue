@@ -97,10 +97,10 @@
   </div>
   <div v-if="isAccountMenuOpen" class="submenu">
     <router-link to="/admin/employee" class="submenu-item" active-class="active"
-      >Quản lý nhân viên</router-link
+      >Tài khoản nhân viên</router-link
     >
     <router-link to="/admin/customer" class="submenu-item" active-class="active"
-      >Quản lý khách hàng</router-link
+      >Tài khoản khách hàng</router-link
     >
   </div>
       <router-link to="/admin/settings" class="menu-item" active-class="active">

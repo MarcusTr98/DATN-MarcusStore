@@ -11,7 +11,6 @@
           <th>SĐT</th>
           <th>Vai trò</th>
           <th>Trạng thái</th>
-          <th>Email xác thực</th>
           <th>Ngày tạo</th>
           <th v-if="canManage">Thao tác</th>
         </tr>
@@ -20,7 +19,7 @@
       <tbody>
  
         <tr v-if="!users.length">
-          <td :colspan="canManage ? 9 : 8" class="empty-state">
+          <td :colspan="canManage ? 8 : 7" class="empty-state">
             <i class="bi bi-people"></i>
             <h3>Không có tài khoản nào</h3>
             <p>Hãy thêm nhân viên mới hoặc thay đổi từ khóa tìm kiếm.</p>
@@ -56,15 +55,6 @@
               :class="item.active ? 'active' : 'locked'"
             >
               {{ item.active ? 'Hoạt động' : 'Đã khóa' }}
-            </span>
-          </td>
- 
-          <td>
-            <span
-              class="status-badge"
-              :class="item.emailVerified ? 'active' : 'warning'"
-            >
-              {{ item.emailVerified ? 'Đã xác thực' : 'Chưa xác thực' }}
             </span>
           </td>
  

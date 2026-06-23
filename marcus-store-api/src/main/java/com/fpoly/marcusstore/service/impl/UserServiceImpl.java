@@ -1,4 +1,5 @@
 package com.fpoly.marcusstore.service.impl;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import org.springframework.data.domain.Page;
@@ -10,10 +11,15 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fpoly.marcusstore.dto.request.CreateUserRequest;
 import com.fpoly.marcusstore.dto.request.UpdateUserRequest;
 import com.fpoly.marcusstore.dto.response.UserResponse;
+import com.fpoly.marcusstore.entity.auth.EmailOTP;
 import com.fpoly.marcusstore.entity.auth.Role;
 import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.repository.auth.EmailOTPRepository;
 import com.fpoly.marcusstore.repository.auth.RoleRepository;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderRepository;
+import com.fpoly.marcusstore.service.EmailService;
+import com.fpoly.marcusstore.service.OtpService;
 import com.fpoly.marcusstore.service.UserService;
 
 import lombok.RequiredArgsConstructor;
@@ -23,8 +29,16 @@ public class UserServiceImpl implements UserService{
 private final UserRepository userRepository;
 private final RoleRepository roleRepository;
 private final PasswordEncoder passwordEncoder;
-
+private final OrderRepository orderRepository;
+private final EmailService emailService;
+private final OtpService otpService;
+private final EmailOTPRepository emailOtpRepository;
 private UserResponse toResponse( User user){
+      BigDecimal totalSpent = BigDecimal.ZERO;
+        if ("CUSTOMER".equals(user.getRole().getRoleName())) {
+            totalSpent = orderRepository.sumTotalSpentByUserId(user.getUserId());
+            if (totalSpent == null) totalSpent = BigDecimal.ZERO;
+        }
     return UserResponse.builder()
           .userId(user.getUserId())
           .username(user.getUsername())
@@ -35,6 +49,7 @@ private UserResponse toResponse( User user){
           .roleName(user.getRole().getRoleName())
           .emailVerified(user.getEmailVerified())
           .createdAt(user.getCreatedAt())
+          .totalSpent(totalSpent)
           .build();
 }
 @Override
@@ -98,6 +113,7 @@ public UserResponse update(Integer Id, UpdateUserRequest request){
          user.setFullName(request.getFullName());
          user.setEmail(request.getEmail());
          user.setPhoneNumber(request.getPhoneNumber());
+         user.setIsActive(true);
          user.setRole(role);
          user.setUpdatedAt(LocalDateTime.now());
          
@@ -138,5 +154,51 @@ public void UnLockUser(Integer Id) {
     user.setIsActive(true);
 
     userRepository.save(user);
+}
+
+@Override
+@Transactional
+public void sendVerifyEmail(Integer userId) {
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+
+    if (Boolean.TRUE.equals(user.getEmailVerified())) {
+        throw new RuntimeException("Email đã được xác thực");
+    }
+
+    // Xóa OTP cũ nếu có
+    emailOtpRepository.deleteByEmail(user.getEmail());
+
+    // Tạo OTP mới
+    String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
+    EmailOTP otp = new EmailOTP();
+    otp.setEmail(user.getEmail());
+    otp.setOtpCode(otpCode);
+    otp.setCreatedAt(LocalDateTime.now());
+    otp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
+    emailOtpRepository.save(otp);
+
+    // Gửi mail
+    emailService.sendOtp(user.getEmail(), otpCode);
+}
+
+@Override
+@Transactional
+public void verifyEmailByOtp(String email, String otp) {
+
+    System.out.println("VERIFY OTP: " + email);
+
+    otpService.verifyOtp(email, otp);
+
+    User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+
+    System.out.println("Before: " + user.getEmailVerified());
+
+    user.setEmailVerified(true);
+
+    userRepository.save(user);
+
+    System.out.println("After: " + user.getEmailVerified());
 }
 }

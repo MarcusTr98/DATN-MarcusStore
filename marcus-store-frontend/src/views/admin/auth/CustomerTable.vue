@@ -9,6 +9,9 @@
           <th>Khách hàng</th>
           <th>Email</th>
           <th>SĐT</th>
+          <th>Hạng thành viên</th>
+          <th>Tổng chi tiêu</th>
+          <th>Ngày tạo</th>
           <th>Email Verify</th>
           <th>Trạng thái</th>
           <th v-if="canManage">Thao tác</th>
@@ -18,17 +21,14 @@
       <tbody>
  
         <tr v-if="!users.length">
-          <td :colspan="canManage ? 7 : 6" class="empty-state">
+          <td :colspan="canManage ? 10 : 9" class="empty-state">
             <i class="bi bi-person-x"></i>
             <h3>Không có khách hàng nào</h3>
             <p>Hãy thay đổi từ khóa tìm kiếm.</p>
           </td>
         </tr>
  
-        <tr
-          v-for="item in users"
-          :key="item.userId"
-        >
+        <tr v-for="item in users" :key="item.userId">
  
           <td class="user-id">#{{ item.userId }}</td>
  
@@ -38,6 +38,26 @@
  
           <td>{{ item.phoneNumber }}</td>
  
+          <!-- Hạng thành viên -->
+          <td>
+            <span class="tier-badge" :class="getTier(item.totalSpent).cls">
+              {{ getTier(item.totalSpent).icon }} {{ getTier(item.totalSpent).label }}
+            </span>
+          </td>
+ 
+          <!-- Tổng chi tiêu -->
+          <td class="spent-cell">
+            {{ formatVND(item.totalSpent) }}
+          </td>
+ 
+          <!-- Ngày tạo -->
+          <td>
+            {{ item.createdAt
+                ? new Date(item.createdAt).toLocaleDateString('vi-VN')
+                : '—' }}
+          </td>
+ 
+          <!-- Email Verify -->
           <td>
             <span
               class="status-badge"
@@ -47,6 +67,7 @@
             </span>
           </td>
  
+          <!-- Trạng thái -->
           <td>
             <span
               class="status-badge"
@@ -56,6 +77,7 @@
             </span>
           </td>
  
+          <!-- Thao tác -->
           <td v-if="canManage">
             <div class="action-group">
  
@@ -65,6 +87,15 @@
                 @click="$emit('edit', item)"
               >
                 <i class="bi bi-pencil-square"></i>
+              </button>
+ 
+              <button
+                v-if="!item.emailVerified"
+                class="btn-action btn-verify"
+                title="Gửi email xác thực"
+                @click="$emit('send-verify', item.userId)"
+              >
+                <i class="bi bi-envelope-check"></i>
               </button>
  
               <button
@@ -172,6 +203,7 @@ const emit = defineEmits([
   'edit',
   'lock',
   'unlock',
+  'send-verify',
   'page-change',
   'page-size-change'
 ])
@@ -185,6 +217,21 @@ watch(
  
 function onPageSizeChange() {
   emit('page-size-change', localPageSize.value)
+}
+ 
+// ── Hạng thành viên ────────────────────────────────────
+function getTier(totalSpent) {
+  const amount = Number(totalSpent) || 0
+  if (amount >= 10_000_000) return { label: 'Kim Cương', icon: '💎', cls: 'diamond' }
+  if (amount >=  2_000_000) return { label: 'Vàng',      icon: '🥇', cls: 'gold'    }
+  if (amount >=    500_000) return { label: 'Bạc',       icon: '🥈', cls: 'silver'  }
+  return                           { label: 'Đồng',      icon: '🥉', cls: 'bronze'  }
+}
+ 
+// ── Format tiền VNĐ ────────────────────────────────────
+function formatVND(amount) {
+  const num = Number(amount) || 0
+  return num.toLocaleString('vi-VN', { style: 'currency', currency: 'VND' })
 }
 </script>
  
@@ -231,7 +278,50 @@ function onPageSizeChange() {
   font-weight: 800;
 }
  
-/* ===== Badges ===== */
+.spent-cell {
+  font-weight: 700;
+  color: #d63384;
+  white-space: nowrap;
+}
+ 
+/* ===== Hạng thành viên ===== */
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+ 
+.tier-badge.bronze {
+  background: #fdf3e7;
+  color: #a0522d;
+  border: 1px solid #f5cfa0;
+}
+ 
+.tier-badge.silver {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+ 
+.tier-badge.gold {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fcd34d;
+}
+ 
+.tier-badge.diamond {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #93c5fd;
+}
+ 
+/* ===== Status badges ===== */
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -284,6 +374,17 @@ function onPageSizeChange() {
 .btn-edit:hover {
   background: #ffe4ef;
   border-color: #efbdd2;
+}
+ 
+.btn-verify {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #2563eb;
+}
+ 
+.btn-verify:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
 }
  
 .btn-lock {
