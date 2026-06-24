@@ -53,6 +53,7 @@ public class SecurityConfig {
                         // 1. Nhóm API mở tự do (Không cần Token)
                         .requestMatchers("/api/auth/**").permitAll() // Ngọc: Đăng nhập, Đăng ký, Quên MK
                         .requestMatchers("/api/public/**").permitAll()
+                        .requestMatchers("/api/admin/user/verify-email").permitAll() // Cho phep khach hang nhap OTP xac thuc email
                         .requestMatchers("/api/vnpay/**").permitAll() // Marcus test môi trường Ngrok webhook Vnpay
                         .requestMatchers("/ws-endpoint/**").permitAll() // Marcus thêm để làm websocket
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập

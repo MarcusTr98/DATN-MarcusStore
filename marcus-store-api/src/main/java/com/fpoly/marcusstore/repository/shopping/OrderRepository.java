@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
@@ -172,4 +173,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     Optional<Order> findDetailByOrderCode(@Param("orderCode") String orderCode);
 
     Optional<Order> findByOrderCodeAndUserUserId(String OrderCode, Integer userId);
+
+    @Query("SELECT COALESCE(SUM(o.finalAmount), 0) FROM Order o " +
+       "WHERE o.user.userId = :userId AND o.orderStatus = 'COMPLETED'")
+    BigDecimal sumTotalSpentByUserId(@Param("userId") Integer userId);
 }
