@@ -134,6 +134,11 @@ public UserResponse update(Integer Id, UpdateUserRequest request){
         Role role = roleRepository.findById(request.getRoleId())
                 .orElseThrow(() ->
                         new RuntimeException("Không tìm thấy role"));
+           if ("ADMIN".equals(user.getRole().getRoleName())
+            && !"ADMIN".equals(role.getRoleName())) {
+        throw new RuntimeException("Không thể thay đổi role của tài khoản Admin");
+    }
+
          user.setFullName(request.getFullName());
          user.setEmail(request.getEmail());
          user.setPhoneNumber(request.getPhoneNumber());
