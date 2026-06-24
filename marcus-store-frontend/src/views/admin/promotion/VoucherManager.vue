@@ -266,11 +266,21 @@
                       class="form-control text-uppercase voucher-code-input"
                       :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
                       placeholder="VD: SUMMER2026"
+                      maxlength="12"
                     />
                     <button type="button" class="generate-code-btn" @click="generateVoucherCode">
                       <i class="bi bi-stars"></i>
                       Tạo mã tự động
                     </button>
+                  </div>
+                  <div class="voucher-code-footer">
+                    <span class="voucher-char-count" :class="{ 'near-limit': codeLength >= 10, 'at-limit': codeLength >= 12 }">
+                      {{ codeLength }}/12 ký tự
+                    </span>
+                    <span v-if="codeLength >= 12" class="voucher-char-warning">
+                      <i class="bi bi-exclamation-circle"></i>
+                      Mã voucher tối đa 12 ký tự
+                    </span>
                   </div>
                   <div v-if="errors.voucher_code" class="invalid-feedback">
                     {{ errors.voucher_code }}
@@ -326,14 +336,13 @@
                 </label>
                 <div class="input-group">
                   <input
-                    v-model.number="form.discount_value"
-                    type="number"
-                    min="0"
-                    :max="form.discount_type === 'PERCENT' ? 100 : undefined"
-                    :step="form.discount_type === 'PERCENT' ? 1 : 1000"
+                    :value="formatNumberInput(form.discount_value)"
+                    @input="form.discount_value = parseNumberInput($event.target.value)"
+                    type="text"
+                    inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
-                    :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000đ'"
+                    :placeholder="form.discount_type === 'PERCENT' ? 'Nhập %, VD: 10' : 'Nhập số tiền, VD: 50.000'"
                   />
                   <span class="input-group-text">{{
                       form.discount_type === 'PERCENT' ? '%' : 'đ'
@@ -348,10 +357,10 @@
                 <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
                 <div class="input-group">
                   <input
-                    v-model.number="form.max_discount_amount"
-                    type="number"
-                    min="0"
-                    step="1000"
+                    :value="formatNumberInput(form.max_discount_amount)"
+                    @input="form.max_discount_amount = parseNumberInput($event.target.value)"
+                    type="text"
+                    inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
                     placeholder="Nhập số tiền giảm tối đa"
@@ -371,10 +380,10 @@
                 </label>
                 <div class="input-group">
                   <input
-                    v-model.number="form.min_order_value"
-                    type="number"
-                    min="0"
-                    step="1000"
+                    :value="formatNumberInput(form.min_order_value)"
+                    @input="form.min_order_value = parseNumberInput($event.target.value)"
+                    type="text"
+                    inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.min_order_value }"
                     placeholder="Nhập giá trị đơn tối thiểu"
@@ -457,7 +466,6 @@
                             type="checkbox"
                             :value="user.userId"
                             v-model="form.selected_user_ids"
-                            @change="onUserSelectionChange"
                           />
                           <div class="user-option-info">
                             <span class="user-name">{{ user.fullName || user.username }}</span>
@@ -506,7 +514,7 @@
                     v-model="form.start_date"
                     type="datetime-local"
                     class="form-control"
-                    :min="todayDateTime"
+                    :min="todayDate"
                     :class="{ 'is-invalid': isSubmitted && errors.start_date }"
                   />
                   <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
@@ -521,7 +529,7 @@
                     v-model="form.end_date"
                     type="datetime-local"
                     class="form-control"
-                    :min="form.start_date || todayDateTime"
+                    :min="form.start_date || todayDate"
                     :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
                   />
                   <small class="form-help">Không được trước ngày bắt đầu.</small>
@@ -556,11 +564,21 @@
                       class="form-control text-uppercase voucher-code-input"
                       :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
                       placeholder="VD: FREESHIP50K"
+                      maxlength="12"
                     />
                     <button type="button" class="generate-code-btn" @click="generateVoucherCode">
                       <i class="bi bi-stars"></i>
                       Tạo mã tự động
                     </button>
+                  </div>
+                  <div class="voucher-code-footer">
+                    <span class="voucher-char-count" :class="{ 'near-limit': codeLength >= 10, 'at-limit': codeLength >= 12 }">
+                      {{ codeLength }}/12 ký tự
+                    </span>
+                    <span v-if="codeLength >= 12" class="voucher-char-warning">
+                      <i class="bi bi-exclamation-circle"></i>
+                      Mã voucher tối đa 12 ký tự
+                    </span>
                   </div>
                   <div v-if="errors.voucher_code" class="invalid-feedback">
                     {{ errors.voucher_code }}
@@ -583,7 +601,7 @@
                 <span>2</span>
                 <div>
                   <h3>Chi tiết Free Ship</h3>
-                  <p>Cấu hình phí ship được miễn phí và khu vực áp dụng.</p>
+                  <p>Cấu hình phí ship được miễn phí và đơn hàng tối thiểu.</p>
                 </div>
               </div>
 
@@ -591,13 +609,13 @@
                 <label class="form-label">Phí ship được miễn phí <span>*</span></label>
                 <div class="input-group">
                   <input
-                    v-model.number="form.freeship_value"
-                    type="number"
-                    min="0"
-                    step="1000"
+                    :value="formatNumberInput(form.freeship_value)"
+                    @input="form.freeship_value = parseNumberInput($event.target.value)"
+                    type="text"
+                    inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.freeship_value }"
-                    placeholder="Nhập số tiền ship được miễn phí, VD: 25000"
+                    placeholder="Nhập số tiền ship được miễn phí, VD: 25.000"
                   />
                   <span class="input-group-text">đ</span>
                   <div v-if="errors.freeship_value" class="invalid-feedback">
@@ -607,6 +625,29 @@
                 <small class="form-help">
                   Khách hàng sẽ được miễn phí vận chuyển với đơn hàng có phí ship từ số tiền này trở xuống.
                 </small>
+              </div>
+
+              <div>
+                <label class="form-label with-help">
+                  Đơn tối thiểu
+                  <i class="bi bi-question-circle" style="cursor:pointer;"
+                     title="Áp dụng cho đơn hàng có giá trị từ số tiền này trở lên."></i>
+                </label>
+                <div class="input-group">
+                  <input
+                    :value="formatNumberInput(form.min_order_value)"
+                    @input="form.min_order_value = parseNumberInput($event.target.value)"
+                    type="text"
+                    inputmode="numeric"
+                    class="form-control"
+                    :class="{ 'is-invalid': isSubmitted && errors.min_order_value }"
+                    placeholder="Nhập giá trị đơn tối thiểu"
+                  />
+                  <span class="input-group-text">đ</span>
+                  <div v-if="errors.min_order_value" class="invalid-feedback">
+                    {{ errors.min_order_value }}
+                  </div>
+                </div>
               </div>
             </section>
 
@@ -680,7 +721,6 @@
                             type="checkbox"
                             :value="user.userId"
                             v-model="form.selected_user_ids"
-                            @change="onUserSelectionChange"
                           />
                           <div class="user-option-info">
                             <span class="user-name">{{ user.fullName || user.username }}</span>
@@ -729,7 +769,7 @@
                     v-model="form.start_date"
                     type="datetime-local"
                     class="form-control"
-                    :min="todayDateTime"
+                    :min="todayDate"
                     :class="{ 'is-invalid': isSubmitted && errors.start_date }"
                   />
                   <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
@@ -744,7 +784,7 @@
                     v-model="form.end_date"
                     type="datetime-local"
                     class="form-control"
-                    :min="form.start_date || todayDateTime"
+                    :min="form.start_date || todayDate"
                     :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
                   />
                   <small class="form-help">Không được trước ngày bắt đầu.</small>
@@ -899,11 +939,12 @@ const defaultForm = {
 }
 
 const form = reactive({...defaultForm})
+const codeLength = computed(() => (form.voucher_code || '').length)
 
-const todayDateTime = computed(() => {
+const todayDate = computed(() => {
   const now = new Date()
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
-  return now.toISOString().slice(0, 16)
+  return now.toISOString().slice(0, 10)
 })
 
 const previewVoucher = computed(() => {
@@ -933,8 +974,6 @@ const previewVoucher = computed(() => {
 const filteredVouchers = computed(() => {
   return vouchers.value
 })
-
-// Filter users based on search query
 const filteredUsers = computed(() => {
   if (!userSearchQuery.value) {
     return allUsers.value
@@ -987,7 +1026,7 @@ const errors = computed(() => {
     }
 
     if (form.discount_type === 'AMOUNT' && form.max_discount_amount !== null) {
-      result.max_discount_amount = 'Với AMOUNT, max_discount_amount phải là null'
+      result.max_discount_amount = 'Giảm tiền cố định không cần giới hạn tối đa, hãy để trống'
     }
   }
 
@@ -1009,6 +1048,14 @@ const errors = computed(() => {
 
   if (!form.start_date) {
     result.start_date = 'Vui lòng chọn ngày bắt đầu'
+  } else {
+    const start = new Date(form.start_date)
+    start.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (start > today) {
+      result.start_date = 'Ngày bắt đầu không được là ngày trong tương lai'
+    }
   }
 
   if (!form.end_date) {
@@ -1048,10 +1095,6 @@ async function loadUsers() {
 function getUserDisplayName(userId) {
   const user = allUsers.value.find(u => u.userId === userId)
   return user ? (user.fullName || user.username) : `User #${userId}`
-}
-
-function onUserSelectionChange() {
-  // Force reactivity update
 }
 
 function removeUser(userId) {
@@ -1179,7 +1222,6 @@ function resetForm() {
   voucherStore.fieldErrors = {}
   Object.assign(form, {...defaultForm})
   isEditing.value = false
-  isSubmitted.value = false
   userSearchQuery.value = ''
   showUserDropdown.value = false
 }
@@ -1389,6 +1431,19 @@ function formatCurrency(value) {
     style: 'currency',
     currency: 'VND',
   }).format(Number(value))
+}
+
+function formatNumberInput(value) {
+  if (value === null || value === undefined || value === '') return ''
+  const raw = String(value).replace(/[^\d]/g, '')
+  if (!raw) return ''
+  return Number(raw).toLocaleString('vi-VN')
+}
+
+function parseNumberInput(value) {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return Number(value.replace(/[^\d]/g, '')) || 0
+  return 0
 }
 
 function formatDateTime(value) {

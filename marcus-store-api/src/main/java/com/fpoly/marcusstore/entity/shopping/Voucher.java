@@ -54,10 +54,6 @@ public class Voucher {
     @Column(name = "description", length = 500)
     private String description;
 
-    // FREESHIP: khu vực áp dụng (NORTH, CENTRAL, SOUTH)
-    @Column(name = "region", length = 20)
-    private String region;
-
     // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     @Column(name = "target_type", length = 20)
     private String targetType = "ALL";

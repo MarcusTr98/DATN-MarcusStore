@@ -22,7 +22,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -61,7 +60,6 @@ public class VoucherServiceImpl implements VoucherService {
                 .quantity(voucher.getQuantity())
                 .isActive(voucher.getIsActive())
                 .description(voucher.getDescription())
-                .region(voucher.getRegion())
                 .targetType(voucher.getTargetType())
                 .targetUserIds(targetUserIds)
                 .targetUserCount(targetUserCount)
@@ -153,7 +151,7 @@ public class VoucherServiceImpl implements VoucherService {
         }
 
         // Nếu là SPECIFIC thì phải có danh sách user
-        if ("SPECIFIC".equals(targetType) && 
+        if ("SPECIFIC".equals(targetType) &&
             (request.getTargetUserIds() == null || request.getTargetUserIds().isEmpty())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -164,44 +162,12 @@ public class VoucherServiceImpl implements VoucherService {
         Voucher voucher = buildVoucher(request, voucherCode, discountType);
         Voucher savedVoucher = voucherRepository.saveAndFlush(voucher);
 
-        // Chỉ gán voucher cho users cụ thể (SPECIFIC)
-        // Voucher "ALL" sẽ không lưu vào User_Vouchers - chỉ check khi user dùng
         if ("SPECIFIC".equals(targetType) && request.getTargetUserIds() != null && !request.getTargetUserIds().isEmpty()) {
-            assignVoucherToUsers(savedVoucher, request.getTargetUserIds());
+            userVoucherService.assignVoucherToUsers(savedVoucher.getVoucherId(), request.getTargetUserIds());
         }
 
         return toResponse(savedVoucher);
     }
-
-    /**
-     * Gán voucher cho các user cụ thể (khi targetType = SPECIFIC)
-     * Lưu với isUsed = false - chờ user dùng
-     */
-    @Transactional
-    private void assignVoucherToUsers(Voucher voucher, List<Integer> userIds) {
-        List<UserVoucher> userVouchers = new ArrayList<>();
-
-        for (Integer userId : userIds) {
-            if (!userVoucherRepository.existsByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)) {
-                User user = userRepository.findById(userId).orElse(null);
-                if (user != null) {
-                    UserVoucher userVoucher = UserVoucher.builder()
-                            .voucher(voucher)
-                            .user(user)
-                            .assignedAt(LocalDateTime.now())
-                            .isUsed(false)
-                            .build();
-                    userVouchers.add(userVoucher);
-                }
-            }
-        }
-
-        if (!userVouchers.isEmpty()) {
-            userVoucherRepository.saveAll(userVouchers);
-        }
-    }
-
-
 
     private Voucher buildVoucher(AddVoucherRequest request, String voucherCode, String discountType) {
         Voucher voucher = new Voucher();
@@ -235,7 +201,6 @@ public class VoucherServiceImpl implements VoucherService {
             case "FREESHIP":
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(null);
-                voucher.setRegion(request.getRegion()); // NORTH, CENTRAL, SOUTH, null=ALL
                 // Mặc định quantity = 1 (mỗi user dùng 1 lần)
                 voucher.setQuantity(1);
                 voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
@@ -378,7 +343,6 @@ public class VoucherServiceImpl implements VoucherService {
             case "FREESHIP":
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(null);
-                voucher.setRegion(request.getRegion());
                 voucher.setQuantity(1);
                 break;
         }
@@ -390,10 +354,10 @@ public class VoucherServiceImpl implements VoucherService {
         if ("SPECIFIC".equals(targetType) && newTargetUserIds != null && !newTargetUserIds.isEmpty()) {
             // SPECIFIC: Cần cập nhật danh sách user
             if ("SPECIFIC".equals(oldTargetType)) {
-                // Chuyển từ SPECIFIC sang SPECIFIC khác → reassign
+                // Chuyển từ SPECIFIC sang SPECIFIC khác -> reassign
                 userVoucherService.reassignVoucherUsers(voucherId, newTargetUserIds);
             } else {
-                // Chuyển từ ALL sang SPECIFIC → gán mới
+                // Chuyển từ ALL sang SPECIFIC -> gán mới
                 userVoucherService.assignVoucherToUsers(voucherId, newTargetUserIds);
             }
         } else if ("ALL".equals(targetType)) {
@@ -417,17 +381,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Kiểm tra và ghi nhận việc sử dụng voucher của user
-     * Logic:
-     * - Voucher "ALL": Ai cũng dùng được, chỉ cần check chưa dùng
-     * - Voucher "SPECIFIC": Chỉ user được gán mới dùng được, check chưa dùng
-     *
-     * @param voucherId ID của voucher
-     * @param userId ID của user
-     * @return true nếu thành công
-     * @throws RuntimeException nếu không hợp lệ
-     */
+    // kiểm tra giá trije hợp lệ của voucher
     @Override
     @Transactional
     public boolean checkAndRecordVoucherUsage(Integer voucherId, Integer userId) {
@@ -469,13 +423,13 @@ public class VoucherServiceImpl implements VoucherService {
             if (Boolean.TRUE.equals(existingUsage.get().getIsUsed())) {
                 throw new RuntimeException("Bạn đã sử dụng mã giảm giá này rồi.");
             }
-            // Đã được gán nhưng chưa dùng → Update thành đã dùng
+            // Đã được gán nhưng chưa dùng -> Update thành đã dùng
             UserVoucher userVoucher = existingUsage.get();
             userVoucher.setIsUsed(true);
             userVoucher.setUsedAt(now);
             userVoucherRepository.save(userVoucher);
         } else {
-            // Voucher "ALL": Chưa có record nào → Tạo mới
+            // Voucher "ALL": Chưa có record nào -> Tạo mới
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy user."));
             UserVoucher userVoucher = UserVoucher.builder()

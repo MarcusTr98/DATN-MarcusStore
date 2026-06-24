@@ -67,156 +67,6 @@
   grid-column: 1 / -1;
 }
 
-/* Customer List Styles */
-.customer-search-box {
-  margin-bottom: 12px;
-}
-
-.customer-list-container {
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  background: #ffffff;
-  overflow: hidden;
-}
-
-.customer-list-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: #fff0f7;
-  border-bottom: 1px solid #f3d6e3;
-}
-
-.customer-count {
-  color: #b4557d;
-  font-size: 0.85rem;
-  font-weight: 700;
-}
-
-.customer-count strong {
-  color: #f55d9b;
-}
-
-.customer-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.customer-actions .btn {
-  padding: 4px 8px;
-  color: #f55d9b;
-  font-size: 0.8rem;
-  font-weight: 700;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-decoration: underline;
-}
-
-.customer-actions .btn:hover {
-  color: #d63384;
-}
-
-.customer-list {
-  max-height: 280px;
-  overflow-y: auto;
-}
-
-.customer-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-bottom: 1px solid #f3d6e3;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.customer-item:last-child {
-  border-bottom: none;
-}
-
-.customer-item:hover {
-  background: #fffafd;
-}
-
-.customer-item.selected {
-  background: #ffe4ef;
-}
-
-.customer-item input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: #f55d9b;
-  cursor: pointer;
-}
-
-.customer-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.customer-name {
-  color: #202636;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-.customer-email {
-  color: #6b7280;
-  font-size: 0.78rem;
-  margin-top: 2px;
-}
-
-.customer-total {
-  text-align: right;
-  flex-shrink: 0;
-}
-
-.total-label {
-  display: block;
-  color: #6b7280;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.total-value {
-  display: block;
-  color: #f55d9b;
-  font-size: 0.9rem;
-  font-weight: 800;
-  margin-top: 2px;
-}
-
-.gift-summary {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 14px;
-  padding: 12px 14px;
-  border: 1px dashed #d8b4e2;
-  border-radius: 8px;
-  background: #faf5ff;
-}
-
-.gift-summary i {
-  color: #8b5cf6;
-  font-size: 1.2rem;
-  flex-shrink: 0;
-}
-
-.gift-summary span {
-  color: #6b7280;
-  font-size: 0.85rem;
-  line-height: 1.5;
-}
-
-.gift-summary strong {
-  color: #7c3aed;
-}
-
 /* Responsive */
 @media (max-width: 576px) {
   .voucher-type-option {
@@ -545,6 +395,40 @@
   box-shadow: 0 0 0 0.12rem rgba(245, 93, 155, 0.1);
 }
 
+.voucher-code-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  min-height: 18px;
+}
+
+.voucher-char-count {
+  font-size: 11px;
+  color: #aaa;
+  margin-left: auto;
+  transition: color 0.15s;
+}
+
+.voucher-char-count.near-limit {
+  color: #e06a1a;
+  font-weight: 600;
+}
+
+.voucher-char-count.at-limit {
+  color: #e11d1d;
+  font-weight: 700;
+}
+
+.voucher-char-warning {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #e11d1d;
+  font-weight: 500;
+}
+
 .form-control:hover,
 .form-select:hover {
   border-color: #efbdd2;
@@ -575,62 +459,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.label-with-tooltip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.info-tooltip {
-  position: relative;
-  display: inline-grid;
-  width: 17px;
-  height: 17px;
-  place-items: center;
-  border: 1px solid #f3b7d0;
-  border-radius: 999px;
-  background: #fff0f7;
-  color: #d63384;
-  cursor: help;
-  font-size: 0.68rem;
-  font-style: normal;
-  font-weight: 900;
-  line-height: 1;
-  text-transform: none;
-}
-
-.tooltip-content {
-  position: absolute;
-  right: 50%;
-  bottom: calc(100% + 10px);
-  z-index: 3;
-  width: 260px;
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #ffffff;
-  color: #4b5563;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
-  font-size: 0.78rem;
-  font-weight: 700;
-  line-height: 1.45;
-  opacity: 0;
-  pointer-events: none;
-  text-align: left;
-  text-transform: none;
-  transform: translate(50%, 4px);
-  transition:
-    opacity 0.16s ease,
-    transform 0.16s ease;
-}
-
-.info-tooltip:hover .tooltip-content,
-.info-tooltip:focus .tooltip-content,
-.info-tooltip:focus-within .tooltip-content {
-  opacity: 1;
-  transform: translate(50%, 0);
 }
 
 .with-help i {

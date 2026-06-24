@@ -28,21 +28,27 @@ public class UserVoucherServiceImpl implements UserVoucherService {
     private final VoucherRepository voucherRepository;
     private final UserRepository userRepository;
 
+    // lấy voucher có thể sử dụng cho user
     @Override
     public List<VoucherResponse> getAvailableVouchersForUser() {
         Integer userId = SecurityUtils.getCurrentUserId();
         LocalDateTime now = LocalDateTime.now();
         Set<VoucherResponse> result = new HashSet<>();
 
-        // 1. Lấy voucher ALL (ai cũng dùng được)
+        // 1. Lấy voucher ALL (ai cũng dùng được) — loại trừ voucher đã dùng
         List<Voucher> allVouchers = voucherRepository.findAvailableVouchers();
         for (Voucher v : allVouchers) {
-            if ("ALL".equalsIgnoreCase(v.getTargetType())) {
-                result.add(toResponseFromVoucher(v));
+            // Kiểm tra user đã dùng voucher này chưa
+            boolean alreadyUsed = userVoucherRepository
+                    .findByVoucherVoucherIdAndUserUserId(v.getVoucherId(), userId)
+                    .map(UserVoucher::getIsUsed)
+                    .orElse(false);
+            if (!alreadyUsed) {
+                result.add(toResponseFromVoucher(v, false));
             }
         }
 
-        // 2. Lấy voucher SPECIFIC đã gán cho user
+        // 2. Lấy voucher SPECIFIC đã gán cho user và chưa dùng
         List<UserVoucher> userVouchers = userVoucherRepository.findAvailableVouchersByUserId(userId, now);
         for (UserVoucher uv : userVouchers) {
             result.add(toResponse(uv));
@@ -58,7 +64,7 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
-
+// thêm voucher cho từng khách hàng
     @Override
     @Transactional
     public void assignVoucherToUsers(Integer voucherId, List<Integer> userIds) {
@@ -110,16 +116,16 @@ public class UserVoucherServiceImpl implements UserVoucherService {
         // Thêm user mới
         for (Integer userId : newUserIds) {
             if (!currentUserIds.contains(userId)) {
-                User user = userRepository.findById(userId).orElse(null);
-                if (user != null) {
-                    UserVoucher userVoucher = UserVoucher.builder()
-                            .voucher(voucher)
-                            .user(user)
-                            .assignedAt(LocalDateTime.now())
-                            .isUsed(false)
-                            .build();
-                    userVoucherRepository.save(userVoucher);
-                }
+                User user = userRepository.findById(userId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + userId));
+
+                UserVoucher userVoucher = UserVoucher.builder()
+                        .voucher(voucher)
+                        .user(user)
+                        .assignedAt(LocalDateTime.now())
+                        .isUsed(false)
+                        .build();
+                userVoucherRepository.save(userVoucher);
             }
         }
     }
@@ -140,12 +146,11 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .usedAt(userVoucher.getUsedAt())
                 .assignedAt(userVoucher.getAssignedAt())
                 .isActive(voucher.getIsActive())
-                .region(voucher.getRegion())
                 .description(voucher.getDescription())
                 .build();
     }
 
-    private VoucherResponse toResponseFromVoucher(Voucher voucher) {
+    private VoucherResponse toResponseFromVoucher(Voucher voucher, boolean isUsed) {
         return VoucherResponse.builder()
                 .voucherId(voucher.getVoucherId())
                 .voucherCode(voucher.getVoucherCode())
@@ -155,9 +160,8 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .minOrderValue(voucher.getMinOrderValue())
                 .startDate(voucher.getStartDate())
                 .endDate(voucher.getEndDate())
-                .isUsed(false)
+                .isUsed(isUsed)
                 .isActive(voucher.getIsActive())
-                .region(voucher.getRegion())
                 .description(voucher.getDescription())
                 .build();
     }

@@ -44,7 +44,7 @@ const confirmLogout = () => {
 
   isLoggedIn.value = false
   showLogoutModal.value = false
-  router.push('/login')
+  router.push('/auth/login')
 }
 
 const cancelLogout = () => {
@@ -179,9 +179,9 @@ onUnmounted(() => {
                     </li>
                     <li><hr class="dropdown-divider mx-3 my-1" /></li>
                     <li>
-                      <a class="dropdown-item text-danger" href="#" @click.prevent="handleLogout">
+                      <button class="dropdown-item text-danger" @click.prevent="handleLogout">
                         <i class="fas fa-sign-out-alt me-2"></i>Đăng xuất
-                      </a>
+                      </button>
                     </li>
                   </ul>
                 </div>

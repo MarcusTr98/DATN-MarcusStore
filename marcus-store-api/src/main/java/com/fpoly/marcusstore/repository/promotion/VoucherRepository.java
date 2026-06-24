@@ -88,6 +88,7 @@ public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
       AND v.quantity > 0
       AND v.startDate <= CURRENT_TIMESTAMP
       AND v.endDate >= CURRENT_TIMESTAMP
+      AND v.targetType = 'ALL'
     ORDER BY v.endDate ASC
 """)
     List<Voucher> findAvailableVouchers();

@@ -495,10 +495,9 @@ const getInitialCartData = () => {
 const cartData = ref(getInitialCartData())
 
 // Khôi phục voucher đã chọn từ localStorage
-const savedVoucherCode = localStorage.getItem('selectedVoucherCode')
-const appliedVoucherCode = ref(savedVoucherCode || '')
-const savedDiscountAmount = localStorage.getItem('selectedVoucherDiscount')
-const discountAmount = ref(savedDiscountAmount ? parseInt(savedDiscountAmount) : 0)
+const savedVoucher = JSON.parse(localStorage.getItem('selectedVoucher') || 'null')
+const appliedVoucherCode = ref(savedVoucher?.code || '')
+const discountAmount = ref(savedVoucher?.discount || 0)
 const shippingFee = ref(0)
 const estimatedDelivery = ref('')
 
@@ -788,10 +787,13 @@ const handleCheckout = async () => {
   try {
     const { data } = await api.post('/checkout', payload)
 
+    // Xóa cart items trên BE sau khi checkout thành công
+    await cartStore.removeAll()
+
     // Dọn dẹp localStorage sau khi checkout thành công
     localStorage.removeItem('selectedCartItems')
     localStorage.removeItem('selectedSubtotal')
-    localStorage.removeItem('selectedVoucherCode')
+    localStorage.removeItem('selectedVoucher')
 
     cartStore.clearCartState()
 

@@ -148,7 +148,7 @@
               Marcus Store Voucher
             </span>
             <button class="open-voucher-btn" type="button" @click="isVoucherModalOpen = true">
-              Chọn hoặc nhập mã
+              Chọn mã giảm giá
               <i class="ti ti-chevron-right" aria-hidden="true"></i>
             </button>
           </div>
@@ -161,10 +161,6 @@
             <div class="summary-row">
               <span class="label">Giảm giá sản phẩm</span>
               <span class="value discount">-{{ formatPrice(productDiscount) }}</span>
-            </div>
-            <div class="summary-row">
-              <span class="label">Phí vận chuyển</span>
-              <span class="value shipping-free">Miễn phí</span>
             </div>
             <div class="summary-row">
               <span class="label">Voucher Marcus Store</span>
@@ -317,18 +313,15 @@
                 <span class="v2-disabled-reason">{{ voucher.disabledReason }}</span>
               </div>
             </div>
+
+            <div v-if="v2ActiveVouchers.length === 0" class="v2-voucher-empty">
+              <i class="ti ti-ticket-off" aria-hidden="true"></i>
+              <p>Không có voucher khả dụng</p>
+            </div>
           </div>
         </div>
 
         <div class="v2-footer-bar">
-          <div class="v2-manual-input">
-            <input
-              v-model="voucherCode"
-              type="text"
-              placeholder="Nhập mã voucher"
-              class="v2-code-input"
-            />
-          </div>
           <button class="v-btn v-btn-primary v2-confirm-btn" type="button" @click="applySelectedVoucher">
             ĐỒNG Ý
           </button>
@@ -336,19 +329,20 @@
       </div>
     </div>
     <div class="v-modal-overlay" :class="{ active: isAlertModalOpen }" @click.self="isAlertModalOpen = false">
-      <div class="v-modal-card" style="width: 400px;">
-        <div class="v-modal-header">
-          <h3>Thông báo hệ thống</h3>
-          <button class="close-btn" type="button" @click="isAlertModalOpen = false">&times;</button>
+      <div class="alert-modal-card">
+        <div class="alert-modal-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22.314 5.286L4.286 35.286C3.428 36.8 4.514 38.628 6.228 38.628H41.772C43.486 38.628 44.572 36.8 43.714 35.286L25.686 5.286C24.828 3.772 23.172 3.772 22.314 5.286Z" stroke="#E11D1D" stroke-width="2.5" stroke-linejoin="round" fill="none"/>
+            <path d="M24 17V25" stroke="#E11D1D" stroke-width="2.8" stroke-linecap="round"/>
+            <circle cx="24" cy="31" r="1.8" fill="#E11D1D"/>
+          </svg>
         </div>
-        <div class="v-modal-body" style="text-align: center; padding: 30px 20px;">
-          <i class="ti ti-alert-triangle" style="font-size: 48px; color: var(--ms-primary); display: block; margin-bottom: 12px;"></i>
-          <p style="font-size: 14.5px; margin: 0; line-height: 1.5; font-weight: 500;">
-            {{ alertModalMessage }}
-          </p>
+        <div class="alert-modal-body">
+          <h3 class="alert-modal-title">Thông báo</h3>
+          <p class="alert-modal-message">{{ alertModalMessage }}</p>
         </div>
-        <div class="v-modal-footer" style="justify-content: center;">
-          <button class="v-btn v-btn-primary" type="button" @click="isAlertModalOpen = false">ĐỒNG Ý</button>
+        <div class="alert-modal-footer">
+          <button class="alert-modal-confirm-btn" type="button" @click="isAlertModalOpen = false">Đồng ý</button>
         </div>
       </div>
     </div>
@@ -374,20 +368,11 @@ onMounted(async () => {
   localStorage.removeItem('selectedSubtotal')
   // Giữ lại selectedVoucherCode để user vẫn thấy voucher đã chọn
 
-  // Khôi phục voucher từ localStorage (nếu có)
-  const savedVoucherCode = localStorage.getItem('selectedVoucherCode')
-  if (savedVoucherCode) {
-    voucherCode.value = savedVoucherCode
-  }
-
   await cartStore.fetchCart()
-  await fetchVoucherApiClient()
+  await fetchAvailableVouchers()
 
   // Khôi phục trạng thái checkbox từ localStorage (nếu có)
   restoreSelectedItems()
-
-  // Khôi phục voucher đã chọn nếu có trong localStorage (sau khi voucherClient đã load)
-  restoreSelectedVoucher()
 })
 
 // Khôi phục trạng thái checkbox từ localStorage
@@ -410,36 +395,15 @@ function restoreSelectedItems() {
   }
 }
 
-// Khôi phục voucher đã chọn từ localStorage
-function restoreSelectedVoucher() {
-  const savedVoucherCode = localStorage.getItem('selectedVoucherCode')
-  if (!savedVoucherCode) return
-
-  try {
-    // Tìm voucher trong danh sách voucherClient
-    const voucher = voucherClient.value.find(v => v.voucherCode === savedVoucherCode)
-    if (voucher) {
-      // Tự động chọn voucher này
-      v2SelectedId.value = voucher.voucherId
-      applySelectedVoucher()
-    } else {
-      // Không tìm thấy voucher, xóa localStorage
-      localStorage.removeItem('selectedVoucherCode')
-    }
-  } catch (e) {
-    console.warn('Lỗi restoreSelectedVoucher:', e)
-  }
-}
-
 const loading = ref(false)
 const error = ref(null)
-const voucherClient = ref([])
-async function fetchVoucherApiClient (){
+const availableVouchers = ref([])
+async function fetchAvailableVouchers (){
   try {
     loading.value = true
     error.value = null
     const response = await voucherApiClient.getAllVoucherClient();
-    voucherClient.value = response.data
+    availableVouchers.value = response.data
   }catch (e) {
     error.value = "không thể lấy voucher"
     console.error(e)
@@ -464,6 +428,38 @@ const alertModalMessage = ref('')
 const isToastVisible = ref(false)
 const toastMessage = ref('')
 const toastKey = ref(0)
+
+function formatPrice(value) {
+  return `${Number(value || 0).toLocaleString('vi-VN')}đ`
+}
+async function updateItemQuantity(item, newQuantity) {
+  const quantity = Math.max(Number(newQuantity) || 1, 1)
+  if (item.stockQuantity && quantity > item.stockQuantity) {
+    showAlert("số lượng đã vượt quá trong kho")
+    await cartStore.fetchCart()
+    return
+  }
+
+  const success = await cartStore.updateItemQuantity(item.skuId, quantity)
+  if (!success) {
+    showAlert(cartError.value || "cập nhật số lượng thất bại")
+    await cartStore.fetchCart()
+  }
+}
+async  function normalizeQty(item) {
+ await  updateItemQuantity(item, item.quantity)
+}
+async function changeQty(item, delta) {
+  const newQuantity = item.quantity + delta
+  if(newQuantity < 1){
+    return
+  }
+  if (item.stockQuantity && newQuantity > item.stockQuantity) {
+    showAlert('Số lượng nhập vượt quá số lượng trong kho')
+    return
+  }
+  await updateItemQuantity(item, newQuantity)
+}
 let toastTimer = null
 const suggestedTrack = ref(null)
 
@@ -471,7 +467,7 @@ const v2SelectedId = ref(null)
 
 // Thêm computed cho voucher từ API
 const v2Vouchers = computed(() => {
-  return voucherClient.value.map((v) => {
+  return availableVouchers.value.map((v) => {
     // Xử lý discountType - đảm bảo so sánh đúng
     const discountType = (v.discountType || '').toUpperCase()
     const isAmount = discountType === 'AMOUNT'
@@ -521,8 +517,8 @@ const v2Vouchers = computed(() => {
 // Kiểm tra voucher có thể dùng không
 function isVoucherActive(voucher) {
   const cartTotal = subtotal.value
-  return voucher.isActive 
-    && !voucher.isUsed 
+  return voucher.isActive
+    && !voucher.isUsed
     && cartTotal >= (voucher.minOrderValue || 0)
 }
 
@@ -661,40 +657,8 @@ const allSelected = computed({
   },
 })
 
-function formatPrice(value) {
-  return `${Number(value || 0).toLocaleString('vi-VN')}đ`
-}
-async function updateItemQuantity(item, newQuantity) {
-  const quantity = Math.max(Number(newQuantity) || 1, 1)
-  if (item.stockQuantity && quantity > item.stockQuantity) {
-    showAlert("số lượng đã vượt quá trong kho")
-    await cartStore.fetchCart()
-    return
-  }
 
-  const success = await cartStore.updateItemQuantity(item.skuId, quantity)
-  if (!success) {
-    showAlert(cartError || "cập nhật số lượng thất bại")
-    await cartStore.fetchCart()
-  }
-}
-async  function normalizeQty(item) {
- await  updateItemQuantity(item, item.quantity)
-}
-async function changeQty(item, delta) {
-  const newQuantity = item.quantity + delta
-  if(newQuantity < 1){
-    return
-  }
-  if (item.stockQuantity && newQuantity > item.stockQuantity) {
-    showAlert('Số lượng nhập vượt quá số lượng trong kho')
-    return
-  }
-  await updateItemQuantity(item, newQuantity)
-}
-
-
-async  function removeItem(skuId){
+async function removeItem(skuId){
   const success = await cartStore.removeItemFromCart(skuId)
   if(success){
     showToast("xóa thành công")
@@ -795,20 +759,22 @@ function handleCheckout(){
 
   // Lưu voucher đã chọn
   if (voucherCode.value) {
-    localStorage.setItem('selectedVoucherCode', voucherCode.value)
-    localStorage.setItem('selectedVoucherType', selectedVoucherType.value)
-    localStorage.setItem('selectedVoucherValue', selectedVoucher.value.toString())
-    localStorage.setItem('selectedVoucherDiscount', voucherDiscount.value.toString())
+    localStorage.setItem(
+      'selectedVoucher',
+      JSON.stringify({
+        code: voucherCode.value,
+        type: selectedVoucherType.value,
+        value: selectedVoucher.value,
+        discount: voucherDiscount.value,
+      })
+    )
   } else {
-    localStorage.removeItem('selectedVoucherCode')
-    localStorage.removeItem('selectedVoucherType')
-    localStorage.removeItem('selectedVoucherValue')
-    localStorage.removeItem('selectedVoucherDiscount')
+    localStorage.removeItem('selectedVoucher')
   }
 
   // Lưu danh sách sản phẩm đã chọn để checkout hiển thị đúng
   const selectedItemsData = selectedItems.value.map(item => ({
-    cartItemId: item.id,
+    cartItemId: item.cartItemId,
     productName: item.name,
     variantName: item.variant,
     skuCode: item.skuCode,

@@ -24,7 +24,6 @@ public class VoucherResponse {
     private Integer quantity;
     private Boolean isActive;
     private String description;
-    private String region;
 
     // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     private String targetType;
