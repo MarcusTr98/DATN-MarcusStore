@@ -184,7 +184,7 @@ const handleNotifClick = async (item) => {
         fetchNotifications()
       }
     } catch (error) {
-      console.error('Lỗi thực thi:', error)
+      console.error(error)
     }
   }
 

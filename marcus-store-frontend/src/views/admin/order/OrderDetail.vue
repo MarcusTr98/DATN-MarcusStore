@@ -305,7 +305,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import '@/assets/css/OrderDetails.css'
 import OrderDetailApi from '@/api/orderDetailApi.js'
@@ -334,9 +334,16 @@ async function fetchGetDetailOrder(orderCode) {
   }
 }
 
-onMounted(() => {
-  fetchGetDetailOrder(route.params.id)
-})
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      orderDetail.value = null
+      fetchGetDetailOrder(newId)
+    }
+  },
+  { immediate: true },
+)
 
 const orderStatusMap = {
   PENDING: { label: 'Chờ xác nhận', className: 'pending' },
