@@ -787,15 +787,14 @@ const handleCheckout = async () => {
   try {
     const { data } = await api.post('/checkout', payload)
 
-    // Xóa cart items trên BE sau khi checkout thành công
-    await cartStore.removeAll()
+    // Chỉ xóa các món đã thanh toán khỏi giỏ hàng, giữ lại món chưa thanh toán
+    const paidSkuIds = cartData.value.items.map((i) => i.skuId)
+    await cartStore.removeManyItemFromCart(paidSkuIds)
 
     // Dọn dẹp localStorage sau khi checkout thành công
     localStorage.removeItem('selectedCartItems')
     localStorage.removeItem('selectedSubtotal')
     localStorage.removeItem('selectedVoucher')
-
-    cartStore.clearCartState()
 
     if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
       window.location.href = data.data.paymentUrl

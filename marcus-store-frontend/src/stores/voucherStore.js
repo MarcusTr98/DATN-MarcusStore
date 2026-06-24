@@ -15,7 +15,11 @@ function mapVoucher(voucher) {
     voucherCode: voucher.voucherCode,
     discountValue: Number(voucher.discountValue || 0),
     discountType: voucher.discountType,
-  quantity: Number(voucher.quantity || 0),
+    maxDiscountAmount: Number(voucher.maxDiscountAmount ?? 0) || null,
+    minOrderValue: Number(voucher.minOrderValue ?? 0) || null,
+    startDate: voucher.startDate || null,
+    endDate: voucher.endDate || null,
+    quantity: Number(voucher.quantity || 0),
     isActive: Boolean(voucher.isActive),
     description: voucher.description || '',
     // Đối tượng sử dụng
