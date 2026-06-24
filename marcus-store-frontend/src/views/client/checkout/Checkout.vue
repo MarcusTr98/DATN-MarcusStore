@@ -16,7 +16,7 @@
       :mask-closable="true"
       @cancel="closeVoucherExpiredModal"
     >
-
+      <p>{{ voucherExpiredMessage }}</p>
     </a-modal>
 
     <!-- Modal thông báo áp dụng voucher thành công -->
@@ -37,14 +37,7 @@
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
-            <circle
-              cx="24"
-              cy="24"
-              r="20"
-              stroke="#16A34A"
-              stroke-width="2.5"
-              fill="none"
-            />
+            <circle cx="24" cy="24" r="20" stroke="#16A34A" stroke-width="2.5" fill="none" />
             <path
               d="M15 24L21 30L33 18"
               stroke="#16A34A"
@@ -59,10 +52,7 @@
           <h3 class="alert-title">Áp dụng voucher thành công</h3>
           <p class="alert-message">{{ voucherSuccessMessage }}</p>
 
-          <div
-            class="voucher-success-modal__highlight"
-            v-if="voucherSuccessType === 'FREESHIP'"
-          >
+          <div class="voucher-success-modal__highlight" v-if="voucherSuccessType === 'FREESHIP'">
             <i class="fas fa-truck"></i>
             <span
               >Tiền được trừ:
@@ -81,10 +71,7 @@
             >
           </div>
 
-          <div
-            class="voucher-success-modal__highlight"
-            v-else-if="voucherSuccessType === 'AMOUNT'"
-          >
+          <div class="voucher-success-modal__highlight" v-else-if="voucherSuccessType === 'AMOUNT'">
             <i class="fas fa-tag"></i>
             <span
               >Tiền được trừ:
@@ -136,6 +123,7 @@
 
     <div class="checkout-body">
       <div class="checkout-left">
+        <!-- Danh sách địa chỉ đã lưu -->
         <div class="checkout-card mb-3" v-if="savedAddresses.length > 0">
           <div class="checkout-card__title">
             <span class="checkout-card__icon"><i class="fas fa-address-book"></i></span>
@@ -171,6 +159,7 @@
           </div>
         </div>
 
+        <!-- Form địa chỉ mới -->
         <div class="checkout-card">
           <div class="checkout-card__title">
             <span class="checkout-card__icon"><i class="fas fa-map-marker-alt"></i></span>
@@ -323,6 +312,7 @@
           </form>
         </div>
 
+        <!-- Phương thức vận chuyển -->
         <div class="checkout-card mt-3">
           <div class="checkout-card__title">
             <span class="checkout-card__icon"><i class="fas fa-truck"></i></span>
@@ -346,20 +336,42 @@
                 <span class="payment-option__desc" v-else>Giao hàng tận nơi toàn quốc</span>
               </div>
 
-              <div style="font-size: 15px; font-weight: 800; color: #d92d20; padding-right: 15px">
+              <div
+                style="
+                  font-size: 15px;
+                  font-weight: 800;
+                  color: #d92d20;
+                  padding-right: 15px;
+                  text-align: right;
+                "
+              >
                 <i class="fas fa-spinner fa-spin text-muted" v-if="isFeeLoading"></i>
-                <template v-else-if="hasFreeshipVoucher">
-                  <span class="text-success">Miễn phí</span>
+                <template v-else-if="toWardCode">
+                  <span v-if="hasFreeshipVoucher" class="text-success">Miễn phí</span>
+                  <template v-else>
+                    <!-- Hiển thị phí gốc bị gạch ngang nếu có Freeship hoặc giảm giá ship từ hệ thống -->
+                    <del
+                      v-if="shippingData.standardShippingFee > shippingData.discountedShippingFee"
+                      style="
+                        font-size: 12px;
+                        color: #9ca3af;
+                        font-weight: 500;
+                        display: block;
+                        line-height: 1;
+                      "
+                    >
+                      {{ shippingData.standardShippingFee?.toLocaleString('vi-VN') }}₫
+                    </del>
+
+                    <span v-if="shippingData.isFreeship" class="text-success">Miễn phí</span>
+                    <span v-else
+                      >+{{ shippingData.discountedShippingFee?.toLocaleString('vi-VN') }}₫</span
+                    >
+                  </template>
                 </template>
-                <template v-else-if="shippingFee > 0"
-                  >+{{ shippingFee.toLocaleString('vi-VN') }}₫</template
-                >
-                <template v-else-if="shippingFee === 0 && !isFeeLoading && toWardCode"
-                  >Miễn phí</template
-                >
-                <span class="text-muted" style="font-size: 12px; font-weight: 500" v-else
-                  >Chưa xác định</span
-                >
+                <span class="text-muted" style="font-size: 12px; font-weight: 500" v-else>
+                  Chưa xác định
+                </span>
               </div>
 
               <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
@@ -367,6 +379,7 @@
           </div>
         </div>
 
+        <!-- Phương thức thanh toán -->
         <div class="checkout-card mt-3">
           <div class="checkout-card__title">
             <span class="checkout-card__icon"><i class="fas fa-wallet"></i></span>
@@ -465,6 +478,7 @@
         </div>
       </div>
 
+      <!-- Cột hiển thị hóa đơn -->
       <div class="checkout-right">
         <div class="order-summary">
           <div class="order-summary__header">
@@ -498,22 +512,30 @@
               <span><i class="fas fa-tag me-1"></i>Giảm giá Voucher</span>
               <span>-{{ discountAmount.toLocaleString('vi-VN') }}₫</span>
             </div>
-            <div class="order-totals__row">
+            <div class="order-totals__row align-items-center">
               <span>Phí vận chuyển (GHN)</span>
-              <span v-if="isFeeLoading" class="text-muted" style="font-size: 12px"
-                ><i class="fas fa-spinner fa-spin"></i
-              ></span>
-              <span v-else-if="hasFreeshipVoucher" class="text-success">
-                <i class="fas fa-truck-fast me-1"></i>Miễn phí
+              <span v-if="isFeeLoading" class="text-muted" style="font-size: 12px">
+                <i class="fas fa-spinner fa-spin"></i>
               </span>
-              <span v-else-if="shippingFee > 0" class="text-danger"
-                >+{{ shippingFee.toLocaleString('vi-VN') }}₫</span
-              >
-              <span
-                v-else-if="shippingFee === 0 && !isFeeLoading && toWardCode"
-                class="text-success"
-                >Miễn phí</span
-              >
+              <div v-else-if="toWardCode" class="d-flex align-items-center gap-2">
+                <span v-if="hasFreeshipVoucher" class="text-success fw-bold">
+                  <i class="fas fa-truck-fast me-1"></i>Miễn phí
+                </span>
+                <template v-else>
+                  <del
+                    v-if="shippingData.standardShippingFee > shippingData.discountedShippingFee"
+                    style="font-size: 12px; color: #9ca3af; font-weight: 500"
+                  >
+                    {{ shippingData.standardShippingFee?.toLocaleString('vi-VN') }}₫
+                  </del>
+                  <span v-if="shippingData.isFreeship" class="text-success fw-bold">
+                    Miễn phí
+                  </span>
+                  <span v-else class="text-danger fw-bold">
+                    +{{ shippingData.discountedShippingFee?.toLocaleString('vi-VN') }}₫
+                  </span>
+                </template>
+              </div>
               <span v-else class="text-muted" style="font-size: 12px">Chưa xác định</span>
             </div>
           </div>
@@ -525,11 +547,39 @@
             >
           </div>
 
+          <!-- Thông báo Upsell / Freeship -->
+          <div
+            v-if="
+              shippingData.suggestionMessage &&
+              shippingData.isAllowedToOrder &&
+              toWardCode &&
+              !isFeeLoading
+            "
+            class="upsell-box"
+          >
+            <i class="fas fa-shipping-fast upsell-box__icon"></i>
+            <span class="upsell-box__text">{{ shippingData.suggestionMessage }}</span>
+          </div>
+
+          <!-- Thông báo chặn đơn hàng khi dưới giá trị tối thiểu -->
+          <div
+            v-if="!shippingData.isAllowedToOrder && toWardCode && !isFeeLoading"
+            class="block-box"
+          >
+            <i class="fas fa-exclamation-triangle block-box__icon"></i>
+            <span class="block-box__text">{{ shippingData.blockMessage }}</span>
+          </div>
+
           <button
             form="checkoutForm"
             type="submit"
-            class="btn-checkout"
-            :disabled="isProcessing || !cartData.items?.length || isFeeLoading"
+            class="btn-checkout mt-3"
+            :disabled="
+              isProcessing ||
+              !cartData.items?.length ||
+              isFeeLoading ||
+              (!shippingData.isAllowedToOrder && !!toWardCode)
+            "
           >
             <span v-if="!isProcessing"><i class="fas fa-lock me-2"></i>Đặt hàng ngay</span>
             <span v-else><i class="fas fa-spinner fa-spin me-2"></i>Đang xử lý...</span>
@@ -544,7 +594,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
-import '@/assets/css/check-out.css'
 
 import { useCartStore } from '@/stores/cartStore'
 const cartStore = useCartStore()
@@ -554,6 +603,7 @@ import userApi from '@/api/userApi'
 import cartApi from '@/api/cartApi'
 import ghnApi from '@/api/ghnApi'
 import api from '@/utils/api'
+import '@/assets/css/CheckOut.css'
 
 const router = useRouter()
 const isProcessing = ref(false)
@@ -570,17 +620,12 @@ const handleModalConfirm = () => {
   modal.value.show = false
   if (modal.value.action === 'redirect_cart') router.push('/cart')
   if (modal.value.action === 'redirect_login') router.push('/auth/login')
-
-  // Đảm bảo xóa action sau khi thực thi để tránh bị kẹt
   modal.value.action = null
 }
 
-// ─── Order & Cart Data
-// Ưu tiên lấy từ localStorage (sản phẩm đã chọn), không thì fetch từ API
+// ─── Order & Cart Data (Kết hợp LocalStorage từ HEAD)
 const getInitialCartData = () => {
   const savedItems = localStorage.getItem('selectedCartItems')
-  const savedSubtotal = localStorage.getItem('selectedSubtotal')
-
   if (savedItems) {
     try {
       const items = JSON.parse(savedItems)
@@ -588,92 +633,98 @@ const getInitialCartData = () => {
         return {
           items,
           totalQuantity: items.reduce((sum, i) => sum + (i.quantity || 0), 0),
-          totalAmount: items.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
+          totalAmount: items.reduce((sum, i) => sum + (i.totalPrice || 0), 0),
         }
       }
     } catch (e) {
       console.warn('Lỗi parse selectedCartItems:', e)
     }
   }
-
-  // Fallback: sẽ fetch từ API
   return { items: [], totalQuantity: 0, totalAmount: 0 }
 }
 
 const cartData = ref(getInitialCartData())
 
-// Khôi phục voucher đã chọn từ localStorage
-// CHỈ lưu code trong localStorage, KHÔNG trust value/maxDiscount - phải gọi BE preview để lấy
 const savedVoucher = JSON.parse(localStorage.getItem('selectedVoucher') || 'null')
 const appliedVoucherCode = ref(savedVoucher?.code || '')
 
-const shippingFee = ref(0)
+// Tích hợp Shipping Data mới theo Backend (Cơ chế Upsell/Freeship của Marcus)
 const estimatedDelivery = ref('')
+const shippingData = ref({
+  standardShippingFee: 0,
+  discountedShippingFee: 0,
+  isFreeship: false,
+  isAllowedToOrder: true,
+  blockMessage: '',
+  amountUntilFreeship: 0,
+  suggestionMessage: '',
+})
 
-// State cho discount - lấy từ BE preview, KHÔNG tính từ localStorage
 const discountAmount = ref(0)
 const hasFreeshipVoucher = ref(false)
 const voucherError = ref('')
 const isVoucherLoading = ref(false)
 
-// Modal thông báo voucher hết hạn/hết lượt (theo yêu cầu: hiển thị modal khi xóa voucher)
 const showVoucherExpiredModal = ref(false)
 const voucherExpiredMessage = ref('')
 
 const openVoucherExpiredModal = (message) => {
-    voucherExpiredMessage.value = message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.'
-    showVoucherExpiredModal.value = true
+  voucherExpiredMessage.value =
+    message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.'
+  showVoucherExpiredModal.value = true
 }
 
 const closeVoucherExpiredModal = () => {
-    showVoucherExpiredModal.value = false
-    voucherExpiredMessage.value = ''
+  showVoucherExpiredModal.value = false
+  voucherExpiredMessage.value = ''
 }
 
-// Modal thông báo áp dụng voucher thành công (áp dụng cho mọi loại voucher)
+// Modal thông báo áp dụng voucher thành công
 const isVoucherSuccessModalOpen = ref(false)
 const voucherSuccessMessage = ref('')
 const voucherSuccessType = ref('AMOUNT')
 const voucherSuccessAmount = ref(0)
 const voucherSuccessPercent = ref(0)
 const voucherSuccessMaxDiscount = ref(0)
-const voucherSuccessDiscountAmount = ref(0) // Số tiền giảm thực tế từ BE
-const voucherSuccessNote = ref('Số tiền giảm thực tế sẽ được hệ thống tính toán lại tại bước thanh toán.')
-// Đánh dấu đã hiển thị modal success cho voucher hiện tại - tránh popup lại khi cart thay đổi
+const voucherSuccessDiscountAmount = ref(0)
+const voucherSuccessNote = ref(
+  'Số tiền giảm thực tế sẽ được hệ thống tính toán lại tại bước thanh toán.',
+)
 const lastShownSuccessCode = ref('')
 
 const openVoucherSuccessModal = (voucherInfo) => {
-    if (!voucherInfo) return
-    const code = voucherInfo.voucherCode || appliedVoucherCode.value
-    // Tránh popup lặp lại cho cùng 1 voucher khi cartData thay đổi nhiều lần
-    if (lastShownSuccessCode.value === code) return
-    lastShownSuccessCode.value = code
+  if (!voucherInfo) return
+  const code = voucherInfo.voucherCode || appliedVoucherCode.value
+  if (lastShownSuccessCode.value === code) return
+  lastShownSuccessCode.value = code
 
-    voucherSuccessType.value = (voucherInfo.discountType || 'AMOUNT').toUpperCase()
-    voucherSuccessAmount.value = Number(voucherInfo.discountValue) || 0
-    voucherSuccessPercent.value = Number(voucherInfo.discountPercent) || 0
-    voucherSuccessMaxDiscount.value = Number(voucherInfo.maxDiscountAmount) || 0
-    voucherSuccessDiscountAmount.value = Number(voucherInfo.actualDiscountAmount ?? voucherInfo.discountAmount) || 0
-    voucherSuccessMessage.value = `Voucher ${code} đã được áp dụng thành công.`
+  voucherSuccessType.value = (voucherInfo.discountType || 'AMOUNT').toUpperCase()
+  voucherSuccessAmount.value = Number(voucherInfo.discountValue) || 0
+  voucherSuccessPercent.value = Number(voucherInfo.discountPercent) || 0
+  voucherSuccessMaxDiscount.value = Number(voucherInfo.maxDiscountAmount) || 0
+  voucherSuccessDiscountAmount.value =
+    Number(voucherInfo.actualDiscountAmount ?? voucherInfo.discountAmount) || 0
+  voucherSuccessMessage.value = `Voucher ${code} đã được áp dụng thành công.`
 
-    // Đặt note phù hợp theo loại voucher
-    if (voucherSuccessType.value === 'FREESHIP') {
-        voucherSuccessNote.value = 'Số tiền freeship thực tế sẽ được tính dựa trên phí vận chuyển GHN tại bước thanh toán.'
-    } else {
-        voucherSuccessNote.value = 'Vui lòng kiểm tra lại thông tin voucher trước khi tiến hành đặt hàng.'
-    }
+  if (voucherSuccessType.value === 'FREESHIP') {
+    voucherSuccessNote.value =
+      'Số tiền freeship thực tế sẽ được tính dựa trên phí vận chuyển GHN tại bước thanh toán.'
+  } else {
+    voucherSuccessNote.value =
+      'Vui lòng kiểm tra lại thông tin voucher trước khi tiến hành đặt hàng.'
+  }
 
-    isVoucherSuccessModalOpen.value = true
+  isVoucherSuccessModalOpen.value = true
 }
 
 const closeVoucherSuccessModal = () => {
-    isVoucherSuccessModalOpen.value = false
-    voucherSuccessMessage.value = ''
-    voucherSuccessAmount.value = 0
-    voucherSuccessPercent.value = 0
-    voucherSuccessMaxDiscount.value = 0
-    voucherSuccessDiscountAmount.value = 0
-    voucherSuccessType.value = 'AMOUNT'
+  isVoucherSuccessModalOpen.value = false
+  voucherSuccessMessage.value = ''
+  voucherSuccessAmount.value = 0
+  voucherSuccessPercent.value = 0
+  voucherSuccessMaxDiscount.value = 0
+  voucherSuccessDiscountAmount.value = 0
+  voucherSuccessType.value = 'AMOUNT'
 }
 
 const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')}₫`
@@ -704,12 +755,13 @@ const selectedAddress = ref(null)
 const activeAddressId = ref(null)
 
 // ─── Computed
-// finalAmount = Tổng tiền hàng - Giảm giá + Phí ship
-// Nếu có FREESHIP voucher: không cộng shippingFee (được miễn phí)
 const finalAmount = computed(() => {
   const total = (cartData.value.totalAmount ?? 0) - discountAmount.value
-  const withShipping = hasFreeshipVoucher.value ? total : total + shippingFee.value
-  return withShipping > 0 ? withShipping : 0
+  const finalShippingFee = hasFreeshipVoucher.value
+    ? 0
+    : shippingData.value.discountedShippingFee || 0
+  const finalTotal = total + finalShippingFee
+  return finalTotal > 0 ? finalTotal : 0
 })
 
 const isAddressReady = computed(() => !!toDistrictId.value && !!toWardCode.value)
@@ -721,7 +773,6 @@ const formatDeliveryDate = (isoDate) => {
     const d = new Date(isoDate)
     return `Dự kiến giao ${d.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}`
   } catch (e) {
-    console.warn('Lỗi format date:', e)
     return ''
   }
 }
@@ -733,7 +784,7 @@ const validateEmail = (email) => {
   return re.test(email)
 }
 
-// ─── Voucher preview (gọi BE để lấy discountAmount thực tế, không trust localStorage)
+// ─── Voucher preview
 const previewVoucher = async () => {
   const code = appliedVoucherCode.value
   if (!code) {
@@ -758,7 +809,6 @@ const previewVoucher = async () => {
       discountAmount.value = Number(result.discountAmount) || 0
       hasFreeshipVoucher.value = result.discountType === 'FREESHIP'
       voucherError.value = ''
-      // Mở modal thông báo áp dụng thành công với thông tin từ BE trả về
       openVoucherSuccessModal({
         voucherCode: code,
         discountType: result.discountType,
@@ -768,34 +818,40 @@ const previewVoucher = async () => {
         actualDiscountAmount: result.discountAmount,
       })
     } else {
-      // Voucher không hợp lệ → xóa khỏi localStorage và hiển thị modal
       discountAmount.value = 0
       hasFreeshipVoucher.value = false
       voucherError.value = result?.message || 'Mã giảm giá không hợp lệ'
       localStorage.removeItem('selectedVoucher')
       appliedVoucherCode.value = ''
-      // Mở modal thông báo theo yêu cầu
-      openVoucherExpiredModal(result?.message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.')
+      openVoucherExpiredModal(
+        result?.message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.',
+      )
     }
   } catch (e) {
-    console.error('Preview voucher fail:', e)
     discountAmount.value = 0
     hasFreeshipVoucher.value = false
     const errorMsg = e.response?.data?.message || 'Không thể áp dụng mã giảm giá'
     voucherError.value = errorMsg
     localStorage.removeItem('selectedVoucher')
     appliedVoucherCode.value = ''
-    // Mở modal thông báo theo yêu cầu
     openVoucherExpiredModal(errorMsg)
   } finally {
     isVoucherLoading.value = false
   }
 }
 
-// ─── 1. Phí vận chuyển GHN
+// ─── 1. Phí vận chuyển GHN & Tính toán Freeship
 const calculateShippingFee = async () => {
   if (!toDistrictId.value || !toWardCode.value) {
-    shippingFee.value = 0
+    shippingData.value = {
+      standardShippingFee: 0,
+      discountedShippingFee: 0,
+      isFreeship: false,
+      isAllowedToOrder: true,
+      blockMessage: '',
+      amountUntilFreeship: 0,
+      suggestionMessage: '',
+    }
     estimatedDelivery.value = ''
     return
   }
@@ -804,21 +860,31 @@ const calculateShippingFee = async () => {
   feeError.value = ''
 
   try {
-    const res = await api.post('/checkout/calculate-fee', {
+    const res = await api.post('/client/shipping/calculate', {
       toDistrictId: toDistrictId.value,
       toWardCode: toWardCode.value,
+      totalWeightGram: 500,
+      cartTotal: cartData.value.totalAmount,
     })
 
-    const feeValue = res.data?.data
-    if (typeof feeValue === 'number' && feeValue >= 0) {
-      shippingFee.value = feeValue
-      estimatedDelivery.value = formatDeliveryDate(res.data?.expectedDelivery ?? null)
+    if (res.data?.code === 200 && res.data?.data) {
+      shippingData.value = res.data.data
+      const futureDate = new Date()
+      futureDate.setDate(futureDate.getDate() + 3)
+      estimatedDelivery.value = formatDeliveryDate(futureDate.toISOString())
     } else {
-      throw new Error('Phí ship không hợp lệ')
+      throw new Error('Không thể lấy thông tin phí vận chuyển')
     }
   } catch (error) {
-    console.error('Lỗi tính phí:', error)
-    shippingFee.value = 0
+    shippingData.value = {
+      standardShippingFee: 0,
+      discountedShippingFee: 0,
+      isFreeship: false,
+      isAllowedToOrder: true,
+      blockMessage: '',
+      amountUntilFreeship: 0,
+      suggestionMessage: '',
+    }
     feeError.value = 'Không thể tính phí vận chuyển. Vui lòng kiểm tra địa chỉ hoặc thử lại!'
   } finally {
     isFeeLoading.value = false
@@ -853,7 +919,15 @@ const clearSelectedAddress = () => {
   activeAddressId.value = null
   toDistrictId.value = null
   toWardCode.value = ''
-  shippingFee.value = 0
+  shippingData.value = {
+    standardShippingFee: 0,
+    discountedShippingFee: 0,
+    isFreeship: false,
+    isAllowedToOrder: true,
+    blockMessage: '',
+    amountUntilFreeship: 0,
+    suggestionMessage: '',
+  }
   estimatedDelivery.value = ''
   manualProvinceId.value = null
   manualDistrictId.value = null
@@ -876,7 +950,15 @@ const onManualProvinceChange = async () => {
   manualWardCode.value = ''
   toDistrictId.value = null
   toWardCode.value = ''
-  shippingFee.value = 0
+  shippingData.value = {
+    standardShippingFee: 0,
+    discountedShippingFee: 0,
+    isFreeship: false,
+    isAllowedToOrder: true,
+    blockMessage: '',
+    amountUntilFreeship: 0,
+    suggestionMessage: '',
+  }
   estimatedDelivery.value = ''
   ghnDistricts.value = []
   ghnWards.value = []
@@ -894,7 +976,15 @@ const onManualDistrictChange = async () => {
   manualWardCode.value = ''
   toWardCode.value = ''
   toDistrictId.value = manualDistrictId.value ?? null
-  shippingFee.value = 0
+  shippingData.value = {
+    standardShippingFee: 0,
+    discountedShippingFee: 0,
+    isFreeship: false,
+    isAllowedToOrder: true,
+    blockMessage: '',
+    amountUntilFreeship: 0,
+    suggestionMessage: '',
+  }
   estimatedDelivery.value = ''
   ghnWards.value = []
   if (!manualDistrictId.value) return
@@ -919,10 +1009,7 @@ const fetchCart = async () => {
     const data = res.data
     const fetchedCart = data?.data ?? data
 
-    // Chỉ cập nhật nếu không có dữ liệu từ localStorage
-    // hoặc nếu API trả về items khác với items đã chọn
     if (!cartData.value.items?.length && fetchedCart.items?.length) {
-      // Không có dữ liệu localStorage, dùng từ API
       cartData.value = fetchedCart
     }
   } catch (error) {
@@ -1026,11 +1113,9 @@ const handleCheckout = async () => {
   try {
     const { data } = await api.post('/checkout', payload)
 
-    // Chỉ xóa các món đã thanh toán khỏi giỏ hàng, giữ lại món chưa thanh toán
     const paidSkuIds = cartData.value.items.map((i) => i.skuId)
     await cartStore.removeManyItemFromCart(paidSkuIds)
 
-    // Dọn dẹp localStorage sau khi checkout thành công
     localStorage.removeItem('selectedCartItems')
     localStorage.removeItem('selectedSubtotal')
     localStorage.removeItem('selectedVoucher')
@@ -1058,7 +1143,6 @@ onMounted(async () => {
   await previewVoucher()
 })
 
-// Khi tổng tiền hàng thay đổi (do GHN thay đổi cũng không ảnh hưởng), gọi lại preview
 watch(
   () => cartData.value.totalAmount,
   () => {
@@ -1085,7 +1169,9 @@ watch(
   background: rgba(15, 23, 42, 0.55);
   backdrop-filter: blur(4px);
   opacity: 0;
-  transition: opacity 0.2s ease, visibility 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease;
 }
 
 .v-overlay.active {
@@ -1101,7 +1187,9 @@ watch(
   overflow: hidden;
   transform: scale(0.92);
   opacity: 0;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
+  transition:
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 0.2s;
 }
 
 .v-overlay.active .v-card {
@@ -1171,7 +1259,6 @@ watch(
   background: linear-gradient(135deg, #15803d 0%, #166534 100%);
 }
 
-/* Voucher Success Modal variants */
 .voucher-success-modal .alert-title {
   color: #16a34a;
 }

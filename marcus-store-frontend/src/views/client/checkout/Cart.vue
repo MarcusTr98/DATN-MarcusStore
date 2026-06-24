@@ -22,9 +22,7 @@
       </div>
     </div>
 
-    <div v-if="isLoadingCart" class="cart-loading">
-      Đang tải giỏ hàng...
-    </div>
+    <div v-if="isLoadingCart" class="cart-loading">Đang tải giỏ hàng...</div>
 
     <div v-else-if="cartError" class="cart-error">
       {{ cartError }}
@@ -44,8 +42,7 @@
             </button>
           </div>
 
-
-          <div class="cart-item-list" >
+          <div class="cart-item-list">
             <div v-for="item in cartItems" :key="item.id" class="cart-item">
               <div class="item-check">
                 <input v-model="item.checked" type="checkbox" />
@@ -58,10 +55,9 @@
                     :alt="item.name"
                     class="cart-product-img"
                   />
-
                   <span v-else class="item-img-placeholder">
-    {{ item.icon }}
-  </span>
+                    {{ item.icon }}
+                  </span>
                 </div>
                 <div class="item-details">
                   <div class="item-name">{{ item.name }}</div>
@@ -79,7 +75,6 @@
                 <button
                   class="qty-btn"
                   type="button"
-
                   :disabled="item.quantity <= 1 || isLoadingCart"
                   @click="changeQty(item, -1)"
                 >
@@ -106,7 +101,12 @@
                 </button>
               </div>
               <div class="item-total">{{ formatPrice(item.price * item.quantity) }}</div>
-              <button class="item-remove" type="button" aria-label="Xóa sản phẩm" @click="removeItem(item.id)">
+              <button
+                class="item-remove"
+                type="button"
+                aria-label="Xóa sản phẩm"
+                @click="removeItem(item.skuId)"
+              >
                 <i class="ti ti-trash" aria-hidden="true"></i>
               </button>
             </div>
@@ -126,12 +126,21 @@
           </div>
 
           <div class="suggested-carousel">
-            <button class="suggested-nav suggested-nav-prev" type="button" aria-label="Xem phụ kiện trước" @click="scrollAccessories(-1)">
+            <button
+              class="suggested-nav suggested-nav-prev"
+              type="button"
+              aria-label="Xem phụ kiện trước"
+              @click="scrollAccessories(-1)"
+            >
               <i class="ti ti-chevron-left" aria-hidden="true"></i>
             </button>
 
             <div id="productTrack" ref="suggestedTrack" class="suggested-track product-track">
-              <div v-for="accessory in accessories" :key="accessory.id" class="sug-card product-card">
+              <div
+                v-for="accessory in accessories"
+                :key="accessory.id"
+                class="sug-card product-card"
+              >
                 <div>
                   <div class="sug-img">{{ accessory.icon }}</div>
                   <div class="sug-name">{{ accessory.name }}</div>
@@ -144,7 +153,12 @@
               </div>
             </div>
 
-            <button class="suggested-nav suggested-nav-next" type="button" aria-label="Xem thêm phụ kiện" @click="scrollAccessories(1)">
+            <button
+              class="suggested-nav suggested-nav-next"
+              type="button"
+              aria-label="Xem thêm phụ kiện"
+              @click="scrollAccessories(1)"
+            >
               <i class="ti ti-chevron-right" aria-hidden="true"></i>
             </button>
           </div>
@@ -187,7 +201,12 @@
                 <i class="ti ti-chevron-right" aria-hidden="true"></i>
               </button>
             </div>
-            <button v-else class="open-voucher-btn" type="button" @click="isVoucherModalOpen = true">
+            <button
+              v-else
+              class="open-voucher-btn"
+              type="button"
+              @click="isVoucherModalOpen = true"
+            >
               Chọn mã giảm giá
               <i class="ti ti-chevron-right" aria-hidden="true"></i>
             </button>
@@ -214,9 +233,7 @@
                   FREESHIP
                 </span>
               </span>
-              <span class="value discount">
-                -{{ formatPrice(voucherDiscount) }}
-              </span>
+              <span class="value discount"> -{{ formatPrice(voucherDiscount) }} </span>
             </div>
           </div>
           <div class="summary-total">
@@ -226,7 +243,9 @@
             </div>
             <div class="total-price">{{ formatPrice(totalPayment) }}</div>
           </div>
-          <button class="checkout-btn" type="button" @click="handleCheckout" >Tiến hành thanh toán</button>
+          <button class="checkout-btn" type="button" @click="handleCheckout">
+            Tiến hành thanh toán
+          </button>
           <div class="guarantee-strip">
             <div class="guarantee-item">
               <i class="ti ti-shield-check" aria-hidden="true"></i>
@@ -253,10 +272,12 @@
             Ưu đãi thanh toán đối tác
           </div>
           <div class="ms-promo-box">
-            Giảm ngay <strong>500.000đ</strong> khi mở thẻ tín dụng VIB hoặc thanh toán qua VNPAY-QR (Nhập mã <code>MARCUS500</code>).
+            Giảm ngay <strong>500.000đ</strong> khi mở thẻ tín dụng VIB hoặc thanh toán qua VNPAY-QR
+            (Nhập mã <code>MARCUS500</code>).
           </div>
           <div class="ms-promo-box">
-            Hỗ trợ <strong>Trả góp 0%</strong> lãi suất qua thẻ tín dụng hoặc công ty tài chính duyệt nhanh 5 phút.
+            Hỗ trợ <strong>Trả góp 0%</strong> lãi suất qua thẻ tín dụng hoặc công ty tài chính
+            duyệt nhanh 5 phút.
           </div>
         </div>
 
@@ -296,14 +317,22 @@
         Tiếp tục mua sắm
       </button>
     </div>
-    <div class="v-modal-overlay" :class="{ active: isVoucherModalOpen }" @click.self="isVoucherModalOpen = false">
+
+    <!-- Voucher Modal V2 (Dat's update) -->
+    <div
+      class="v-modal-overlay"
+      :class="{ active: isVoucherModalOpen }"
+      @click.self="isVoucherModalOpen = false"
+    >
       <div class="v-modal-card">
         <div class="v-modal-header">
           <div class="v2-header-text">
             <h3>Chọn 1 Voucher Áp Dụng</h3>
             <p class="v2-subtitle">Hệ thống tự động chọn mã có giá trị giảm cao nhất cho bạn</p>
           </div>
-          <button class="close-btn" type="button" @click="isVoucherModalOpen = false">&times;</button>
+          <button class="close-btn" type="button" @click="isVoucherModalOpen = false">
+            &times;
+          </button>
         </div>
 
         <div class="v-modal-body v2-modal-body">
@@ -326,7 +355,9 @@
               <div class="v2-voucher-info">
                 <span class="v2-code">ID voucher: {{ voucher.voucherCode }}</span>
                 <span class="v2-title">{{ voucher.title }}</span>
-                <span class="v2-min-order">Đơn tối thiểu {{ formatPriceVnd(voucher.minOrder) }}</span>
+                <span class="v2-min-order"
+                  >Đơn tối thiểu {{ formatPriceVnd(voucher.minOrder) }}</span
+                >
                 <span class="v2-expiry" :class="{ urgent: voucher.expiryUrgent }">
                   {{ voucher.expiryLabel }}
                 </span>
@@ -356,7 +387,9 @@
               <div class="v2-voucher-info">
                 <span class="v2-code">ID voucher: {{ voucher.voucherCode }}</span>
                 <span class="v2-title">{{ voucher.title }}</span>
-                <span class="v2-min-order">Đơn tối thiểu {{ formatPriceVnd(voucher.minOrder) }}</span>
+                <span class="v2-min-order"
+                  >Đơn tối thiểu {{ formatPriceVnd(voucher.minOrder) }}</span
+                >
                 <span class="v2-expiry" :class="{ urgent: voucher.expiryUrgent }">
                   {{ voucher.expiryLabel }}
                 </span>
@@ -376,19 +409,41 @@
         </div>
 
         <div class="v2-footer-bar">
-          <button class="v-btn v-btn-primary v2-confirm-btn" type="button" @click="applySelectedVoucher">
+          <button
+            class="v-btn v-btn-primary v2-confirm-btn"
+            type="button"
+            @click="applySelectedVoucher"
+          >
             ĐỒNG Ý
           </button>
         </div>
       </div>
     </div>
-    <div class="v-modal-overlay" :class="{ active: isAlertModalOpen }" @click.self="isAlertModalOpen = false">
+
+    <!-- Alert Modal (Dat's UI) -->
+    <div
+      class="v-modal-overlay"
+      :class="{ active: isAlertModalOpen }"
+      @click.self="isAlertModalOpen = false"
+    >
       <div class="alert-modal-card">
         <div class="alert-modal-icon">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M22.314 5.286L4.286 35.286C3.428 36.8 4.514 38.628 6.228 38.628H41.772C43.486 38.628 44.572 36.8 43.714 35.286L25.686 5.286C24.828 3.772 23.172 3.772 22.314 5.286Z" stroke="#E11D1D" stroke-width="2.5" stroke-linejoin="round" fill="none"/>
-            <path d="M24 17V25" stroke="#E11D1D" stroke-width="2.8" stroke-linecap="round"/>
-            <circle cx="24" cy="31" r="1.8" fill="#E11D1D"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M22.314 5.286L4.286 35.286C3.428 36.8 4.514 38.628 6.228 38.628H41.772C43.486 38.628 44.572 36.8 43.714 35.286L25.686 5.286C24.828 3.772 23.172 3.772 22.314 5.286Z"
+              stroke="#E11D1D"
+              stroke-width="2.5"
+              stroke-linejoin="round"
+              fill="none"
+            />
+            <path d="M24 17V25" stroke="#E11D1D" stroke-width="2.8" stroke-linecap="round" />
+            <circle cx="24" cy="31" r="1.8" fill="#E11D1D" />
           </svg>
         </div>
         <div class="alert-modal-body">
@@ -396,18 +451,40 @@
           <p class="alert-modal-message">{{ alertModalMessage }}</p>
         </div>
         <div class="alert-modal-footer">
-          <button class="alert-modal-confirm-btn" type="button" @click="isAlertModalOpen = false">Đồng ý</button>
+          <button class="alert-modal-confirm-btn" type="button" @click="isAlertModalOpen = false">
+            Đồng ý
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Modal thông báo áp dụng voucher thành công -->
-    <div class="v-modal-overlay" :class="{ active: isVoucherSuccessModalOpen }" @click.self="closeVoucherSuccessModal">
-      <div class="alert-modal-card voucher-success-modal" :class="`voucher-success-modal--${voucherSuccessType.toLowerCase()}`">
+    <div
+      class="v-modal-overlay"
+      :class="{ active: isVoucherSuccessModalOpen }"
+      @click.self="closeVoucherSuccessModal"
+    >
+      <div
+        class="alert-modal-card voucher-success-modal"
+        :class="`voucher-success-modal--${voucherSuccessType.toLowerCase()}`"
+      >
         <div class="alert-modal-icon voucher-success-modal__icon">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="20" stroke="#16A34A" stroke-width="2.5" fill="none"/>
-            <path d="M15 24L21 30L33 18" stroke="#16A34A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle cx="24" cy="24" r="20" stroke="#16A34A" stroke-width="2.5" fill="none" />
+            <path
+              d="M15 24L21 30L33 18"
+              stroke="#16A34A"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              fill="none"
+            />
           </svg>
         </div>
         <div class="alert-modal-body">
@@ -415,11 +492,18 @@
           <p class="alert-modal-message">{{ voucherSuccessMessage }}</p>
           <div class="voucher-success-modal__highlight" v-if="voucherSuccessType === 'FREESHIP'">
             <i class="ti ti-truck-delivery" aria-hidden="true"></i>
-            <span>Miễn phí vận chuyển tối đa <strong>{{ formatPrice(voucherSuccessAmount) }}</strong></span>
+            <span
+              >Miễn phí vận chuyển tối đa
+              <strong>{{ formatPrice(voucherSuccessAmount) }}</strong></span
+            >
           </div>
-          <div class="voucher-success-modal__highlight" v-else-if="voucherSuccessType === 'PERCENT'">
+          <div
+            class="voucher-success-modal__highlight"
+            v-else-if="voucherSuccessType === 'PERCENT'"
+          >
             <i class="ti ti-percentage" aria-hidden="true"></i>
-            <span>Giảm <strong>{{ voucherSuccessPercent }}%</strong>
+            <span
+              >Giảm <strong>{{ voucherSuccessPercent }}%</strong>
               <template v-if="voucherSuccessMaxDiscount > 0">
                 (tối đa {{ formatPrice(voucherSuccessMaxDiscount) }})
               </template>
@@ -432,7 +516,13 @@
           </p>
         </div>
         <div class="alert-modal-footer">
-          <button class="alert-modal-confirm-btn voucher-success-modal__btn" type="button" @click="closeVoucherSuccessModal">Đồng ý</button>
+          <button
+            class="alert-modal-confirm-btn voucher-success-modal__btn"
+            type="button"
+            @click="closeVoucherSuccessModal"
+          >
+            Đồng ý
+          </button>
         </div>
       </div>
     </div>
@@ -440,7 +530,9 @@
     <div class="cart-toast" :class="{ active: isToastVisible }">
       <i class="ti ti-circle-check" aria-hidden="true"></i>
       <span>{{ toastMessage }}</span>
-      <button class="cart-toast-close" type="button" aria-label="Đóng thông báo" @click="hideToast">&times;</button>
+      <button class="cart-toast-close" type="button" aria-label="Đóng thông báo" @click="hideToast">
+        &times;
+      </button>
       <div :key="toastKey" class="cart-toast-progress"></div>
     </div>
   </div>
@@ -450,7 +542,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useCartStore } from '@/stores/cartStore'
 import '@/assets/css/cart.css'
-import voucherApiClient from "@/api/voucherApiClient.js"
+import voucherApiClient from '@/api/voucherApiClient.js'
 const cartStore = useCartStore()
 
 onMounted(async () => {
@@ -473,10 +565,10 @@ function restoreSelectedItems() {
 
   try {
     const selectedItems = JSON.parse(savedItems)
-    const selectedIds = new Set(selectedItems.map(i => i.cartItemId))
+    const selectedIds = new Set(selectedItems.map((i) => i.cartItemId))
 
     // Uncheck các sản phẩm không có trong danh sách đã chọn
-    cartStore.items.forEach(item => {
+    cartStore.items.forEach((item) => {
       if (item.cartItemId && !selectedIds.has(item.cartItemId)) {
         item.checked = false
       }
@@ -489,16 +581,16 @@ function restoreSelectedItems() {
 const loading = ref(false)
 const error = ref(null)
 const availableVouchers = ref([])
-async function fetchAvailableVouchers (){
+async function fetchAvailableVouchers() {
   try {
     loading.value = true
     error.value = null
-    const response = await voucherApiClient.getAllVoucherClient();
+    const response = await voucherApiClient.getAllVoucherClient()
     availableVouchers.value = response.data
-  }catch (e) {
-    error.value = "không thể lấy voucher"
+  } catch (e) {
+    error.value = 'không thể lấy voucher'
     console.error(e)
-  }finally {
+  } finally {
     loading.value = false
   }
 }
@@ -507,9 +599,6 @@ const cartItems = computed(() => cartStore.items)
 const isLoadingCart = computed(() => cartStore.loading)
 const cartError = computed(() => cartStore.error)
 
-// function addAccessoryToCart(accessory) {
-//   showAlert('Chức năng thêm phụ kiện vào giỏ sẽ làm sau khi có skuId thật')
-// }
 const isVoucherModalOpen = ref(false)
 const selectedVoucher = ref(0)
 const selectedVoucherType = ref('AMOUNT') // 'AMOUNT', 'PERCENT', 'FREESHIP'
@@ -531,26 +620,29 @@ const toastKey = ref(0)
 function formatPrice(value) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`
 }
+
 async function updateItemQuantity(item, newQuantity) {
   const quantity = Math.max(Number(newQuantity) || 1, 1)
   if (item.stockQuantity && quantity > item.stockQuantity) {
-    showAlert("số lượng đã vượt quá trong kho")
+    showAlert('số lượng đã vượt quá trong kho')
     await cartStore.fetchCart()
     return
   }
 
   const success = await cartStore.updateItemQuantity(item.skuId, quantity)
   if (!success) {
-    showAlert(cartError.value || "cập nhật số lượng thất bại")
+    showAlert(cartError.value || 'cập nhật số lượng thất bại')
     await cartStore.fetchCart()
   }
 }
-async  function normalizeQty(item) {
- await  updateItemQuantity(item, item.quantity)
+
+async function normalizeQty(item) {
+  await updateItemQuantity(item, item.quantity)
 }
+
 async function changeQty(item, delta) {
   const newQuantity = item.quantity + delta
-  if(newQuantity < 1){
+  if (newQuantity < 1) {
     return
   }
   if (item.stockQuantity && newQuantity > item.stockQuantity) {
@@ -559,6 +651,7 @@ async function changeQty(item, delta) {
   }
   await updateItemQuantity(item, newQuantity)
 }
+
 let toastTimer = null
 const suggestedTrack = ref(null)
 
@@ -604,11 +697,7 @@ const v2Vouchers = computed(() => {
       maxDiscountAmount: v.maxDiscountAmount || 0,
       expiryLabel: `Hạn dùng đến: ${new Date(v.endDate).toLocaleDateString('vi-VN')}`,
       expiryUrgent: false,
-      icon: isFreeship
-        ? 'bi bi-truck'
-        : isPercent
-          ? 'bi bi-cash'
-          : 'bi bi-cash',
+      icon: isFreeship ? 'bi bi-truck' : isPercent ? 'bi bi-cash' : 'bi bi-cash',
       iconClass: isFreeship
         ? 'v2-icon-box--freeship'
         : isPercent
@@ -625,9 +714,7 @@ const v2Vouchers = computed(() => {
 // Kiểm tra voucher có thể dùng không
 function isVoucherActive(voucher) {
   const cartTotal = subtotal.value
-  return voucher.isActive
-    && !voucher.isUsed
-    && cartTotal >= (voucher.minOrderValue || 0)
+  return voucher.isActive && !voucher.isUsed && cartTotal >= (voucher.minOrderValue || 0)
 }
 
 // Lý do voucher bị disable
@@ -643,9 +730,7 @@ function getDisabledReason(voucher) {
 }
 
 const v2ActiveVouchers = computed(() =>
-  v2Vouchers.value
-    .filter((v) => v.active)
-    .sort((a, b) => b.discountValue - a.discountValue),
+  v2Vouchers.value.filter((v) => v.active).sort((a, b) => b.discountValue - a.discountValue),
 )
 
 const v2DisabledVouchers = computed(() => v2Vouchers.value.filter((v) => !v.active))
@@ -657,7 +742,8 @@ function selectVoucher(id) {
 function applySelectedVoucher() {
   const picked = v2Vouchers.value.find((v) => v.id === v2SelectedId.value)
   if (picked) {
-    selectedVoucher.value = picked.discountPercent > 0 ? picked.discountPercent : picked.discountValue
+    selectedVoucher.value =
+      picked.discountPercent > 0 ? picked.discountPercent : picked.discountValue
     selectedVoucherType.value = picked.discountType
     voucherCode.value = picked.voucherCode
     selectedVoucherMaxDiscount.value = picked.maxDiscountAmount || 0
@@ -696,6 +782,7 @@ function closeVoucherSuccessModal() {
 function formatPriceVnd(value) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`
 }
+
 const accessories = [
   {
     id: 'item-sac-anker',
@@ -746,6 +833,7 @@ const accessories = [
     originalPrice: 390000,
   },
 ]
+
 const selectedItems = computed(() => cartItems.value.filter((item) => item.checked))
 
 const selectedCount = computed(() =>
@@ -793,27 +881,26 @@ const allSelected = computed({
   },
 })
 
-
-async function removeItem(skuId){
+async function removeItem(skuId) {
   const success = await cartStore.removeItemFromCart(skuId)
-  if(success){
-    showToast("xóa thành công")
-  }else{
-    showAlert(cartStore.error || "xóa sản phẩm thất bại")
+  if (success) {
+    showToast('xóa thành công')
+  } else {
+    showAlert(cartStore.error || 'xóa sản phẩm thất bại')
   }
 }
 
- async function deleteChecked() {
+async function deleteChecked() {
   const checkedItems = cartItems.value.filter((item) => item.checked)
-  if(checkedItems.length === 0){
-    showAlert("vui lòng chọn 1 sản phẩm để xóa")
+  if (checkedItems.length === 0) {
+    showAlert('vui lòng chọn 1 sản phẩm để xóa')
     return
   }
   const skuIds = checkedItems.map((item) => item.skuId)
   const success = await cartStore.removeManyItemFromCart(skuIds)
-  if(success){
-    showToast("xóa các sản phẩm thành công")
-  }else{
+  if (success) {
+    showToast('xóa các sản phẩm thành công')
+  } else {
     showAlert(cartStore.error || 'xóa thất bại')
   }
 }
@@ -887,10 +974,10 @@ function scrollAccessories(direction) {
   })
 }
 
-function handleCheckout(){
-  if(selectedCount.value === 0){
-    showAlert("Vui lòng chọn ít nhất một sản phẩm để thanh toán");
-    return;
+function handleCheckout() {
+  if (selectedCount.value === 0) {
+    showAlert('Vui lòng chọn ít nhất một sản phẩm để thanh toán')
+    return
   }
 
   // Lưu voucher đã chọn - CHỈ lưu code và type, KHÔNG lưu value
@@ -901,14 +988,14 @@ function handleCheckout(){
       JSON.stringify({
         code: voucherCode.value,
         type: selectedVoucherType.value,
-      })
+      }),
     )
   } else {
     localStorage.removeItem('selectedVoucher')
   }
 
   // Lưu danh sách sản phẩm đã chọn để checkout hiển thị đúng
-  const selectedItemsData = selectedItems.value.map(item => ({
+  const selectedItemsData = selectedItems.value.map((item) => ({
     cartItemId: item.cartItemId,
     productName: item.name,
     variantName: item.variant,
@@ -916,17 +1003,13 @@ function handleCheckout(){
     imageUrl: item.imageUrl,
     quantity: item.quantity,
     price: item.price,
-    totalPrice: item.price * item.quantity
+    totalPrice: item.price * item.quantity,
   }))
   localStorage.setItem('selectedCartItems', JSON.stringify(selectedItemsData))
 
   // Lưu thông tin tổng tiền
   localStorage.setItem('selectedSubtotal', subtotal.value.toString())
 
-  window.location.href='/checkout';
+  window.location.href = '/checkout'
 }
 </script>
-
-<style scoped>
-
-</style>
