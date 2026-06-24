@@ -7,19 +7,18 @@
         <tr>
           <th>ID</th>
           <th>Họ tên</th>
-          <th>Email</th>
-          <th>SĐT</th>
+          <th>Liên hệ</th>
           <th>Vai trò</th>
           <th>Trạng thái</th>
           <th>Ngày tạo</th>
-          <th v-if="canManage">Thao tác</th>
+          <th v-if="canManage" class="action-col">Thao tác</th>
         </tr>
       </thead>
  
       <tbody>
  
         <tr v-if="!users.length">
-          <td :colspan="canManage ? 8 : 7" class="empty-state">
+          <td :colspan="canManage ? 7 : 6" class="empty-state">
             <i class="bi bi-people"></i>
             <h3>Không có tài khoản nào</h3>
             <p>Hãy thêm nhân viên mới hoặc thay đổi từ khóa tìm kiếm.</p>
@@ -36,12 +35,16 @@
           <td>
             <div class="user-info">
               <div class="user-name">{{ item.fullName }}</div>
+              <div v-if="item.username" class="user-username">{{ item.username }}</div>
             </div>
           </td>
  
-          <td>{{ item.email }}</td>
- 
-          <td>{{ item.phoneNumber }}</td>
+          <td>
+            <div class="contact-info">
+              <div class="contact-email">{{ item.email }}</div>
+              <div class="contact-phone">{{ item.phoneNumber }}</div>
+            </div>
+          </td>
  
           <td>
             <span class="role-badge" :class="item.roleName">
@@ -66,7 +69,7 @@
             }}
           </td>
  
-          <td v-if="canManage">
+          <td v-if="canManage" class="action-cell">
             <div class="action-group">
  
               <button
@@ -233,11 +236,37 @@ function onPageSizeChange() {
 .table tbody tr:last-child td {
   border-bottom: none;
 }
+
+.action-col,
+.action-cell {
+  width: 128px;
+  min-width: 128px;
+  text-align: center;
+}
  
 .user-id,
 .user-name {
   color: #202636;
   font-weight: 800;
+}
+
+.user-info,
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.user-username,
+.contact-phone {
+  color: #7c8798;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.contact-email {
+  color: #202636;
+  font-weight: 700;
 }
  
 /* ===== Badges ===== */
@@ -282,7 +311,9 @@ function onPageSizeChange() {
 .action-group {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: center;
+  align-items: center;
+  min-width: 84px;
 }
  
 .btn-action {

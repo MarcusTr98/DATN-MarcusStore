@@ -1,6 +1,8 @@
 package com.fpoly.marcusstore.service.impl;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -54,17 +56,39 @@ private UserResponse toResponse( User user){
 }
 @Override
 @Transactional
-public Page<UserResponse> getALL(String keyword, Pageable pageable){
-          if (keyword == null || keyword.trim().isEmpty()) {
-            return userRepository.findAll(pageable)
-                    .map(this::toResponse);
-        }
+public Page<UserResponse> getALL(String keyword, List<String> roles, Pageable pageable){
+        String normalizedKeyword = normalizeKeyword(keyword);
+        List<String> normalizedRoles = normalizeRoles(roles);
+        boolean rolesEmpty = normalizedRoles.isEmpty();
+        List<String> queryRoles = rolesEmpty ? List.of("__NO_ROLE__") : normalizedRoles;
 
         return userRepository
-                .findByFullNameContainingIgnoreCase(
-                        keyword,
+                .findAllByKeywordAndRoles(
+                        normalizedKeyword,
+                        queryRoles,
+                        rolesEmpty,
                         pageable)
                 .map(this::toResponse);
+}
+
+private String normalizeKeyword(String keyword) {
+    if (keyword == null || keyword.trim().isEmpty()) {
+        return null;
+    }
+    return keyword.trim().toLowerCase();
+}
+
+private List<String> normalizeRoles(List<String> roles) {
+    if (roles == null) {
+        return List.of();
+    }
+
+    return roles.stream()
+            .filter(role -> role != null)
+            .flatMap(role -> Arrays.stream(role.split(",")))
+            .filter(role -> !role.trim().isEmpty())
+            .map(role -> role.trim().toUpperCase())
+            .toList();
 }
 @Override
 @Transactional

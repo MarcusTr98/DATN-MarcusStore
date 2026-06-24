@@ -7,21 +7,20 @@
         <tr>
           <th>ID</th>
           <th>Khách hàng</th>
-          <th>Email</th>
-          <th>SĐT</th>
+          <th>Liên hệ</th>
           <th>Hạng thành viên</th>
           <th>Tổng chi tiêu</th>
           <th>Ngày tạo</th>
           <th>Email Verify</th>
           <th>Trạng thái</th>
-          <th v-if="canManage">Thao tác</th>
+          <th v-if="canManage" class="action-col">Thao tác</th>
         </tr>
       </thead>
  
       <tbody>
  
         <tr v-if="!users.length">
-          <td :colspan="canManage ? 10 : 9" class="empty-state">
+          <td :colspan="canManage ? 9 : 8" class="empty-state">
             <i class="bi bi-person-x"></i>
             <h3>Không có khách hàng nào</h3>
             <p>Hãy thay đổi từ khóa tìm kiếm.</p>
@@ -32,11 +31,19 @@
  
           <td class="user-id">#{{ item.userId }}</td>
  
-          <td class="user-name">{{ item.fullName }}</td>
+          <td>
+            <div class="user-info">
+              <div class="user-name">{{ item.fullName }}</div>
+              <div v-if="item.username" class="user-username">{{ item.username }}</div>
+            </div>
+          </td>
  
-          <td>{{ item.email }}</td>
- 
-          <td>{{ item.phoneNumber }}</td>
+          <td>
+            <div class="contact-info">
+              <div class="contact-email">{{ item.email }}</div>
+              <div class="contact-phone">{{ item.phoneNumber }}</div>
+            </div>
+          </td>
  
           <!-- Hạng thành viên -->
           <td>
@@ -78,7 +85,7 @@
           </td>
  
           <!-- Thao tác -->
-          <td v-if="canManage">
+          <td v-if="canManage" class="action-cell">
             <div class="action-group">
  
               <button
@@ -271,11 +278,37 @@ function formatVND(amount) {
 .table tbody tr:last-child td {
   border-bottom: none;
 }
+
+.action-col,
+.action-cell {
+  width: 176px;
+  min-width: 176px;
+  text-align: center;
+}
  
 .user-id,
 .user-name {
   color: #202636;
   font-weight: 800;
+}
+
+.user-info,
+.contact-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.user-username,
+.contact-phone {
+  color: #7c8798;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.contact-email {
+  color: #202636;
+  font-weight: 700;
 }
  
 .spent-cell {
@@ -352,7 +385,9 @@ function formatVND(amount) {
 .action-group {
   display: flex;
   gap: 8px;
-  justify-content: flex-end;
+  justify-content: center;
+  align-items: center;
+  min-width: 128px;
 }
  
 .btn-action {
