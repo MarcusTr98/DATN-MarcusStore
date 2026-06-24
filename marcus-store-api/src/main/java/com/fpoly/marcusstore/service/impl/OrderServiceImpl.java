@@ -9,6 +9,7 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.event.OrderConfirmedEvent;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
@@ -19,6 +20,7 @@ import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -41,27 +43,22 @@ public class OrderServiceImpl implements OrderService {
     private final ProductSkuRepository productSkuRepository;
     private final VoucherRepository voucherRepository;
     private final UserVoucherRepository userVoucherRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
+    // --- CÁC HÀM BỔ TRỢ (HELPER) ---
 
     private String normalizeKeyword(String keyword) {
-        return keyword == null || keyword.isBlank()
-                ? null
-                : keyword.trim();
+        return keyword == null || keyword.isBlank() ? null : keyword.trim();
     }
 
     private String normalizePaymentMethod(String paymentMethod) {
-        return paymentMethod == null ||
-                paymentMethod.isBlank() ||
-                "ALL".equalsIgnoreCase(paymentMethod)
-                        ? null
-                        : paymentMethod.trim();
+        return paymentMethod == null || paymentMethod.isBlank() || "ALL".equalsIgnoreCase(paymentMethod) ? null
+                : paymentMethod.trim();
     }
 
     private String normalizeOrderStatus(String orderStatus) {
-        return orderStatus == null ||
-                orderStatus.isBlank() ||
-                "ALL".equalsIgnoreCase(orderStatus)
-                        ? null
-                        : orderStatus.trim();
+        return orderStatus == null || orderStatus.isBlank() || "ALL".equalsIgnoreCase(orderStatus) ? null
+                : orderStatus.trim();
     }
 
     private String normalizeStatusValue(String status) {
@@ -69,16 +66,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private String getUserDisplayName(User user) {
-        if (user == null) {
+        if (user == null)
             return null;
-        }
-        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+        if (user.getFullName() != null && !user.getFullName().isBlank())
             return user.getFullName();
-        }
-        if (user.getUsername() != null && !user.getUsername().isBlank()) {
-            return user.getUsername();
-        }
-        return user.getEmail();
+        return user.getUsername();
     }
 
     private OrderResponse toResponse(Order order) {
@@ -93,7 +85,154 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .orderStatus(order.getOrderStatus())
                 .createdAt(order.getCreatedAt()).build();
+    }
 
+    private boolean canChangeStatus(String currentStatus, String newStatus) {
+        return switch (currentStatus) {
+            case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
+            case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
+            case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
+            case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            default -> false;
+        };
+    }
+
+    private boolean requiresNote(String status) {
+        return "FAILED".equals(status) || "CANCELLED".equals(status);
+    }
+
+    private String getHistoryTitle(String status) {
+        return switch (status) {
+            case "PENDING" -> "Đơn hàng đã đặt";
+            case "CONFIRMED" -> "Đơn hàng đã được xác nhận";
+            case "PROCESSING" -> "Đơn hàng đang được chuẩn bị";
+            case "SHIPPING" -> "Đơn hàng đang được giao";
+            case "COMPLETED" -> "Giao hàng thành công";
+            case "FAILED" -> "Giao hàng không thành công";
+            case "CANCELLED" -> "Đơn hàng đã hủy";
+            default -> "Cập nhật trạng thái";
+        };
+    }
+
+    private String generateTrackingCode(Order order) {
+        String randomPart = UUID.randomUUID().toString()
+                .replace("-", "")
+                .substring(0, 10)
+                .toUpperCase();
+        return "GHN" + randomPart;
+    }
+
+    private boolean ensureTrackingCodeForShipping(Order order) {
+        boolean isShipping = "SHIPPING".equals(normalizeStatusValue(order.getOrderStatus()));
+        boolean missingTrackingCode = order.getTrackingCode() == null || order.getTrackingCode().isBlank();
+
+        if (isShipping && missingTrackingCode) {
+            order.setTrackingCode(generateTrackingCode(order));
+            return true;
+        }
+        return false;
+    }
+
+    private void markPaymentPaidWhenCompleted(Order order) {
+        if ("COMPLETED".equals(normalizeStatusValue(order.getOrderStatus()))) {
+            order.setPaymentStatus("PAID");
+        }
+    }
+
+    private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
+        Integer currentUserId = SecurityUtils.getCurrentUserId();
+        User currentUser = userRepository.getReferenceById(currentUserId);
+
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(order);
+        history.setStatus(status);
+        history.setTitle(getHistoryTitle(status));
+        history.setNote(note);
+        history.setCreatedBy(currentUser);
+        return history;
+    }
+
+    @Override
+    @Transactional
+    public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        String currentStatus = normalizeStatusValue(order.getOrderStatus());
+        String newStatus = request.getStatus();
+
+        if (newStatus == null || newStatus.isBlank()) {
+            throw new RuntimeException("Trạng thái mới không hợp lệ");
+        }
+
+        newStatus = normalizeStatusValue(newStatus);
+
+        if (!canChangeStatus(currentStatus, newStatus)) {
+            throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
+        }
+
+        String note = request.getNote();
+
+        if (requiresNote(newStatus) && (note == null || note.isBlank())) {
+            throw new RuntimeException("Vui lòng nhập lý do cho trạng thái này");
+        }
+
+        boolean wasCancelled = "CANCELLED".equals(newStatus);
+
+        if (wasCancelled) {
+            List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+            List<Integer> skuIds = orderItems.stream()
+                    .map(item -> item.getSku().getSkuId())
+                    .toList();
+            List<ProductSku> lockedSkus = productSkuRepository.findByIdsForUpdate(skuIds);
+            Map<Integer, ProductSku> skuMap = lockedSkus.stream()
+                    .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
+
+            for (OrderItem item : orderItems) {
+                ProductSku sku = skuMap.get(item.getSku().getSkuId());
+                if (sku != null) {
+                    sku.setStockQuantity(sku.getStockQuantity() + item.getQuantity());
+                }
+            }
+
+            if (order.getVoucher() != null) {
+                Voucher voucher = order.getVoucher();
+                LocalDateTime now = LocalDateTime.now();
+
+                // Chỉ hoàn quota nếu voucher còn hiệu lực (chưa hết hạn)
+                if (voucher.getEndDate() == null || voucher.getEndDate().isAfter(now)) {
+                    voucher.setQuantity(voucher.getQuantity() + 1);
+                    voucherRepository.save(voucher);
+                }
+
+                // Reset UserVoucher.isUsed = false
+                Integer userId = order.getUser().getUserId();
+                userVoucherRepository
+                        .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
+                        .ifPresent(userVoucher -> {
+                            if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
+                                userVoucher.setIsUsed(false);
+                                userVoucher.setUsedAt(null);
+                                userVoucherRepository.save(userVoucher);
+                            }
+                        });
+            }
+        }
+
+        order.setOrderStatus(newStatus);
+        ensureTrackingCodeForShipping(order);
+        markPaymentPaidWhenCompleted(order);
+        orderRepository.save(order);
+
+        OrderStatusHistory history = createStatusHistory(order, newStatus, note);
+        orderStatusHistoryRepository.save(history);
+
+        // TRIGGER BẮN ĐƠN SANG GHN KHI XÁC NHẬN
+        if ("CONFIRMED".equals(newStatus)) {
+            eventPublisher.publishEvent(new OrderConfirmedEvent(this, order));
+        }
+
+        return getOrderDetailResponse(orderCode);
     }
 
     @Override
@@ -108,7 +247,6 @@ public class OrderServiceImpl implements OrderService {
                 .map(this::toResponse);
     }
 
-    // hàm gọi tổng đơn hàng và số lượng trạng thái đơn hàng
     @Override
     public OrderStatsResponse getOrderStats(String keyword, String paymentMethod, String orderStatus) {
         String normalizedKeyword = normalizeKeyword(keyword);
@@ -156,18 +294,16 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDetailResponse getOrderDetailResponse(String orderCode) {
-        // Lấy chi tiết đơn hàng theo mã đơn hàng
         Order order = orderRepository.findDetailByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("không tìm thấy đơn hàng "));
+
         if (ensureTrackingCodeForShipping(order)) {
             orderRepository.saveAndFlush(order);
         }
-        // lấy trạng thái lịch sử đơn hàng
+
         List<OrderStatusHistory> histories = orderStatusHistoryRepository
                 .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
-        // map từ Entity sang DTO
-        // mỗi dòng khi được tách ra sẽ là một trạng thái của đơn hàng khi hiển thị lên
-        // FE
+
         List<OrderStatusHistoryResponse> historyResponses = histories.stream()
                 .map(history -> OrderStatusHistoryResponse.builder()
                         .status(history.getStatus())
@@ -175,10 +311,9 @@ public class OrderServiceImpl implements OrderService {
                         .note(history.getNote())
                         .createdAt(history.getCreatedAt())
                         .createdByName(getUserDisplayName(history.getCreatedBy()))
-
                         .build())
                 .toList();
-        // map từ Entity sang DTO
+
         return OrderDetailResponse.builder()
                 .orderCode(order.getOrderCode())
                 .orderStatus(order.getOrderStatus())
@@ -194,7 +329,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentMethod(order.getPaymentMethod())
                 .paymentStatus(order.getPaymentStatus())
                 .transactionId(order.getTransactionId())
-                .paymentDate(order.getPaymentDate()) // marcus thêm
+                .paymentDate(order.getPaymentDate())
                 .trackingCode(order.getTrackingCode())
                 .userId(order.getUser().getUserId())
                 .fullName(order.getUser().getFullName())
@@ -226,174 +361,14 @@ public class OrderServiceImpl implements OrderService {
                                             orderItem.getProductItems().stream()
                                                     .map(item -> ImeiResponse.builder()
                                                             .imeiCode(item.getImeiCode())
-
                                                             .build())
                                                     .toList())
-
                                     .build();
-                        })
-                                .toList())
-                // ghép dto orderDetail và dto History
+                        }).toList())
                 .history(historyResponses)
                 .build();
-
     }
 
-    // logic đổi trạng thái đơn hàng
-    // Những trạng thái có thể đổi
-    private boolean canChangeStatus(String currentStatus, String newStatus) {
-        if (currentStatus == null || newStatus == null) {
-            return false;
-        }
-
-        currentStatus = normalizeStatusValue(currentStatus);
-        newStatus = normalizeStatusValue(newStatus);
-
-        return switch (currentStatus) {
-            case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
-            case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
-            case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
-            case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
-            case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
-            default -> false;
-        };
-    }
-
-    private boolean requiresNote(String status) {
-        return "FAILED".equals(status) || "CANCELLED".equals(status);
-    }
-
-    private String getHistoryTitle(String status) {
-        return switch (status) {
-            case "PENDING" -> "Đơn hàng đã đặt";
-            case "CONFIRMED" -> "Đơn hàng đã được xác nhận";
-            case "PROCESSING" -> "Đơn hàng đang được chuẩn bị";
-            case "SHIPPING" -> "Đơn hàng đang được giao";
-            case "COMPLETED" -> "Giao hàng thành công";
-            case "FAILED" -> "Giao hàng không thành công";
-            case "CANCELLED" -> "Đơn hàng đã hủy";
-            default -> "Cập nhật trạng thái";
-        };
-    }
-
-    private String generateTrackingCode(Order order) {
-        String randomPart = UUID.randomUUID().toString()
-                .replace("-", "")
-                .substring(0, 10)
-                .toUpperCase();
-        return "GHN" + randomPart;
-    }
-
-    private boolean ensureTrackingCodeForShipping(Order order) {
-        boolean isShipping = "SHIPPING".equals(normalizeStatusValue(order.getOrderStatus()));
-        boolean missingTrackingCode = order.getTrackingCode() == null || order.getTrackingCode().isBlank();
-
-        if (isShipping && missingTrackingCode) {
-            order.setTrackingCode(generateTrackingCode(order));
-            return true;
-        }
-
-        return false;
-    }
-
-    private void markPaymentPaidWhenCompleted(Order order) {
-        if ("COMPLETED".equals(normalizeStatusValue(order.getOrderStatus()))) {
-            order.setPaymentStatus("PAID");
-        }
-    }
-
-    private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
-        Integer currentUserId = SecurityUtils.getCurrentUserId();
-        User currentUser = userRepository.getReferenceById(currentUserId);
-
-        OrderStatusHistory history = new OrderStatusHistory();
-        history.setOrder(order);
-        history.setStatus(status);
-        history.setTitle(getHistoryTitle(status));
-        history.setNote(note);
-        history.setCreatedBy(currentUser);
-        return history;
-    }
-
-    @Override
-    @Transactional
-    public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
-        Order order = orderRepository.findByOrderCode(orderCode)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
-        String currentStatus = normalizeStatusValue(order.getOrderStatus());
-        String newStatus = request.getStatus();
-        if (newStatus == null || newStatus.isBlank()) {
-            throw new RuntimeException("Trạng thái mới không hợp lệ");
-        }
-
-        newStatus = normalizeStatusValue(newStatus);
-
-        if (!canChangeStatus(currentStatus, newStatus)) {
-            throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
-        }
-
-        String note = request.getNote();
-
-        if (requiresNote(newStatus) && (note == null || note.isBlank())) {
-            throw new RuntimeException("Vui lòng nhập lý do cho trạng thái này");
-        }
-
-        boolean wasCancelled = "CANCELLED".equals(newStatus);
-
-        if (wasCancelled) {
-            List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
-            List<Integer> skuIds = orderItems.stream()
-                    .map(item -> item.getSku().getSkuId())
-                    .toList();
-            List<ProductSku> lockedSkus = productSkuRepository.findByIdsForUpdate(skuIds);
-            Map<Integer, ProductSku> skuMap = lockedSkus.stream()
-                    .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
-
-            for (OrderItem item : orderItems) {
-                ProductSku sku = skuMap.get(item.getSku().getSkuId());
-                if (sku != null) {
-                    sku.setStockQuantity(sku.getStockQuantity() + item.getQuantity());
-                }
-            }
-
-            if (order.getVoucher() != null) {
-                Voucher voucher = order.getVoucher();
-                LocalDateTime now = LocalDateTime.now();
-
-                // Chỉ hoàn quota nếu voucher còn hiệu lực (chưa hết hạn)
-                // Nếu voucher đã hết hạn thì KHÔNG tăng quantity (voucher chết không dùng lại
-                // được)
-                if (voucher.getEndDate() == null || voucher.getEndDate().isAfter(now)) {
-                    voucher.setQuantity(voucher.getQuantity() + 1);
-                    voucherRepository.save(voucher);
-                }
-
-                // Reset UserVoucher.isUsed = false (cho cả ALL và SPECIFIC)
-                Integer userId = order.getUser().getUserId();
-                userVoucherRepository
-                        .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
-                        .ifPresent(userVoucher -> {
-                            if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
-                                userVoucher.setIsUsed(false);
-                                userVoucher.setUsedAt(null);
-                                userVoucherRepository.save(userVoucher);
-                            }
-                        });
-            }
-        }
-
-        order.setOrderStatus(newStatus);
-        ensureTrackingCodeForShipping(order);
-        markPaymentPaidWhenCompleted(order);
-        orderRepository.save(order);
-
-        OrderStatusHistory history = createStatusHistory(order, newStatus, note);
-        orderStatusHistoryRepository.save(history);
-
-        return getOrderDetailResponse(orderCode);
-    }
-
-    // lấy danh sách đơn hàng của user theo ID
     @Override
     @Transactional(readOnly = true)
     public List<OrderResponse> getUserOrder() {
@@ -413,7 +388,6 @@ public class OrderServiceImpl implements OrderService {
         if (!userId.equals(response.getUserId())) {
             throw new RuntimeException("Không có quyền xem");
         }
-
         return response;
     }
 }

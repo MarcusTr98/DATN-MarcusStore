@@ -18,6 +18,9 @@ import java.util.Optional;
 public interface OrderRepository extends JpaRepository<Order, Integer> {
   Optional<Order> findByOrderCode(String orderCode);
 
+  // Được thêm từ nhánh GHN Webhook
+  Optional<Order> findByTrackingCode(String trackingCode);
+
   List<Order> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
 
   @Query("""
@@ -135,7 +138,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
       @Param("paymentMethod") String paymentMethod,
       @Param("orderStatus") String orderStatus);
 
-  // lấy tổng số sản phẩm trong 1 đơn hàng
   @Query("""
           SELECT COALESCE(SUM(oi.quantity), 0)
           FROM OrderItem oi
@@ -161,7 +163,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
       """, nativeQuery = true)
   List<String> findDistinctOrderStatuses();
 
-  // Left join fetch dùng để lấy kèm dữ liệu quan hệ cùng lúc với Order
   @Query("""
       SELECT DISTINCT o
       FROM Order o
