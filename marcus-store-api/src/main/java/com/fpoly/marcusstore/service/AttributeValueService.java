@@ -20,7 +20,7 @@ public class AttributeValueService {
     }
 
     @Transactional
-    public AttributeValue createValue(Integer attributeId, String valueString) {
+    public AttributeValue createValue(Integer attributeId, String valueString, String valueMeta) {
         if (valueRepository.existsByValueStringAndAttribute_AttributeId(valueString, attributeId)) {
             throw new RuntimeException("Giá trị này đã tồn tại trong thuộc tính!");
         }
@@ -29,14 +29,16 @@ public class AttributeValueService {
         attribute.setAttributeId(attributeId);
         value.setAttribute(attribute);
         value.setValueString(valueString);
+        value.setValueMeta(valueMeta);
         return valueRepository.save(value);
     }
 
     @Transactional
-    public AttributeValue updateValue(Integer id, String newValue) {
+    public AttributeValue updateValue(Integer id, String newValue, String valueMeta) {
         AttributeValue value = valueRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giá trị!"));
         value.setValueString(newValue);
+        value.setValueMeta(valueMeta);
         return valueRepository.save(value);
     }
 

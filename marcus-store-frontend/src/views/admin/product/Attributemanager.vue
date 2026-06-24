@@ -27,9 +27,7 @@
             </h3>
             <button class="btn-icon-add" @click="openAddAttributeModal">Thêm mới</button>
           </div>
-          <p class="panel-subtitle">
-            Nhấn vào một thuộc tính để xem và quản lý các giá trị của nó.
-          </p>
+          <p class="panel-subtitle">Nhấn vào một thuộc tính để xem các giá trị của nó.</p>
         </div>
 
         <div class="attr-list">
@@ -78,7 +76,26 @@
 
           <div class="values-grid">
             <div v-for="val in currentValues" :key="val.valueId" class="value-chip-card">
-              <div class="value-chip-preview" :style="getColorStyle(val.valueString)"></div>
+              <div
+                v-if="val.valueMeta && val.valueMeta.startsWith('#')"
+                class="value-chip-preview"
+                :style="{ backgroundColor: val.valueMeta }"
+              ></div>
+              <div
+                v-else
+                class="value-chip-preview"
+                style="
+                  background: #f1f5f9;
+                  color: #64748b;
+                  font-size: 10px;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <i class="fa-solid fa-microchip"></i>
+              </div>
+
               <span class="value-chip-name">{{ val.valueString }}</span>
               <div class="value-chip-actions">
                 <button class="btn-ghost-sm btn-edit" @click="openEditValueModal(val)">Sửa</button>
@@ -108,7 +125,7 @@
             <input
               v-model="modalAttr.name"
               class="form-input"
-              placeholder="VD: Màu sắc..."
+              placeholder="VD: Màu sắc, Bộ nhớ..."
               @keyup.enter="saveAttribute"
               autofocus
             />
@@ -130,16 +147,69 @@
             <h4>{{ modalVal.isEdit ? 'Sửa Giá trị' : 'Thêm Giá trị mới' }}</h4>
             <button class="modal-close" @click="modalVal.show = false">✕</button>
           </div>
+
           <div class="modal-body">
-            <label class="form-label"
-              >Giá trị cho: <strong>{{ selectedAttribute?.attributeName }}</strong></label
+            <label class="form-label">
+              Giá trị thuộc tính:
+              <strong style="color: #db2777">{{ selectedAttribute?.attributeName }}</strong>
+            </label>
+
+            <div class="input-with-unit">
+              <input
+                v-model="modalVal.value"
+                class="form-input"
+                :placeholder="inputPlaceholder"
+                @keyup.enter="saveValue"
+              />
+              <select v-model="modalVal.unit" class="form-input select-unit">
+                <option value="">(Thường)</option>
+                <option value="COLOR">Màu sắc</option>
+                <option value="GB">GB</option>
+                <option value="TB">TB</option>
+                <option value="mAh">mAh</option>
+                <option value="W">W</option>
+              </select>
+            </div>
+
+            <div v-if="modalVal.unit === 'COLOR'" class="dynamic-section">
+              <label class="form-label" style="font-size: 11px">Mã màu hiển thị trên Website</label>
+              <div class="color-swatches">
+                <button
+                  v-for="(color, idx) in predefinedColors"
+                  :key="idx"
+                  class="color-swatch-btn"
+                  :class="{ active: modalVal.colorHex === color.hex }"
+                  :style="{ backgroundColor: color.hex }"
+                  :title="color.name"
+                  @click="modalVal.colorHex = color.hex"
+                ></button>
+
+                <div
+                  class="color-custom-wrapper"
+                  :style="{ borderColor: modalVal.colorHex ? modalVal.colorHex : '#d1d5db' }"
+                >
+                  <input type="color" v-model="modalVal.colorHex" class="color-custom-input" />
+                  <span class="color-custom-label">Khác</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              v-else-if="['GB', 'TB', 'mAh', 'W'].includes(modalVal.unit)"
+              class="dynamic-section"
             >
-            <input
-              v-model="modalVal.value"
-              class="form-input"
-              placeholder="VD: Đỏ, 256GB..."
-              @keyup.enter="saveValue"
-            />
+              <label class="form-label" style="font-size: 11px">Gợi ý bấm nhanh</label>
+              <div class="quick-suggest-row">
+                <button
+                  v-for="sug in quickSuggestions[modalVal.unit]"
+                  :key="sug"
+                  class="suggest-pill"
+                  @click="modalVal.value = sug"
+                >
+                  {{ sug }}
+                </button>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button class="btn-cancel" @click="modalVal.show = false">Hủy</button>
@@ -164,8 +234,7 @@
         <div class="modal-box alert-modal-box">
           <div class="modal-body text-center">
             <div class="alert-icon" :class="alertModal.type">
-              <span v-if="alertModal.type === 'success'">✓</span>
-              <span v-else>✕</span>
+              <span v-if="alertModal.type === 'success'">✓</span><span v-else>✕</span>
             </div>
             <h4 class="alert-title">
               {{ alertModal.type === 'success' ? 'Thành công' : 'Thông báo lỗi' }}
@@ -178,47 +247,81 @@
         </div>
       </div>
     </Transition>
-  </div>
-  <Transition name="modal">
-    <div class="modal-backdrop" v-if="confirmModal.show" @click.self="confirmModal.show = false">
-      <div class="modal-box alert-modal-box">
-        <div class="modal-body text-center">
-          <h4 class="alert-title">Xác nhận xóa</h4>
-          <p class="alert-message">{{ confirmModal.message }}</p>
-        </div>
-        <div class="modal-footer justify-center">
-          <button class="btn-cancel" @click="confirmModal.show = false">Hủy</button>
-          <button class="btn-primary" style="background: #ef4444" @click="confirmDelete">
-            Xóa
-          </button>
+
+    <Transition name="modal">
+      <div class="modal-backdrop" v-if="confirmModal.show" @click.self="confirmModal.show = false">
+        <div class="modal-box alert-modal-box">
+          <div class="modal-body text-center">
+            <h4 class="alert-title">Xác nhận xóa</h4>
+            <p class="alert-message">{{ confirmModal.message }}</p>
+          </div>
+          <div class="modal-footer justify-center">
+            <button class="btn-cancel" @click="confirmModal.show = false">Hủy</button>
+            <button class="btn-primary" style="background: #ef4444" @click="confirmDelete">
+              Xóa
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </Transition>
+    </Transition>
+  </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '@/utils/api'
-import '@/assets/css/attributemanager.css'
+import '@/assets/css/AttributeManager.css'
+
+// ── CẤU HÌNH GỢI Ý NHANH VÀ BẢNG MÀU ──
+const predefinedColors = [
+  { name: 'Đen', hex: '#1a1a2e' },
+  { name: 'Trắng', hex: '#f0f0f0' },
+  { name: 'Xám Titan', hex: '#8b8fa8' },
+  { name: 'Bạc', hex: '#e2e8f0' },
+  { name: 'Đỏ', hex: '#ef4444' },
+  { name: 'Xanh dương', hex: '#3b82f6' },
+  { name: 'Xanh lá', hex: '#22c55e' },
+  { name: 'Vàng/Gold', hex: '#eab308' },
+  { name: 'Hồng', hex: '#f472b6' },
+  { name: 'Tím', hex: '#a855f7' },
+]
+
+const quickSuggestions = {
+  GB: ['64', '128', '256', '512'],
+  TB: ['1', '2', '4'],
+  mAh: ['4000', '4500', '5000', '6000'],
+  W: ['15', '20', '25', '45', '65', '120'],
+}
+
+const inputPlaceholder = computed(() => {
+  if (modalVal.value.unit === 'COLOR') return 'Nhập tên màu (VD: Đen Phantom)'
+  if (['GB', 'TB', 'mAh', 'W'].includes(modalVal.value.unit)) return 'Nhập số (VD: 256)'
+  return 'Nhập giá trị (VD: Bản Tiêu Chuẩn)'
+})
 
 // ── STATE ──
 const attributes = ref([])
-
 const selectedAttribute = ref(null)
+const attributeValues = ref({})
 
 const modalAttr = ref({ show: false, isEdit: false, editId: null, name: '' })
-const modalVal = ref({ show: false, isEdit: false, editId: null, value: '' })
+const modalVal = ref({
+  show: false,
+  isEdit: false,
+  editId: null,
+  value: '',
+  unit: '',
+  colorHex: '',
+})
 const alertModal = ref({ show: false, message: '', type: 'success' })
+const confirmModal = ref({ show: false, message: '', action: null })
 
 const currentValues = computed(() => {
   if (!selectedAttribute.value) return []
   return attributeValues.value[selectedAttribute.value.attributeId] || []
 })
 
-const getValueCount = (attrId) => {
-  return (attributeValues.value[attrId] || []).length
-}
+const getValueCount = (attrId) => (attributeValues.value[attrId] || []).length
 
 // ── API FETCH ──
 const fetchAttributes = async () => {
@@ -226,30 +329,30 @@ const fetchAttributes = async () => {
     const res = await api.get('/admin/attributes')
     attributes.value = res.data?.data || []
   } catch (error) {
-    showAlert(error.response?.data?.message || 'Lỗi tải danh sách thuộc tính', 'error')
+    showAlert(error.response?.data?.message || 'Lỗi tải danh sách', 'error')
   }
 }
 
-const attributeValues = ref({})
 const fetchValuesForAttribute = async (attrId) => {
   try {
     const res = await api.get(`/admin/attribute-values/attribute/${attrId}`)
     attributeValues.value[attrId] = res.data.data || []
-  } catch (err) {
-    showAlert('Lỗi tải giá trị: ' + (err.response?.data?.message || err.message), 'error')
+  } catch {
+    showAlert('Lỗi tải giá trị', 'error')
   }
 }
+
 onMounted(async () => {
   await fetchAttributes()
   await Promise.all(attributes.value.map((attr) => fetchValuesForAttribute(attr.attributeId)))
 })
+
 const selectAttribute = async (attr) => {
   selectedAttribute.value = attr
-  console.log('Đang chọn thuộc tính:', attr)
-  const id = attr.attributeId || attr.attribute_id
-  await fetchValuesForAttribute(id)
+  await fetchValuesForAttribute(attr.attributeId)
 }
 
+// ── THUỘC TÍNH CRUD ──
 const openAddAttributeModal = () => {
   modalAttr.value = { show: true, isEdit: false, editId: null, name: '' }
 }
@@ -262,21 +365,15 @@ const saveAttribute = async () => {
   if (!name) return
   try {
     if (modalAttr.value.isEdit)
-      await api.put(`/admin/attributes/${modalAttr.value.editId}`, { name: name })
-    else await api.post('/admin/attributes', { name: name })
-
+      await api.put(`/admin/attributes/${modalAttr.value.editId}`, { name })
+    else await api.post('/admin/attributes', { name })
     await fetchAttributes()
     modalAttr.value.show = false
-    showAlert(
-      modalAttr.value.isEdit ? 'Đã cập nhật thuộc tính!' : 'Đã thêm thuộc tính mới!',
-      'success',
-    )
+    showAlert(modalAttr.value.isEdit ? 'Đã cập nhật!' : 'Đã thêm thuộc tính!', 'success')
   } catch (err) {
     showAlert(err.response?.data?.message || 'Có lỗi xảy ra', 'error')
   }
 }
-
-const confirmModal = ref({ show: false, message: '', action: null })
 
 const deleteAttribute = (attr) => {
   confirmModal.value = {
@@ -285,11 +382,11 @@ const deleteAttribute = (attr) => {
     action: async () => {
       await api.delete(`/admin/attributes/${attr.attributeId}`)
       attributes.value = attributes.value.filter((a) => a.attributeId !== attr.attributeId)
+      if (selectedAttribute.value?.attributeId === attr.attributeId) selectedAttribute.value = null
       confirmModal.value.show = false
     },
   }
 }
-
 const confirmDelete = async () => {
   try {
     await confirmModal.value.action()
@@ -298,24 +395,73 @@ const confirmDelete = async () => {
   }
 }
 
+// ── GIÁ TRỊ CRUD ──
 const openAddValueModal = () => {
-  modalVal.value = { show: true, isEdit: false, editId: null, value: '' }
+  // Logic Auto-Detect thông minh dựa vào tên Thuộc tính
+  let autoUnit = ''
+  const attrName = selectedAttribute.value?.attributeName?.toLowerCase() || ''
+
+  if (attrName.includes('màu') || attrName.includes('color')) autoUnit = 'COLOR'
+  else if (attrName.includes('nhớ') || attrName.includes('lượng')) autoUnit = 'GB'
+  else if (attrName.includes('pin')) autoUnit = 'mAh'
+  else if (attrName.includes('sạc') || attrName.includes('công suất')) autoUnit = 'W'
+
+  modalVal.value = {
+    show: true,
+    isEdit: false,
+    editId: null,
+    value: '',
+    unit: autoUnit,
+    colorHex: '#1a1a2e',
+  }
 }
+
 const openEditValueModal = (val) => {
-  modalVal.value = { show: true, isEdit: true, editId: val.valueId, value: val.valueString }
+  let sValue = val.valueString
+  let sUnit = ''
+
+  if (val.valueMeta && val.valueMeta.startsWith('#')) {
+    sUnit = 'COLOR'
+  } else {
+    // Regex bóc tách chữ số và đơn vị (nếu có đuôi GB, TB, mAh, W)
+    const match = val.valueString.match(/^(.*?)(GB|TB|mAh|W)$/i)
+    if (match) {
+      sValue = match[1].trim()
+      sUnit = match[2].toUpperCase()
+    }
+  }
+
+  modalVal.value = {
+    show: true,
+    isEdit: true,
+    editId: val.valueId,
+    value: sValue,
+    unit: sUnit,
+    colorHex: val.valueMeta || '#1a1a2e',
+  }
 }
 
 const saveValue = async () => {
-  const vs = modalVal.value.value.trim()
-  if (!vs) return
+  let finalValueString = modalVal.value.value.trim()
+  let finalValueMeta = null
+
+  // Gộp chuỗi nếu là dạng Đơn vị (GB, mAh...)
+  if (modalVal.value.unit === 'COLOR') {
+    finalValueMeta = modalVal.value.colorHex || null
+  } else if (modalVal.value.unit !== '') {
+    finalValueString = `${finalValueString}${modalVal.value.unit}`
+  }
+
   try {
+    const payload = {
+      attributeId: selectedAttribute.value.attributeId,
+      valueString: finalValueString,
+      valueMeta: finalValueMeta,
+    }
+
     if (modalVal.value.isEdit)
-      await api.put(`/admin/attribute-values/${modalVal.value.editId}`, { valueString: vs })
-    else
-      await api.post('/admin/attribute-values', {
-        attributeId: selectedAttribute.value.attributeId,
-        valueString: vs,
-      })
+      await api.put(`/admin/attribute-values/${modalVal.value.editId}`, payload)
+    else await api.post('/admin/attribute-values', payload)
 
     await fetchValuesForAttribute(selectedAttribute.value.attributeId)
     modalVal.value.show = false
@@ -327,55 +473,86 @@ const saveValue = async () => {
 
 const saveValueAndContinue = async () => {
   await saveValue()
-  modalVal.value = { show: true, isEdit: false, editId: null, value: '' }
+  openAddValueModal()
 }
 
 const deleteValue = async (val) => {
-  if (!confirm(`Xóa giá trị "${val.valueString}"?`)) return
-  try {
-    await api.delete(`/admin/attribute-values/${val.valueId}`)
-    await fetchValuesForAttribute(selectedAttribute.value.attributeId)
-    showAlert('Đã xóa giá trị thành công!', 'success')
-  } catch (err) {
-    showAlert(err.response?.data?.message || 'Xóa thất bại!', 'error')
+  confirmModal.value = {
+    show: true,
+    message: `Xóa giá trị "${val.valueString}"?`,
+    action: async () => {
+      await api.delete(`/admin/attribute-values/${val.valueId}`)
+      await fetchValuesForAttribute(selectedAttribute.value.attributeId)
+      confirmModal.value.show = false
+    },
   }
 }
 
-// ── UTILS ──
 const showAlert = (msg, type = 'success') => {
   alertModal.value = { show: true, message: msg, type }
 }
-
-const colorKeywords = {
-  đen: '#1a1a2e',
-  black: '#1a1a2e',
-  trắng: '#f0f0f0',
-  white: '#f0f0f0',
-  hồng: '#f472b6',
-  pink: '#f472b6',
-  đỏ: '#ef4444',
-  red: '#ef4444',
-  'xanh lam': '#3b82f6',
-  blue: '#3b82f6',
-  'xanh lá': '#22c55e',
-  green: '#22c55e',
-  vàng: '#eab308',
-  gold: '#eab308',
-  titan: '#8b8fa8',
-  titanium: '#8b8fa8',
-  xám: '#6b7280',
-  gray: '#6b7280',
-  tím: '#a855f7',
-  purple: '#a855f7',
-}
-const getColorStyle = (valueStr) => {
-  if (!valueStr) return {}
-  const lower = valueStr.toLowerCase()
-  for (const [key, color] of Object.entries(colorKeywords)) {
-    if (lower.includes(key)) return { background: color }
-  }
-  return { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)' }
-}
 </script>
 
-<style scoped></style>
+<style scoped>
+/* Khối Nhập liệu + Đơn vị */
+.input-with-unit {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.select-unit {
+  width: 110px;
+  flex-shrink: 0;
+  cursor: pointer;
+  background-color: #fff9fc;
+  color: #db2777;
+  font-weight: 700;
+}
+
+/* Khu vực hiển thị Động (Dynamic Section) */
+.dynamic-section {
+  margin-top: 14px;
+  padding: 12px;
+  background: #fdf6f9;
+  border: 1px dashed #fce7f3;
+  border-radius: 12px;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Gợi ý Bấm nhanh (Quick Suggest Pills) */
+.quick-suggest-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.suggest-pill {
+  background: #fff;
+  border: 1.5px solid #fce7f3;
+  color: #db2777;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s;
+}
+
+.suggest-pill:hover {
+  background: #fdf2f8;
+  border-color: #f9a8d4;
+  transform: translateY(-1px);
+}
+</style>

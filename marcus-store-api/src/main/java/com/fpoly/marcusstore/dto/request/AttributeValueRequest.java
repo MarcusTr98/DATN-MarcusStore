@@ -6,4 +6,5 @@ import lombok.Data;
 public class AttributeValueRequest {
     private Integer attributeId;
     private String valueString;
+    private String valueMeta;
 }
