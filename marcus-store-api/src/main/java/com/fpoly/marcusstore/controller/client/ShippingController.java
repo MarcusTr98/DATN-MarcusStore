@@ -6,7 +6,6 @@ import com.fpoly.marcusstore.dto.response.ShippingCalculationResponse;
 import com.fpoly.marcusstore.service.GhnService;
 import com.fpoly.marcusstore.service.ShippingService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -23,16 +22,20 @@ public class ShippingController {
     @PostMapping("/calculate")
     public ApiResponse<ShippingCalculationResponse> calculateFee(@Valid @RequestBody ShippingCalculateRequest request) {
 
-        // 1. Gọi API GHN để lấy phí vận chuyển gốc (Integer)
+        // lấy tổng tiền giỏ hàng chuyển sang Integer để làm phí khai giá (bảo hiểm)
+        Integer insuranceValue = request.getCartTotal() != null ? request.getCartTotal().intValue() : 0;
+
+        // 1. Gọi API GHN để lấy phí vận chuyển gốc
         Integer ghnFeeInt = ghnService.calculateShippingFee(
                 request.getToDistrictId(),
                 request.getToWardCode(),
-                request.getTotalWeightGram());
+                request.getTotalWeightGram(),
+                insuranceValue);
 
-        // Chuyển đổi sang BigDecimal để đồng bộ hệ thống tiền tệ
+        // đồng bộ hệ thống tiền tệ
         BigDecimal ghnStandardFee = new BigDecimal(ghnFeeInt.toString());
 
-        // 2. Đưa qua Service tính toán điều kiện Freeship, Chặn đơn, Upsell
+        // 2. đẩy qua Service tính toán điều kiện Freeship, Chặn đơn, Upsell...
         ShippingCalculationResponse finalResponse = shippingService.calculateFinalShipping(
                 request.getCartTotal(),
                 ghnStandardFee);

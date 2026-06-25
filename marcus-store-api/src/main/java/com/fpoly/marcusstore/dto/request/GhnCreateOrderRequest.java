@@ -41,9 +41,12 @@ public class GhnCreateOrderRequest {
     private String fromWardCode;
 
     private Integer weight;
-    @JsonProperty("cod_amount")
 
+    @JsonProperty("cod_amount")
     private Integer codAmount;
+
+    @JsonProperty("insurance_value")
+    private Integer insuranceValue;
 
     private List<Item> items;
 

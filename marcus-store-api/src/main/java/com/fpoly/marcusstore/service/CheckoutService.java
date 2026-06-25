@@ -77,12 +77,18 @@ public class CheckoutService {
 
         if (cartItems.isEmpty())
             return 0;
+
         int totalWeightGram = 0;
+        int totalAmount = 0;
+
         for (CartItem item : cartItems) {
             int weight = item.getSku().getWeightGram() != null ? item.getSku().getWeightGram() : 500;
             totalWeightGram += (weight * item.getQuantity());
+            totalAmount += item.getSku().getPrice().intValue() * item.getQuantity();
         }
-        return ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(), totalWeightGram);
+
+        return ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(), totalWeightGram,
+                totalAmount);
     }
 
     @Transactional
@@ -156,11 +162,13 @@ public class CheckoutService {
             totalWeightGram += itemWeight;
         }
 
-        Integer shippingFee = ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(),
-                totalWeightGram);
+        Integer shippingFee = ghnService.calculateShippingFee(
+                req.getToDistrictId(),
+                req.getToWardCode(),
+                totalWeightGram,
+                totalAmount.intValue());
         BigDecimal shippingFeeDecimal = BigDecimal.valueOf(shippingFee);
 
-        // 3. XỬ LÝ VOUCHER QUA VOUCHERSERVICE (Logic xịn của Marcus)
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal freeshipAmount = BigDecimal.ZERO;
         Voucher voucher = null;
@@ -191,17 +199,14 @@ public class CheckoutService {
         order.setShippingFee(shippingFeeDecimal);
         order.setDiscountAmount(discountAmount);
 
-        // Final Amount = (Tiền hàng + Phí Ship - Giảm giá) - Miễn phí ship
         BigDecimal finalAmount = totalAmount.add(shippingFeeDecimal)
                 .subtract(discountAmount)
                 .subtract(freeshipAmount);
 
-        // Đảm bảo không bị số âm
         order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
         Order savedOrder = orderRepository.save(order);
 
-        // Confirm voucher usage sau khi order lưu thành công
         if (appliedVoucherId != null) {
             final Integer finalVoucherId = appliedVoucherId;
             try {

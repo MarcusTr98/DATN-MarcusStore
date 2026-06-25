@@ -137,13 +137,14 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
-        String newStatus = request.getStatus();
 
+        String newStatus = request.getStatus();
         if (newStatus == null || newStatus.isBlank()) {
             throw new RuntimeException("Trạng thái mới không hợp lệ");
         }
-
         newStatus = normalizeStatusValue(newStatus);
+
+        boolean isJustConfirmed = "PENDING".equals(currentStatus) && "CONFIRMED".equals(newStatus);
 
         if (!canChangeStatus(currentStatus, newStatus)) {
             throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
@@ -205,7 +206,7 @@ public class OrderServiceImpl implements OrderService {
         orderStatusHistoryRepository.save(history);
 
         // TRIGGER BẮN ĐƠN SANG GHN KHI XÁC NHẬN
-        if ("CONFIRMED".equals(newStatus)) {
+        if (isJustConfirmed) {
             eventPublisher.publishEvent(new OrderConfirmedEvent(this, order));
         }
 
@@ -253,9 +254,6 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findDetailByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
-        // Lấy chi tiết Imeis
-        // orderItemRepository.findWithProductItemsByOrderId(order.getOrderId());
-
         List<OrderStatusHistory> histories = orderStatusHistoryRepository
                 .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
 
@@ -285,7 +283,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .transactionId(order.getTransactionId())
                 .paymentDate(order.getPaymentDate())
-                .trackingCode(order.getTrackingCode()) // Giờ sẽ hiển thị NULL nếu GHN chưa trả về mã thật
+                .trackingCode(order.getTrackingCode())
                 .userId(order.getUser().getUserId())
                 .fullName(order.getUser().getFullName())
                 .email(order.getUser().getEmail())

@@ -43,6 +43,10 @@ public class GhnOrderListener {
                             i -> (i.getSku().getWeightGram() > 0 ? i.getSku().getWeightGram() : 500) * i.getQuantity())
                     .sum();
 
+            int totalAmount = order.getOrderItems().stream()
+                    .mapToInt(i -> i.getSku().getPrice().intValue() * i.getQuantity())
+                    .sum();
+
             GhnCreateOrderRequest request = GhnCreateOrderRequest.builder()
                     .paymentTypeId(2)
                     .serviceTypeId(2)
@@ -55,6 +59,7 @@ public class GhnOrderListener {
                     .toWardCode(order.getToWardCode())
                     .weight(totalWeight)
                     .codAmount("COD".equalsIgnoreCase(order.getPaymentMethod()) ? order.getFinalAmount().intValue() : 0)
+                    .insuranceValue(Math.min(totalAmount, 5000000))
                     .items(order.getOrderItems().stream().map(i -> GhnCreateOrderRequest.Item.builder()
                             .name(i.getSku().getProduct().getProductName())
                             .code(i.getSku().getSkuCode())
@@ -69,7 +74,9 @@ public class GhnOrderListener {
                 orderRepository.save(order);
                 log.info("Tạo đơn GHN thành công. Tracking: {}", trackingCode);
             }
-        } catch (Exception e) {
+        } catch (
+
+        Exception e) {
             log.error("Lỗi tạo đơn GHN cho đơn {}: {}", order.getOrderCode(), e.getMessage());
         }
     }

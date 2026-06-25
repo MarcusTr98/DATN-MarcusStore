@@ -44,6 +44,12 @@ public class GhnPollingService {
 
         for (Order order : shippingOrders) {
             try {
+                // xử lý thêm chốt để qua đc VNPAY
+                if (order.getTrackingCode() == null || order.getTrackingCode().trim().isEmpty()) {
+                    log.warn("⚠️ [Polling] Đơn {} đang SHIPPING nhưng chưa có mã vận đơn GHN. Bỏ qua.",
+                            order.getOrderCode());
+                    continue;
+                }
                 String ghnStatus = ghnService.getTrackingStatus(order.getTrackingCode());
                 if (ghnStatus == null)
                     continue;

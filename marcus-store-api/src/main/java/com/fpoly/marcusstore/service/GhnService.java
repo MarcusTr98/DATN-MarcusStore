@@ -33,8 +33,7 @@ public class GhnService {
     @Value("${ghn.api.url.create}")
     private String ghnCreateUrl;
 
-    // Thêm link check detail (Ưu tiên lấy trong properties, nếu không có tự dùng
-    // link Dev Sandbox)
+    // Thêm link check detail
     @Value("${ghn.api.url.detail:https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/detail}")
     private String ghnDetailUrl;
 
@@ -46,7 +45,8 @@ public class GhnService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    public Integer calculateShippingFee(Integer toDistrictId, String toWardCode, Integer totalWeight) {
+    public Integer calculateShippingFee(Integer toDistrictId, String toWardCode, Integer totalWeight,
+            Integer insuranceValue) {
         try {
             HttpHeaders headers = buildHeaders();
 
@@ -57,6 +57,10 @@ public class GhnService {
             payload.put("to_ward_code", toWardCode);
             payload.put("weight", totalWeight > 0 ? totalWeight : 500);
 
+            // Marcus BỔ SUNG PHÍ KHAI GIÁ ĐỂ GHN TÍNH KÈM BẢO HIỂM
+            if (insuranceValue != null && insuranceValue > 0) {
+                payload.put("insurance_value", Math.min(insuranceValue, 5000000));
+            }
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(ghnFeeUrl, request, Map.class);
 
