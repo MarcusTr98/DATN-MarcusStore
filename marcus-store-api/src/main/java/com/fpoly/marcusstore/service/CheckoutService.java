@@ -196,8 +196,10 @@ public class CheckoutService {
                             RoundingMode.HALF_UP);
                     discountAmount = totalAmount.multiply(percent);
 
-                    // Giới hạn số tiền giảm tối đa (Nếu có)
+                    // Giới hạn số tiền giảm tối đa (CHỉ khi maxDiscountAmount > 0)
+                    // min(discountAmount, maxDiscountAmount)
                     if (voucher.getMaxDiscountAmount() != null
+                            && voucher.getMaxDiscountAmount().compareTo(BigDecimal.ZERO) > 0
                             && discountAmount.compareTo(voucher.getMaxDiscountAmount()) > 0) {
                         discountAmount = voucher.getMaxDiscountAmount();
                     }

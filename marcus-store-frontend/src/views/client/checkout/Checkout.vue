@@ -497,9 +497,29 @@ const cartData = ref(getInitialCartData())
 // Khôi phục voucher đã chọn từ localStorage
 const savedVoucher = JSON.parse(localStorage.getItem('selectedVoucher') || 'null')
 const appliedVoucherCode = ref(savedVoucher?.code || '')
-const discountAmount = ref(savedVoucher?.discount || 0)
+const savedVoucherType = ref(savedVoucher?.type || '')
+const savedVoucherValue = ref(savedVoucher?.value || 0)
+const savedVoucherMaxDiscount = ref(savedVoucher?.maxDiscountAmount || 0)
 const shippingFee = ref(0)
 const estimatedDelivery = ref('')
+
+// Recalculate discount với cap maxDiscountAmount khi totalAmount thay đổi
+const discountAmount = computed(() => {
+  const totalAmt = cartData.value.totalAmount || 0
+
+  if (!savedVoucherType.value || !savedVoucherValue.value) return 0
+
+  if (savedVoucherType.value === 'PERCENT') {
+    let discount = totalAmt * (savedVoucherValue.value / 100)
+    if (savedVoucherMaxDiscount.value > 0 && discount > savedVoucherMaxDiscount.value) {
+      discount = savedVoucherMaxDiscount.value
+    }
+    return Math.floor(discount)
+  }
+
+  // AMOUNT hoặc FREESHIP: giảm trực tiếp số tiền
+  return savedVoucherValue.value || 0
+})
 
 const orderForm = ref({
   recipientName: '',

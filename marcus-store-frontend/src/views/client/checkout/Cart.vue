@@ -422,6 +422,7 @@ const cartError = computed(() => cartStore.error)
 const isVoucherModalOpen = ref(false)
 const selectedVoucher = ref(0)
 const selectedVoucherType = ref('AMOUNT') // 'AMOUNT', 'PERCENT', 'FREESHIP'
+const selectedVoucherMaxDiscount = ref(0) // Số tiền giảm tối đa cho voucher PERCENT
 const voucherCode = ref('')
 const isAlertModalOpen = ref(false)
 const alertModalMessage = ref('')
@@ -502,6 +503,7 @@ const v2Vouchers = computed(() => {
       minOrder: v.minOrderValue,
       discountValue,
       discountPercent,
+      maxDiscountAmount: v.maxDiscountAmount || 0,
       expiryLabel: `Hạn dùng đến: ${new Date(v.endDate).toLocaleDateString('vi-VN')}`,
       expiryUrgent: false,
       icon: 'ti ti-shopping-cart',
@@ -552,10 +554,12 @@ function applySelectedVoucher() {
     selectedVoucher.value = picked.discountPercent > 0 ? picked.discountPercent : picked.discountValue
     selectedVoucherType.value = picked.discountType
     voucherCode.value = picked.voucherCode
+    selectedVoucherMaxDiscount.value = picked.maxDiscountAmount || 0
   } else if (!voucherCode.value.trim()) {
     selectedVoucher.value = 0
     selectedVoucherType.value = 'AMOUNT'
     voucherCode.value = ''
+    selectedVoucherMaxDiscount.value = 0
   }
   isVoucherModalOpen.value = false
 }
@@ -635,8 +639,11 @@ const voucherDiscount = computed(() => {
 
   if (selectedVoucherType.value === 'PERCENT') {
     // PERCENT: giảm theo % của subtotal
-    const discount = subtotal.value * (selectedVoucher.value / 100)
-    // Có thể áp dụng maxDiscountAmount nếu backend trả về
+    let discount = subtotal.value * (selectedVoucher.value / 100)
+    // Áp dụng cap maxDiscountAmount nếu có
+    if (selectedVoucherMaxDiscount.value > 0 && discount > selectedVoucherMaxDiscount.value) {
+      discount = selectedVoucherMaxDiscount.value
+    }
     return Math.floor(discount)
   }
 
@@ -765,6 +772,7 @@ function handleCheckout(){
         code: voucherCode.value,
         type: selectedVoucherType.value,
         value: selectedVoucher.value,
+        maxDiscountAmount: selectedVoucherMaxDiscount.value,
         discount: voucherDiscount.value,
       })
     )

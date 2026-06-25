@@ -399,9 +399,13 @@ public class VoucherServiceImpl implements VoucherService {
         if (voucher.getEndDate() != null && now.isAfter(voucher.getEndDate())) {
             throw new RuntimeException("Mã giảm giá đã hết hạn.");
         }
-        if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
-            throw new RuntimeException("Mã giảm giá đã hết lượt sử dụng.");
+        // 2. Kiểm tra số lượng voucher còn không (CHỉ cho SPECIFIC)
+        if ("SPECIFIC".equals(voucher.getTargetType())) {
+            if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
+                throw new RuntimeException("Mã giảm giá đã hết lượt sử dụng.");
+            }
         }
+        // Voucher ALL: không giới hạn số lần sử dụng toàn cục
 
         // 3. Kiểm tra user có được phép dùng voucher này không
         boolean isAllUsers = !"SPECIFIC".equals(voucher.getTargetType());
@@ -441,9 +445,12 @@ public class VoucherServiceImpl implements VoucherService {
             userVoucherRepository.save(userVoucher);
         }
 
-        // 5. Trừ số lượng voucher
-        voucher.setQuantity(voucher.getQuantity() - 1);
-        voucherRepository.save(voucher);
+        // 5. Trừ số lượng voucher (CHỉ cho SPECIFIC)
+        if ("SPECIFIC".equals(voucher.getTargetType())) {
+            voucher.setQuantity(voucher.getQuantity() - 1);
+            voucherRepository.save(voucher);
+        }
+        // Voucher ALL: không trừ quantity - ai cũng dùng được miễn còn active
 
         return true;
     }
