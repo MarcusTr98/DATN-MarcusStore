@@ -59,7 +59,7 @@ public class GhnService {
 
             // Marcus BỔ SUNG PHÍ KHAI GIÁ ĐỂ GHN TÍNH KÈM BẢO HIỂM
             if (insuranceValue != null && insuranceValue > 0) {
-                payload.put("insurance_value", Math.min(insuranceValue, 5000000));
+                payload.put("insurance_value", insuranceValue);
             }
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(ghnFeeUrl, request, Map.class);

@@ -84,7 +84,7 @@ public class CheckoutService {
         for (CartItem item : cartItems) {
             int weight = item.getSku().getWeightGram() != null ? item.getSku().getWeightGram() : 500;
             totalWeightGram += (weight * item.getQuantity());
-            totalAmount += item.getSku().getPrice().intValue() * item.getQuantity();
+            totalAmount += item.getSku().getPrice().intValue() * item.getQuantity(); // CỘNG TIỀN
         }
 
         return ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(), totalWeightGram,
@@ -167,6 +167,7 @@ public class CheckoutService {
                 req.getToWardCode(),
                 totalWeightGram,
                 totalAmount.intValue());
+
         BigDecimal shippingFeeDecimal = BigDecimal.valueOf(shippingFee);
 
         BigDecimal discountAmount = BigDecimal.ZERO;
