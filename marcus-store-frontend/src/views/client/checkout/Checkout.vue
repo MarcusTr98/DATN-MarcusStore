@@ -1104,8 +1104,9 @@ const handleCheckout = async () => {
     paymentMethod: orderForm.value.paymentMethod,
     note: orderForm.value.note,
     shippingAddress: buildShippingAddress(),
-    toDistrictId: toDistrictId.value,
-    toWardCode: toWardCode.value,
+    // ÉP LẤY DỮ LIỆU: Ưu tiên địa chỉ sổ (toDistrictId) => nếu không có thì lấy địa chỉ chọn tay
+    toDistrictId: toDistrictId.value || manualDistrictId.value,
+    toWardCode: toWardCode.value || manualWardCode.value,
     voucherCode: appliedVoucherCode.value || null,
   }
 
