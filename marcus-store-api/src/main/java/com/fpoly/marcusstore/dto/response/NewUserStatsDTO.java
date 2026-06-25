@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 @Builder
-public class OrderByWeekdayResponseDTO {
-    private String dayLabel;
-    private Long totalOrders;
+public class NewUserStatsDTO {
+    private String registerDate;   
+    private Long totalNewUsers;
 }

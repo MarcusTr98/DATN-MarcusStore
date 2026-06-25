@@ -1,8 +1,11 @@
 package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.response.*;
+import com.fpoly.marcusstore.repository.statistics.BrandRevenueProjection;
+import com.fpoly.marcusstore.repository.statistics.NewUserByDayProjection;
 import com.fpoly.marcusstore.repository.statistics.RevenueCompareProjection;
 import com.fpoly.marcusstore.repository.statistics.StatisticsRepository;
+import com.fpoly.marcusstore.repository.shopping.TopCustomerProjection;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -13,10 +16,8 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.IsoFields;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -31,7 +32,6 @@ public class StatisticsService {
     };
     private static final int LOW_STOCK_THRESHOLD = 5;
     private static final DateTimeFormatter SHORT_DATE = DateTimeFormatter.ofPattern("dd/MM");
-
     public static LocalDate[] resolveDateRange(LocalDate startDate, LocalDate endDate, String period) {
         if (startDate != null && endDate != null) {
             return new LocalDate[]{startDate, endDate};
@@ -39,10 +39,12 @@ public class StatisticsService {
         LocalDate now = LocalDate.now();
         LocalDate start;
         LocalDate end = now;
-
         switch (period == null ? "month" : period) {
             case "today"   -> start = now;
-            case "week"    -> start = now.minusDays(6);
+            case "week"    -> {
+                start = now.with(DayOfWeek.MONDAY);
+                end   = start.plusDays(6);
+            }
             case "quarter" -> {
                 int firstMonth = ((now.getMonthValue() - 1) / 3) * 3 + 1;
                 start = now.withMonth(firstMonth).withDayOfMonth(1);
@@ -66,6 +68,16 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
+    public KpiSummaryDTO getKpiSummary(LocalDate startDate, LocalDate endDate) {
+        var p = statisticsRepository.getKpiSummary(startDate, endDate);
+        return KpiSummaryDTO.builder()
+                .totalRevenue(p.getTotalRevenue() != null ? p.getTotalRevenue() : BigDecimal.ZERO)
+                .totalOrders(p.getTotalOrders() != null ? p.getTotalOrders() : 0L)
+                .totalProductsSold(p.getTotalProductsSold() != null ? p.getTotalProductsSold() : 0L)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
     public List<StatisticsResponseDTO> getRevenueByMonth(Integer year) {
         return statisticsRepository.getRevenueByMonth(year).stream()
                 .map(p -> StatisticsResponseDTO.builder()
@@ -79,8 +91,10 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
-    public List<TopProductResponseDTO> getTopSellingProducts(int topN, LocalDate startDate, LocalDate endDate) {
-        return statisticsRepository.getTopSellingProducts(topN, startDate, endDate).stream()
+    public List<TopProductResponseDTO> getTopSellingProducts(
+            int topN, LocalDate startDate, LocalDate endDate, String keyword) {
+        return statisticsRepository.getTopSellingProducts(topN, startDate, endDate,
+                        toNullIfBlank(keyword)).stream()
                 .map(p -> TopProductResponseDTO.builder()
                         .productName(p.getProductName())
                         .totalSold(p.getTotalSold())
@@ -101,11 +115,10 @@ public class StatisticsService {
 
     @Transactional(readOnly = true)
     public List<BrandRevenueResponseDTO> getRevenueByBrand(LocalDate startDate, LocalDate endDate) {
-        List<com.fpoly.marcusstore.repository.statistics.BrandRevenueProjection> raw =
-                statisticsRepository.getRevenueByBrand(startDate, endDate);
+        List<BrandRevenueProjection> raw = statisticsRepository.getRevenueByBrand(startDate, endDate);
 
         BigDecimal totalRevenue = raw.stream()
-                .map(com.fpoly.marcusstore.repository.statistics.BrandRevenueProjection::getRevenue)
+                .map(BrandRevenueProjection::getRevenue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return raw.stream()
@@ -126,8 +139,12 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
-    public List<LowStockResponseDTO> getLowStockProducts() {
-        return statisticsRepository.getLowStockProducts(LOW_STOCK_THRESHOLD).stream()
+    public List<LowStockResponseDTO> getLowStockProducts(String keyword, String brand, String status) {
+        return statisticsRepository.getLowStockProducts(
+                        LOW_STOCK_THRESHOLD,
+                        toNullIfBlank(keyword),
+                        toNullIfBlank(brand),
+                        toNullIfBlank(status)).stream()
                 .map(p -> LowStockResponseDTO.builder()
                         .skuCode(p.getSkuCode())
                         .productName(p.getProductName())
@@ -139,19 +156,20 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
-    public List<TopCustomerResponseDTO> getTopCustomers(int topN, LocalDate startDate, LocalDate endDate) {
-        List<com.fpoly.marcusstore.repository.shopping.TopCustomerProjection> raw =
-                statisticsRepository.getTopCustomers(topN, startDate, endDate);
+    public List<TopCustomerResponseDTO> getTopCustomers(
+            int topN, LocalDate startDate, LocalDate endDate, String keyword) {
+        List<TopCustomerProjection> raw =
+                statisticsRepository.getTopCustomers(topN, startDate, endDate, toNullIfBlank(keyword));
 
-        BigDecimal totalSpentAll = raw.stream()
-                .map(com.fpoly.marcusstore.repository.shopping.TopCustomerProjection::getTotalSpent)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalShopRevenue = statisticsRepository.getTotalRevenue(startDate, endDate);
+        if (totalShopRevenue == null) totalShopRevenue = BigDecimal.ZERO;
+        final BigDecimal denominator = totalShopRevenue;
 
         return raw.stream()
                 .map(p -> {
-                    double contribution = totalSpentAll.compareTo(BigDecimal.ZERO) > 0
+                    double contribution = denominator.compareTo(BigDecimal.ZERO) > 0
                             ? p.getTotalSpent().multiply(BigDecimal.valueOf(100))
-                                    .divide(totalSpentAll, 1, RoundingMode.HALF_UP)
+                                    .divide(denominator, 1, RoundingMode.HALF_UP)
                                     .doubleValue()
                             : 0.0;
                     return TopCustomerResponseDTO.builder()
@@ -166,8 +184,14 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
-    public List<RecentOrderResponseDTO> getRecentOrders(int limit, LocalDate startDate, LocalDate endDate) {
-        return statisticsRepository.getRecentOrders(limit, startDate, endDate).stream()
+    public List<RecentOrderResponseDTO> getRecentOrders(
+            int limit, LocalDate startDate, LocalDate endDate,
+            String keyword, String status, String brand) {
+        return statisticsRepository.getRecentOrders(
+                        limit, startDate, endDate,
+                        toNullIfBlank(keyword),
+                        toNullIfBlank(status),
+                        toNullIfBlank(brand)).stream()
                 .map(p -> RecentOrderResponseDTO.builder()
                         .orderCode(p.getOrderCode())
                         .customerName(p.getCustomerName())
@@ -180,7 +204,6 @@ public class StatisticsService {
                 .collect(Collectors.toList());
     }
 
-    // So sánh doanh thu kỳ này với kỳ trước
     @Transactional(readOnly = true)
     public RevenueCompareResponseDTO getRevenueCompare(String period) {
         LocalDate today = LocalDate.now();
@@ -197,12 +220,14 @@ public class StatisticsService {
                 previousLabel = "Hôm qua (" + today.minusDays(1).format(SHORT_DATE) + ")";
             }
             case "week" -> {
-                currentStart  = today.minusDays(6);
-                currentEnd    = today;
-                previousStart = today.minusDays(13);
-                previousEnd   = today.minusDays(7);
-                currentLabel  = "Tuần này";
-                previousLabel = "Tuần trước";
+                currentStart  = today.with(DayOfWeek.MONDAY);
+                currentEnd    = currentStart.plusDays(6);
+                previousStart = currentStart.minusDays(7);
+                previousEnd   = currentEnd.minusDays(7);
+                currentLabel  = "Tuần này ("
+                        + currentStart.format(SHORT_DATE) + "–" + currentEnd.format(SHORT_DATE) + ")";
+                previousLabel = "Tuần trước ("
+                        + previousStart.format(SHORT_DATE) + "–" + previousEnd.format(SHORT_DATE) + ")";
             }
             case "year" -> {
                 currentStart  = today.withDayOfYear(1);
@@ -212,14 +237,13 @@ public class StatisticsService {
                 currentLabel  = "Năm " + today.getYear();
                 previousLabel = "Năm " + (today.getYear() - 1);
             }
-            default -> { // month
+            default -> {
                 currentStart  = today.withDayOfMonth(1);
                 currentEnd    = today;
                 previousStart = today.minusMonths(1).withDayOfMonth(1);
-                // Chỉ lấy đến cùng ngày tháng trước để so sánh công bằng
                 int lastDayOfPrevMonth = today.minusMonths(1).lengthOfMonth();
                 int comparableDay = Math.min(today.getDayOfMonth(), lastDayOfPrevMonth);
-                previousEnd = today.minusMonths(1).withDayOfMonth(comparableDay);
+                previousEnd   = today.minusMonths(1).withDayOfMonth(comparableDay);
                 currentLabel  = "Tháng " + today.getMonthValue() + "/" + today.getYear();
                 previousLabel = "Tháng " + today.minusMonths(1).getMonthValue()
                         + "/" + today.minusMonths(1).getYear();
@@ -239,36 +263,81 @@ public class StatisticsService {
                 .build();
     }
 
+    //Tài khoản mới đăng ký
+    @Transactional(readOnly = true)
+    public List<NewUserStatsDTO> getNewUsers(String period, LocalDate startDate, LocalDate endDate) {
+        List<NewUserByDayProjection> raw = statisticsRepository.getNewUsersByDay(startDate, endDate);
+
+        if ("year".equals(period)) {
+            Map<Integer, Long> monthMap = new LinkedHashMap<>();
+            for (int m = 1; m <= 12; m++) monthMap.put(m, 0L);
+
+            for (var p : raw) {
+                LocalDate date = LocalDate.parse(p.getRegisterDate().toString());
+                monthMap.merge(date.getMonthValue(), p.getTotalNewUsers(), Long::sum);
+            }
+
+            int year = startDate.getYear();
+            return monthMap.entrySet().stream()
+                    .map(e -> NewUserStatsDTO.builder()
+                            .registerDate(String.format("T%d/%d", e.getKey(), year))
+                            .totalNewUsers(e.getValue())
+                            .build())
+                    .collect(Collectors.toList());
+        } else {
+            return raw.stream()
+                    .map(p -> NewUserStatsDTO.builder()
+                            .registerDate(p.getRegisterDate().toString())
+                            .totalNewUsers(p.getTotalNewUsers())
+                            .build())
+                    .collect(Collectors.toList());
+        }
+    }
+
+    public Long countPendingOrders() {
+        return statisticsRepository.countPendingOrders();
+    }
+    private String toNullIfBlank(String value) {
+        return (value == null || value.isBlank()) ? null : value;
+    }
+
+    private String toWeekdayLabel(LocalDate date) {
+        return switch (date.getDayOfWeek()) {
+            case MONDAY    -> "T2";
+            case TUESDAY   -> "T3";
+            case WEDNESDAY -> "T4";
+            case THURSDAY  -> "T5";
+            case FRIDAY    -> "T6";
+            case SATURDAY  -> "T7";
+            case SUNDAY    -> "CN";
+        };
+    }
+
     private List<RevenueCompareResponseDTO.PeriodData> groupByPeriod(
             List<RevenueCompareProjection> raw, String period, LocalDate periodStart) {
 
         if ("today".equals(period) || "week".equals(period)) {
-            // FIX: tách label (thứ) và sublabel (ngày) riêng để frontend dùng đúng cho từng dataset
-            DateTimeFormatter dayFmt  = DateTimeFormatter.ofPattern("EEE", new Locale("vi", "VN"));
             DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd/MM");
             return raw.stream()
                     .map(p -> {
                         LocalDate date = LocalDate.parse(p.getDateLabel().toString());
                         return RevenueCompareResponseDTO.PeriodData.builder()
-                                .label(date.format(dayFmt))       // "T2", "T3", ..., "CN"
-                                .sublabel(date.format(dateFmt))   // "01/06", "02/06"...
+                                .label(toWeekdayLabel(date))
+                                .sublabel(date.format(dateFmt))
                                 .revenue(p.getTotalRevenue().doubleValue())
                                 .build();
                     })
                     .collect(Collectors.toList());
 
         } else if ("month".equals(period)) {
-            // Group by ngày trong tháng → label "Ngày 1" + sublabel "01/06"
             Map<Integer, Double>    dayRevenueMap = new LinkedHashMap<>();
             Map<Integer, LocalDate> dayDateMap    = new LinkedHashMap<>();
-
             for (RevenueCompareProjection p : raw) {
-                LocalDate date = LocalDate.parse(p.getDateLabel().toString());
-                int dayOfMonth = date.getDayOfMonth();
+                LocalDate date       = LocalDate.parse(p.getDateLabel().toString());
+                int       dayOfMonth = date.getDayOfMonth();
                 dayRevenueMap.merge(dayOfMonth, p.getTotalRevenue().doubleValue(), Double::sum);
                 dayDateMap.putIfAbsent(dayOfMonth, date);
             }
-
             return dayRevenueMap.entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(e -> RevenueCompareResponseDTO.PeriodData.builder()
@@ -279,40 +348,35 @@ public class StatisticsService {
                     .collect(Collectors.toList());
 
         } else {
-            // year: ISO Week chuẩn, tuần bắt đầu Thứ 2 → label "Tuần 23" + sublabel "02/06–08/06"
-            Map<Integer, Double>    weekRevenueMap = new LinkedHashMap<>();
-            Map<Integer, LocalDate> weekStartMap   = new LinkedHashMap<>();
+            // year: fill đủ T1→T12, tháng không có data => 0
+            Map<Integer, Double>  monthRevenueMap = new LinkedHashMap<>();
+            Map<Integer, Integer> monthYearMap    = new LinkedHashMap<>();
+
+            for (int m = 1; m <= 12; m++) {
+                monthRevenueMap.put(m, 0.0);
+                monthYearMap.put(m, periodStart.getYear());
+            }
 
             for (RevenueCompareProjection p : raw) {
                 LocalDate date  = LocalDate.parse(p.getDateLabel().toString());
-                int isoWeek     = date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR);
-
-                weekRevenueMap.merge(isoWeek, p.getTotalRevenue().doubleValue(), Double::sum);
-
-                // Luôn tính đúng ngày Thứ 2 đầu tuần ISO
-                if (!weekStartMap.containsKey(isoWeek)) {
-                    LocalDate monday = date.with(DayOfWeek.MONDAY);
-                    weekStartMap.put(isoWeek, monday);
-                }
+                int       month = date.getMonthValue();
+                monthRevenueMap.merge(month, p.getTotalRevenue().doubleValue(), Double::sum);
+                monthYearMap.put(month, date.getYear());
             }
 
-            return weekRevenueMap.entrySet().stream()
+            return monthRevenueMap.entrySet().stream()
                     .sorted(Map.Entry.comparingByKey())
                     .map(e -> {
-                        LocalDate wStart    = weekStartMap.get(e.getKey());
-                        LocalDate wEnd      = wStart.plusDays(6); // Chủ nhật
-                        String    dateRange = wStart.format(SHORT_DATE) + "–" + wEnd.format(SHORT_DATE);
+                        int    m   = e.getKey();
+                        int    yr  = monthYearMap.getOrDefault(m, periodStart.getYear());
+                        String sub = String.format("%02d/%d", m, yr);
                         return RevenueCompareResponseDTO.PeriodData.builder()
-                                .label("Tuần " + e.getKey())
-                                .sublabel(dateRange)
+                                .label("T" + m)
+                                .sublabel(sub)
                                 .revenue(e.getValue())
                                 .build();
                     })
                     .collect(Collectors.toList());
         }
-    }
-
-    public Long countPendingOrders() {
-        return statisticsRepository.countPendingOrders();
     }
 }

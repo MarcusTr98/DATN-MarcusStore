@@ -1,899 +1,151 @@
 <template>
   <section class="dashboard-page">
     <div class="dashboard-shell">
-      <header class="dashboard-heading">
-        <div>
-          <p class="eyebrow">Bảng điều khiển kinh doanh</p>
-          <h1>Màn hình quản trị</h1>
-          <span>Theo dõi doanh thu, đơn hàng, tồn kho và khách hàng trong một màn hình.</span>
-        </div>
 
-        <div class="time-filter">
-          <button
-            v-for="item in timeFilters"
-            :key="item.value"
-            type="button"
-            :class="{ active: selectedTime === item.value && !customDate }"
-            @click="selectPreset(item.value)"
-          >
-            {{ item.label }}
-          </button>
-          <input
-            type="date"
-            class="date-picker"
-            :class="{ active: !!customDate }"
-            :max="todayStr"
-            v-model="customDate"
-            @change="selectCustomDate"
-          />
-        </div>
-      </header>
+      <DashboardHeader
+        v-model:selectedTime="selectedTime"
+        v-model:customDate="customDate"
+      />
 
-      <section class="kpi-grid">
-        <article
-          v-for="item in kpiOverview"
-          :key="item.key"
-          class="kpi-card"
-          :class="{ warning: item.type === 'warning' }"
-        >
-          <div class="kpi-top">
-            <span class="kpi-icon">
-              <i :class="item.icon"></i>
-            </span>
-            <small>{{ item.growth }}</small>
-          </div>
-          <div>
-            <p>{{ item.title }}</p>
-            <strong>{{ item.value }}</strong>
-            <span>{{ item.note }}</span>
-          </div>
-        </article>
-      </section>
+      <KpiGrid
+        :kpiSummary="kpiSummary"
+        :pendingOrdersCount="pendingOrdersCount"
+        :lowStockData="lowStockData"
+        :periodLabel="periodNoteLabel"
+      />
 
-      <section class="dashboard-grid">
+      <ChartsSection
+        :selectedTime="selectedTime"
+        :compareData="compareData"
+        :weekdayStats="weekdayStats"
+        :brandStats="brandStats"
+        :newUsersData="newUsersData"
+      />
 
-        <!-- Chart 1: Xu hướng doanh thu - Line -->
-        <article class="dashboard-card">
-          <div class="card-header">
-            <div>
-              <h2>Xu hướng doanh thu</h2>
-              <p>Theo ngày trong kỳ</p>
-            </div>
-            <span>Line chart</span>
-          </div>
-          <div class="chart-frame">
-            <canvas ref="revenueChartRef"></canvas>
-          </div>
-        </article>
+      <DataSection
+        ref="dataSectionRef"
+        :selectedTime="selectedTime"
+        :customDate="customDate"
+        :childCategories="childCategories"
+      />
 
-        <!-- Chart 2: Đơn hàng phát sinh - Bar -->
-        <article class="dashboard-card">
-          <div class="card-header">
-            <div>
-              <h2>Đơn hàng phát sinh</h2>
-              <p>Số lượng đơn theo thứ trong tuần</p>
-            </div>
-            <span>Bar chart</span>
-          </div>
-          <div class="chart-frame">
-            <canvas ref="orderChartRef"></canvas>
-          </div>
-        </article>
-
-        <!-- Chart 3: Doanh thu theo thương hiệu - Doughnut -->
-        <article class="dashboard-card">
-          <div class="card-header">
-            <div>
-              <h2>Doanh thu theo thương hiệu</h2>
-              <p>Tỷ lệ % theo thương hiệu</p>
-            </div>
-            <span>Doughnut</span>
-          </div>
-          <div class="donut-wrap">
-            <div class="chart-frame donut-canvas">
-              <canvas ref="brandChartRef"></canvas>
-            </div>
-            <div class="legend-list">
-              <span v-for="item in brandRevenue" :key="item.label">
-                <i :style="{ backgroundColor: item.color }"></i>
-                {{ item.label }} {{ item.value }}%
-              </span>
-            </div>
-          </div>
-        </article>
-
-        <!-- Chart 4: So sánh doanh thu - Bar grouped -->
-        <article class="dashboard-card">
-          <div class="card-header">
-            <div>
-              <h2>So sánh doanh thu</h2>
-              <p>Kỳ này so với kỳ trước</p>
-            </div>
-            <span>Bar chart</span>
-          </div>
-          <div class="chart-frame">
-            <canvas ref="compareChartRef"></canvas>
-          </div>
-        </article>
-
-      </section>
-
-      <section class="dashboard-card data-card">
-        <div class="data-header">
-          <div>
-            <h2>Dữ liệu chi tiết</h2>
-            <p>Lọc nhanh dữ liệu bán hàng, tồn kho và khách hàng</p>
-          </div>
-          <button type="button" class="reset-btn" @click="resetFilters">Đặt lại bộ lọc</button>
-        </div>
-
-        <div class="filter-grid">
-          <div class="search-box">
-            <i class="bi bi-search"></i>
-            <input v-model.trim="filters.search" type="text" placeholder="Tìm mã đơn / tên khách..." />
-          </div>
-
-          <select v-model="filters.status">
-            <option value="all">Tất cả trạng thái</option>
-            <option v-for="status in statusOptions" :key="status.value" :value="status.value">
-              {{ status.label }}
-            </option>
-          </select>
-
-          <select v-model="filters.category" v-show="categoryOptions.length > 0">
-            <option value="all">Tất cả danh mục / thương hiệu</option>
-            <option v-for="category in categoryOptions" :key="category" :value="category">{{ category }}</option>
-          </select>
-
-          <select v-model="filters.date">
-            <option value="month">Tháng này</option>
-            <option value="today">Hôm nay</option>
-            <option value="week">7 ngày gần nhất</option>
-            <option value="quarter">Quý này</option>
-            <option value="year">Năm nay</option>
-          </select>
-        </div>
-
-        <div class="tab-list">
-          <button
-            v-for="tab in tabs"
-            :key="tab.value"
-            type="button"
-            :class="{ active: currentTab === tab.value }"
-            @click="currentTab = tab.value"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th
-                  v-for="column in activeTable.columns"
-                  :key="column.key"
-                  :class="alignClass(column.align)"
-                >
-                  {{ column.label }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="filteredRows.length === 0">
-                <td :colspan="activeTable.columns.length" class="empty-cell">
-                  <strong>Không có dữ liệu phù hợp</strong>
-                  <span>Hãy thử đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc.</span>
-                </td>
-              </tr>
-              <tr v-for="row in filteredRows" v-else :key="row.id">
-                <td
-                  v-for="column in activeTable.columns"
-                  :key="`${row.id}-${column.key}`"
-                  :class="alignClass(column.align)"
-                >
-                  <span v-if="column.type === 'money'" class="money">{{ formatCurrency(row[column.key]) }}</span>
-                  <span v-else-if="column.type === 'percent'" class="cell-main">{{ row[column.key] }}%</span>
-                  <span v-else-if="column.type === 'status'" class="status-badge" :class="statusClass(row[column.key])">
-                    {{ statusLabel(row[column.key]) }}
-                  </span>
-                  <span v-else class="cell-main">{{ row[column.key] }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   </section>
 </template>
 
 <script setup>
-import { computed, reactive, ref, onMounted, watch, nextTick } from 'vue'
-import { Chart, registerables } from 'chart.js'
+import { ref, computed, watch, onMounted } from 'vue'
 import statisticsApi from '@/api/statisticsApi'
-import '@/assets/css/Dashboard.css'
+import DashboardHeader from '../../layouts/Dashboard/Dashboardheader.vue'
+import KpiGrid         from '../../layouts/Dashboard/Kpigrid.vue'
+import ChartsSection   from '../../layouts/Dashboard/Chartssection.vue'
+import DataSection     from '../../layouts/Dashboard/Datasection.vue'
 
-Chart.register(...registerables)
-
-const revenueChartRef = ref(null)
-const orderChartRef = ref(null)
-const brandChartRef = ref(null)
-const compareChartRef = ref(null)
-
-let revenueChart = null
-let orderChart = null
-let brandChart = null
-let compareChart = null
-
-// State
+// ── state ────────────────────────────────────────────────────
 const selectedTime = ref('month')
-const customDate = ref('')
-const currentTab = ref('recentOrders')
-const loading = ref(true)
-const errorMsg = ref('')
+const customDate   = ref('')
 
-const filters = reactive({
-  search: '',
-  status: 'all',
-  category: 'all',
-  date: 'month',
-})
-
-watch(selectedTime, (val) => {
-  if (!val) return
-  filters.date = val
-  fetchDashboardData(val)
-})
-onMounted(() => fetchDashboardData(selectedTime.value))
-
-watch(() => filters.date, (val) => {
-  selectedTime.value = val
-})
-
-watch(currentTab, () => {
-  filters.status = 'all'
-  filters.category = 'all'
-})
-
-const timeFilters = [
-  { label: 'Hôm nay', value: 'today' },
-  { label: 'Tuần', value: 'week' },
-  { label: 'Tháng', value: 'month' },
-  { label: 'Năm', value: 'year' },
-]
-
-const tabs = [
-  { label: 'Đơn hàng gần nhất', value: 'recentOrders' },
-  { label: 'Top sản phẩm bán chạy', value: 'topProducts' },
-  { label: 'Sản phẩm sắp hết kho', value: 'lowStock' },
-  { label: 'Khách hàng mua nhiều nhất', value: 'topCustomers' },
-]
-
-// Data từ API
-const dailyStats = ref([])
+const kpiSummary         = ref({ totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 })
 const pendingOrdersCount = ref(0)
-const monthlyStats = ref([])
-const weekdayStats = ref([])
-const brandStats = ref([])
-const recentOrdersData = ref([])
-const topProductsData = ref([])
-const lowStockData = ref([])
-const topCustomersData = ref([])
-const compareData = ref({ current: [], previous: [], currentLabel: '', previousLabel: '' })
+const weekdayStats       = ref([])
+const brandStats         = ref([])
+const compareData        = ref({ current: [], previous: [], currentLabel: '', previousLabel: '' })
+const newUsersData       = ref([])
+const lowStockData       = ref([])
+const childCategories    = ref([])
 
-// Chart colors
-const DONUT_COLORS = ['#ff4d8d', '#6366f1', '#22c55e', '#f59e0b', '#06b6d4', '#a855f7']
+const dataSectionRef = ref(null)
 
-// KPI
-const todayStr = new Date().toISOString().split('T')[0]
-
-const todayRevenue = computed(() => {
-  const todayData = dailyStats.value.find((item) => item.reportDate === todayStr)
-  return todayData?.totalRevenue || 0
-})
-
-const todayOrders = computed(() => {
-  const todayData = dailyStats.value.find((item) => item.reportDate === todayStr)
-  return todayData?.totalOrders || 0
-})
-
-const periodTotals = computed(() => {
-  return dailyStats.value.reduce(
-    (acc, item) => {
-      acc.totalRevenue += item.totalRevenue || 0
-      acc.totalOrders += item.totalOrders || 0
-      acc.totalProductsSold += item.totalProductsSold || 0
-      return acc
-    },
-    { totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 },
-  )
-})
-
+// ── computed ─────────────────────────────────────────────────
 const periodNoteLabel = computed(() => {
   switch (selectedTime.value) {
-    case 'today': return 'hôm nay'
-    case 'week':  return 'tuần này'
-    case 'year':  return 'năm nay'
-    default:      return 'tháng này'
+    case 'week': return 'tuần này'
+    case 'year': return 'năm nay'
+    default:     return 'tháng này'
   }
 })
 
-const inventoryAlerts = computed(() =>
-  lowStockData.value.slice(0, 3).map((item, idx) => ({
-    id: idx + 1,
-    tone: item.status === 'Hết hàng' ? 'pink' : 'orange',
-    title:
-      item.status === 'Hết hàng'
-        ? `Hết hàng: ${item.productName} (${item.skuCode})`
-        : `Sắp hết hàng: ${item.productName} chỉ còn ${item.stockQuantity} sản phẩm`,
-    description: item.brand,
-    actionLabel: 'Xem tồn kho',
-  })),
-)
-
-const kpiOverview = computed(() => {
-  const { totalRevenue: monthRevenue, totalOrders: monthOrders, totalProductsSold: monthProductsSold } = periodTotals.value
-
-  return [
-    {
-      key: 'revenue',
-      title: 'Doanh thu',
-      value: formatCurrency(monthRevenue),
-      growth: '',
-      note: `Tổng doanh thu ${periodNoteLabel.value}`,
-      icon: 'bi bi-currency-dollar',
-      type: 'normal',
-    },
-    {
-      key: 'orders',
-      title: 'Tổng đơn hàng',
-      value: String(monthOrders),
-      growth: '',
-      note: `Đơn hàng đã ghi nhận ${periodNoteLabel.value}`,
-      icon: 'bi bi-bag-check',
-      type: 'normal',
-    },
-    {
-      key: 'soldProducts',
-      title: 'Sản phẩm đã bán',
-      value: String(monthProductsSold),
-      growth: '',
-      note: `Số lượng SKU đã bán ${periodNoteLabel.value}`,
-      icon: 'bi bi-box-seam',
-      type: 'normal',
-    },
-    {
-      key: 'pendingOrders',
-      title: 'Đơn mới chưa xử lý',
-      value: String(pendingOrdersCount.value),
-      growth: 'Ưu tiên',
-      note: 'Ưu tiên duyệt để tránh trễ SLA',
-      icon: 'bi bi-exclamation-triangle',
-      type: 'warning',
-    },
-    {
-      key: 'todayRevenue',
-      title: 'Doanh thu hôm nay',
-      value: formatCurrency(todayRevenue.value),
-      growth: '',
-      note: `${todayOrders.value} đơn hàng hôm nay`,
-      icon: 'bi bi-graph-up-arrow',
-      type: 'normal',
-    },
-    {
-      key: 'lowStock',
-      title: 'SP sắp/ hết hàng',
-      value: String(lowStockData.value.length),
-      growth: '',
-      note: 'Cần nhập thêm hàng',
-      icon: 'bi bi-people',
-      type: lowStockData.value.length > 0 ? 'warning' : 'normal',
-    },
-    {
-      key: 'alerts',
-      title: 'Cảnh báo tồn kho',
-      value: String(inventoryAlerts.value.length),
-      growth: inventoryAlerts.value.length > 0 ? 'Mới' : '',
-      note:
-        inventoryAlerts.value.length > 0
-          ? inventoryAlerts.value[0].title
-          : 'Không có cảnh báo',
-      icon: 'bi bi-bell',
-      type: inventoryAlerts.value.length > 0 ? 'warning' : 'normal',
-    },
-  ]
-})
-
-// Table
-const tableConfig = computed(() => ({
-  recentOrders: {
-    columns: [
-      { label: 'Mã đơn', key: 'orderCode', align: 'left' },
-      { label: 'Khách hàng', key: 'customerName', align: 'left' },
-      { label: 'Thanh toán', key: 'paymentMethod', align: 'left' },
-      { label: 'Trạng thái', key: 'orderStatus', align: 'center', type: 'status' },
-      { label: 'Tổng tiền', key: 'totalAmount', align: 'right', type: 'money' },
-      { label: 'Thời gian', key: 'createdAt', align: 'left' },
-    ],
-    data: recentOrdersData.value,
-  },
-  topProducts: {
-    columns: [
-      { label: 'Sản phẩm', key: 'productName', align: 'left' },
-      { label: 'Đã bán', key: 'totalSold', align: 'center' },
-      { label: 'Doanh thu', key: 'revenue', align: 'right', type: 'money' },
-    ],
-    data: topProductsData.value,
-  },
-  lowStock: {
-    columns: [
-      { label: 'SKU', key: 'skuCode', align: 'left' },
-      { label: 'Sản phẩm', key: 'productName', align: 'left' },
-      { label: 'Thương hiệu', key: 'brand', align: 'left' },
-      { label: 'Tồn kho', key: 'stockQuantity', align: 'center' },
-      { label: 'Trạng thái', key: 'status', align: 'center', type: 'status' },
-    ],
-    data: lowStockData.value,
-  },
-  topCustomers: {
-    columns: [
-      { label: 'Khách hàng', key: 'customerName', align: 'left' },
-      { label: 'Email', key: 'email', align: 'left' },
-      { label: 'Số đơn', key: 'totalOrders', align: 'center' },
-      { label: 'Tổng chi tiêu', key: 'totalSpent', align: 'right', type: 'money' },
-      { label: 'Đóng góp', key: 'contributionPercent', align: 'right', type: 'percent' },
-    ],
-    data: topCustomersData.value,
-  },
-}))
-
-const statusOptions = computed(() => {
-  if (currentTab.value === 'recentOrders') {
-    return [
-      { value: 'PAID',       label: 'Đã thanh toán' },
-      { value: 'UNPAID',     label: 'Chưa thanh toán' },
-      { value: 'PENDING',    label: 'Chờ xử lý' },
-      { value: 'CONFIRMED',  label: 'Đã xác nhận' },
-      { value: 'SHIPPING',   label: 'Đang giao hàng' },
-      { value: 'COMPLETED',  label: 'Hoàn thành' },
-      { value: 'CANCELLED',  label: 'Đã hủy' },
-      { value: 'PROCESSING', label: 'Đang xử lý' },
-    ]
-  }
-  if (currentTab.value === 'lowStock') {
-    return [
-      { value: 'Hết hàng',     label: 'Hết hàng' },
-      { value: 'Sắp hết hàng', label: 'Sắp hết hàng' },
-    ]
-  }
-  return []
-})
-
-const categoryOptions = computed(() => {
-  if (currentTab.value === 'recentOrders' || currentTab.value === 'lowStock') {
-    return brandStats.value.map((b) => b.brand)
-  }
-  return []
-})
-
-const activeTable = computed(() => tableConfig.value[currentTab.value])
-
-const filteredRows = computed(() => {
-  const searchValue = filters.search.toLowerCase()
-  const now = new Date()
-
-  const parseItemDate = (dateStr) => {
-    if (!dateStr) return null
-    const match = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/)
-    if (match) return new Date(`${match[3]}-${match[2]}-${match[1]}`)
-    return new Date(dateStr)
-  }
-
-  const getStartDate = () => {
-    const d = new Date()
-    if (filters.date === 'today') { d.setHours(0, 0, 0, 0); return d }
-    if (filters.date === 'week') { d.setDate(d.getDate() - 7); return d }
-    if (filters.date === 'month') return new Date(d.getFullYear(), d.getMonth(), 1)
-    if (filters.date === 'quarter') return new Date(d.getFullYear(), Math.floor(d.getMonth() / 3) * 3, 1)
-    if (filters.date === 'year') return new Date(d.getFullYear(), 0, 1)
-    return null
-  }
-
-  const startDate = getStartDate()
-
-  return activeTable.value.data.filter((item) => {
-    const searchableText = Object.values(item).join(' ').toLowerCase()
-    const matchSearch = !searchValue || searchableText.includes(searchValue)
-    const matchStatus = filters.status === 'all' || item.status === filters.status || item.orderStatus === filters.status
-    const matchCategory = filters.category === 'all' || item.brand === filters.category
-
-    let matchDate = true
-    if (startDate) {
-      const dateStr = item.createdAt || item.reportDate || item.date
-      const itemDate = parseItemDate(dateStr)
-      if (itemDate) matchDate = itemDate >= startDate && itemDate <= now
-    }
-
-    return matchSearch && matchStatus && matchCategory && matchDate
-  })
-})
-
-const brandRevenue = computed(() =>
-  brandStats.value.map((item, idx) => ({
-    label: item.brand || 'Khác',
-    value: item.percentage,
-    color: DONUT_COLORS[idx % DONUT_COLORS.length],
-  })),
-)
-
-const chartDefaults = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-  },
-}
-
-const gridColor = 'rgba(255, 77, 141, 0.1)'
-const tickColor = '#9ca3af'
-
-function destroyChart(chart) {
-  if (chart) { chart.destroy() }
-  return null
-}
-
-function buildRevenueChart() {
-  revenueChart = destroyChart(revenueChart)
-  if (!revenueChartRef.value || !dailyStats.value.length) return
-
-  let labels = []
-  let data = []
-
-  if (selectedTime.value === 'year') {
-    // Xem theo Năm: gộp dữ liệu theo tháng
-    const monthlyRevenue = Array(12).fill(0)
-    dailyStats.value.forEach((d) => {
-      const date = new Date(d.reportDate)
-      const monthIndex = date.getMonth() // 0 -> 11
-      monthlyRevenue[monthIndex] += d.totalRevenue || 0
-    })
-
-    labels = [
-      'Tháng 1','Tháng 2','Tháng 3','Tháng 4',
-      'Tháng 5','Tháng 6','Tháng 7','Tháng 8',
-      'Tháng 9','Tháng 10','Tháng 11','Tháng 12',
-    ]
-    data = monthlyRevenue
-  } else {
-    // Hôm nay / Tuần / Tháng: giữ nguyên độ phân giải theo ngày
-    labels = dailyStats.value.map((d) => formatShortDate(d.reportDate))
-    data = dailyStats.value.map((d) => d.totalRevenue)
-  }
-
-  revenueChart = new Chart(revenueChartRef.value, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        data,
-        borderColor: '#ff4d8d',
-        backgroundColor: 'rgba(255, 77, 141, 0.12)',
-        borderWidth: 3,
-        pointBackgroundColor: '#ff4d8d',
-        pointRadius: 4,
-        tension: 0.4,
-        fill: true,
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      scales: {
-        x: {
-          ticks: { color: tickColor, font: { size: 11 } },
-          grid: { color: gridColor },
-        },
-        y: {
-          ticks: {
-            color: tickColor,
-            font: { size: 11 },
-            callback: (val) => formatShortCurrency(val),
-          },
-          grid: { color: gridColor },
-        },
-      },
-      plugins: {
-        ...chartDefaults.plugins,
-        tooltip: {
-          callbacks: {
-            label: (ctx) => ` ${formatCurrency(ctx.parsed.y)}`,
-          },
-        },
-      },
-    },
-  })
-}
-
-function buildOrderChart() {
-  orderChart = destroyChart(orderChart)
-  if (!orderChartRef.value || !weekdayStats.value.length) return
-
-  const labels = weekdayStats.value.map((d) =>
-    d.dayLabel.replace('Thứ ', 'T').replace('Chủ nhật', 'CN'),
-  )
-  const data = weekdayStats.value.map((d) => d.totalOrders)
-
-  orderChart = new Chart(orderChartRef.value, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data,
-        backgroundColor: 'rgba(255, 77, 141, 0.8)',
-        borderRadius: 10,
-        borderSkipped: false,
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      scales: {
-        x: {
-          ticks: { color: tickColor, font: { size: 11 } },
-          grid: { display: false },
-        },
-        y: {
-          ticks: { color: tickColor, font: { size: 11 }, stepSize: 1 },
-          grid: { color: gridColor },
-          title: { display: true, text: 'Số đơn', color: tickColor, font: { size: 11 } },
-        },
-      },
-      plugins: {
-        ...chartDefaults.plugins,
-        tooltip: {
-          callbacks: {
-            label: (ctx) => ` ${ctx.parsed.y} đơn`,
-          },
-        },
-      },
-    },
-  })
-}
-
-function buildBrandChart() {
-  brandChart = destroyChart(brandChart)
-  if (!brandChartRef.value || !brandStats.value.length) return
-
-  const labels = brandRevenue.value.map((b) => b.label)
-  const data = brandRevenue.value.map((b) => b.value)
-  const colors = brandRevenue.value.map((b) => b.color)
-
-  brandChart = new Chart(brandChartRef.value, {
-    type: 'doughnut',
-    data: {
-      labels,
-      datasets: [{
-        data,
-        backgroundColor: colors,
-        borderWidth: 2,
-        borderColor: '#fff',
-      }],
-    },
-    options: {
-      ...chartDefaults,
-      cutout: '68%',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => ` ${ctx.label}: ${ctx.parsed}%`,
-          },
-        },
-      },
-    },
-  })
-}
-
-// ====== Chart 4: So sánh doanh thu (Bar grouped) ======
-function buildCompareChart() {
-  compareChart = destroyChart(compareChart)
-  if (!compareChartRef.value || !compareData.value.current?.length) return
-
-  // Trục X chỉ hiện label gốc ("Ngày 1" / "Tuần 23" / "T2")
-  // sublabel chỉ dùng trong tooltip để phân biệt ngày của từng kỳ
-  const labels = compareData.value.current.map((d) => d.label)
-
-  const currentValues  = compareData.value.current.map((d) => d.revenue)
-  const previousValues = compareData.value.previous.map((d) => d.revenue)
-
-  compareChart = new Chart(compareChartRef.value, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: compareData.value.previousLabel || 'Kỳ trước',
-          data: previousValues,
-          backgroundColor: 'rgba(156, 163, 175, 0.6)',
-          borderRadius: 8,
-          borderSkipped: false,
-        },
-        {
-          label: compareData.value.currentLabel || 'Kỳ này',
-          data: currentValues,
-          backgroundColor: 'rgba(255, 77, 141, 0.85)',
-          borderRadius: 8,
-          borderSkipped: false,
-        },
-      ],
-    },
-    options: {
-      ...chartDefaults,
-      scales: {
-        x: {
-          ticks: {
-            color: tickColor,
-            font: { size: 11 },
-            maxRotation: 0,
-          },
-          grid: { display: false },
-        },
-        y: {
-          ticks: {
-            color: tickColor,
-            font: { size: 11 },
-            callback: (val) => formatShortCurrency(val),
-          },
-          grid: { color: gridColor },
-        },
-      },
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: { color: '#6b7280', font: { size: 11 }, boxWidth: 12 },
-        },
-        tooltip: {
-          callbacks: {
-            // FIX: lấy sublabel đúng theo dataset (0 = kỳ trước, 1 = kỳ này)
-            title: (items) => {
-              const idx        = items[0].dataIndex
-              const datasetIdx = items[0].datasetIndex
-              const source     = datasetIdx === 0
-                ? compareData.value.previous[idx]
-                : compareData.value.current[idx]
-              if (!source) return ''
-              return source.sublabel
-                ? `${source.label} (${source.sublabel})`
-                : source.label
-            },
-            label: (ctx) => ` ${ctx.dataset.label}: ${formatCurrency(ctx.parsed.y)}`,
-          },
-        },
-      },
-    },
-  })
-}
-
-function buildAllCharts() {
-  nextTick(() => {
-    buildRevenueChart()
-    buildOrderChart()
-    buildBrandChart()
-    buildCompareChart()
-  })
-}
-
-// ====== Helpers ======
-function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
-    maximumFractionDigits: 0,
-  }).format(value || 0)
-}
-
-function formatShortCurrency(value) {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}T`
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(0)}tr`
-  if (value >= 1_000) return `${(value / 1_000).toFixed(0)}k`
-  return String(value)
-}
-
-function formatShortDate(dateStr) {
-  const d = new Date(dateStr)
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-function alignClass(align) {
-  return {
-    'text-center': align === 'center',
-    'text-right': align === 'right',
-    'text-left': align !== 'center' && align !== 'right',
-  }
-}
-
-function statusClass(status) {
-  return {
-    success: ['COMPLETED', 'PAID'].includes(status),
-    warning: ['PENDING', 'PROCESSING', 'Sắp hết hàng'].includes(status),
-    info:    ['SHIPPING', 'CONFIRMED'].includes(status),
-    danger:  ['CANCELLED', 'Hết hàng', 'UNPAID'].includes(status),
-  }
-}
-
-const statusLabels = {
-  PENDING:    'Chờ xử lý',
-  CONFIRMED:  'Đã xác nhận',
-  SHIPPING:   'Đang giao hàng',
-  COMPLETED:  'Hoàn thành',
-  CANCELLED:  'Đã hủy',
-  PROCESSING: 'Đang xử lý',
-  PAID:       'Đã thanh toán',
-  UNPAID:     'Chưa thanh toán',
-  'Hết hàng':     'Hết hàng',
-  'Sắp hết hàng': 'Sắp hết hàng',
-}
-
-function statusLabel(status) {
-  return statusLabels[status] || status
-}
-
-function resetFilters() {
-  filters.search = ''
-  filters.status = 'all'
-  filters.category = 'all'
-  filters.date = 'month'
-}
-
-function selectPreset(val) {
-  customDate.value = ''
-  selectedTime.value = val
-}
-
-function selectCustomDate() {
-  if (!customDate.value) return
-  selectedTime.value = ''
-  fetchDashboardData('today', customDate.value, customDate.value)
-}
-
-// ====== API ======
+// ── fetch ─────────────────────────────────────────────────────
 async function fetchDashboardData(period = 'month', startDate = '', endDate = '') {
-  loading.value = true
-  errorMsg.value = ''
   try {
-    const [
-      dailyRes, monthlyRes, weekdayRes, brandRes,
-      recentOrdersRes, topProductsRes, lowStockRes, topCustomersRes,
-      compareRes, pendingRes,
-    ] = await Promise.all([
-      statisticsApi.getRevenueByDay(period, startDate, endDate),
-      statisticsApi.getRevenueByMonth(),
-      statisticsApi.getOrdersByWeekday(period, startDate, endDate),
-      statisticsApi.getRevenueByBrand(period, startDate, endDate),
-      statisticsApi.getRecentOrders(10, period, startDate, endDate),
-      statisticsApi.getTopProducts(10, period, startDate, endDate),
-      statisticsApi.getLowStockProducts(),
-      statisticsApi.getTopCustomers(10, period, startDate, endDate),
-      statisticsApi.getRevenueCompare(period),
-      statisticsApi.getPendingOrdersCount(),
-    ])
+    const [kpiRes, weekdayRes, brandRes, lowStockRes, compareRes, pendingRes, newUserRes] =
+      await Promise.all([
+        statisticsApi.getKpiSummary(period, startDate, endDate),
+        statisticsApi.getOrdersByWeekday(period, startDate, endDate),
+        statisticsApi.getRevenueByBrand(period, startDate, endDate),
+        statisticsApi.getLowStockProducts(),
+        statisticsApi.getRevenueCompare(period),
+        statisticsApi.getPendingOrdersCount(),
+statisticsApi.getNewUsers(period, startDate, endDate),
+      ])
 
-    dailyStats.value         = dailyRes.data.data
-    monthlyStats.value       = monthlyRes.data.data
+    kpiSummary.value         = kpiRes.data.data
     weekdayStats.value       = weekdayRes.data.data
     brandStats.value         = brandRes.data.data
-    recentOrdersData.value   = recentOrdersRes.data.data
-    topProductsData.value    = topProductsRes.data.data
     lowStockData.value       = lowStockRes.data.data
-    topCustomersData.value   = topCustomersRes.data.data
     compareData.value        = compareRes.data.data
     pendingOrdersCount.value = pendingRes.data.data
-
-    buildAllCharts()
+    newUsersData.value       = newUserRes.data.data
   } catch (err) {
-    errorMsg.value = err.response?.data?.message || 'Không thể tải dữ liệu thống kê'
-  } finally {
-    loading.value = false
+    console.error('Không thể tải dữ liệu thống kê:', err)
   }
 }
+
+// ── watches ──────────────────────────────────────────────────
+watch(selectedTime, (val) => {
+  if (!val) return
+  fetchDashboardData(val)
+})
+
+watch(customDate, (val) => {
+  if (!val) return
+  fetchDashboardData('custom', val, val)
+})
+
+// ── init ─────────────────────────────────────────────────────
+onMounted(async () => {
+  fetchDashboardData(selectedTime.value)
+  try {
+    const catRes = await statisticsApi.getChildCategories()
+    childCategories.value = catRes.data.data
+  } catch {
+    childCategories.value = []
+  }
+})
 </script>
+
+<style>
+/* CSS variables phải là global, không dùng scoped */
+:root {
+  --primary: #2563eb;
+  --primary-light: #eff6ff;
+  --primary-border: #bfdbfe;
+  --success: #16a34a;
+  --warning: #f59e0b;
+  --danger: #dc2626;
+  --text-main: #111827;
+  --text-sub: #6b7280;
+}
+</style>
+
+<style scoped>
+.dashboard-page {
+  min-height: calc(100vh - 74px);
+  background: #fff7fb;
+  color: #1f2937;
+  padding: 28px;
+}
+
+.dashboard-shell {
+  max-width: 1800px;
+  margin: 0 auto;
+  display: grid;
+  gap: 24px;
+}
+
+@media (max-width: 992px) {
+  .dashboard-page {
+    padding: 18px;
+  }
+}
+</style>

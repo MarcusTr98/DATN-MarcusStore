@@ -10,5 +10,5 @@ public class LowStockResponseDTO {
     private String productName;
     private String brand;
     private Integer stockQuantity;
-    private String status; // "Hết hàng" / "Sắp hết hàng"
+    private String status;
 }

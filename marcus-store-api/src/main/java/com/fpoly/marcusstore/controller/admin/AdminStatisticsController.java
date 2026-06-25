@@ -18,17 +18,22 @@ public class AdminStatisticsController {
     @Autowired
     private StatisticsService statisticsService;
 
-    private LocalDate[] resolveDates(LocalDate startDate, LocalDate endDate, String period) {
-        return StatisticsService.resolveDateRange(startDate, endDate, period);
-    }
-
     @GetMapping("/revenue/daily")
     public ApiResponse<List<StatisticsResponseDTO>> getRevenueByDay(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false, defaultValue = "month") String period) {
-        LocalDate[] dates = resolveDates(startDate, endDate, period);
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
         return ApiResponse.success(statisticsService.getRevenueByDay(dates[0], dates[1]));
+    }
+
+    @GetMapping("/kpi-summary")
+    public ApiResponse<KpiSummaryDTO> getKpiSummary(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false, defaultValue = "month") String period) {
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
+        return ApiResponse.success(statisticsService.getKpiSummary(dates[0], dates[1]));
     }
 
     @GetMapping("/revenue/monthly")
@@ -42,9 +47,10 @@ public class AdminStatisticsController {
             @RequestParam(defaultValue = "10") int topN,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false, defaultValue = "month") String period) {
-        LocalDate[] dates = resolveDates(startDate, endDate, period);
-        return ApiResponse.success(statisticsService.getTopSellingProducts(topN, dates[0], dates[1]));
+            @RequestParam(required = false, defaultValue = "month") String period,
+            @RequestParam(required = false) String keyword) {
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
+        return ApiResponse.success(statisticsService.getTopSellingProducts(topN, dates[0], dates[1], keyword));
     }
 
     @GetMapping("/orders/weekday")
@@ -52,7 +58,7 @@ public class AdminStatisticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false, defaultValue = "month") String period) {
-        LocalDate[] dates = resolveDates(startDate, endDate, period);
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
         return ApiResponse.success(statisticsService.getOrdersByWeekday(dates[0], dates[1]));
     }
 
@@ -61,13 +67,16 @@ public class AdminStatisticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false, defaultValue = "month") String period) {
-        LocalDate[] dates = resolveDates(startDate, endDate, period);
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
         return ApiResponse.success(statisticsService.getRevenueByBrand(dates[0], dates[1]));
     }
 
     @GetMapping("/low-stock")
-    public ApiResponse<List<LowStockResponseDTO>> getLowStockProducts() {
-        return ApiResponse.success(statisticsService.getLowStockProducts());
+    public ApiResponse<List<LowStockResponseDTO>> getLowStockProducts(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String status) {
+        return ApiResponse.success(statisticsService.getLowStockProducts(keyword, brand, status));
     }
 
     @GetMapping("/top-customers")
@@ -75,9 +84,10 @@ public class AdminStatisticsController {
             @RequestParam(defaultValue = "10") int topN,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false, defaultValue = "month") String period) {
-        LocalDate[] dates = resolveDates(startDate, endDate, period);
-        return ApiResponse.success(statisticsService.getTopCustomers(topN, dates[0], dates[1]));
+            @RequestParam(required = false, defaultValue = "month") String period,
+            @RequestParam(required = false) String keyword) {
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
+        return ApiResponse.success(statisticsService.getTopCustomers(topN, dates[0], dates[1], keyword));
     }
 
     @GetMapping("/recent-orders")
@@ -85,9 +95,12 @@ public class AdminStatisticsController {
             @RequestParam(defaultValue = "10") int limit,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false, defaultValue = "month") String period) {
-        LocalDate[] dates = resolveDates(startDate, endDate, period);
-        return ApiResponse.success(statisticsService.getRecentOrders(limit, dates[0], dates[1]));
+            @RequestParam(required = false, defaultValue = "month") String period,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String brand) {
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
+        return ApiResponse.success(statisticsService.getRecentOrders(limit, dates[0], dates[1], keyword, status, brand));
     }
 
     @GetMapping("/revenue/compare")
@@ -95,9 +108,18 @@ public class AdminStatisticsController {
             @RequestParam(required = false, defaultValue = "month") String period) {
         return ApiResponse.success(statisticsService.getRevenueCompare(period));
     }
-    
+
     @GetMapping("/pending-orders/count")
-public ApiResponse<Long> countPendingOrders() {
-    return ApiResponse.success(statisticsService.countPendingOrders());
-}
+    public ApiResponse<Long> countPendingOrders() {
+        return ApiResponse.success(statisticsService.countPendingOrders());
+    }
+
+    @GetMapping("/users/new")
+    public ApiResponse<List<NewUserStatsDTO>> getNewUsers(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false, defaultValue = "month") String period) {
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
+        return ApiResponse.success(statisticsService.getNewUsers(period, dates[0], dates[1]));
+    }
 }
