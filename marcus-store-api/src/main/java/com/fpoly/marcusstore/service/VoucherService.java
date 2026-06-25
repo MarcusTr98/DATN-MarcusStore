@@ -17,13 +17,5 @@ public interface VoucherService {
     VoucherResponse addVoucher(AddVoucherRequest request);
     VoucherResponse updateVoucher(Integer voucherId, AddVoucherRequest request);
     List<VoucherResponse> getAvailableVouchers();
-
-    /**
-     * Kiểm tra và ghi nhận việc sử dụng voucher của user
-     * @param voucherId ID của voucher
-     * @param userId ID của user
-     * @return true nếu user được phép dùng voucher và đã ghi nhận thành công
-     * @throws RuntimeException nếu voucher không hợp lệ hoặc user đã dùng rồi
-     */
     boolean checkAndRecordVoucherUsage(Integer voucherId, Integer userId);
 }
