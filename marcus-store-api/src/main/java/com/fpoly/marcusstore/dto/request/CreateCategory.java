@@ -17,4 +17,6 @@ public class CreateCategory {
     private String categoryName;
 
     private Integer parentId;
+
+    private String categoryImg;
 }
