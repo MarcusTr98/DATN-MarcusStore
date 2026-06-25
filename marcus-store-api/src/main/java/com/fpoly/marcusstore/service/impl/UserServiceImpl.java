@@ -102,7 +102,7 @@ public UserResponse update(Integer Id, UpdateUserRequest request){
          user.setPhoneNumber(request.getPhoneNumber());
          user.setRole(role);
          user.setUpdatedAt(LocalDateTime.now());
-         
+
         return toResponse(userRepository.save(user));
 }
 @Override
@@ -141,15 +141,6 @@ public void UnLockUser(Integer Id) {
 
     userRepository.save(user);
 }
-
-@Override
-@Transactional(readOnly = true)
-public List<UserResponse> getAllUsers() {
-    return userRepository.findAll().stream()
-            .map(this::toResponse)
-            .collect(Collectors.toList());
-}
-
 @Override
 @Transactional(readOnly = true)
 public List<UserResponse> getCustomers() {

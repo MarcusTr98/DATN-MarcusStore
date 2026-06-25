@@ -62,25 +62,11 @@ public ApiResponse<String> lockUser(@PathVariable Integer id){
     userServiceImpl.lockUser(id);
     return ApiResponse.success("Khóa tài khoản thành công");
 }
-@GetMapping("/{id}/unLock")
 @PreAuthorize("hasRole('ADMIN')")
 public ApiResponse<String> unLockUser(@PathVariable Integer id){
     userServiceImpl.UnLockUser(id);
     return ApiResponse.success("Mở khóa tài khoản thành công");
 }
-
-/**
- * Lấy danh sách tất cả users (không phân trang) cho dropdown chọn khách hàng
- */
-@GetMapping("/all")
-public ResponseEntity<List<UserResponse>> getAllUsers() {
-    List<UserResponse> users = userServiceImpl.getAllUsers();
-    return ResponseEntity.ok(users);
-}
-
-/**
- * Lấy danh sách customers (role_id = 3) cho dropdown voucher
- */
 @GetMapping("/customers")
 public ResponseEntity<List<UserResponse>> getCustomers() {
     List<UserResponse> customers = userServiceImpl.getCustomers();

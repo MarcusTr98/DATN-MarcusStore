@@ -16,8 +16,6 @@ public interface UserService {
    UserResponse update(Integer Id,UpdateUserRequest request);
    void lockUser(Integer Id);
    void UnLockUser(Integer Id);
-   List<UserResponse> getAllUsers();
-   
    // Lấy tất cả customers (role_id = 3)
    List<UserResponse> getCustomers();
 }
