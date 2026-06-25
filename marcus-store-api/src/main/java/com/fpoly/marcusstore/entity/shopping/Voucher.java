@@ -51,8 +51,6 @@ public class Voucher {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-    @Column(name = "description", length = 500)
-    private String description;
 
     // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     @Column(name = "target_type", length = 20)

@@ -146,7 +146,6 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .usedAt(userVoucher.getUsedAt())
                 .assignedAt(userVoucher.getAssignedAt())
                 .isActive(voucher.getIsActive())
-                .description(voucher.getDescription())
                 .build();
     }
 
@@ -162,7 +161,7 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .endDate(voucher.getEndDate())
                 .isUsed(isUsed)
                 .isActive(voucher.getIsActive())
-                .description(voucher.getDescription())
+
                 .build();
     }
 }

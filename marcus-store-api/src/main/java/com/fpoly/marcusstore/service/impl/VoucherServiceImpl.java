@@ -59,7 +59,6 @@ public class VoucherServiceImpl implements VoucherService {
                 .endDate(voucher.getEndDate())
                 .quantity(voucher.getQuantity())
                 .isActive(voucher.getIsActive())
-                .description(voucher.getDescription())
                 .targetType(voucher.getTargetType())
                 .targetUserIds(targetUserIds)
                 .targetUserCount(targetUserCount)
@@ -176,7 +175,7 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setMinOrderValue(request.getMinOrderValue());
         voucher.setStartDate(request.getStartDate());
         voucher.setEndDate(request.getEndDate());
-        voucher.setDescription(request.getDescription());
+
 
         // Set targetType - mặc định là ALL
         voucher.setTargetType(request.getTargetType() != null ? request.getTargetType() : "ALL");
@@ -324,7 +323,7 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setMinOrderValue(request.getMinOrderValue());
         voucher.setStartDate(request.getStartDate());
         voucher.setEndDate(request.getEndDate());
-        voucher.setDescription(request.getDescription());
+
         voucher.setTargetType(targetType);
         voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
 

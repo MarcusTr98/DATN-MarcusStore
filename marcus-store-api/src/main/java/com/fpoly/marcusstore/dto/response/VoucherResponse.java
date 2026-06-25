@@ -23,7 +23,6 @@ public class VoucherResponse {
     private LocalDateTime endDate;
     private Integer quantity;
     private Boolean isActive;
-    private String description;
 
     // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     private String targetType;
