@@ -199,6 +199,9 @@ public class OrderServiceImpl implements OrderService {
                 .email(order.getUser().getEmail())
                 .phoneNumber(order.getUser().getPhoneNumber())
                 .voucherCode(order.getVoucher() != null ? order.getVoucher().getVoucherCode() : null)
+                .voucherDiscountType(order.getVoucher() != null ? order.getVoucher().getDiscountType() : null)
+                .voucherDiscountValue(order.getVoucher() != null ? order.getVoucher().getDiscountValue() : null)
+                .voucherMaxDiscount(order.getVoucher() != null ? order.getVoucher().getMaxDiscountAmount() : null)
                 .items(
                         order.getOrderItems().stream().map(orderItem -> {
                             ProductSku sku = orderItem.getSku();

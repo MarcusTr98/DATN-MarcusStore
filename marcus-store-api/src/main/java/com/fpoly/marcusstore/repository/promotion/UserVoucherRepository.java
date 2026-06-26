@@ -28,4 +28,26 @@ public interface UserVoucherRepository extends JpaRepository<UserVoucher, Intege
            "AND v.startDate <= :now " +
            "AND v.endDate >= :now")
     List<UserVoucher> findAvailableVouchersByUserId(@Param("userId") Integer userId, @Param("now") LocalDateTime now);
+
+    // Lay lich su su dung voucher (danh sach ai da dung voucher nay)
+    @Query("SELECT uv FROM UserVoucher uv " +
+           "JOIN FETCH uv.user u " +
+           "JOIN FETCH uv.voucher v " +
+           "WHERE uv.voucher.voucherId = :voucherId " +
+           "AND uv.isUsed = true " +
+           "ORDER BY uv.usedAt DESC")
+    List<UserVoucher> findUsedByVoucherId(@Param("voucherId") Integer voucherId);
+
+    // Lay tat ca voucher da su dung cua 1 user
+    @Query("SELECT uv FROM UserVoucher uv " +
+           "JOIN FETCH uv.voucher v " +
+           "WHERE uv.user.userId = :userId " +
+           "AND uv.isUsed = true " +
+           "ORDER BY uv.usedAt DESC")
+    List<UserVoucher> findUsedByUserId(@Param("userId") Integer userId);
+    // Dem so lan su dung voucher
+    @Query("SELECT COUNT(uv) FROM UserVoucher uv " +
+           "WHERE uv.voucher.voucherId = :voucherId " +
+           "AND uv.isUsed = true")
+    long countUsedByVoucherId(@Param("voucherId") Integer voucherId);
 }

@@ -15,18 +15,14 @@ public class UserVoucherAdminController {
 
     private final UserVoucherService userVoucherService;
 
-    /**
-     * Lấy danh sách user được gán voucher
-     */
+   // get các user được gán voucher
     @GetMapping("/voucher/{voucherId}/users")
     public ResponseEntity<List<VoucherResponse>> getUsersByVoucher(@PathVariable Integer voucherId) {
         List<VoucherResponse> users = userVoucherService.getUserVouchersByVoucherId(voucherId);
         return ResponseEntity.ok(users);
     }
 
-    /**
-     * Gán voucher cho nhiều user (thêm user mới, giữ nguyên user đã có)
-     */
+    // thêm voucher cho từng user
     @PostMapping("/assign")
     public ResponseEntity<Void> assignVoucherToUsers(
             @RequestParam Integer voucherId,
@@ -35,12 +31,7 @@ public class UserVoucherAdminController {
         return ResponseEntity.ok().build();
     }
 
-    /**
-     * Cập nhật danh sách user cho voucher
-     * - Xóa những user không còn trong danh sách
-     * - Thêm những user mới chưa có
-     * - Giữ nguyên những user đã có
-     */
+    // update thêm user mới xóa bỏ user cũ
     @PutMapping("/voucher/{voucherId}/users")
     public ResponseEntity<Void> reassignVoucherUsers(
             @PathVariable Integer voucherId,

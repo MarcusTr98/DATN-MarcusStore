@@ -246,6 +246,9 @@
 
               <div style="font-size: 15px; font-weight: 800; color: #d92d20; padding-right: 15px">
                 <i class="fas fa-spinner fa-spin text-muted" v-if="isFeeLoading"></i>
+                <template v-else-if="hasFreeshipVoucher">
+                  <span class="text-success">Miễn phí</span>
+                </template>
                 <template v-else-if="shippingFee > 0"
                   >+{{ shippingFee.toLocaleString('vi-VN') }}₫</template
                 >
@@ -398,6 +401,9 @@
               <span v-if="isFeeLoading" class="text-muted" style="font-size: 12px"
                 ><i class="fas fa-spinner fa-spin"></i
               ></span>
+              <span v-else-if="hasFreeshipVoucher" class="text-success">
+                <i class="fas fa-truck-fast me-1"></i>Miễn phí
+              </span>
               <span v-else-if="shippingFee > 0" class="text-danger"
                 >+{{ shippingFee.toLocaleString('vi-VN') }}₫</span
               >
@@ -504,6 +510,7 @@ const shippingFee = ref(0)
 const estimatedDelivery = ref('')
 
 // Recalculate discount với cap maxDiscountAmount khi totalAmount thay đổi
+// FREESHIP: chỉ hiển thị "Miễn phí ship" ở UI, không tính vào discount
 const discountAmount = computed(() => {
   const totalAmt = cartData.value.totalAmount || 0
 
@@ -517,9 +524,14 @@ const discountAmount = computed(() => {
     return Math.floor(discount)
   }
 
-  // AMOUNT hoặc FREESHIP: giảm trực tiếp số tiền
-  return savedVoucherValue.value || 0
+  if (savedVoucherType.value === 'AMOUNT') {
+    return savedVoucherValue.value || 0
+  }
+
+  return 0
 })
+
+const hasFreeshipVoucher = computed(() => savedVoucherType.value === 'FREESHIP')
 
 const orderForm = ref({
   recipientName: '',
@@ -547,9 +559,12 @@ const selectedAddress = ref(null)
 const activeAddressId = ref(null)
 
 // ─── Computed
+// finalAmount = Tổng tiền hàng - Giảm giá + Phí ship
+// Nếu có FREESHIP voucher: không cộng shippingFee (được miễn phí)
 const finalAmount = computed(() => {
-  const total = (cartData.value.totalAmount ?? 0) - discountAmount.value + shippingFee.value
-  return total > 0 ? total : 0
+  const total = (cartData.value.totalAmount ?? 0) - discountAmount.value
+  const withShipping = hasFreeshipVoucher.value ? total : total + shippingFee.value
+  return withShipping > 0 ? withShipping : 0
 })
 
 const isAddressReady = computed(() => !!toDistrictId.value && !!toWardCode.value)

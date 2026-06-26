@@ -1,7 +1,9 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.ApplyVoucherRequest;
 import com.fpoly.marcusstore.dto.request.CalculateFeeRequestDTO;
 import com.fpoly.marcusstore.dto.request.CheckoutRequestDTO;
+import com.fpoly.marcusstore.dto.response.VoucherApplyResult;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.CartItem;
@@ -20,10 +22,11 @@ import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.VoucherService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -63,6 +66,13 @@ public class CheckoutService {
     // Bổ sung Inject Notification Service để bắn thông báo
     @Autowired
     private AdminNotificationService notificationService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    private TransactionTemplate getTransactionTemplate() {
+        return new TransactionTemplate(transactionManager);
+    }
 
     // Hàm tính phí ship cho Frontend gọi real-time
     @Transactional(readOnly = true)
@@ -160,63 +170,29 @@ public class CheckoutService {
                 totalWeightGram);
         BigDecimal shippingFeeDecimal = BigDecimal.valueOf(shippingFee);
 
-        // 3. XỬ LÝ VOUCHER
+        // 3. XỬ LÝ VOUCHER QUA VOUCHERSERVICE
         BigDecimal discountAmount = BigDecimal.ZERO;
-        BigDecimal freeshipAmount = BigDecimal.ZERO; // Tiền ship được miễn phí
+        BigDecimal freeshipAmount = BigDecimal.ZERO;
+        Voucher voucher = null;
+        Integer appliedVoucherId = null;
         if (req.getVoucherCode() != null && !req.getVoucherCode().trim().isEmpty()) {
-            Voucher voucher = voucherRepository.findByVoucherCode(req.getVoucherCode())
-                    .orElseThrow(() -> new RuntimeException("Mã giảm giá không tồn tại."));
+            ApplyVoucherRequest applyReq = ApplyVoucherRequest.builder()
+                    .voucherCode(req.getVoucherCode())
+                    .orderAmount(totalAmount)
+                    .shippingFee(shippingFeeDecimal)
+                    .build();
 
-            // Validate Đơn tối thiểu (check trước khi gọi usage check)
-            if (voucher.getMinOrderValue() != null && totalAmount.compareTo(voucher.getMinOrderValue()) < 0) {
-                throw new RuntimeException("Đơn hàng chưa đạt giá trị tối thiểu để sử dụng mã này.");
+            VoucherApplyResult result = voucherService.applyVoucher(applyReq, currentUserId);
+
+            if (!result.isApplied()) {
+                throw new RuntimeException(result.getMessage());
             }
 
-            // Kiểm tra và ghi nhận việc sử dụng voucher
-            // Method này sẽ throw exception nếu không hợp lệ
-            voucherService.checkAndRecordVoucherUsage(voucher.getVoucherId(), currentUserId);
-
-            // Xử lý theo loại voucher
-            if ("FREESHIP".equalsIgnoreCase(voucher.getDiscountType())) {
-                // FREESHIP - miễn phí ship
-                BigDecimal freeshipCover = voucher.getDiscountValue();
-                if (shippingFeeDecimal.compareTo(freeshipCover) <= 0) {
-                    freeshipAmount = shippingFeeDecimal;
-                } else {
-                    freeshipAmount = freeshipCover;
-                }
-
-                order.setVoucher(voucher);
-
-            } else {
-                // === XỬ LÝ DISCOUNT (PERCENT, AMOUNT) ===
-                if ("PERCENT".equalsIgnoreCase(voucher.getDiscountType())) {
-                    // Giảm theo %
-                    BigDecimal percent = voucher.getDiscountValue().divide(BigDecimal.valueOf(100), 2,
-                            RoundingMode.HALF_UP);
-                    discountAmount = totalAmount.multiply(percent);
-
-                    // Giới hạn số tiền giảm tối đa (CHỉ khi maxDiscountAmount > 0)
-                    // min(discountAmount, maxDiscountAmount)
-                    if (voucher.getMaxDiscountAmount() != null
-                            && voucher.getMaxDiscountAmount().compareTo(BigDecimal.ZERO) > 0
-                            && discountAmount.compareTo(voucher.getMaxDiscountAmount()) > 0) {
-                        discountAmount = voucher.getMaxDiscountAmount();
-                    }
-                } else if ("AMOUNT".equalsIgnoreCase(voucher.getDiscountType())) {
-                    // Giảm tiền mặt
-                    discountAmount = voucher.getDiscountValue();
-                }
-
-                // Tránh trường hợp tiền giảm lớn hơn tiền hàng
-                if (discountAmount.compareTo(totalAmount) > 0) {
-                    discountAmount = totalAmount;
-                }
-
-                // Ghi nhận Voucher vào Order
-                // Số lượng đã được trừ trong checkAndRecordVoucherUsage
-                order.setVoucher(voucher);
-            }
+            discountAmount = result.getDiscountAmount() != null ? result.getDiscountAmount() : BigDecimal.ZERO;
+            freeshipAmount = result.getFreeshipAmount() != null ? result.getFreeshipAmount() : BigDecimal.ZERO;
+            appliedVoucherId = result.getVoucherId();
+            voucher = voucherRepository.findById(appliedVoucherId).orElse(null);
+            order.setVoucher(voucher);
         }
 
         // 4. CHỐT SỔ ĐƠN HÀNG
@@ -234,6 +210,19 @@ public class CheckoutService {
 
         // Lưu đơn hàng & dọn Giỏ hàng
         Order savedOrder = orderRepository.save(order);
+
+        // Confirm voucher usage sau khi order lưu thành công
+        // Sử dụng TransactionTemplate để confirm trong transaction riêng biệt
+        if (appliedVoucherId != null) {
+            final Integer finalVoucherId = appliedVoucherId;
+            try {
+                getTransactionTemplate().executeWithoutResult(status -> {
+                    voucherService.confirmVoucherUsage(finalVoucherId, currentUserId);
+                });
+            } catch (Exception e) {
+                System.err.println("[Cảnh báo] Lỗi khi confirm voucher, voucher vẫn được áp dụng: " + e.getMessage());
+            }
+        }
 
         OrderStatusHistory createdHistory = new OrderStatusHistory();
         createdHistory.setOrder(savedOrder);

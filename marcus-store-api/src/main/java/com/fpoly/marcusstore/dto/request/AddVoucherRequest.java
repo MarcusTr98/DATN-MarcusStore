@@ -17,7 +17,7 @@ public class AddVoucherRequest {
     @NotNull(message = "Giá trị giảm không được để trống")
     private BigDecimal discountValue;
     @NotBlank(message = "Hãy chọn kiểu giảm giá hợp lệ")
-    private String discountType; // 'PERCENT', 'AMOUNT', 'FREESHIP', 'GIFT'
+    private String discountType; // 'PERCENT', 'AMOUNT', 'FREESHIP',
     private BigDecimal maxDiscountAmount;
     @NotNull(message = "Đơn tối thiểu không đuợc bỏ trống")
     private BigDecimal minOrderValue;
@@ -26,13 +26,12 @@ public class AddVoucherRequest {
     @NotNull(message = "Ngày kết thúc không đuợc bỏ trống")
     private LocalDateTime endDate;
     private Boolean isActive;
-    private String description;
-
-    // FREESHIP: khu vực áp dụng (NORTH, CENTRAL, SOUTH, null = ALL)
-    private String region;
-
     // Đối tượng sử dụng
     @NotBlank(message = "Hãy chọn đối tượng sử dụng")
     private String targetType; // 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     private List<Integer> targetUserIds; // Danh sách user IDs khi targetType = 'SPECIFIC'
+
+    // Số lượng voucher có thể sử dụng
+    @NotNull(message = "Số lượng voucher không được để trống")
+    private Integer quantity;
 }

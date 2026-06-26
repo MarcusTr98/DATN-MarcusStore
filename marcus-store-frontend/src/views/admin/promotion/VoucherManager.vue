@@ -101,6 +101,7 @@
               <th>Giá trị</th>
               <th>Giảm tối đa</th>
               <th>Đơn tối thiểu</th>
+              <th>Số lượng</th>
               <th>Thời gian</th>
               <th>Đối tượng</th>
               <th>Trạng thái</th>
@@ -122,6 +123,7 @@
               <td class="fw-semibold">{{ formatDiscountValue(voucher) }}</td>
               <td>{{ formatCurrency(voucher.maxDiscountAmount) }}</td>
               <td>{{ formatCurrency(voucher.minOrderValue) }}</td>
+              <td>{{ voucher.quantity || '-' }}</td>
               <td>
                 <div class="date-line">Từ: {{ formatDateTime(voucher.startDate) }}</div>
                 <div class="date-line">Đến: {{ formatDateTime(voucher.endDate) }}</div>
@@ -394,6 +396,24 @@
                   </div>
                 </div>
               </div>
+
+              <div>
+                <label class="form-label">Số lượng voucher <span>*</span></label>
+                <div class="input-group">
+                  <input
+                    v-model.number="form.quantity"
+                    type="number"
+                    min="1"
+                    class="form-control"
+                    :class="{ 'is-invalid': isSubmitted && errors.quantity }"
+                    placeholder="Nhập số lượng voucher"
+                  />
+                  <span class="input-group-text">lần</span>
+                  <div v-if="errors.quantity" class="invalid-feedback">
+                    {{ errors.quantity }}
+                  </div>
+                </div>
+              </div>
             </section>
 
             <section class="form-section">
@@ -646,6 +666,24 @@
                   <span class="input-group-text">đ</span>
                   <div v-if="errors.min_order_value" class="invalid-feedback">
                     {{ errors.min_order_value }}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label class="form-label">Số lượng voucher <span>*</span></label>
+                <div class="input-group">
+                  <input
+                    v-model.number="form.quantity"
+                    type="number"
+                    min="1"
+                    class="form-control"
+                    :class="{ 'is-invalid': isSubmitted && errors.quantity }"
+                    placeholder="Nhập số lượng voucher"
+                  />
+                  <span class="input-group-text">lần</span>
+                  <div v-if="errors.quantity" class="invalid-feedback">
+                    {{ errors.quantity }}
                   </div>
                 </div>
               </div>
@@ -929,6 +967,7 @@ const defaultForm = {
   discount_type: 'PERCENT',
   max_discount_amount: null,
   min_order_value: 0,
+  quantity: 100,
   start_date: '',
   end_date: '',
   is_active: true,
@@ -1040,6 +1079,11 @@ const errors = computed(() => {
   // Validation cho đối tượng sử dụng
   if (form.target_type === 'SPECIFIC' && form.selected_user_ids.length === 0) {
     result.selected_user_ids = 'Vui lòng chọn ít nhất 1 khách hàng'
+  }
+
+  // Validation cho số lượng voucher
+  if (!form.quantity || form.quantity < 1) {
+    result.quantity = 'Số lượng phải lớn hơn 0'
   }
 
   if (Number(form.min_order_value) < 0) {
@@ -1248,6 +1292,7 @@ function openEditModal(voucher) {
     discount_type: voucher.discountType,
     max_discount_amount: voucher.maxDiscountAmount,
     min_order_value: voucher.minOrderValue,
+    quantity: voucher.quantity || 1,
     start_date: voucher.startDate,
     end_date: voucher.endDate,
     is_active: voucher.isActive,
@@ -1274,6 +1319,7 @@ function buildPayload() {
     endDate: form.end_date,
     isActive: Boolean(form.is_active),
     targetType: form.target_type,
+    quantity: Number(form.quantity),
   }
 
   if (form.target_type === 'SPECIFIC') {
@@ -1286,7 +1332,6 @@ function buildPayload() {
       discountValue: Number(form.discount_value),
       discountType: form.discount_type,
       maxDiscountAmount: form.discount_type === 'AMOUNT' ? null : Number(form.max_discount_amount),
-      // Không gửi quantity nữa - mặc định 1 lần/user
     }
   }
 
@@ -1295,7 +1340,6 @@ function buildPayload() {
       ...basePayload,
       discountType: 'FREESHIP',
       discountValue: Number(form.freeship_value),
-      // Không gửi quantity nữa - mặc định 1 lần/user
     }
   }
 }
