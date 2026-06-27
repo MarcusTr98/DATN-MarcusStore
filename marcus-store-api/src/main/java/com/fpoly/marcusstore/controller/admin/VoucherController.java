@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+@PreAuthorize("hasAuthority('MARKETING_VIEW')")
 @RequiredArgsConstructor
 public class VoucherController {
     private final VoucherService voucherService;
@@ -52,16 +52,19 @@ public class VoucherController {
         return voucherService.getVoucherById(voucherId);
     }
     @DeleteMapping("/voucher/{voucherId}")
+    @PreAuthorize("hasAuthority('MARKETING_DELETE')")
     public ResponseEntity<Void> removeVoucher(@PathVariable("voucherId") Integer voucherId){
         voucherService.deleteVoucherById(voucherId);
         return ResponseEntity.noContent().build();
     }
     @PostMapping("/voucher")
+    @PreAuthorize("hasAuthority('MARKETING_CREATE')")
     public ResponseEntity<VoucherResponse> addVoucher(@Valid @RequestBody AddVoucherRequest request){
         VoucherResponse response =  voucherService.addVoucher(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     @PutMapping("/voucher/{voucherId}")
+    @PreAuthorize("hasAuthority('MARKETING_UPDATE')")
     public ResponseEntity<VoucherResponse> updateVoucher( @PathVariable("voucherId") Integer voucherId,@Valid @RequestBody AddVoucherRequest request){
         VoucherResponse voucher = voucherService.updateVoucher(voucherId, request);
         return ResponseEntity.status(HttpStatus.OK).body(voucher);

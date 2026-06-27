@@ -43,7 +43,7 @@ public class AdminUserController {
         return ApiResponse.success(userServiceImpl.getALL(keyword, roles, pageable));
 }
  @PostMapping
-@PreAuthorize("hasAuthority('USER_MANAGE')")
+@PreAuthorize("hasAuthority('USER_CREATE')")
  public ApiResponse<UserResponse> create(@Valid @RequestBody CreateUserRequest request){
     return ApiResponse.success(userServiceImpl.create(request));
  }
@@ -52,19 +52,19 @@ public ApiResponse<UserResponse> getById(@PathVariable("id") Integer id){
     return ApiResponse.success(userServiceImpl.getById(id));
 }
 @PutMapping("/{id}")
-@PreAuthorize("hasAuthority('USER_MANAGE')")
+@PreAuthorize("hasAuthority('USER_UPDATE')")
 public ApiResponse<UserResponse> update( @PathVariable Integer id,@Valid @RequestBody UpdateUserRequest request){
     return ApiResponse.success(userServiceImpl.update(id, request));
 }
 @PutMapping("/{id}/lock")
-@PreAuthorize("hasAuthority('USER_MANAGE')")
+@PreAuthorize("hasAuthority('USER_LOCK')")
 public ApiResponse<String> lockUser(@PathVariable Integer id){
     userServiceImpl.lockUser(id);
     return ApiResponse.success("Khóa tài khoản thành công");
 }
 
 @PutMapping("/{id}/unLock")
-@PreAuthorize("hasAuthority('USER_MANAGE')")
+@PreAuthorize("hasAuthority('USER_UNLOCK')")
 public ApiResponse<String> unLockUser(@PathVariable Integer id){
     userServiceImpl.UnLockUser(id);
     return ApiResponse.success("Mở khóa tài khoản thành công");
