@@ -142,6 +142,9 @@
                 </span>
               </div>
 
+              <!-- Khuyến mãi / ưu đãi (sửa nội dung trong PromotionCard.vue) -->
+              <VoucherCard />
+
               <!-- Rating -->
               <div class="card-footer-row">
                 <div class="card-rating">
@@ -153,9 +156,6 @@
           </div>
         </div>
 
-        <!-- Xem thêm:
-             - standalone (Home) -> link sang /category/:slug
-             - filter (trang /category/:slug) -> load more -->
         <div v-if="block.totalElements > 0" class="load-more-wrap">
           <router-link
             v-if="props.mode === 'standalone'"
@@ -196,6 +196,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import api from '@/utils/api'
 import FilterModal from '@/layouts/home/FilterModal.vue'
+import VoucherCard from '@/layouts/home/VoucherCard.vue'
 
 const props = defineProps({
   mode: {
@@ -220,6 +221,7 @@ const sortOptions = [
 // ---- DANH SÁCH CATEGORY CHA (chỉ cate có sản phẩm) ----
 const mainCategories = ref([])
 const loadingCategories = ref(false)
+
 const blocks = ref([])
 
 // ---- FILTER MODAL STATE ----
@@ -234,9 +236,11 @@ function openFilter(block) {
 }
 
 function getActiveFilterCount(block) {
-  return (block.selectedMinPrice != null || block.selectedMaxPrice != null ? 1 : 0)
-    + (block.selectedValueIds?.length ?? 0)
-    + (block.selectedBrandIds?.length ?? 0)
+  return (
+    (block.selectedMinPrice != null || block.selectedMaxPrice != null ? 1 : 0) +
+    (block.selectedValueIds?.length ?? 0) +
+    (block.selectedBrandIds?.length ?? 0)
+  )
 }
 
 function onFilterApply({ brandIds, minPrice, maxPrice, valueIds }) {
@@ -261,7 +265,7 @@ function createBlock(cate) {
     sectionTitle: 'Sắp xếp theo',
     sortBy: 'popular',
     page: 0,
-    size: 10,
+    size: 8,
     totalPages: 0,
     totalElements: 0,
     products: [],
@@ -301,7 +305,10 @@ async function fetchBrands(block) {
   try {
     const res = await api.get(`/client/categories/${block.categoryId}/children`)
     block.brands = res.data?.data ?? []
-    console.log(`[brand] cate=${block.categoryName} (id=${block.categoryId}) -> ${block.brands.length} brands`, block.brands)
+    console.log(
+      `[brand] cate=${block.categoryName} (id=${block.categoryId}) -> ${block.brands.length} brands`,
+      block.brands,
+    )
   } catch (err) {
     console.error('Lỗi khi tải danh sách hãng:', err)
     block.brands = []
@@ -702,12 +709,11 @@ function formatPrice(value) {
   font-size: 14px;
   font-weight: 500;
   line-height: 1.4;
-  height: 40px;
+  height: 20px;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  margin: 0 0 8px;
+  margin: 0 0 4px;
 }
 
 .card-price {
@@ -819,7 +825,9 @@ function formatPrice(value) {
   font-weight: 600;
   color: #d70018;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .load-more-btn:hover:not(:disabled) {
