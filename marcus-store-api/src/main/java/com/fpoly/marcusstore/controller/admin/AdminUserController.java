@@ -33,7 +33,7 @@ public class AdminUserController {
     private final UserServiceImpl userServiceImpl;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    @PreAuthorize("hasAuthority('USER_VIEW')")
     public ApiResponse<Page<UserResponse>> getAll(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) List<String> roles,
@@ -45,19 +45,19 @@ public class AdminUserController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
         return ApiResponse.success(userServiceImpl.create(request));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<UserResponse> getById(@PathVariable("id") Integer id) {
         return ApiResponse.success(userServiceImpl.getById(id));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<UserResponse> update(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateUserRequest request) {
@@ -65,27 +65,26 @@ public class AdminUserController {
     }
 
     @PutMapping("/{id}/lock")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<String> lockUser(@PathVariable Integer id) {
         userServiceImpl.lockUser(id);
         return ApiResponse.success("Khóa tài khoản thành công");
     }
 
     @PutMapping("/{id}/unLock")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<String> unLockUser(@PathVariable Integer id) {
         userServiceImpl.UnLockUser(id);
         return ApiResponse.success("Mở khóa tài khoản thành công");
     }
 
     @PostMapping("/{id}/send-verify-email")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<String> sendVerifyEmail(@PathVariable Integer id) {
         userServiceImpl.sendVerifyEmail(id);
         return ApiResponse.success("Email xác thực đã được gửi đến khách hàng");
     }
 
-    // Khách submit OTP (không cần ADMIN)
     @PostMapping("/verify-email")
     @PreAuthorize("permitAll()")
     public ApiResponse<String> verifyEmail(@RequestBody @Valid VerifyOtpRequest request) {

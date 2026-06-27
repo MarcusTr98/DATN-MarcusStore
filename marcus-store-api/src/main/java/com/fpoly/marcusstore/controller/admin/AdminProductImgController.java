@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.controller.admin;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,11 +26,13 @@ public class AdminProductImgController {
     ProductImgService productImgService;
 
     @GetMapping("/{productId}/images")
+    @PreAuthorize("hasAuthority('PRODUCT_VIEW')")
     public ApiResponse<List<ProductImgResponse>> getImagesByProductId(@PathVariable Integer productId) {
         return ApiResponse.success(productImgService.getProductImgByIdProduct(productId));
     }
 
     @PostMapping("/{productId}/images")
+    @PreAuthorize("hasAuthority('PRODUCT_CREATE')")
     public ApiResponse<ProductImgResponse> createProductImg(
             @PathVariable Integer productId,
             @RequestParam("file") MultipartFile file,
@@ -44,6 +47,7 @@ public class AdminProductImgController {
     }
 
     @PutMapping("/images/{id}")
+    @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
     public ApiResponse<ProductImgResponse> updateProductImg(
             @PathVariable Integer id,
             @RequestParam(value="file", required = false) MultipartFile file,
@@ -58,6 +62,7 @@ public class AdminProductImgController {
     }
 
      @DeleteMapping("/images/{id}")
+     @PreAuthorize("hasAuthority('PRODUCT_DELETE')")
     public ApiResponse<String> deleteProductImg(@PathVariable Integer id) {
         productImgService.deleteProductImg(id);
         return ApiResponse.success("Xóa ảnh thành công");

@@ -12,6 +12,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +20,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/admin/product")
+@PreAuthorize("hasAuthority('PRODUCT_VIEW')")
 public class AdminProductController {
 
     @Autowired
@@ -36,6 +38,7 @@ public class AdminProductController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('PRODUCT_CREATE')")
     public ApiResponse<ProductResponse> createProduct(@Valid @RequestBody CreateProduct createProduct) {
         return ApiResponse.success(productsService.createProduct(createProduct));
     }
@@ -47,12 +50,14 @@ public class AdminProductController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
     public ApiResponse<ProductResponse> updateProduct(@PathVariable Integer id,
             @Valid @RequestBody UpdateProduct updateProduct) {
         return ApiResponse.success(productsService.updateProduct(id, updateProduct));
     }
 
     @PutMapping("/hidden/{id}")
+    @PreAuthorize("hasAuthority('PRODUCT_DELETE')")
     public ApiResponse<ProductResponse> hiddenProduct(@PathVariable Integer id) {
         return ApiResponse.success(productsService.hiddenProduct(id));
     }
