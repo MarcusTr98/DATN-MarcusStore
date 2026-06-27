@@ -21,7 +21,6 @@ function mapVoucher(voucher) {
     endDate: voucher.endDate || null,
     quantity: Number(voucher.quantity || 0),
     isActive: Boolean(voucher.isActive),
-    description: voucher.description || '',
     // Đối tượng sử dụng
     targetType: voucher.targetType || 'ALL',
     targetUserIds: voucher.targetUserIds || [],

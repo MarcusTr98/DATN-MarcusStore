@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.dto.response;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import lombok.AllArgsConstructor;
@@ -12,7 +13,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserResponse {
-    
+
     private Integer userId;
 
     private String username;
@@ -30,5 +31,7 @@ public class UserResponse {
     private String roleName;
 
     private LocalDateTime createdAt;
+
+    private BigDecimal totalSpent;
 
 }

@@ -25,17 +25,29 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
     Optional<User> findByEmail(String email);
 
-    Page<User> findByFullNameContainingIgnoreCase(
-        String keyword,
-        Pageable pageable
-);
-
+    @Query("""
+            SELECT u FROM User u
+            JOIN u.role r
+            WHERE (
+                :keyword IS NULL
+                OR LOWER(u.fullName) LIKE CONCAT('%', :keyword, '%')
+                OR LOWER(u.email) LIKE CONCAT('%', :keyword, '%')
+                OR LOWER(u.username) LIKE CONCAT('%', :keyword, '%')
+                OR u.phoneNumber LIKE CONCAT('%', :keyword, '%')
+            )
+            AND (:rolesEmpty = true OR r.roleName IN :roles)
+            """)
+    Page<User> findAllByKeywordAndRoles(
+            @Param("keyword") String keyword,
+            @Param("roles") List<String> roles,
+            @Param("rolesEmpty") boolean rolesEmpty,
+            Pageable pageable);
     // Lấy tất cả users có role cụ thể (roleId = 3 cho CUSTOMER)
     List<User> findByRoleRoleId(Integer roleId);
 
     @Query("SELECT u FROM User u WHERE u.role.roleId = :roleId AND " +
-           "(LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
-           "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+            "(LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
     List<User> findByRoleRoleIdAndKeyword(@Param("roleId") Integer roleId, @Param("keyword") String keyword);
 }
