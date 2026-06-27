@@ -3,18 +3,31 @@
     <component
       v-for="item in kpiItems"
       :key="item.key"
-      :is="item.link ? 'a' : 'article'"
-      :href="item.link || undefined"
+      :is="item.link ? 'router-link' : 'article'"
+      :to="item.link || undefined"
       class="kpi-card"
-      :class="{ warning: item.type === 'warning' }"
+      :class="{ warning: item.type === 'warning', clickable: !!item.link || !!item.action }"
+      @click="item.action ? $emit('action', item.action) : undefined"
     >
       <div class="kpi-top">
         <span
           class="kpi-icon"
-          style="width:48px;height:48px;min-width:48px;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;font-size:22px;flex:none;"
-          :style="{ background: item.type === 'warning' ? '#ffedd5' : '#fff2f7', color: item.type === 'warning' ? '#c2410c' : '#ff4d8d' }"
-        ><i :class="item.icon"></i></span>
-        <small>{{ item.growth }}</small>
+          :class="item.icon"
+          :style="{
+            background: item.type === 'warning' ? '#ffedd5' : '#fff2f7',
+            color: item.type === 'warning' ? '#c2410c' : '#ff4d8d',
+            width: '46px',
+            height: '46px',
+            minWidth: '46px',
+            borderRadius: '14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '20px',
+            flex: 'none',
+          }"
+        ></span>
+        <small v-if="item.growth">{{ item.growth }}</small>
       </div>
       <div>
         <p>{{ item.title }}</p>
@@ -29,11 +42,13 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  kpiSummary:         { type: Object,  default: () => ({ totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 }) },
-  pendingOrdersCount: { type: Number,  default: 0 },
-  lowStockData:       { type: Array,   default: () => [] },
-  periodLabel:        { type: String,  default: 'tháng này' },
+  kpiSummary:         { type: Object, default: () => ({ totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 }) },
+  pendingOrdersCount: { type: Number, default: 0 },
+  lowStockData:       { type: Array,  default: () => [] },
+  periodLabel:        { type: String, default: 'tháng này' },
 })
+
+const emit = defineEmits(['action'])
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('vi-VN', {
@@ -42,78 +57,63 @@ function formatCurrency(value) {
 }
 
 const inventoryAlerts = computed(() =>
-  props.lowStockData.slice(0, 3).map((item) => ({
+  props.lowStockData.slice(0, 3).map(item => ({
     title: item.status === 'Hết hàng'
       ? `Hết hàng: ${item.productName} (${item.skuCode})`
       : `Sắp hết hàng: ${item.productName} chỉ còn ${item.stockQuantity} sản phẩm`,
-  })),
+  }))
 )
 
 const kpiItems = computed(() => [
   {
-    key:    'revenue',
-    title:  'Doanh thu',
-    value:  formatCurrency(props.kpiSummary.totalRevenue),
-    growth: '',
-    note:   `Tổng doanh thu ${props.periodLabel}`,
-    icon:   'bi bi-currency-dollar',
-    type:   'normal',
+    key: 'revenue', title: 'Doanh thu',
+    value: formatCurrency(props.kpiSummary.totalRevenue), growth: '',
+    note: `Tổng doanh thu ${props.periodLabel}`,
+    icon: 'bi bi-currency-dollar', type: 'normal', link: null, action: null,
   },
   {
-    key:    'orders',
-    title:  'Tổng đơn hàng',
-    value:  String(props.kpiSummary.totalOrders),
-    growth: '',
-    note:   `Đơn hàng đã ghi nhận ${props.periodLabel}`,
-    icon:   'bi bi-bag-check',
-    type:   'normal',
+    key: 'orders', title: 'Tổng đơn hàng',
+    value: String(props.kpiSummary.totalOrders), growth: '',
+    note: `Đơn hàng đã ghi nhận ${props.periodLabel}`,
+    icon: 'bi bi-bag-check', type: 'normal', link: null, action: null,
   },
   {
-    key:    'soldProducts',
-    title:  'Sản phẩm đã bán',
-    value:  String(props.kpiSummary.totalProductsSold),
-    growth: '',
-    note:   `Số lượng SKU đã bán ${props.periodLabel}`,
-    icon:   'bi bi-box-seam',
-    type:   'normal',
+    key: 'soldProducts', title: 'Sản phẩm đã bán',
+    value: String(props.kpiSummary.totalProductsSold), growth: '',
+    note: `Số lượng SKU đã bán ${props.periodLabel}`,
+    icon: 'bi bi-box-seam', type: 'normal', link: null, action: null,
   },
   {
-    key:    'pendingOrders',
-    title:  'Đơn mới chưa xử lý',
-    value:  String(props.pendingOrdersCount),
-    growth: 'Ưu tiên',
-    note:   'Ưu tiên duyệt để tránh trễ SLA',
-    icon:   'bi bi-exclamation-triangle',
-    type:   'warning',
-    link:   '/admin/orders?status=PENDING',
+    key: 'pendingOrders', title: 'Đơn mới chưa xử lý',
+    value: String(props.pendingOrdersCount),
+    growth: props.pendingOrdersCount > 0 ? 'Ưu tiên' : '',
+    note: 'Ưu tiên duyệt để tránh trễ SLA',
+    icon: 'bi bi-exclamation-triangle',
+    type: props.pendingOrdersCount > 0 ? 'warning' : 'normal',
+    link: '/admin/order', action: null,
   },
   {
-    key:    'lowStock',
-    title:  'SP sắp / hết hàng',
-    value:  String(props.lowStockData.length),
-growth: props.lowStockData.length > 0 ? 'Cần xử lý' : '',
-    note:   'Cần nhập thêm hàng',
-    icon:   'bi bi-archive',
-    type:   props.lowStockData.length > 0 ? 'warning' : 'normal',
-    link:   '/admin/inventory?filter=low',
+    key: 'lowStock', title: 'SP sắp / hết hàng',
+    value: String(props.lowStockData.length),
+    growth: props.lowStockData.length > 0 ? 'Cần xử lý' : '',
+    note: 'Cần nhập thêm hàng',
+    icon: 'bi bi-archive',
+    type: props.lowStockData.length > 0 ? 'warning' : 'normal',
+    link: null, action: 'lowStock',
   },
   {
-    key:    'alerts',
-    title:  'Cảnh báo tồn kho',
-    value:  String(inventoryAlerts.value.length),
+    key: 'alerts', title: 'Cảnh báo tồn kho',
+    value: String(inventoryAlerts.value.length),
     growth: inventoryAlerts.value.length > 0 ? 'Mới' : '',
-    note:   inventoryAlerts.value.length > 0
-      ? inventoryAlerts.value[0].title
-      : 'Không có cảnh báo',
-    icon:   'bi bi-bell',
-    type:   inventoryAlerts.value.length > 0 ? 'warning' : 'normal',
-    link:   inventoryAlerts.value.length > 0 ? '/admin/inventory?filter=low' : undefined,
+    note: inventoryAlerts.value.length > 0 ? inventoryAlerts.value[0].title : 'Không có cảnh báo',
+    icon: 'bi bi-bell',
+    type: inventoryAlerts.value.length > 0 ? 'warning' : 'normal',
+    link: null, action: inventoryAlerts.value.length > 0 ? 'lowStock' : null,
   },
 ])
 </script>
 
-<style>
-/* Không dùng scoped vì <component :is> dynamic không nhận được scoped hash */
+<style scoped>
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -135,7 +135,11 @@ growth: props.lowStockData.length > 0 ? 'Cần xử lý' : '',
   color: inherit;
 }
 
-.kpi-grid .kpi-card:hover {
+.kpi-grid .kpi-card.clickable {
+  cursor: pointer;
+}
+
+.kpi-grid .kpi-card.clickable:hover {
   transform: translateY(-4px);
   box-shadow: 0 16px 40px rgba(37, 99, 235, 0.15);
 }
@@ -153,32 +157,20 @@ growth: props.lowStockData.length > 0 ? 'Cần xử lý' : '',
 }
 
 .kpi-grid .kpi-icon {
-  width: 48px !important;
-  height: 48px !important;
-  min-width: 48px;
-  min-height: 48px;
-  border-radius: 16px;
-  background: #fff2f7;
-  color: #ff4d8d;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
   flex: none;
+  font-size: 20px;
 }
 
-.kpi-grid .kpi-icon i {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1em;
-  height: 1em;
+.kpi-grid .kpi-icon::before {
+  display: block;
   line-height: 1;
-}
-
-.kpi-grid .kpi-card.warning .kpi-icon {
-  background: #ffedd5;
-  color: #c2410c;
 }
 
 .kpi-grid .kpi-top small {
@@ -223,14 +215,10 @@ growth: props.lowStockData.length > 0 ? 'Cần xử lý' : '',
 }
 
 @media (max-width: 992px) {
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 600px) {
-  .kpi-grid {
-    grid-template-columns: 1fr;
-  }
+  .kpi-grid { grid-template-columns: 1fr; }
 }
 </style>

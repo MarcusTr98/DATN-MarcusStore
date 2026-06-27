@@ -95,21 +95,20 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("endDate")   LocalDate endDate,
             @Param("keyword")   String keyword);
 
-    @Query(value = """
-        SET DATEFIRST 7;
-        SELECT
-            DATEPART(WEEKDAY, o.created_at) AS dayOfWeek,
-            COUNT(DISTINCT o.order_id)      AS totalOrders
-        FROM Orders o
-        WHERE o.payment_status = 'PAID'
-            AND (:startDate IS NULL OR CAST(o.created_at AS DATE) >= :startDate)
-            AND (:endDate   IS NULL OR CAST(o.created_at AS DATE) <= :endDate)
-        GROUP BY DATEPART(WEEKDAY, o.created_at)
-        ORDER BY dayOfWeek
-        """, nativeQuery = true)
-    List<OrderByWeekdayProjection> getOrdersByWeekday(
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate")   LocalDate endDate);
+   @Query(value = """
+    SELECT
+        DATEPART(WEEKDAY, o.created_at) AS dayOfWeek,
+        COUNT(DISTINCT o.order_id)      AS totalOrders
+    FROM Orders o
+    WHERE o.payment_status = 'PAID'
+        AND (:startDate IS NULL OR CAST(o.created_at AS DATE) >= :startDate)
+        AND (:endDate   IS NULL OR CAST(o.created_at AS DATE) <= :endDate)
+    GROUP BY DATEPART(WEEKDAY, o.created_at)
+    ORDER BY dayOfWeek
+    """, nativeQuery = true)
+List<OrderByWeekdayProjection> getOrdersByWeekday(
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate")   LocalDate endDate);
 
     @Query(value = """
         SELECT
@@ -176,16 +175,16 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("endDate")   LocalDate endDate,
             @Param("keyword")   String keyword);
 
-    @Query(value = """
-        SELECT COALESCE(SUM(o.final_amount), 0)
-        FROM Orders o
-        WHERE o.payment_status = 'PAID'
-            AND CAST(o.created_at AS DATE) >= :startDate
-            AND CAST(o.created_at AS DATE) <= :endDate
-        """, nativeQuery = true)
+   @Query(value = """
+    SELECT ISNULL(SUM(o.final_amount), 0) AS totalRevenue
+    FROM Orders o
+    WHERE o.payment_status = 'PAID'
+        AND CAST(o.created_at AS DATE) >= :startDate
+        AND CAST(o.created_at AS DATE) <= :endDate
+    """, nativeQuery = true)
     BigDecimal getTotalRevenue(
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate")   LocalDate endDate);
+        @Param("startDate") LocalDate startDate,
+        @Param("endDate")   LocalDate endDate);
 
     @Query(value = """
         SELECT TOP (:limit)

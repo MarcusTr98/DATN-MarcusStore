@@ -23,10 +23,34 @@
         <option value="">Tất cả trạng thái</option>
         <option v-for="s in statusOptions" :key="s.value" :value="s.value">{{ s.label }}</option>
       </select>
-      <select v-if="categoryOptions.length > 0" v-model="filters.category" @change="applyFilters">
-        <option value="">Tất cả danh mục / thương hiệu</option>
+
+      <!--
+        FIX #1: Tách riêng filter brand (recentOrders / lowStock)
+        vs filter category (topProducts) để tránh gửi sai field lên backend.
+        Backend getRecentOrders & getLowStockProducts nhận param "brand",
+        không nhận "category".
+      -->
+      <select
+        v-if="showBrandFilter"
+        v-model="filters.brand"
+        @change="applyFilters"
+      >
+        <option value="">Tất cả thương hiệu</option>
+        <option v-for="b in brandOptions" :key="b" :value="b">{{ b }}</option>
+      </select>
+
+      <select
+        v-else-if="showCategoryFilter"
+        v-model="filters.category"
+        @change="applyFilters"
+      >
+        <option value="">Tất cả danh mục</option>
         <option v-for="c in categoryOptions" :key="c" :value="c">{{ c }}</option>
       </select>
+
+      <!-- placeholder để giữ layout khi cả 2 filter đều ẩn -->
+      <div v-else></div>
+
       <select v-model="filters.date" @change="applyFilters">
         <option value="week">Tuần này</option>
         <option value="month">Tháng này</option>
@@ -48,7 +72,13 @@
 
     <!-- Table -->
     <div class="table-wrap">
-      <table>
+      <!-- FIX #11: loading state -->
+      <div v-if="isLoading" class="loading-cell">
+        <span class="spinner"></span>
+        <span>Đang tải dữ liệu...</span>
+      </div>
+
+      <table v-else>
         <thead>
           <tr>
             <th v-for="col in activeColumns" :key="col.key" :class="alignClass(col.align)">
@@ -88,9 +118,11 @@ import { ref, reactive, computed, watch } from 'vue'
 import statisticsApi from '@/api/statisticsApi'
 
 const props = defineProps({
-  selectedTime:     { type: String, default: 'month' },
-  customDate:       { type: String, default: '' },
-  childCategories:  { type: Array,  default: () => [] },
+  selectedTime:    { type: String, default: 'month' },
+  customDate:      { type: String, default: '' },
+  childCategories: { type: Array,  default: () => [] },
+  // FIX #1: nhận thêm danh sách brand từ parent (lấy từ brandStats hoặc API riêng)
+  brandList:       { type: Array,  default: () => [] },
 })
 
 // ── tabs & columns ───────────────────────────────────────────
@@ -134,16 +166,34 @@ const columnMap = {
 // ── state ────────────────────────────────────────────────────
 const currentTab = ref('recentOrders')
 const tableRows  = ref([])
+const isLoading  = ref(false) // FIX #11
 
 const filters = reactive({
   search:   '',
   status:   '',
-  category: '',
+  brand:    '',    // FIX #1: tách thành field riêng
+  category: '',    // FIX #1: dùng cho topProducts nếu cần
   date:     'month',
 })
 
 // ── computed ─────────────────────────────────────────────────
 const activeColumns = computed(() => columnMap[currentTab.value] ?? [])
+
+// FIX #1: hiển thị brand filter cho recentOrders và lowStock
+const showBrandFilter = computed(() =>
+  ['recentOrders', 'lowStock'].includes(currentTab.value) && brandOptions.value.length > 0
+)
+
+// showCategoryFilter có thể dùng cho topProducts nếu muốn thêm sau
+const showCategoryFilter = computed(() => false)
+
+// FIX #1: brandOptions lấy từ props.brandList (truyền từ Dashboard.vue qua brandStats)
+const brandOptions = computed(() => props.brandList)
+
+const categoryOptions = computed(() =>
+  props.childCategories.map(c => c.categoryName)
+)
+
 const statusOptions = computed(() => {
   if (currentTab.value === 'recentOrders') {
     return [
@@ -164,62 +214,61 @@ const statusOptions = computed(() => {
   return []
 })
 
-const categoryOptions = computed(() => {
-  if (currentTab.value === 'recentOrders' || currentTab.value === 'lowStock') {
-    return props.childCategories.map(c => c.categoryName)
-  }
-  return []
-})
-
 // ── fetch ────────────────────────────────────────────────────
 async function fetchTableData() {
   const period = filters.date || props.selectedTime || 'month'
-  const sd     = props.customDate || ''
-  const ed     = props.customDate || ''
+  const sd = props.customDate || ''
+  const ed = props.customDate || ''
 
+  isLoading.value = true // FIX #11
   try {
     let res
     if (currentTab.value === 'recentOrders') {
-      res = await statisticsApi.getRecentOrders(50, period, sd, ed, filters.search, filters.status, filters.category)
+      // FIX #1: truyền filters.brand thay vì filters.category
+      res = await statisticsApi.getRecentOrders(50, period, sd, ed, filters.search, filters.status, filters.brand)
     } else if (currentTab.value === 'topProducts') {
       res = await statisticsApi.getTopProducts(50, period, sd, ed, filters.search)
     } else if (currentTab.value === 'lowStock') {
-      res = await statisticsApi.getLowStockProducts(filters.search, filters.category, filters.status)
+      // FIX #1: truyền filters.brand thay vì filters.category
+      res = await statisticsApi.getLowStockProducts(filters.search, filters.brand, filters.status)
     } else if (currentTab.value === 'topCustomers') {
       res = await statisticsApi.getTopCustomers(50, period, sd, ed, filters.search)
     }
     tableRows.value = res?.data?.data ?? []
   } catch {
     tableRows.value = []
+  } finally {
+    isLoading.value = false // FIX #11
   }
 }
 
 function applyFilters()  { fetchTableData() }
 
 function switchTab(val) {
-  currentTab.value   = val
-  filters.status     = ''
-  filters.category   = ''
+  currentTab.value = val
+  filters.status   = ''
+  filters.brand    = ''    // FIX #1: reset brand khi đổi tab
+  filters.category = ''
   fetchTableData()
 }
 
 function resetFilters() {
   filters.search   = ''
   filters.status   = ''
+  filters.brand    = ''    // FIX #1
   filters.category = ''
   filters.date     = props.selectedTime || 'month'
   fetchTableData()
 }
 
-// re-fetch khi period thay đổi từ parent
 watch(() => props.selectedTime, (val) => {
   if (!val) return
   filters.date = val
   fetchTableData()
 })
 
-watch(() => props.customDate, () => {
-  filters.date = props.customDate
+watch(() => props.customDate, (val) => {
+  filters.date = val || props.selectedTime
   fetchTableData()
 })
 
@@ -239,7 +288,7 @@ function alignClass(align) {
 }
 
 const statusLabels = {
-PENDING: 'Chờ xử lý', CONFIRMED: 'Đã xác nhận', SHIPPING: 'Đang giao hàng',
+  PENDING: 'Chờ xử lý', CONFIRMED: 'Đã xác nhận', SHIPPING: 'Đang giao hàng',
   COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy', PROCESSING: 'Đang xử lý',
   PAID: 'Đã thanh toán', UNPAID: 'Chưa thanh toán',
   'Hết hàng': 'Hết hàng', 'Sắp hết hàng': 'Sắp hết hàng',
@@ -256,8 +305,12 @@ function statusClass(status) {
   }
 }
 
-// expose để Dashboard.vue có thể trigger fetch lần đầu
-defineExpose({ fetchTableData })
+defineExpose({
+  fetchTableData,
+  switchToLowStock() {
+    switchTab('lowStock')
+  },
+})
 </script>
 
 <style scoped>
@@ -374,7 +427,7 @@ defineExpose({ fetchTableData })
   box-shadow: 0 10px 22px rgba(255, 77, 141, 0.22);
 }
 
-/* Table — dùng :deep để scoped ăn vào element selector */
+/* Table */
 .table-wrap {
   overflow: hidden;
   border: 1px solid #ffe0ec;
@@ -401,7 +454,7 @@ defineExpose({ fetchTableData })
 }
 
 :deep(th) {
-color: #374151;
+  color: #374151;
   font-size: 12px;
   font-weight: 900;
   letter-spacing: 0.04em;
@@ -465,6 +518,31 @@ color: #374151;
   margin-top: 6px;
   color: #9ca3af;
   font-weight: 700;
+}
+
+/* FIX #11: loading state */
+.loading-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 44px 18px;
+  color: #9ca3af;
+  font-weight: 700;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #ffe0ec;
+  border-top-color: #ff4d8d;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 992px) {

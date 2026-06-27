@@ -36,12 +36,6 @@ public class AdminStatisticsController {
         return ApiResponse.success(statisticsService.getKpiSummary(dates[0], dates[1]));
     }
 
-    @GetMapping("/revenue/monthly")
-    public ApiResponse<List<StatisticsResponseDTO>> getRevenueByMonth(
-            @RequestParam(required = false) Integer year) {
-        return ApiResponse.success(statisticsService.getRevenueByMonth(year));
-    }
-
     @GetMapping("/top-products")
     public ApiResponse<List<TopProductResponseDTO>> getTopSellingProducts(
             @RequestParam(defaultValue = "10") int topN,
@@ -104,10 +98,12 @@ public class AdminStatisticsController {
     }
 
     @GetMapping("/revenue/compare")
-    public ApiResponse<RevenueCompareResponseDTO> getRevenueCompare(
-            @RequestParam(required = false, defaultValue = "month") String period) {
-        return ApiResponse.success(statisticsService.getRevenueCompare(period));
-    }
+public ApiResponse<RevenueCompareResponseDTO> getRevenueCompare(
+        @RequestParam(required = false, defaultValue = "month") String period,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+    return ApiResponse.success(statisticsService.getRevenueCompare(period, startDate, endDate));
+}
 
     @GetMapping("/pending-orders/count")
     public ApiResponse<Long> countPendingOrders() {

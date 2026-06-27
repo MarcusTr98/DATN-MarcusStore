@@ -26,7 +26,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 const props = defineProps({
   selectedTime: { type: String, default: 'month' },
@@ -36,9 +36,13 @@ const props = defineProps({
 const emit = defineEmits(['update:selectedTime', 'update:customDate'])
 
 const timeFilters = [
-  { label: 'Tuần',  value: 'week'  },
-  { label: 'Tháng', value: 'month' },
-  { label: 'Năm',   value: 'year'  },
+  { label: 'Hôm nay',     value: 'today'    },
+  { label: 'Hôm qua',     value: 'yesterday'},
+  { label: '7 ngày qua',  value: '7days'    },
+  { label: '30 ngày qua', value: '30days'   },
+  { label: 'Tuần',        value: 'week'     },
+  { label: 'Tháng',       value: 'month'    },
+  { label: 'Năm',         value: 'year'     },
 ]
 
 const todayStr = (() => {
@@ -55,8 +59,7 @@ function onSelectPreset(val) {
 }
 
 function onSelectCustomDate() {
-  if (!localCustomDate.value) return
-  emit('update:selectedTime', '')
+  emit('update:selectedTime', 'today')   // dùng 'today' để backend hiểu là 1 ngày
   emit('update:customDate', localCustomDate.value)
 }
 </script>
@@ -94,9 +97,9 @@ function onSelectCustomDate() {
   color: #6b7280;
 }
 
-/* Time filter */
 .time-filter {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 8px;
   border: 1px solid #ffe0ec;
@@ -131,7 +134,7 @@ function onSelectCustomDate() {
   background: #fff;
   cursor: pointer;
   outline: none;
-transition: border-color 0.2s, background 0.2s, color 0.2s;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
   font-family: inherit;
 }
 
@@ -158,6 +161,10 @@ transition: border-color 0.2s, background 0.2s, color 0.2s;
   .dashboard-heading {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .time-filter {
+    justify-content: flex-start;
   }
 }
 </style>
