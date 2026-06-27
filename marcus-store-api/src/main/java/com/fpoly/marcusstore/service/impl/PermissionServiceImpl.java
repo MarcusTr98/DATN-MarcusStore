@@ -1,11 +1,9 @@
 package com.fpoly.marcusstore.service.impl;
 
-
 import java.util.List;
 import java.util.Set;
 import java.util.HashSet;
 import org.springframework.stereotype.Service;
-
 
 import com.fpoly.marcusstore.dto.request.UpdateRolePermissionRequest;
 import com.fpoly.marcusstore.dto.response.PermissionResponse;
@@ -22,20 +20,20 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 @Transactional
 public class PermissionServiceImpl
-implements PermissionService{
+        implements PermissionService {
 
     private final PermissionRepository permissionRepository;
 
     private final RoleRepository roleRepository;
 
     @Override
-    public List<PermissionResponse> getAll(){
+    public List<PermissionResponse> getAll() {
 
         return permissionRepository.findAll()
 
                 .stream()
 
-                .map(p->new PermissionResponse(
+                .map(p -> new PermissionResponse(
 
                         p.getPermissionId(),
 
@@ -52,7 +50,7 @@ implements PermissionService{
     }
 
     @Override
-    public List<Integer> getPermissionOfRole(Integer roleId){
+    public List<Integer> getPermissionOfRole(Integer roleId) {
 
         Role role = roleRepository.findById(roleId)
 
@@ -69,12 +67,14 @@ implements PermissionService{
     }
 
     @Override
-    public void updateRolePermission(Integer roleId,UpdateRolePermissionRequest request){
+    public void updateRolePermission(Integer roleId, UpdateRolePermissionRequest request) {
 
         Role role = roleRepository.findById(roleId).orElseThrow();
 
-        Set<Permission> permissions= new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
-
+        Set<Permission> permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
+        if (role.getRoleName().equals("ADMIN")) {
+            throw new RuntimeException("Không được sửa quyền ADMIN");
+        }
         role.setPermissions(permissions);
 
         roleRepository.save(role);

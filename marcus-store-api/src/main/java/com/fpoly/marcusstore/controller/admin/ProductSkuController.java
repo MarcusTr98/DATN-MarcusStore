@@ -16,6 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/skus")
+@PreAuthorize("hasAuthority('PRODUCT_VIEW')")
 public class ProductSkuController {
 
     @Autowired
@@ -23,7 +24,6 @@ public class ProductSkuController {
 
     // Lấy danh sách SKU của 1 Sản phẩm
     @GetMapping("/product/{productId}")
-    @PreAuthorize("hasAuthority('PRODUCT_VIEW')")
     public ApiResponse<List<ProductSku>> getSkusByProduct(@PathVariable Integer productId) {
         return ApiResponse.success(configService.getSkusByProductId(productId));
     }

@@ -13,6 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/post-categories")
+@PreAuthorize("hasAuthority('POST_VIEW')")
 public class AdminPostCategoryController {
 
     @Autowired
@@ -20,14 +21,12 @@ public class AdminPostCategoryController {
 
     // GET /api/admin/post-categories
     @GetMapping
-    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<List<PostCategoryResponseDTO>> getAll() {
         return ApiResponse.success(postCategoryService.getAll());
     }
 
     // GET /api/admin/post-categories/{id}
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<PostCategoryResponseDTO> getOne(@PathVariable Integer id) {
         return ApiResponse.success(postCategoryService.getOne(id));
     }

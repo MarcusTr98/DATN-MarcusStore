@@ -16,12 +16,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
+@PreAuthorize("hasAuthority('ORDER_VIEW')")
 @RequiredArgsConstructor
 public class AdminOrderController {
     private final OrderService orderService;
 
     @GetMapping("/orders")
-    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+
     public Page<OrderResponse> getAllOrder(@RequestParam(defaultValue = "0") int page,
                                            @RequestParam(defaultValue = "10") int size,
                                            @RequestParam(required = false) String keyword,
@@ -31,7 +32,6 @@ public class AdminOrderController {
         return orderService.getOrdersPage(keyword, paymentMethod, orderStatus, pageable);
     }
     @GetMapping("/orders/stats")
-    @PreAuthorize("hasAuthority('ORDER_VIEW')")
     public OrderStatsResponse getOrderStats(@RequestParam(required = false) String keyword,
                                             @RequestParam(required = false) String paymentMethod,
                                             @RequestParam(required = false) String orderStatus){
@@ -45,12 +45,11 @@ public class AdminOrderController {
         );
     }
     @GetMapping("/order/{orderCode}")
-    @PreAuthorize("hasAuthority('ORDER_VIEW')")
     public OrderDetailResponse getDetailResponse(@PathVariable("orderCode") String orderCode){
         return orderService.getOrderDetailResponse(orderCode);
     }
     @PutMapping("/order/{orderCode}")
-    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    @PreAuthorize("hasAuthority('ORDER_PROCESS')")
     public OrderDetailResponse updateStatusOrder(@PathVariable("orderCode") String orderCode,@RequestBody UpdateOrderStatusRequest request){
         return orderService.updateStatusOrder(orderCode, request);
     }

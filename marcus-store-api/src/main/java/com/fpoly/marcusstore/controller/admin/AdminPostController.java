@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/posts")
+@PreAuthorize("hasAuthority('POST_VIEW')")
 public class AdminPostController {
 
     @Autowired
@@ -20,14 +21,12 @@ public class AdminPostController {
 
     // GET /api/admin/posts
     @GetMapping
-    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<Page<PostResponseDTO>> getAll(Pageable pageable) {
         return ApiResponse.success(postService.getAll(pageable));
     }
 
     // GET /api/admin/posts/{id}
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<PostResponseDTO> getOne(@PathVariable Integer id) {
         return ApiResponse.success(postService.getOne(id));
     }
