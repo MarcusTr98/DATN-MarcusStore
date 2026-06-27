@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.security;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fpoly.marcusstore.entity.auth.Permission;
 import com.fpoly.marcusstore.entity.auth.User;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -29,8 +30,21 @@ public class CustomUserDetails implements UserDetails {
 
     public static CustomUserDetails build(User user) {
         List<GrantedAuthority> authorities = new ArrayList<>();
+         String roleName = user.getRole().getRoleName();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getRoleName()));
-        user.getRole().getPermissions().forEach(permission ->authorities.add(new SimpleGrantedAuthority(permission.getPermissionName())));
+                // Nếu là ADMIN thì luôn có SUPER_ADMIN
+        if ("ADMIN".equalsIgnoreCase(roleName)) {
+            authorities.add(new SimpleGrantedAuthority("SUPER_ADMIN"));
+        }
+
+        // Thêm toàn bộ permission
+        if (user.getRole().getPermissions() != null) {
+            for (Permission permission : user.getRole().getPermissions()) {
+                authorities.add(
+                        new SimpleGrantedAuthority(permission.getPermissionName())
+                );
+            }
+        }
         return new CustomUserDetails(
                 user.getUserId(),
                 user.getUsername(),

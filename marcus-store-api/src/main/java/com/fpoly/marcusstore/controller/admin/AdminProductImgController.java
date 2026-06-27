@@ -21,12 +21,12 @@ import com.fpoly.marcusstore.service.ProductImgService;
 
 @RestController
 @RequestMapping("/api/admin/products")
+@PreAuthorize("hasAuthority('PRODUCT_VIEW')")
 public class AdminProductImgController {
     @Autowired
     ProductImgService productImgService;
 
     @GetMapping("/{productId}/images")
-    @PreAuthorize("hasAuthority('PRODUCT_VIEW')")
     public ApiResponse<List<ProductImgResponse>> getImagesByProductId(@PathVariable Integer productId) {
         return ApiResponse.success(productImgService.getProductImgByIdProduct(productId));
     }

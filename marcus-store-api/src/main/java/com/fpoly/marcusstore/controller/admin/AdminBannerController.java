@@ -13,7 +13,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/banners")
-@PreAuthorize("hasAuthority('MARKETING_MANAGE')")
+@PreAuthorize("hasAuthority('MARKETING_VIEW')")
 public class AdminBannerController {
 
     @Autowired
@@ -33,18 +33,21 @@ public class AdminBannerController {
 
     // thêm banner mới
     @PostMapping
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
     public ApiResponse<BannerResponseDTO> add(@Valid @RequestBody BannerRequestDTO req) {
         return ApiResponse.success(bannerService.add(req));
     }
 
     // sửa banner
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
     public ApiResponse<BannerResponseDTO> update( @PathVariable Integer id, @Valid @RequestBody BannerRequestDTO req) {
         return ApiResponse.success(bannerService.update(id, req));
     }
 
     //xóa mềm banner
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('MARKETING_MANAGE')")
     public ApiResponse<String> remove(@PathVariable Integer id) {
         bannerService.remove(id);
         return ApiResponse.success("Xóa banner thành công");

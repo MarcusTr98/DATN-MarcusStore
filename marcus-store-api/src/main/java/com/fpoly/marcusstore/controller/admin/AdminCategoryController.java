@@ -25,7 +25,6 @@ public class AdminCategoryController {
     CategoriesService categoriesService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('CATEGORY_VIEW')")
     public ApiResponse<Page<CategoryResponse>> findAllCategory(Pageable pageable) {
         return ApiResponse.success(categoriesService.findAllCategory(pageable));
     }
@@ -37,7 +36,6 @@ public class AdminCategoryController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('CATEGORY_VIEW')")
     public ApiResponse<Optional<CategoryResponse>> getCategoryById(@PathVariable Integer id) {
         return ApiResponse.success(categoriesService.getCategoryById(id));
     }

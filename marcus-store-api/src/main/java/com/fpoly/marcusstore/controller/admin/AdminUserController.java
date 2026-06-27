@@ -28,11 +28,11 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/admin/user")
+@PreAuthorize("hasAuthority('USER_VIEW')")
 @RequiredArgsConstructor
 public class AdminUserController {
     private final UserServiceImpl userServiceImpl;
 @GetMapping
-@PreAuthorize("hasAuthority('USER_VIEW')")
   public ApiResponse<Page<UserResponse>> getAll(
           @RequestParam(required = false) String keyword,
             @RequestParam(required = false) List<String> roles,
@@ -48,7 +48,6 @@ public class AdminUserController {
     return ApiResponse.success(userServiceImpl.create(request));
  }
 @GetMapping("/{id}")
-@PreAuthorize("hasAuthority('USER_MANAGE')")
 public ApiResponse<UserResponse> getById(@PathVariable("id") Integer id){
     return ApiResponse.success(userServiceImpl.getById(id));
 }

@@ -13,13 +13,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/attributes")
+@PreAuthorize("hasAuthority('ATTRIBUTE_VIEW')")
 public class AttributeController {
 
     @Autowired
     private AttributeService attributeService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ATTRIBUTE_VIEW')")
     public ResponseEntity<ApiResponse<List<Attribute>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success(attributeService.getAllAttributes()));
     }

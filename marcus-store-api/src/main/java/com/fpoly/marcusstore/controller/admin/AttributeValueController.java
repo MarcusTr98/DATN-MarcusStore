@@ -14,13 +14,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/attribute-values")
+@PreAuthorize("hasAuthority('ATTRIBUTE_VIEW')")
 public class AttributeValueController {
 
     @Autowired
     private AttributeValueService valueService;
 
     @GetMapping("/attribute/{attributeId}")
-    @PreAuthorize("hasAuthority('ATTRIBUTE_VIEW')")
     public ResponseEntity<ApiResponse<List<AttributeValue>>> getValuesByAttribute(@PathVariable Integer attributeId) {
         // Kiểm tra xem service này có trả về đúng dữ liệu không
         List<AttributeValue> list = valueService.getValuesByAttributeId(attributeId);
