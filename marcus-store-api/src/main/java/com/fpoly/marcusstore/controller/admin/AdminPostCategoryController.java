@@ -6,6 +6,7 @@ import com.fpoly.marcusstore.dto.response.PostCategoryResponseDTO;
 import com.fpoly.marcusstore.service.PostCategoryService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,18 +20,21 @@ public class AdminPostCategoryController {
 
     // GET /api/admin/post-categories
     @GetMapping
+    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<List<PostCategoryResponseDTO>> getAll() {
         return ApiResponse.success(postCategoryService.getAll());
     }
 
     // GET /api/admin/post-categories/{id}
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<PostCategoryResponseDTO> getOne(@PathVariable Integer id) {
         return ApiResponse.success(postCategoryService.getOne(id));
     }
 
     // POST /api/admin/post-categories
     @PostMapping
+    @PreAuthorize("hasAuthority('POST_MANAGE')")
     public ApiResponse<PostCategoryResponseDTO> add(
             @Valid @RequestBody PostCategoryRequestDTO req) {
         return ApiResponse.success(postCategoryService.add(req));
@@ -38,6 +42,7 @@ public class AdminPostCategoryController {
 
     // PUT /api/admin/post-categories/{id}
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('POST_MANAGE')")
     public ApiResponse<PostCategoryResponseDTO> update(
             @PathVariable Integer id,
             @Valid @RequestBody PostCategoryRequestDTO req) {
@@ -46,6 +51,7 @@ public class AdminPostCategoryController {
 
     // DELETE /api/admin/post-categories/{id}
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('POST_MANAGE')")
     public ApiResponse<String> remove(@PathVariable Integer id) {
         postCategoryService.remove(id);
         return ApiResponse.success("Xóa danh mục thành công");

@@ -14,13 +14,13 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/attribute-values")
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
 public class AttributeValueController {
 
     @Autowired
     private AttributeValueService valueService;
 
     @GetMapping("/attribute/{attributeId}")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_VIEW')")
     public ResponseEntity<ApiResponse<List<AttributeValue>>> getValuesByAttribute(@PathVariable Integer attributeId) {
         // Kiểm tra xem service này có trả về đúng dữ liệu không
         List<AttributeValue> list = valueService.getValuesByAttributeId(attributeId);
@@ -30,16 +30,19 @@ public class AttributeValueController {
 
     // Marcus sửa vì đã thêm dto
     @PostMapping
+    @PreAuthorize("hasAuthority('ATTRIBUTE_MANAGE')")
     public ApiResponse<AttributeValue> create(@RequestBody AttributeValueRequest req) {
         return ApiResponse.success(valueService.createValue(req.getAttributeId(), req.getValueString()));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_MANAGE')")
     public ApiResponse<AttributeValue> update(@PathVariable Integer id, @RequestBody AttributeValueRequest req) {
         return ApiResponse.success(valueService.updateValue(id, req.getValueString()));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_MANAGE')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable Integer id) {
         try {
             valueService.deleteValue(id);

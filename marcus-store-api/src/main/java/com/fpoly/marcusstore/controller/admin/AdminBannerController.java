@@ -6,12 +6,14 @@ import com.fpoly.marcusstore.dto.response.BannerResponseDTO;
 import com.fpoly.marcusstore.service.BannerService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/banners")
+@PreAuthorize("hasAuthority('MARKETING_MANAGE')")
 public class AdminBannerController {
 
     @Autowired

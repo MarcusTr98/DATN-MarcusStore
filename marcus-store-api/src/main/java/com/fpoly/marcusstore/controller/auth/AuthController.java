@@ -53,38 +53,44 @@ public class AuthController {
                         List<String> roles = userDetails.getAuthorities()
                                         .stream()
                                         .map(GrantedAuthority::getAuthority)
-                                        .collect(Collectors.toList());
-
+                                        .filter(a -> a.startsWith("ROLE_"))
+                                        .toList();
+                        List<String> permissions = userDetails.getAuthorities()
+                                        .stream()
+                                        .map(GrantedAuthority::getAuthority)
+                                        .filter(a -> !a.startsWith("ROLE_"))
+                                        .toList();
                         JwtResponse jwtResponse = new JwtResponse(
                                         jwt,
                                         userDetails.getUserId(),
                                         userDetails.getUsername(),
                                         userDetails.getEmail(),
-                                        roles);
+                                        roles,
+                                        permissions);
 
                         return ResponseEntity.ok(
                                         ApiResponse.success(jwtResponse));
 
                 } catch (BadCredentialsException e) {
 
-            return ResponseEntity.status(401)
-                    .body(ApiResponse.error(
-                            401,
-                            "Sai tên đăng nhập hoặc mật khẩu"));
+                        return ResponseEntity.status(401)
+                                        .body(ApiResponse.error(
+                                                        401,
+                                                        "Sai tên đăng nhập hoặc mật khẩu"));
 
-        } catch (DisabledException e) {
+                } catch (DisabledException e) {
 
-            return ResponseEntity.status(403)
-                    .body(ApiResponse.error(
-                            403,
-                            "Tài khoản đã bị khóa"));
+                        return ResponseEntity.status(403)
+                                        .body(ApiResponse.error(
+                                                        403,
+                                                        "Tài khoản đã bị khóa"));
 
-        } catch (Exception e) {
+                } catch (Exception e) {
 
-            return ResponseEntity.status(500)
-                    .body(ApiResponse.error(
-                            500,
-                            "Đã xảy ra lỗi hệ thống"));
-        }
+                        return ResponseEntity.status(500)
+                                        .body(ApiResponse.error(
+                                                        500,
+                                                        "Đã xảy ra lỗi hệ thống"));
+                }
         }
 }

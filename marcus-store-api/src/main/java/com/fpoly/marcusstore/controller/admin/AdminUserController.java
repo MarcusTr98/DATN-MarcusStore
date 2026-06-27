@@ -32,7 +32,7 @@ import lombok.RequiredArgsConstructor;
 public class AdminUserController {
     private final UserServiceImpl userServiceImpl;
 @GetMapping
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+@PreAuthorize("hasAuthority('USER_VIEW')")
   public ApiResponse<Page<UserResponse>> getAll(
           @RequestParam(required = false) String keyword,
             @RequestParam(required = false) List<String> roles,
@@ -43,29 +43,29 @@ public class AdminUserController {
         return ApiResponse.success(userServiceImpl.getALL(keyword, roles, pageable));
 }
  @PostMapping
- @PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('USER_MANAGE')")
  public ApiResponse<UserResponse> create(@Valid @RequestBody CreateUserRequest request){
     return ApiResponse.success(userServiceImpl.create(request));
  }
 @GetMapping("/{id}")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('USER_MANAGE')")
 public ApiResponse<UserResponse> getById(@PathVariable("id") Integer id){
     return ApiResponse.success(userServiceImpl.getById(id));
 }
 @PutMapping("/{id}")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('USER_MANAGE')")
 public ApiResponse<UserResponse> update( @PathVariable Integer id,@Valid @RequestBody UpdateUserRequest request){
     return ApiResponse.success(userServiceImpl.update(id, request));
 }
 @PutMapping("/{id}/lock")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('USER_MANAGE')")
 public ApiResponse<String> lockUser(@PathVariable Integer id){
     userServiceImpl.lockUser(id);
     return ApiResponse.success("Khóa tài khoản thành công");
 }
 
 @PutMapping("/{id}/unLock")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('USER_MANAGE')")
 public ApiResponse<String> unLockUser(@PathVariable Integer id){
     userServiceImpl.UnLockUser(id);
     return ApiResponse.success("Mở khóa tài khoản thành công");

@@ -30,7 +30,7 @@ public class CustomUserDetails implements UserDetails {
     public static CustomUserDetails build(User user) {
         List<GrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getRoleName()));
-
+        user.getRole().getPermissions().forEach(permission ->authorities.add(new SimpleGrantedAuthority(permission.getPermissionName())));
         return new CustomUserDetails(
                 user.getUserId(),
                 user.getUsername(),

@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,24 +20,28 @@ public class AdminPostController {
 
     // GET /api/admin/posts
     @GetMapping
+    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<Page<PostResponseDTO>> getAll(Pageable pageable) {
         return ApiResponse.success(postService.getAll(pageable));
     }
 
     // GET /api/admin/posts/{id}
     @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('POST_VIEW')")
     public ApiResponse<PostResponseDTO> getOne(@PathVariable Integer id) {
         return ApiResponse.success(postService.getOne(id));
     }
 
     // POST /api/admin/posts
     @PostMapping
+    @PreAuthorize("hasAuthority('POST_MANAGE')")
     public ApiResponse<PostResponseDTO> add(@Valid @RequestBody PostRequestDTO req) {
         return ApiResponse.success(postService.add(req));
     }
 
     // PUT /api/admin/posts/{id}
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('POST_MANAGE')")
     public ApiResponse<PostResponseDTO> update(
             @PathVariable Integer id,
             @Valid @RequestBody PostRequestDTO req) {
@@ -45,6 +50,7 @@ public class AdminPostController {
 
     // DELETE /api/admin/posts/{id}
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('POST_MANAGE')")
     public ApiResponse<Void> remove(@PathVariable Integer id) {
         postService.remove(id);
         return ApiResponse.success("Xóa post thành công");

@@ -22,7 +22,7 @@ public class AdminProfileController {
         return ApiResponse.success(userProfileService.getMyProfile());
     }
 
-    @PutMapping
+    @PutMapping 
     public ApiResponse<ProfileResponseDTO> updateAdminProfile(@Valid @RequestBody ProfileRequestDTO request) {
         return ApiResponse.success(userProfileService.updateProfile(request));
     }
