@@ -7,6 +7,26 @@
       @close="handleModalConfirm"
     />
 
+    <!-- Modal thông báo voucher hết hạn / hết lượt -->
+    <a-modal
+      v-model:open="showVoucherExpiredModal"
+      title="Thông báo"
+      :footer="null"
+      centered
+      :mask-closable="true"
+      @cancel="closeVoucherExpiredModal"
+    >
+      <div style="text-align: center; padding: 16px 0 8px;">
+        <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
+        <p style="font-size: 16px; color: #333; margin-bottom: 20px; line-height: 1.5;">
+          {{ voucherExpiredMessage }}
+        </p>
+        <a-button type="primary" size="large" @click="closeVoucherExpiredModal">
+          Đóng
+        </a-button>
+      </div>
+    </a-modal>
+
     <div class="checkout-header">
       <div class="checkout-header__inner">
         <router-link to="/" class="checkout-header__brand">
@@ -439,7 +459,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/check-out.css'
@@ -501,37 +521,32 @@ const getInitialCartData = () => {
 const cartData = ref(getInitialCartData())
 
 // Khôi phục voucher đã chọn từ localStorage
+// CHỈ lưu code trong localStorage, KHÔNG trust value/maxDiscount - phải gọi BE preview để lấy
 const savedVoucher = JSON.parse(localStorage.getItem('selectedVoucher') || 'null')
 const appliedVoucherCode = ref(savedVoucher?.code || '')
-const savedVoucherType = ref(savedVoucher?.type || '')
-const savedVoucherValue = ref(savedVoucher?.value || 0)
-const savedVoucherMaxDiscount = ref(savedVoucher?.maxDiscountAmount || 0)
+
 const shippingFee = ref(0)
 const estimatedDelivery = ref('')
 
-// Recalculate discount với cap maxDiscountAmount khi totalAmount thay đổi
-// FREESHIP: chỉ hiển thị "Miễn phí ship" ở UI, không tính vào discount
-const discountAmount = computed(() => {
-  const totalAmt = cartData.value.totalAmount || 0
+// State cho discount - lấy từ BE preview, KHÔNG tính từ localStorage
+const discountAmount = ref(0)
+const hasFreeshipVoucher = ref(false)
+const voucherError = ref('')
+const isVoucherLoading = ref(false)
 
-  if (!savedVoucherType.value || !savedVoucherValue.value) return 0
+// Modal thông báo voucher hết hạn/hết lượt (theo yêu cầu: hiển thị modal khi xóa voucher)
+const showVoucherExpiredModal = ref(false)
+const voucherExpiredMessage = ref('')
 
-  if (savedVoucherType.value === 'PERCENT') {
-    let discount = totalAmt * (savedVoucherValue.value / 100)
-    if (savedVoucherMaxDiscount.value > 0 && discount > savedVoucherMaxDiscount.value) {
-      discount = savedVoucherMaxDiscount.value
-    }
-    return Math.floor(discount)
-  }
+const openVoucherExpiredModal = (message) => {
+    voucherExpiredMessage.value = message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.'
+    showVoucherExpiredModal.value = true
+}
 
-  if (savedVoucherType.value === 'AMOUNT') {
-    return savedVoucherValue.value || 0
-  }
-
-  return 0
-})
-
-const hasFreeshipVoucher = computed(() => savedVoucherType.value === 'FREESHIP')
+const closeVoucherExpiredModal = () => {
+    showVoucherExpiredModal.value = false
+    voucherExpiredMessage.value = ''
+}
 
 const orderForm = ref({
   recipientName: '',
@@ -586,6 +601,56 @@ const validatePhone = (phone) => /(03|05|07|08|09)\d{8}/.test(phone)
 const validateEmail = (email) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)
+}
+
+// ─── Voucher preview (gọi BE để lấy discountAmount thực tế, không trust localStorage)
+const previewVoucher = async () => {
+  const code = appliedVoucherCode.value
+  if (!code) {
+    discountAmount.value = 0
+    hasFreeshipVoucher.value = false
+    voucherError.value = ''
+    return
+  }
+
+  isVoucherLoading.value = true
+  voucherError.value = ''
+
+  try {
+    const res = await api.post('/client/vouchers/preview', {
+      voucherCode: code,
+      orderAmount: cartData.value.totalAmount || 0,
+      shippingFee: 0,
+    })
+
+    const result = res.data?.data ?? res.data
+    if (result?.applied) {
+      discountAmount.value = Number(result.discountAmount) || 0
+      hasFreeshipVoucher.value = result.discountType === 'FREESHIP'
+      voucherError.value = ''
+    } else {
+      // Voucher không hợp lệ → xóa khỏi localStorage và hiển thị modal
+      discountAmount.value = 0
+      hasFreeshipVoucher.value = false
+      voucherError.value = result?.message || 'Mã giảm giá không hợp lệ'
+      localStorage.removeItem('selectedVoucher')
+      appliedVoucherCode.value = ''
+      // Mở modal thông báo theo yêu cầu
+      openVoucherExpiredModal(result?.message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.')
+    }
+  } catch (e) {
+    console.error('Preview voucher fail:', e)
+    discountAmount.value = 0
+    hasFreeshipVoucher.value = false
+    const errorMsg = e.response?.data?.message || 'Không thể áp dụng mã giảm giá'
+    voucherError.value = errorMsg
+    localStorage.removeItem('selectedVoucher')
+    appliedVoucherCode.value = ''
+    // Mở modal thông báo theo yêu cầu
+    openVoucherExpiredModal(errorMsg)
+  } finally {
+    isVoucherLoading.value = false
+  }
 }
 
 // ─── 1. Phí vận chuyển GHN
@@ -851,5 +916,16 @@ const handleCheckout = async () => {
 onMounted(async () => {
   await prefillUserEmail()
   await Promise.allSettled([fetchGhnProvinces(), fetchCart(), fetchMyAddresses()])
+  await previewVoucher()
 })
+
+// Khi tổng tiền hàng thay đổi (do GHN thay đổi cũng không ảnh hưởng), gọi lại preview
+watch(
+  () => cartData.value.totalAmount,
+  () => {
+    if (appliedVoucherCode.value) {
+      previewVoucher()
+    }
+  },
+)
 </script>

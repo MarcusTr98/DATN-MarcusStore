@@ -11,6 +11,7 @@ import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -38,6 +40,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserRepository userRepository;
     private final ProductSkuRepository productSkuRepository;
     private final VoucherRepository voucherRepository;
+    private final UserVoucherRepository userVoucherRepository;
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank()
@@ -159,7 +162,6 @@ public class OrderServiceImpl implements OrderService {
         if (ensureTrackingCodeForShipping(order)) {
             orderRepository.saveAndFlush(order);
         }
-        orderItemRepository.findWithProductItemsByOrderId(order.getOrderId());
         // lấy trạng thái lịch sử đơn hàng
         List<OrderStatusHistory> histories = orderStatusHistoryRepository
                 .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
@@ -356,7 +358,26 @@ public class OrderServiceImpl implements OrderService {
 
             if (order.getVoucher() != null) {
                 Voucher voucher = order.getVoucher();
-                voucher.setQuantity(voucher.getQuantity() + 1);
+                LocalDateTime now = LocalDateTime.now();
+
+                // Chỉ hoàn quota nếu voucher còn hiệu lực (chưa hết hạn)
+                // Nếu voucher đã hết hạn thì KHÔNG tăng quantity (voucher chết không dùng lại được)
+                if (voucher.getEndDate() == null || voucher.getEndDate().isAfter(now)) {
+                    voucher.setQuantity(voucher.getQuantity() + 1);
+                    voucherRepository.save(voucher);
+                }
+
+                // Reset UserVoucher.isUsed = false (cho cả ALL và SPECIFIC)
+                Integer userId = order.getUser().getUserId();
+                userVoucherRepository
+                    .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
+                    .ifPresent(userVoucher -> {
+                        if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
+                            userVoucher.setIsUsed(false);
+                            userVoucher.setUsedAt(null);
+                            userVoucherRepository.save(userVoucher);
+                        }
+                    });
             }
         }
 

@@ -23,21 +23,15 @@ public interface VoucherService {
     VoucherResponse addVoucher(AddVoucherRequest request);
     // update voucher
     VoucherResponse updateVoucher(Integer voucherId, AddVoucherRequest request);
-    // lấy danh sách voucher dùng được
-    List<VoucherResponse> getAvailableVouchers();
-    // kiểm
-    boolean checkAndRecordVoucherUsage(Integer voucherId, Integer userId);
-    // Ap dung voucher vao don hang, tra ve so tien giam
+    // áp dụng voucher vào đơn và return về tiền giảm
     VoucherApplyResult applyVoucher(ApplyVoucherRequest request, Integer userId);
-    // Hoan tac viec su dung voucher (tra lai so luong)
-    void rollbackVoucherUsage(Integer voucherId, Integer userId);
     // Xac nhan viec su dung voucher (luu vao database)
     void confirmVoucherUsage(Integer voucherId, Integer userId);
 
-    // Lay lich su su dung voucher (admin xem)
+    // get lịch sử sử dụng voucher của user (admin xem)
     List<VoucherUsageResponse> getVoucherUsageHistory(Integer voucherId);
-    // Lay lich su su dung voucher (user xem)
+    // get lịch sử sử dụng voucher (user xem)
     List<VoucherUsageResponse> getUserVoucherUsageHistory(Integer userId);
-    // Dem so lan su dung voucher
+    // đếm số lần voucher được dừng
     long getVoucherUsedCount(Integer voucherId);
 }

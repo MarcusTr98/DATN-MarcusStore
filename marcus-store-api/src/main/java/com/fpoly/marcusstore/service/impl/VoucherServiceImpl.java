@@ -39,7 +39,7 @@ public class VoucherServiceImpl implements VoucherService {
     private final UserRepository userRepository;
     private final UserVoucherService userVoucherService;
 
-    // Chuyen doi Entity thanh Response (co them thong tin user duoc gan neu la SPECIFIC)
+    // convert từ entity sang DTO
     private VoucherResponse toResponse(Voucher voucher) {
         // Lấy danh sách user đã được gán voucher nếu là SPECIFIC
         List<Integer> targetUserIds = null;
@@ -80,7 +80,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .map(this::toResponse);
     }
 
-    // Lay danh sach thong ke voucher (tong so, dang su dung, theo loai)
+    // lấy danh sách thống kê voucher
     @Override
     public VoucherStatsResponse getVoucherStats(String keyword, String discountType, Boolean isActive) {
         String normalizedKeyword = normalizeKeyword(keyword);
@@ -108,7 +108,7 @@ public class VoucherServiceImpl implements VoucherService {
                 : discountType.trim().toUpperCase();
     }
 
-    // Lay thong tin chi tiet 1 voucher theo id
+    // Lấy chi tiết voucher theo ID
     @Override
     public VoucherResponse getVoucherById(Integer voucherId) {
         Voucher voucher = voucherRepository.findById(voucherId)
@@ -118,7 +118,7 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
 
-    // Tao moi 1 voucher
+    // thêm mới voucher
     @Override
     @Transactional
     public VoucherResponse addVoucher(AddVoucherRequest request) {
@@ -160,6 +160,18 @@ public class VoucherServiceImpl implements VoucherService {
             );
         }
 
+        // Validate quantity:
+        // - ALL: bắt buộc phải có và > 0 (admin nhập tay, là tổng lượt dùng)
+        // - SPECIFIC: không cần nhập, tự sinh = số user được chọn (validate sau ở buildVoucher)
+        if ("ALL".equals(targetType)) {
+            if (request.getQuantity() == null || request.getQuantity() <= 0) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Voucher áp dụng cho tất cả phải có số lượng lớn hơn 0"
+                );
+            }
+        }
+
         Voucher voucher = buildVoucher(request, voucherCode, discountType);
         Voucher savedVoucher = voucherRepository.saveAndFlush(voucher);
 
@@ -183,25 +195,37 @@ public class VoucherServiceImpl implements VoucherService {
         // Set targetType - mặc định là ALL
         voucher.setTargetType(request.getTargetType() != null ? request.getTargetType() : "ALL");
 
+        // Tính quantity theo targetType:
+        // - SPECIFIC: tự động = số user được chọn (mỗi user 1 lượt)
+        // - ALL: lấy từ request, mặc định 1
+        Integer resolvedQuantity;
+        if ("SPECIFIC".equalsIgnoreCase(voucher.getTargetType())
+                && request.getTargetUserIds() != null
+                && !request.getTargetUserIds().isEmpty()) {
+            resolvedQuantity = request.getTargetUserIds().size();
+        } else {
+            resolvedQuantity = request.getQuantity() != null ? request.getQuantity() : 1;
+        }
+
         switch (discountType) {
             case "PERCENT":
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
-                voucher.setQuantity(request.getQuantity() != null ? request.getQuantity() : 1);
+                voucher.setQuantity(resolvedQuantity);
                 voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
                 break;
 
             case "AMOUNT":
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(null);
-                voucher.setQuantity(request.getQuantity() != null ? request.getQuantity() : 1);
+                voucher.setQuantity(resolvedQuantity);
                 voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
                 break;
 
             case "FREESHIP":
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(null);
-                voucher.setQuantity(request.getQuantity() != null ? request.getQuantity() : 1);
+                voucher.setQuantity(resolvedQuantity);
                 voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
                 break;
 
@@ -215,7 +239,7 @@ public class VoucherServiceImpl implements VoucherService {
         return voucher;
     }
 
-    // Kiem tra loai giam gia hop le (PERCENT, AMOUNT, FREESHIP)
+    // kiểm tra loại giảm giá hợp lệ
     private void validateDiscountType(String discountType) {
         if (discountType == null) {
             throw new ResponseStatusException(
@@ -234,7 +258,7 @@ public class VoucherServiceImpl implements VoucherService {
         }
     }
 
-    // Kiem tra cac truong giam gia (gia tri, gioi han, phan tram)
+    // validate các trường giảm giá
     private void validateDiscountFields(AddVoucherRequest request, String discountType) {
         if ("PERCENT".equals(discountType)) {
             if (request.getMaxDiscountAmount() == null ||
@@ -263,7 +287,7 @@ public class VoucherServiceImpl implements VoucherService {
         }
     }
 
-    // Kiem tra khoang thoi gian hop le (ngay bat dau < ngay ket thuc)
+    // validate ngày khi nhập voucher
     private void validateDateRange(LocalDateTime startDate, LocalDateTime endDate) {
         if (startDate == null || endDate == null) {
             throw new ResponseStatusException(
@@ -280,7 +304,7 @@ public class VoucherServiceImpl implements VoucherService {
         }
     }
 
-    // Cap nhat thong tin voucher
+    // cập nhật thông tin voucher
     @Override
     @Transactional
     public VoucherResponse updateVoucher(Integer voucherId, AddVoucherRequest request) {
@@ -331,25 +355,6 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setTargetType(targetType);
         voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
 
-        // Cập nhật discountValue và maxDiscountAmount theo discountType
-        switch (discountType) {
-            case "PERCENT":
-                voucher.setDiscountValue(request.getDiscountValue());
-                voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
-                voucher.setQuantity(request.getQuantity() != null ? request.getQuantity() : voucher.getQuantity());
-                break;
-            case "AMOUNT":
-                voucher.setDiscountValue(request.getDiscountValue());
-                voucher.setMaxDiscountAmount(null);
-                voucher.setQuantity(request.getQuantity() != null ? request.getQuantity() : voucher.getQuantity());
-                break;
-            case "FREESHIP":
-                voucher.setDiscountValue(request.getDiscountValue());
-                voucher.setMaxDiscountAmount(null);
-                voucher.setQuantity(request.getQuantity() != null ? request.getQuantity() : voucher.getQuantity());
-                break;
-        }
-
         // Xử lý UserVoucher khi thay đổi targetType hoặc targetUserIds
         String oldTargetType = voucher.getTargetType();
         List<Integer> newTargetUserIds = request.getTargetUserIds();
@@ -373,92 +378,67 @@ public class VoucherServiceImpl implements VoucherService {
             }
         }
 
+        // Cập nhật quantity theo targetType mới:
+        // - SPECIFIC: tự động = số user được chọn (đã đồng bộ với UserVoucher ở trên)
+        // - ALL: lấy từ request, giữ nguyên nếu null
+        Integer resolvedQuantity;
+        if ("SPECIFIC".equals(targetType) && newTargetUserIds != null && !newTargetUserIds.isEmpty()) {
+            resolvedQuantity = newTargetUserIds.size();
+        } else {
+            resolvedQuantity = request.getQuantity() != null ? request.getQuantity() : voucher.getQuantity();
+        }
+
+        // Cập nhật discountValue và maxDiscountAmount theo discountType
+        switch (discountType) {
+            case "PERCENT":
+                voucher.setDiscountValue(request.getDiscountValue());
+                voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
+                voucher.setQuantity(resolvedQuantity);
+                break;
+            case "AMOUNT":
+                voucher.setDiscountValue(request.getDiscountValue());
+                voucher.setMaxDiscountAmount(null);
+                voucher.setQuantity(resolvedQuantity);
+                break;
+            case "FREESHIP":
+                voucher.setDiscountValue(request.getDiscountValue());
+                voucher.setMaxDiscountAmount(null);
+                voucher.setQuantity(resolvedQuantity);
+                break;
+        }
+
         return toResponse(voucherRepository.save(voucher));
     }
 
-    // Lay danh sach voucher con han su dung
-    @Override
-    @Transactional
-    public List<VoucherResponse> getAvailableVouchers() {
-        return voucherRepository.findAvailableVouchers()
-                .stream().map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    // Kiem tra va ghi nhan viec su dung voucher (tru so luong voucher)
-    @Override
-    @Transactional
-    public boolean checkAndRecordVoucherUsage(Integer voucherId, Integer userId) {
-        // 1. Tìm voucher
-        Voucher voucher = voucherRepository.findById(voucherId)
-                .orElseThrow(() -> new RuntimeException("Mã giảm giá không tồn tại."));
-
-        // 2. Validate voucher
+    // Helper: tự động deactivate voucher nếu hết quantity hoặc quá hạn
+    private boolean deactivateIfExpired(Voucher voucher) {
         LocalDateTime now = LocalDateTime.now();
-        if (!Boolean.TRUE.equals(voucher.getIsActive())) {
-            throw new RuntimeException("Mã giảm giá không còn hoạt động.");
-        }
-        if (voucher.getStartDate() != null && now.isBefore(voucher.getStartDate())) {
-            throw new RuntimeException("Mã giảm giá chưa có hiệu lực.");
-        }
-        if (voucher.getEndDate() != null && now.isAfter(voucher.getEndDate())) {
-            throw new RuntimeException("Mã giảm giá đã hết hạn.");
-        }
-        // 2. Kiểm tra số lượng voucher còn không
+        boolean changed = false;
 
-            if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
-                throw new RuntimeException("Mã giảm giá đã hết lượt sử dụng.");
-            }
-
-
-        // 3. Kiểm tra user có được phép dùng voucher này không
-        boolean isAllUsers = !"SPECIFIC".equals(voucher.getTargetType());
-
-        if (!isAllUsers) {
-            // Voucher "SPECIFIC": Kiểm tra user có trong danh sách được gán không
-            boolean isAssigned = userVoucherRepository.existsByVoucherVoucherIdAndUserUserId(voucherId, userId);
-            if (!isAssigned) {
-                throw new RuntimeException("Bạn không được phép sử dụng mã giảm giá này.");
-            }
+        // 1. Hết quantity → tắt
+        if (voucher.getQuantity() != null && voucher.getQuantity() <= 0
+                && Boolean.TRUE.equals(voucher.getIsActive())) {
+            voucher.setIsActive(false);
+            changed = true;
         }
 
-        // 4. Kiểm tra user đã dùng voucher này chưa
-        Optional<UserVoucher> existingUsage = userVoucherRepository
-                .findByVoucherVoucherIdAndUserUserId(voucherId, userId);
-
-        if (existingUsage.isPresent()) {
-            if (Boolean.TRUE.equals(existingUsage.get().getIsUsed())) {
-                throw new RuntimeException("Bạn đã sử dụng mã giảm giá này rồi.");
-            }
-            // Đã được gán nhưng chưa dùng -> Update thành đã dùng
-            UserVoucher userVoucher = existingUsage.get();
-            userVoucher.setIsUsed(true);
-            userVoucher.setUsedAt(now);
-            userVoucherRepository.save(userVoucher);
-        } else {
-            // Voucher "ALL": Chưa có record nào -> Tạo mới
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy user."));
-            UserVoucher userVoucher = UserVoucher.builder()
-                    .voucher(voucher)
-                    .user(user)
-                    .assignedAt(now)
-                    .isUsed(true)
-                    .usedAt(now)
-                    .build();
-            userVoucherRepository.save(userVoucher);
+        // 2. Quá hạn endDate → tắt
+        if (voucher.getEndDate() != null
+                && voucher.getEndDate().isBefore(now)
+                && Boolean.TRUE.equals(voucher.getIsActive())) {
+            voucher.setIsActive(false);
+            changed = true;
         }
 
-        // 5. Trừ số lượng voucher
-            voucher.setQuantity(voucher.getQuantity() - 1);
+        if (changed) {
             voucherRepository.save(voucher);
-
-
-        return true;
+        }
+        return changed;
     }
 
-    // Ap dung voucher vao don hang (kiem tra tinh hop le, tinh so tien giam, tru so luong)
+    // áp dụng voucher vào đơn hàng
     @Override
+    @Transactional
     public VoucherApplyResult applyVoucher(ApplyVoucherRequest request, Integer userId) {
         // 1. Tìm voucher theo code
         Voucher voucher = voucherRepository.findByVoucherCode(request.getVoucherCode().trim().toUpperCase())
@@ -471,14 +451,19 @@ public class VoucherServiceImpl implements VoucherService {
                     .build();
         }
 
-        // 2. Validate voucher
-        LocalDateTime now = LocalDateTime.now();
-        if (!Boolean.TRUE.equals(voucher.getIsActive())) {
+        // 2. Auto deactivate nếu quá hạn hoặc hết quantity (lazy deactivate)
+        deactivateIfExpired(voucher);
+
+        // 3. Validate isActive
+        if (Boolean.FALSE.equals(voucher.getIsActive())) {
             return VoucherApplyResult.builder()
                     .applied(false)
-                    .message("Mã giảm giá không còn hoạt động.")
+                    .message("Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.")
                     .build();
         }
+
+        // 4. Validate ngày hiệu lực
+        LocalDateTime now = LocalDateTime.now();
         if (voucher.getStartDate() != null && now.isBefore(voucher.getStartDate())) {
             return VoucherApplyResult.builder()
                     .applied(false)
@@ -488,7 +473,7 @@ public class VoucherServiceImpl implements VoucherService {
         if (voucher.getEndDate() != null && now.isAfter(voucher.getEndDate())) {
             return VoucherApplyResult.builder()
                     .applied(false)
-                    .message("Mã giảm giá đã hết hạn.")
+                    .message("Voucher đã hết hạn, vui lòng chọn voucher khác.")
                     .build();
         }
 
@@ -530,40 +515,31 @@ public class VoucherServiceImpl implements VoucherService {
         }
         // Voucher ALL: chưa có record -> sẽ tạo trong confirmVoucherUsage()
 
-        // 5. Trừ quantity nếu là SPECIFIC (chỉ trừ khi còn quota)
-        if ("SPECIFIC".equals(voucher.getTargetType())) {
-            if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
-                // Rollback lại UserVoucher nếu quantity hết
+        // 5. Kiểm tra quota (chỉ đọc - trừ quantity sẽ xảy ra trong confirmVoucherUsage)
+        if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
+            if ("SPECIFIC".equals(voucher.getTargetType())) {
+                // SPECIFIC: reset UserVoucher.isUsed về false nếu user đã được gán
                 userVoucherRepository.findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
                         .ifPresent(uv -> {
-                            uv.setIsUsed(false);
-                            uv.setUsedAt(null);
-                            userVoucherRepository.save(uv);
+                            if (Boolean.TRUE.equals(uv.getIsUsed())) {
+                                uv.setIsUsed(false);
+                                uv.setUsedAt(null);
+                                userVoucherRepository.save(uv);
+                            }
                         });
-                return VoucherApplyResult.builder()
-                        .applied(false)
-                        .message("Mã giảm giá đã hết lượt sử dụng.")
-                        .build();
             }
-            voucher.setQuantity(voucher.getQuantity() - 1);
-            // KHÔNG save ngay - để trong transaction của checkout
-        } else {
-            // ALL voucher: kiểm tra và trừ quantity
-            if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
-                return VoucherApplyResult.builder()
-                        .applied(false)
-                        .message("Mã giảm giá đã hết lượt sử dụng.")
-                        .build();
-            }
-            voucher.setQuantity(voucher.getQuantity() - 1);
+            return VoucherApplyResult.builder()
+                    .applied(false)
+                    .message("Voucher đã hết lượt sử dụng, vui lòng chọn voucher khác.")
+                    .build();
         }
+        // KHÔNG trừ quantity ở đây - confirmVoucherUsage sẽ trừ atomic với UserVoucher
 
         // 6. Tính discount
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal freeshipAmount = BigDecimal.ZERO;
 
-        // TODO: FREESHIP voucher - chỉ hiển thị miễn phí ship ở UI
-        //       Cần tích hợp lại với GHN khi hoàn thiện cơ chế mới
+      // hiện tại chỉ hiển thị ở UI còn cơ chế trừ sẽ làm sau
         if ("FREESHIP".equalsIgnoreCase(voucher.getDiscountType())) {
             // Không tính freeshipAmount ở đây - frontend tự xử lý hiển thị
             // freeshipAmount = voucher.getDiscountValue();
@@ -596,42 +572,47 @@ public class VoucherServiceImpl implements VoucherService {
                 .build();
     }
 
-    // Hoan tac viec su dung voucher (tra lai so luong voucher)
+    // xác nhận voucher dduojc sử dụng nếu thành công
     @Override
-    public void rollbackVoucherUsage(Integer voucherId, Integer userId) {
-        // 1. Tìm UserVoucher record
-        Optional<UserVoucher> userVoucherOpt = userVoucherRepository
-                .findByVoucherVoucherIdAndUserUserId(voucherId, userId);
-
-        if (userVoucherOpt.isPresent()) {
-            UserVoucher userVoucher = userVoucherOpt.get();
-            // Chỉ rollback nếu voucher đang ở trạng thái đã used
-            if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
-                userVoucher.setIsUsed(false);
-                userVoucher.setUsedAt(null);
-                userVoucherRepository.save(userVoucher);
-            }
-        }
-
-        // 2. Tăng lại Voucher.quantity
-        Voucher voucher = voucherRepository.findById(voucherId).orElse(null);
-        if (voucher != null) {
-            voucher.setQuantity(voucher.getQuantity() + 1);
-            voucherRepository.save(voucher);
-        }
-    }
-
-    // Xac nhan viec su dung voucher (luu UserVoucher va save so luong)
-    @Override
+    @Transactional
     public void confirmVoucherUsage(Integer voucherId, Integer userId) {
         LocalDateTime now = LocalDateTime.now();
 
-        // 1. Update hoặc create UserVoucher record
-        Optional<UserVoucher> userVoucherOpt = userVoucherRepository
-                .findByVoucherVoucherIdAndUserUserId(voucherId, userId);
-
+        // 1. Tìm voucher
         Voucher voucher = voucherRepository.findById(voucherId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy voucher."));
+
+        // 2. Nếu voucher đã bị deactivate trước đó → throw lỗi thân thiện
+        if (Boolean.FALSE.equals(voucher.getIsActive())) {
+            throw new RuntimeException("Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.");
+        }
+
+        // 3. Nếu endDate đã qua → auto deactivate + throw lỗi
+        if (voucher.getEndDate() != null && voucher.getEndDate().isBefore(now)) {
+            voucher.setIsActive(false);
+            voucherRepository.save(voucher);
+            throw new RuntimeException("Voucher đã hết hạn, vui lòng chọn voucher khác.");
+        }
+
+        // 4. Nếu hết quantity → auto deactivate + throw lỗi (race condition guard)
+        if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
+            voucher.setIsActive(false);
+            voucherRepository.save(voucher);
+            throw new RuntimeException("Voucher đã hết lượt sử dụng, vui lòng chọn voucher khác.");
+        }
+
+        // 5. Trừ quantity
+        voucher.setQuantity(voucher.getQuantity() - 1);
+
+        // 6. chuyển trạng thái của voucher nểu số lượng <= 0
+        if (voucher.getQuantity() <= 0) {
+            voucher.setIsActive(false);
+        }
+        voucherRepository.save(voucher);
+
+        // 7. Update hoặc create UserVoucher record
+        Optional<UserVoucher> userVoucherOpt = userVoucherRepository
+                .findByVoucherVoucherIdAndUserUserId(voucherId, userId);
 
         if (userVoucherOpt.isPresent()) {
             UserVoucher userVoucher = userVoucherOpt.get();
@@ -653,13 +634,7 @@ public class VoucherServiceImpl implements VoucherService {
                     .build();
             userVoucherRepository.save(newUserVoucher);
         }
-
-        // 2. Save Voucher.quantity
-        // (quantity đã được trừ trong applyVoucher nhưng chưa persist)
-        voucherRepository.save(voucher);
     }
-
-    // ========== Voucher Usage Tracking ==========
 
     // Chuyen doi UserVoucher thanh VoucherUsageResponse
     private VoucherUsageResponse toUsageResponse(UserVoucher uv) {
@@ -685,7 +660,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .build();
     }
 
-    // Lay lich su su dung voucher (danh sach user da dung)
+    // get lịch sử voucher user đã dùng
     @Override
     @Transactional(readOnly = true)
     public List<VoucherUsageResponse> getVoucherUsageHistory(Integer voucherId) {
@@ -695,7 +670,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .collect(Collectors.toList());
     }
 
-    // Lay lich su su dung voucher cua 1 user
+    // laasys lịch sử dùng của 1 user
     @Override
     @Transactional(readOnly = true)
     public List<VoucherUsageResponse> getUserVoucherUsageHistory(Integer userId) {
@@ -705,7 +680,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .collect(Collectors.toList());
     }
 
-    // Dem so lan su dung voucher
+    // đếm số lần sử dụng của 1 user
     @Override
     @Transactional(readOnly = true)
     public long getVoucherUsedCount(Integer voucherId) {

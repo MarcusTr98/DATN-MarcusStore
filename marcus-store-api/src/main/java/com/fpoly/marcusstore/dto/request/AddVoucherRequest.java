@@ -29,9 +29,10 @@ public class AddVoucherRequest {
     // Đối tượng sử dụng
     @NotBlank(message = "Hãy chọn đối tượng sử dụng")
     private String targetType; // 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
-    private List<Integer> targetUserIds; // Danh sách user IDs khi targetType = 'SPECIFIC'
+    // Danh sách user IDs khi targetType = 'SPECIFIC'
+    private List<Integer> targetUserIds;
 
-    // Số lượng voucher có thể sử dụng
-    @NotNull(message = "Số lượng voucher không được để trống")
+    // Số lượng voucher có thể sử dụng.
+    // Bắt buộc khi targetType = 'ALL'. Bỏ qua khi 'SPECIFIC' (tự động = số user được chọn).
     private Integer quantity;
 }

@@ -764,16 +764,14 @@ function handleCheckout(){
     return;
   }
 
-  // Lưu voucher đã chọn
+  // Lưu voucher đã chọn - CHỈ lưu code và type, KHÔNG lưu value
+  // (để FE không bị trust data sai từ localStorage, BE sẽ tự tính lại khi checkout)
   if (voucherCode.value) {
     localStorage.setItem(
       'selectedVoucher',
       JSON.stringify({
         code: voucherCode.value,
         type: selectedVoucherType.value,
-        value: selectedVoucher.value,
-        maxDiscountAmount: selectedVoucherMaxDiscount.value,
-        discount: voucherDiscount.value,
       })
     )
   } else {

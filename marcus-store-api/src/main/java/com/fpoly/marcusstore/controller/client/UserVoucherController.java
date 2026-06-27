@@ -1,5 +1,8 @@
 package com.fpoly.marcusstore.controller.client;
 
+import com.fpoly.marcusstore.dto.request.ApplyVoucherRequest;
+import com.fpoly.marcusstore.dto.response.ApiResponse;
+import com.fpoly.marcusstore.dto.response.VoucherApplyResult;
 import com.fpoly.marcusstore.dto.response.VoucherResponse;
 import com.fpoly.marcusstore.dto.response.VoucherUsageResponse;
 import com.fpoly.marcusstore.security.SecurityUtils;
@@ -19,17 +22,26 @@ public class UserVoucherController {
     private final UserVoucherService userVoucherService;
     private final VoucherService voucherService;
 
-    // lấy toàn bộ voucher user có thể dùng hiển thij
+    // Lay danh sach voucher ma user hien tai co the su dung
     @GetMapping("/available")
     public ResponseEntity<List<VoucherResponse>> getAvailableVouchers() {
         return ResponseEntity.ok(userVoucherService.getAvailableVouchersForUser());
     }
 
-    // Lấy Voucher mà user đã sử dụng
+    // Lay lich su voucher ma user da su dung
     @GetMapping("/my-usage")
     public ResponseEntity<List<VoucherUsageResponse>> getMyVoucherUsageHistory() {
         Integer userId = SecurityUtils.getCurrentUserId();
         List<VoucherUsageResponse> usages = voucherService.getUserVoucherUsageHistory(userId);
         return ResponseEntity.ok(usages);
+    }
+
+    // Preview voucher de hien thi discount tren FE (khong confirm, khong tru quota)
+    @PostMapping("/preview")
+    public ResponseEntity<ApiResponse<VoucherApplyResult>> previewVoucher(
+            @RequestBody ApplyVoucherRequest request) {
+        Integer userId = SecurityUtils.getCurrentUserId();
+        VoucherApplyResult result = voucherService.applyVoucher(request, userId);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 }
