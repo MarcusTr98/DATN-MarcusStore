@@ -30,7 +30,7 @@ public class AdminCategoryController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CATEGORY_MANAGE')")
+    @PreAuthorize("hasAuthority('CATEGORY_CREATE')")
     public ApiResponse<CategoryResponse> createCategory(@Valid @RequestBody CreateCategory createCategory) {
         return ApiResponse.success(categoriesService.createCategory(createCategory));
     }
@@ -41,7 +41,7 @@ public class AdminCategoryController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('CATEGORY_MANAGE')")
+    @PreAuthorize("hasAuthority('CATEGORY_UPDATE')")
     public ApiResponse<CategoryResponse> updateCategory(@Valid @PathVariable Integer id, @RequestBody UpdateCategory updateCategory) {
         return ApiResponse.success(categoriesService.updateCategory(id, updateCategory));
     }

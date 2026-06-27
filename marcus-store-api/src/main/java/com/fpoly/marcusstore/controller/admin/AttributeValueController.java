@@ -30,19 +30,19 @@ public class AttributeValueController {
 
     // Marcus sửa vì đã thêm dto
     @PostMapping
-    @PreAuthorize("hasAuthority('ATTRIBUTE_MANAGE')")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_CREATE')")
     public ApiResponse<AttributeValue> create(@RequestBody AttributeValueRequest req) {
         return ApiResponse.success(valueService.createValue(req.getAttributeId(), req.getValueString()));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('ATTRIBUTE_MANAGE')")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_UPDATE')")
     public ApiResponse<AttributeValue> update(@PathVariable Integer id, @RequestBody AttributeValueRequest req) {
         return ApiResponse.success(valueService.updateValue(id, req.getValueString()));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('ATTRIBUTE_MANAGE')")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_DELETE')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable Integer id) {
         try {
             valueService.deleteValue(id);
