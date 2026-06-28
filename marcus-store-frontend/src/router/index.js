@@ -72,6 +72,11 @@ const routes = [
         name: 'Policy',
         component: () => import('@/views/client/cms/Policy.vue'),
       },
+      {
+        path: 'contact-store',
+        name: 'ConTactStore',
+        component: () => import('@/views/client/shop/Contact.vue'),
+      },
 
       //PROFILE
       {
@@ -103,11 +108,11 @@ const routes = [
             name: 'Wishlist',
             component: () => import('@/views/client/account/Wishlist.vue'),
           },
-                {
-      path: "/change-password",
-      name: "change-password",
-      component: () => import("@/views/client/account/ChangePassword.vue")
-      }
+          {
+            path: '/change-password',
+            name: 'change-password',
+            component: () => import('@/views/client/account/ChangePassword.vue'),
+          },
         ],
       },
     ],
@@ -191,11 +196,16 @@ const routes = [
         component: () => import('@/views/admin/settings/SystemSettings.vue'),
       },
       {
+        path: 'contact-management',
+        name: 'ContactManagement',
+        component: () => import('@/views/admin/contact/ContactManagement.vue'),
+      },
+      {
         path: 'employee',
         name: 'EmployeeManagement',
         component: () => import('@/views/admin/auth/EmployeeManagement.vue'),
       },
-            {
+      {
         path: 'customer',
         name: 'CustomerManagement',
         component: () => import('@/views/admin/auth/CustomerManagement.vue'),
@@ -225,11 +235,7 @@ router.beforeEach((to) => {
   const isAdminOrStaff = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_STAFF')
 
   // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào admin
-  if (
-    token &&
-    isAdminOrStaff &&
-    (to.path === '/' || to.path.startsWith('/auth/login'))
-  ) {
+  if (token && isAdminOrStaff && (to.path === '/' || to.path.startsWith('/auth/login'))) {
     return '/admin/dashboard'
   }
 

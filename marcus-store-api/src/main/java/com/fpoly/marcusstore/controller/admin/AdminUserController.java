@@ -5,10 +5,7 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,7 +20,6 @@ import com.fpoly.marcusstore.dto.request.UpdateUserRequest;
 import com.fpoly.marcusstore.dto.request.VerifyOtpRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.dto.response.UserResponse;
-import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.service.impl.UserServiceImpl;
 
 import jakarta.validation.Valid;
@@ -33,17 +29,19 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/user")
 @RequiredArgsConstructor
 public class AdminUserController {
+
     private final UserServiceImpl userServiceImpl;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ApiResponse<Page<UserResponse>> getAll(
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) List<String> roles,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         Pageable pageable = PageRequest.of(page, size);
-        return ApiResponse.success(userServiceImpl.getALL(keyword, pageable));
+        return ApiResponse.success(userServiceImpl.getALL(keyword, roles, pageable));
     }
 
     @PostMapping
@@ -60,7 +58,9 @@ public class AdminUserController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<UserResponse> update(@PathVariable Integer id, @Valid @RequestBody UpdateUserRequest request) {
+    public ApiResponse<UserResponse> update(
+            @PathVariable Integer id,
+            @Valid @RequestBody UpdateUserRequest request) {
         return ApiResponse.success(userServiceImpl.update(id, request));
     }
 

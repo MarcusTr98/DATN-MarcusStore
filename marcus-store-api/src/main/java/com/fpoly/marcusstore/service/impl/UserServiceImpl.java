@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,7 +30,6 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class UserServiceImpl implements UserService {
-
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -89,6 +87,7 @@ public class UserServiceImpl implements UserService {
         if (roles == null) {
             return List.of();
         }
+
         return roles.stream()
                 .filter(role -> role != null)
                 .flatMap(role -> Arrays.stream(role.split(",")))
@@ -136,12 +135,12 @@ public class UserServiceImpl implements UserService {
 
         if (!user.getEmail().equals(request.getEmail())
                 && userRepository.existsByEmail(request.getEmail())) {
+
             throw new RuntimeException("Email đã tồn tại");
         }
 
         Role role = roleRepository.findById(request.getRoleId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy role"));
-
         if ("ADMIN".equals(user.getRole().getRoleName())
                 && !"ADMIN".equals(role.getRoleName())) {
             throw new RuntimeException("Không thể thay đổi role của tài khoản Admin");
@@ -160,6 +159,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void lockUser(Integer Id) {
+
         User user = userRepository.findById(Id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + Id));
 
@@ -172,12 +172,14 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setIsActive(false);
+
         userRepository.save(user);
     }
 
     @Override
     @Transactional
     public void UnLockUser(Integer Id) {
+
         User user = userRepository.findById(Id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + Id));
 
@@ -186,6 +188,7 @@ public class UserServiceImpl implements UserService {
         }
 
         user.setIsActive(true);
+
         userRepository.save(user);
     }
 
@@ -218,6 +221,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public void verifyEmailByOtp(String email, String otp) {
+
         System.out.println("VERIFY OTP: " + email);
 
         otpService.verifyOtp(email, otp);
@@ -228,17 +232,9 @@ public class UserServiceImpl implements UserService {
         System.out.println("Before: " + user.getEmailVerified());
 
         user.setEmailVerified(true);
+
         userRepository.save(user);
 
         System.out.println("After: " + user.getEmailVerified());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<UserResponse> getCustomers() {
-        // roleId = 3 là CUSTOMER
-        return userRepository.findByRoleRoleId(3).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
     }
 }
