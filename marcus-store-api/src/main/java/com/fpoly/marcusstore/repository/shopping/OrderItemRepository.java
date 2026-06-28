@@ -10,13 +10,6 @@ import java.util.List;
 
 @Repository
 public interface OrderItemRepository extends JpaRepository<OrderItem, Integer> {
-    @Query("""
-            SELECT DISTINCT oi
-            FROM OrderItem oi
-            LEFT JOIN FETCH oi.productItems
-            WHERE oi.order.orderId = :orderId
-            """)
-    List<OrderItem> findWithProductItemsByOrderId(@Param("orderId") Integer orderId);
 
     List<OrderItem> findByOrder_OrderId(Integer orderId);
 }

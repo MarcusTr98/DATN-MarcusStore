@@ -138,6 +138,18 @@ const toggleProductMenu = () => {
 onMounted(() => {
   if (isProductMenuActive.value) isProductMenuOpen.value = true
 })
+
+const isAccountMenuOpen = ref(false)
+
+const toggleAccountMenu = () => {
+  isAccountMenuOpen.value = !isAccountMenuOpen.value
+}
+
+onMounted(() => {
+  if (route.path.includes('/admin/employee') || route.path.includes('/admin/customer')) {
+    isAccountMenuOpen.value = true
+  }
+})
 </script>
 
 <style scoped>

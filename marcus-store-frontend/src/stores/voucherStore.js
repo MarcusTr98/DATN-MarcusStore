@@ -15,26 +15,29 @@ function mapVoucher(voucher) {
     voucherCode: voucher.voucherCode,
     discountValue: Number(voucher.discountValue || 0),
     discountType: voucher.discountType,
-    maxDiscountAmount: voucher.maxDiscountAmount,
-    minOrderValue: Number(voucher.minOrderValue || 0),
-    startDate: formatDateTimeLocal(voucher.startDate),
-    endDate: formatDateTimeLocal(voucher.endDate),
+    maxDiscountAmount: Number(voucher.maxDiscountAmount ?? 0) || null,
+    minOrderValue: Number(voucher.minOrderValue ?? 0) || null,
+    startDate: voucher.startDate || null,
+    endDate: voucher.endDate || null,
     quantity: Number(voucher.quantity || 0),
     isActive: Boolean(voucher.isActive),
+    // Đối tượng sử dụng
+    targetType: voucher.targetType || 'ALL',
+    targetUserIds: voucher.targetUserIds || [],
+    targetUserCount: voucher.targetUserCount || null,
   }
 }
 
 function mapFieldErrors(errors = {}) {
   const mappedErrors = {
     voucher_code: errors.voucherCode,
-    discount_value: errors.discountValue,
-    discount_type: errors.discountType,
-    max_discount_amount: errors.maxDiscountAmount,
-    min_order_value: errors.minOrderValue,
-    start_date: errors.startDate,
-    end_date: errors.endDate,
-    quantity: errors.quantity,
-  }
+  discount_value: errors.discountValue,
+  discount_type: errors.discountType,
+  max_discount_amount: errors.maxDiscountAmount,
+  min_order_value: errors.minOrderValue,
+  start_date: errors.startDate,
+  end_date: errors.endDate,
+}
 
   return Object.fromEntries(
     Object.entries(mappedErrors).filter(([, message]) => Boolean(message))
@@ -89,6 +92,7 @@ function buildFallbackStats(vouchers = [], totalElements = 0) {
     active: vouchers.filter((voucher) => voucher.isActive).length,
     percent: vouchers.filter((voucher) => voucher.discountType === 'PERCENT').length,
     amount: vouchers.filter((voucher) => voucher.discountType === 'AMOUNT').length,
+    freeship: vouchers.filter((voucher) => voucher.discountType === 'FREESHIP').length,
   }
 }
 
@@ -110,6 +114,7 @@ export const useVoucherStore = defineStore('voucher', {
       active: 0,
       percent: 0,
       amount: 0,
+      freeship: 0,
     },
   }),
 
@@ -185,6 +190,7 @@ export const useVoucherStore = defineStore('voucher', {
         this.vouchers = this.vouchers.filter(
           (voucher) => voucher.voucherId !== voucherId
         )
+        this.stats = buildFallbackStats(this.vouchers)
 
         return true
       } catch (error) {
@@ -208,6 +214,7 @@ export const useVoucherStore = defineStore('voucher', {
 
         const response = await voucherApi.createVoucher(payload)
         this.vouchers.unshift(mapVoucher(response.data))
+        this.stats = buildFallbackStats(this.vouchers)
 
         return true
       } catch (error) {

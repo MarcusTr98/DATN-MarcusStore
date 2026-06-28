@@ -1,6 +1,6 @@
 import api from '@/utils/api'
 
-const  voucherApi = {
+const voucherApi = {
   getAllVoucher(params){
     return api.get('/admin/vouchers', { params })
   },
@@ -18,6 +18,7 @@ const  voucherApi = {
   createVoucher(data) {
     return api.post('/admin/voucher', data)
   },
+
   updateVoucher(voucherId, data) {
     return api.put(`/admin/voucher/${voucherId}`, data)
   },

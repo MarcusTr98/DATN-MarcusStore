@@ -1,6 +1,10 @@
 package com.fpoly.marcusstore.service.impl;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,182 +27,218 @@ import com.fpoly.marcusstore.service.OtpService;
 import com.fpoly.marcusstore.service.UserService;
 
 import lombok.RequiredArgsConstructor;
+
 @Service
 @RequiredArgsConstructor
-public class UserServiceImpl implements UserService{
-private final UserRepository userRepository;
-private final RoleRepository roleRepository;
-private final PasswordEncoder passwordEncoder;
-private final OrderRepository orderRepository;
-private final EmailService emailService;
-private final OtpService otpService;
-private final EmailOTPRepository emailOtpRepository;
-private UserResponse toResponse( User user){
-      BigDecimal totalSpent = BigDecimal.ZERO;
+public class UserServiceImpl implements UserService {
+
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final OrderRepository orderRepository;
+    private final EmailService emailService;
+    private final OtpService otpService;
+    private final EmailOTPRepository emailOtpRepository;
+
+    private UserResponse toResponse(User user) {
+        BigDecimal totalSpent = BigDecimal.ZERO;
         if ("CUSTOMER".equals(user.getRole().getRoleName())) {
             totalSpent = orderRepository.sumTotalSpentByUserId(user.getUserId());
-            if (totalSpent == null) totalSpent = BigDecimal.ZERO;
+            if (totalSpent == null)
+                totalSpent = BigDecimal.ZERO;
         }
-    return UserResponse.builder()
-          .userId(user.getUserId())
-          .username(user.getUsername())
-          .email(user.getEmail())
-          .fullName(user.getFullName())
-          .phoneNumber(user.getPhoneNumber())
-          .active(user.getIsActive())
-          .roleName(user.getRole().getRoleName())
-          .emailVerified(user.getEmailVerified())
-          .createdAt(user.getCreatedAt())
-          .totalSpent(totalSpent)
-          .build();
-}
-@Override
-@Transactional
-public Page<UserResponse> getALL(String keyword, Pageable pageable){
-          if (keyword == null || keyword.trim().isEmpty()) {
-            return userRepository.findAll(pageable)
-                    .map(this::toResponse);
-        }
+        return UserResponse.builder()
+                .userId(user.getUserId())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .phoneNumber(user.getPhoneNumber())
+                .active(user.getIsActive())
+                .roleName(user.getRole().getRoleName())
+                .emailVerified(user.getEmailVerified())
+                .createdAt(user.getCreatedAt())
+                .totalSpent(totalSpent)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public Page<UserResponse> getALL(String keyword, List<String> roles, Pageable pageable) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        List<String> normalizedRoles = normalizeRoles(roles);
+        boolean rolesEmpty = normalizedRoles.isEmpty();
+        List<String> queryRoles = rolesEmpty ? List.of("__NO_ROLE__") : normalizedRoles;
 
         return userRepository
-                .findByFullNameContainingIgnoreCase(
-                        keyword,
+                .findAllByKeywordAndRoles(
+                        normalizedKeyword,
+                        queryRoles,
+                        rolesEmpty,
                         pageable)
                 .map(this::toResponse);
-}
-@Override
-@Transactional
-public UserResponse getById(Integer id){
-     User user = userRepository.findById(id).orElseThrow(()->
-         new RuntimeException("Không tìm thấy user với Id" + id));
-    return toResponse(user);
-}
-@Override
-@Transactional
-public UserResponse create(CreateUserRequest request){
-    if (userRepository.existsByUsername(request.getUsername())) {
-        throw new RuntimeException("Tên đã tồn tại");
     }
-    if (userRepository.existsByEmail(request.getEmail())) {
-        throw new RuntimeException("Email đã tồn tại");
+
+    private String normalizeKeyword(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return null;
+        }
+        return keyword.trim().toLowerCase();
     }
-    Role role = roleRepository.findById(request.getRoleId()).orElseThrow(()-> new RuntimeException("Không tìm thấy role"));
-         User user = new User();
-         user.setUsername(request.getUsername());
-         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-         user.setFullName(request.getFullName());
-         user.setEmail(request.getEmail());
-         user.setPhoneNumber(request.getPhoneNumber());
-         user.setIsActive(true);
-         user.setRole(role);
-         user.setCreatedAt(LocalDateTime.now());
-         return toResponse(userRepository.save(user));
-}
-@Override
-@Transactional
-public UserResponse update(Integer Id, UpdateUserRequest request){
-    User user = userRepository.findById(Id)
-                .orElseThrow(() ->
-                        new RuntimeException("Không tìm thấy user"));
+
+    private List<String> normalizeRoles(List<String> roles) {
+        if (roles == null) {
+            return List.of();
+        }
+        return roles.stream()
+                .filter(role -> role != null)
+                .flatMap(role -> Arrays.stream(role.split(",")))
+                .filter(role -> !role.trim().isEmpty())
+                .map(role -> role.trim().toUpperCase())
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public UserResponse getById(Integer id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user với Id" + id));
+        return toResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserResponse create(CreateUserRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new RuntimeException("Tên đã tồn tại");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new RuntimeException("Email đã tồn tại");
+        }
+        Role role = roleRepository.findById(request.getRoleId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy role"));
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName());
+        user.setEmail(request.getEmail());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setIsActive(true);
+        user.setRole(role);
+        user.setCreatedAt(LocalDateTime.now());
+        return toResponse(userRepository.save(user));
+    }
+
+    @Override
+    @Transactional
+    public UserResponse update(Integer Id, UpdateUserRequest request) {
+        User user = userRepository.findById(Id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
         if (!user.getEmail().equals(request.getEmail())
                 && userRepository.existsByEmail(request.getEmail())) {
-
             throw new RuntimeException("Email đã tồn tại");
         }
 
         Role role = roleRepository.findById(request.getRoleId())
-                .orElseThrow(() ->
-                        new RuntimeException("Không tìm thấy role"));
-         user.setFullName(request.getFullName());
-         user.setEmail(request.getEmail());
-         user.setPhoneNumber(request.getPhoneNumber());
-         user.setIsActive(true);
-         user.setRole(role);
-         user.setUpdatedAt(LocalDateTime.now());
-         
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy role"));
+
+        if ("ADMIN".equals(user.getRole().getRoleName())
+                && !"ADMIN".equals(role.getRoleName())) {
+            throw new RuntimeException("Không thể thay đổi role của tài khoản Admin");
+        }
+
+        user.setFullName(request.getFullName());
+        user.setEmail(request.getEmail());
+        user.setPhoneNumber(request.getPhoneNumber());
+        user.setIsActive(true);
+        user.setRole(role);
+        user.setUpdatedAt(LocalDateTime.now());
+
         return toResponse(userRepository.save(user));
-}
-@Override
-@Transactional
-public void lockUser(Integer Id) {
-
-    User user = userRepository.findById(Id)
-            .orElseThrow(() ->
-                    new RuntimeException("Không tìm thấy user với id: " + Id));
-
-    if ("ADMIN".equals(user.getRole().getRoleName())) {
-        throw new RuntimeException("Không thể khóa tài khoản Admin");
     }
 
-    if (!Boolean.TRUE.equals(user.getIsActive())) {
-        throw new RuntimeException("Tài khoản đã bị khóa");
+    @Override
+    @Transactional
+    public void lockUser(Integer Id) {
+        User user = userRepository.findById(Id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + Id));
+
+        if ("ADMIN".equals(user.getRole().getRoleName())) {
+            throw new RuntimeException("Không thể khóa tài khoản Admin");
+        }
+
+        if (!Boolean.TRUE.equals(user.getIsActive())) {
+            throw new RuntimeException("Tài khoản đã bị khóa");
+        }
+
+        user.setIsActive(false);
+        userRepository.save(user);
     }
 
-    user.setIsActive(false);
+    @Override
+    @Transactional
+    public void UnLockUser(Integer Id) {
+        User user = userRepository.findById(Id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + Id));
 
-    userRepository.save(user);
-}
-@Override
-@Transactional
-public void UnLockUser(Integer Id) {
+        if (Boolean.TRUE.equals(user.getIsActive())) {
+            throw new RuntimeException("Tài khoản đang hoạt động");
+        }
 
-    User user = userRepository.findById(Id)
-            .orElseThrow(() ->
-                    new RuntimeException("Không tìm thấy user với id: " + Id));
-
-    if (Boolean.TRUE.equals(user.getIsActive())) {
-        throw new RuntimeException("Tài khoản đang hoạt động");
+        user.setIsActive(true);
+        userRepository.save(user);
     }
 
-    user.setIsActive(true);
+    @Override
+    @Transactional
+    public void sendVerifyEmail(Integer userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
-    userRepository.save(user);
-}
+        if (Boolean.TRUE.equals(user.getEmailVerified())) {
+            throw new RuntimeException("Email đã được xác thực");
+        }
 
-@Override
-@Transactional
-public void sendVerifyEmail(Integer userId) {
-    User user = userRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
+        // Xóa OTP cũ nếu có
+        emailOtpRepository.deleteByEmail(user.getEmail());
 
-    if (Boolean.TRUE.equals(user.getEmailVerified())) {
-        throw new RuntimeException("Email đã được xác thực");
+        // Tạo OTP mới
+        String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
+        EmailOTP otp = new EmailOTP();
+        otp.setEmail(user.getEmail());
+        otp.setOtpCode(otpCode);
+        otp.setCreatedAt(LocalDateTime.now());
+        otp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
+        emailOtpRepository.save(otp);
+
+        // Gửi mail
+        emailService.sendOtp(user.getEmail(), otpCode);
     }
 
-    // Xóa OTP cũ nếu có
-    emailOtpRepository.deleteByEmail(user.getEmail());
+    @Override
+    @Transactional
+    public void verifyEmailByOtp(String email, String otp) {
+        System.out.println("VERIFY OTP: " + email);
 
-    // Tạo OTP mới
-    String otpCode = String.format("%06d", new java.util.Random().nextInt(999999));
-    EmailOTP otp = new EmailOTP();
-    otp.setEmail(user.getEmail());
-    otp.setOtpCode(otpCode);
-    otp.setCreatedAt(LocalDateTime.now());
-    otp.setExpiredAt(LocalDateTime.now().plusMinutes(5));
-    emailOtpRepository.save(otp);
+        otpService.verifyOtp(email, otp);
 
-    // Gửi mail
-    emailService.sendOtp(user.getEmail(), otpCode);
-}
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
-@Override
-@Transactional
-public void verifyEmailByOtp(String email, String otp) {
+        System.out.println("Before: " + user.getEmailVerified());
 
-    System.out.println("VERIFY OTP: " + email);
+        user.setEmailVerified(true);
+        userRepository.save(user);
 
-    otpService.verifyOtp(email, otp);
+        System.out.println("After: " + user.getEmailVerified());
+    }
 
-    User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
-
-    System.out.println("Before: " + user.getEmailVerified());
-
-    user.setEmailVerified(true);
-
-    userRepository.save(user);
-
-    System.out.println("After: " + user.getEmailVerified());
-}
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserResponse> getCustomers() {
+        // roleId = 3 là CUSTOMER
+        return userRepository.findByRoleRoleId(3).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
 }

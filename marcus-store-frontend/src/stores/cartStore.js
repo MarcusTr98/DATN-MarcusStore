@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import cartApi from '@/api/cartApi'
 
+
 // Convert dữ liệu backend trả về sang dữ liệu mà Cart.vue đang dùng
 function mapCartItem(item) {
   // convert dữ liệu   từ BE sang FE
@@ -19,7 +20,7 @@ function mapCartItem(item) {
     totalPrice: Number(item.totalPrice || 0),
     stockQuantity: Number(item.stockQuantity || 0),
     // Dữ liệu phục vụ giao diện hiện tại
-    checked: true,
+    checked: false,
     badge: 'Sản phẩm chính',
     isAccessory: false,
     // Nếu chưa có ảnh thì dùng tạm mã SKU để hiển thị
