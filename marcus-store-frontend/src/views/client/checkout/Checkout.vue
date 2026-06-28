@@ -7,6 +7,108 @@
       @close="handleModalConfirm"
     />
 
+    <!-- Modal thông báo voucher hết hạn / hết lượt -->
+    <a-modal
+      v-model:open="showVoucherExpiredModal"
+      title="Thông báo"
+      :footer="null"
+      centered
+      :mask-closable="true"
+      @cancel="closeVoucherExpiredModal"
+    >
+
+    </a-modal>
+
+    <!-- Modal thông báo áp dụng voucher thành công -->
+    <div
+      class="v-overlay"
+      :class="{ active: isVoucherSuccessModalOpen }"
+      @click.self="closeVoucherSuccessModal"
+    >
+      <div
+        class="v-card alert-card voucher-success-modal"
+        :class="`voucher-success-modal--${voucherSuccessType.toLowerCase()}`"
+      >
+        <div class="alert-icon voucher-success-modal__icon">
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <circle
+              cx="24"
+              cy="24"
+              r="20"
+              stroke="#16A34A"
+              stroke-width="2.5"
+              fill="none"
+            />
+            <path
+              d="M15 24L21 30L33 18"
+              stroke="#16A34A"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              fill="none"
+            />
+          </svg>
+        </div>
+        <div class="alert-body">
+          <h3 class="alert-title">Áp dụng voucher thành công</h3>
+          <p class="alert-message">{{ voucherSuccessMessage }}</p>
+
+          <div
+            class="voucher-success-modal__highlight"
+            v-if="voucherSuccessType === 'FREESHIP'"
+          >
+            <i class="fas fa-truck"></i>
+            <span
+              >Tiền được trừ:
+              <strong>−{{ formatCurrency(voucherSuccessDiscountAmount) }}</strong></span
+            >
+          </div>
+
+          <div
+            class="voucher-success-modal__highlight"
+            v-else-if="voucherSuccessType === 'PERCENT'"
+          >
+            <i class="fas fa-percent"></i>
+            <span
+              >Tiền được trừ:
+              <strong>−{{ formatCurrency(voucherSuccessDiscountAmount) }}</strong></span
+            >
+          </div>
+
+          <div
+            class="voucher-success-modal__highlight"
+            v-else-if="voucherSuccessType === 'AMOUNT'"
+          >
+            <i class="fas fa-tag"></i>
+            <span
+              >Tiền được trừ:
+              <strong>−{{ formatCurrency(voucherSuccessDiscountAmount) }}</strong></span
+            >
+          </div>
+
+          <p class="voucher-success-modal__note">
+            <i class="fas fa-info-circle"></i>
+            {{ voucherSuccessNote }}
+          </p>
+        </div>
+        <div class="alert-footer">
+          <button
+            class="alert-confirm-btn voucher-success-modal__btn"
+            type="button"
+            @click="closeVoucherSuccessModal"
+          >
+            Đồng ý
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="checkout-header">
       <div class="checkout-header__inner">
         <router-link to="/" class="checkout-header__brand">
@@ -246,6 +348,9 @@
 
               <div style="font-size: 15px; font-weight: 800; color: #d92d20; padding-right: 15px">
                 <i class="fas fa-spinner fa-spin text-muted" v-if="isFeeLoading"></i>
+                <template v-else-if="hasFreeshipVoucher">
+                  <span class="text-success">Miễn phí</span>
+                </template>
                 <template v-else-if="shippingFee > 0"
                   >+{{ shippingFee.toLocaleString('vi-VN') }}₫</template
                 >
@@ -398,6 +503,9 @@
               <span v-if="isFeeLoading" class="text-muted" style="font-size: 12px"
                 ><i class="fas fa-spinner fa-spin"></i
               ></span>
+              <span v-else-if="hasFreeshipVoucher" class="text-success">
+                <i class="fas fa-truck-fast me-1"></i>Miễn phí
+              </span>
               <span v-else-if="shippingFee > 0" class="text-danger"
                 >+{{ shippingFee.toLocaleString('vi-VN') }}₫</span
               >
@@ -433,7 +541,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/check-out.css'
@@ -468,11 +576,107 @@ const handleModalConfirm = () => {
 }
 
 // ─── Order & Cart Data
-const cartData = ref({ items: [], totalQuantity: 0, totalAmount: 0 })
-const appliedVoucherCode = ref('')
-const discountAmount = ref(0)
+// Ưu tiên lấy từ localStorage (sản phẩm đã chọn), không thì fetch từ API
+const getInitialCartData = () => {
+  const savedItems = localStorage.getItem('selectedCartItems')
+  const savedSubtotal = localStorage.getItem('selectedSubtotal')
+
+  if (savedItems) {
+    try {
+      const items = JSON.parse(savedItems)
+      if (Array.isArray(items) && items.length > 0) {
+        return {
+          items,
+          totalQuantity: items.reduce((sum, i) => sum + (i.quantity || 0), 0),
+          totalAmount: items.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
+        }
+      }
+    } catch (e) {
+      console.warn('Lỗi parse selectedCartItems:', e)
+    }
+  }
+
+  // Fallback: sẽ fetch từ API
+  return { items: [], totalQuantity: 0, totalAmount: 0 }
+}
+
+const cartData = ref(getInitialCartData())
+
+// Khôi phục voucher đã chọn từ localStorage
+// CHỈ lưu code trong localStorage, KHÔNG trust value/maxDiscount - phải gọi BE preview để lấy
+const savedVoucher = JSON.parse(localStorage.getItem('selectedVoucher') || 'null')
+const appliedVoucherCode = ref(savedVoucher?.code || '')
+
 const shippingFee = ref(0)
 const estimatedDelivery = ref('')
+
+// State cho discount - lấy từ BE preview, KHÔNG tính từ localStorage
+const discountAmount = ref(0)
+const hasFreeshipVoucher = ref(false)
+const voucherError = ref('')
+const isVoucherLoading = ref(false)
+
+// Modal thông báo voucher hết hạn/hết lượt (theo yêu cầu: hiển thị modal khi xóa voucher)
+const showVoucherExpiredModal = ref(false)
+const voucherExpiredMessage = ref('')
+
+const openVoucherExpiredModal = (message) => {
+    voucherExpiredMessage.value = message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.'
+    showVoucherExpiredModal.value = true
+}
+
+const closeVoucherExpiredModal = () => {
+    showVoucherExpiredModal.value = false
+    voucherExpiredMessage.value = ''
+}
+
+// Modal thông báo áp dụng voucher thành công (áp dụng cho mọi loại voucher)
+const isVoucherSuccessModalOpen = ref(false)
+const voucherSuccessMessage = ref('')
+const voucherSuccessType = ref('AMOUNT')
+const voucherSuccessAmount = ref(0)
+const voucherSuccessPercent = ref(0)
+const voucherSuccessMaxDiscount = ref(0)
+const voucherSuccessDiscountAmount = ref(0) // Số tiền giảm thực tế từ BE
+const voucherSuccessNote = ref('Số tiền giảm thực tế sẽ được hệ thống tính toán lại tại bước thanh toán.')
+// Đánh dấu đã hiển thị modal success cho voucher hiện tại - tránh popup lại khi cart thay đổi
+const lastShownSuccessCode = ref('')
+
+const openVoucherSuccessModal = (voucherInfo) => {
+    if (!voucherInfo) return
+    const code = voucherInfo.voucherCode || appliedVoucherCode.value
+    // Tránh popup lặp lại cho cùng 1 voucher khi cartData thay đổi nhiều lần
+    if (lastShownSuccessCode.value === code) return
+    lastShownSuccessCode.value = code
+
+    voucherSuccessType.value = (voucherInfo.discountType || 'AMOUNT').toUpperCase()
+    voucherSuccessAmount.value = Number(voucherInfo.discountValue) || 0
+    voucherSuccessPercent.value = Number(voucherInfo.discountPercent) || 0
+    voucherSuccessMaxDiscount.value = Number(voucherInfo.maxDiscountAmount) || 0
+    voucherSuccessDiscountAmount.value = Number(voucherInfo.actualDiscountAmount ?? voucherInfo.discountAmount) || 0
+    voucherSuccessMessage.value = `Voucher ${code} đã được áp dụng thành công.`
+
+    // Đặt note phù hợp theo loại voucher
+    if (voucherSuccessType.value === 'FREESHIP') {
+        voucherSuccessNote.value = 'Số tiền freeship thực tế sẽ được tính dựa trên phí vận chuyển GHN tại bước thanh toán.'
+    } else {
+        voucherSuccessNote.value = 'Vui lòng kiểm tra lại thông tin voucher trước khi tiến hành đặt hàng.'
+    }
+
+    isVoucherSuccessModalOpen.value = true
+}
+
+const closeVoucherSuccessModal = () => {
+    isVoucherSuccessModalOpen.value = false
+    voucherSuccessMessage.value = ''
+    voucherSuccessAmount.value = 0
+    voucherSuccessPercent.value = 0
+    voucherSuccessMaxDiscount.value = 0
+    voucherSuccessDiscountAmount.value = 0
+    voucherSuccessType.value = 'AMOUNT'
+}
+
+const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')}₫`
 
 const orderForm = ref({
   recipientName: '',
@@ -500,9 +704,12 @@ const selectedAddress = ref(null)
 const activeAddressId = ref(null)
 
 // ─── Computed
+// finalAmount = Tổng tiền hàng - Giảm giá + Phí ship
+// Nếu có FREESHIP voucher: không cộng shippingFee (được miễn phí)
 const finalAmount = computed(() => {
-  const total = (cartData.value.totalAmount ?? 0) - discountAmount.value + shippingFee.value
-  return total > 0 ? total : 0
+  const total = (cartData.value.totalAmount ?? 0) - discountAmount.value
+  const withShipping = hasFreeshipVoucher.value ? total : total + shippingFee.value
+  return withShipping > 0 ? withShipping : 0
 })
 
 const isAddressReady = computed(() => !!toDistrictId.value && !!toWardCode.value)
@@ -524,6 +731,65 @@ const validatePhone = (phone) => /(03|05|07|08|09)\d{8}/.test(phone)
 const validateEmail = (email) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return re.test(email)
+}
+
+// ─── Voucher preview (gọi BE để lấy discountAmount thực tế, không trust localStorage)
+const previewVoucher = async () => {
+  const code = appliedVoucherCode.value
+  if (!code) {
+    discountAmount.value = 0
+    hasFreeshipVoucher.value = false
+    voucherError.value = ''
+    return
+  }
+
+  isVoucherLoading.value = true
+  voucherError.value = ''
+
+  try {
+    const res = await api.post('/client/vouchers/preview', {
+      voucherCode: code,
+      orderAmount: cartData.value.totalAmount || 0,
+      shippingFee: 0,
+    })
+
+    const result = res.data?.data ?? res.data
+    if (result?.applied) {
+      discountAmount.value = Number(result.discountAmount) || 0
+      hasFreeshipVoucher.value = result.discountType === 'FREESHIP'
+      voucherError.value = ''
+      // Mở modal thông báo áp dụng thành công với thông tin từ BE trả về
+      openVoucherSuccessModal({
+        voucherCode: code,
+        discountType: result.discountType,
+        discountValue: result.discountValue,
+        discountPercent: result.discountPercent,
+        maxDiscountAmount: result.maxDiscountAmount,
+        actualDiscountAmount: result.discountAmount,
+      })
+    } else {
+      // Voucher không hợp lệ → xóa khỏi localStorage và hiển thị modal
+      discountAmount.value = 0
+      hasFreeshipVoucher.value = false
+      voucherError.value = result?.message || 'Mã giảm giá không hợp lệ'
+      localStorage.removeItem('selectedVoucher')
+      appliedVoucherCode.value = ''
+      // Mở modal thông báo theo yêu cầu
+      openVoucherExpiredModal(result?.message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.')
+    }
+  } catch (e) {
+    console.error('Preview voucher fail:', e)
+    discountAmount.value = 0
+    hasFreeshipVoucher.value = false
+    const errorMsg = e.response?.data?.message || 'Không thể áp dụng mã giảm giá'
+    voucherError.value = errorMsg
+    localStorage.removeItem('selectedVoucher')
+    appliedVoucherCode.value = ''
+    // Mở modal thông báo theo yêu cầu
+    openVoucherExpiredModal(errorMsg)
+  } finally {
+    isVoucherLoading.value = false
+  }
 }
 
 // ─── 1. Phí vận chuyển GHN
@@ -651,9 +917,14 @@ const fetchCart = async () => {
   try {
     const res = await cartApi.getCart()
     const data = res.data
-    cartData.value = data?.data ?? data
-    if (!cartData.value.items?.length)
-      showModal('Giỏ hàng trống', 'Bạn chưa có sản phẩm nào trong giỏ hàng!', 'redirect_cart')
+    const fetchedCart = data?.data ?? data
+
+    // Chỉ cập nhật nếu không có dữ liệu từ localStorage
+    // hoặc nếu API trả về items khác với items đã chọn
+    if (!cartData.value.items?.length && fetchedCart.items?.length) {
+      // Không có dữ liệu localStorage, dùng từ API
+      cartData.value = fetchedCart
+    }
   } catch (error) {
     if (error.response?.status === 401) {
       showModal('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để tiếp tục thanh toán.', 'redirect_login')
@@ -755,7 +1026,14 @@ const handleCheckout = async () => {
   try {
     const { data } = await api.post('/checkout', payload)
 
-    cartStore.clearCartState()
+    // Chỉ xóa các món đã thanh toán khỏi giỏ hàng, giữ lại món chưa thanh toán
+    const paidSkuIds = cartData.value.items.map((i) => i.skuId)
+    await cartStore.removeManyItemFromCart(paidSkuIds)
+
+    // Dọn dẹp localStorage sau khi checkout thành công
+    localStorage.removeItem('selectedCartItems')
+    localStorage.removeItem('selectedSubtotal')
+    localStorage.removeItem('selectedVoucher')
 
     if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
       window.location.href = data.data.paymentUrl
@@ -777,5 +1055,208 @@ const handleCheckout = async () => {
 onMounted(async () => {
   await prefillUserEmail()
   await Promise.allSettled([fetchGhnProvinces(), fetchCart(), fetchMyAddresses()])
+  await previewVoucher()
 })
+
+// Khi tổng tiền hàng thay đổi (do GHN thay đổi cũng không ảnh hưởng), gọi lại preview
+watch(
+  () => cartData.value.totalAmount,
+  () => {
+    if (appliedVoucherCode.value) {
+      previewVoucher()
+    }
+  },
+)
 </script>
+
+<style scoped>
+/* ── Voucher Success Modal (style tương thích với check-out.css) ── */
+.v-overlay {
+  position: fixed;
+  z-index: 1100;
+  top: 0;
+  left: 0;
+  display: flex;
+  visibility: hidden;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.v-overlay.active {
+  visibility: visible;
+  opacity: 1;
+}
+
+.v-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  transform: scale(0.92);
+  opacity: 0;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s;
+}
+
+.v-overlay.active .v-card {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.alert-card {
+  width: 420px;
+  max-width: 92vw;
+  border-radius: 20px;
+  padding: 36px 32px 28px;
+  text-align: center;
+  align-items: center;
+}
+
+.alert-icon {
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #f0fdf4;
+}
+
+.alert-body {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.alert-title {
+  margin: 0 0 10px;
+  color: #16a34a;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.alert-message {
+  margin: 0;
+  color: #475569;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.alert-footer {
+  width: 100%;
+}
+
+.alert-confirm-btn {
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  transition: background 0.15s ease;
+}
+
+.alert-confirm-btn:hover {
+  background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+}
+
+/* Voucher Success Modal variants */
+.voucher-success-modal .alert-title {
+  color: #16a34a;
+}
+
+.voucher-success-modal__highlight {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px auto 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  color: #065f46;
+  font-size: 14px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.voucher-success-modal__highlight i {
+  font-size: 18px;
+  color: #16a34a;
+  flex-shrink: 0;
+}
+
+.voucher-success-modal__highlight strong {
+  color: #047857;
+  font-size: 15.5px;
+  font-weight: 800;
+}
+
+.voucher-success-modal__note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  color: #64748b;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.voucher-success-modal__note i {
+  font-size: 14px;
+  color: #94a3b8;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.voucher-success-modal--percent .voucher-success-modal__highlight {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.voucher-success-modal--percent .voucher-success-modal__highlight i {
+  color: #b45309;
+}
+
+.voucher-success-modal--percent .voucher-success-modal__highlight strong {
+  color: #b45309;
+}
+
+.voucher-success-modal--amount .voucher-success-modal__highlight {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.voucher-success-modal--amount .voucher-success-modal__highlight i {
+  color: #1d4ed8;
+}
+
+.voucher-success-modal--amount .voucher-success-modal__highlight strong {
+  color: #1d4ed8;
+}
+
+@media (max-width: 480px) {
+  .alert-card {
+    width: 94vw;
+    padding: 28px 22px 22px;
+  }
+}
+</style>

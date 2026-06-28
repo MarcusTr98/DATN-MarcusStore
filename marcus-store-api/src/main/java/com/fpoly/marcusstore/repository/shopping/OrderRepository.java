@@ -173,8 +173,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     Optional<Order> findDetailByOrderCode(@Param("orderCode") String orderCode);
 
     Optional<Order> findByOrderCodeAndUserUserId(String OrderCode, Integer userId);
-
     @Query("SELECT COALESCE(SUM(o.finalAmount), 0) FROM Order o " +
-       "WHERE o.user.userId = :userId AND o.orderStatus = 'COMPLETED'")
+            "WHERE o.user.userId = :userId AND o.orderStatus = 'COMPLETED'")
     BigDecimal sumTotalSpentByUserId(@Param("userId") Integer userId);
 }

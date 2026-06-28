@@ -34,6 +34,9 @@ public class OrderDetailResponse {
     private String email;
     private String phoneNumber;
     private String voucherCode;
+    private String voucherDiscountType;
+    private BigDecimal voucherDiscountValue;
+    private BigDecimal voucherMaxDiscount;
     private List<OrderItemDetailResponse> items;
     private List<OrderStatusHistoryResponse> history;
 }

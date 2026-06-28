@@ -30,4 +30,7 @@ public class CheckoutRequestDTO {
     private String paymentMethod;
 
     private String voucherCode;
+
+    // Tỉnh/thành phố giao hàng (để check voucher FREESHIP theo khu vực)
+    private String provinceCity;
 }

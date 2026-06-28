@@ -42,4 +42,12 @@ public interface UserRepository extends JpaRepository<User, Integer> {
             @Param("roles") List<String> roles,
             @Param("rolesEmpty") boolean rolesEmpty,
             Pageable pageable);
+    // Lấy tất cả users có role cụ thể (roleId = 3 cho CUSTOMER)
+    List<User> findByRoleRoleId(Integer roleId);
+
+    @Query("SELECT u FROM User u WHERE u.role.roleId = :roleId AND " +
+            "(LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+    List<User> findByRoleRoleIdAndKeyword(@Param("roleId") Integer roleId, @Param("keyword") String keyword);
 }

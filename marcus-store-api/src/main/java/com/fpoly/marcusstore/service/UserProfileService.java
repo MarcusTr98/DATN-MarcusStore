@@ -37,7 +37,6 @@ public class UserProfileService {
                 .fullName(user.getFullName())
                 .phoneNumber(user.getPhoneNumber())
                 .roleName(roleName)
-                .emailVerified(user.getEmailVerified())
                 .build();
     }
 
@@ -62,7 +61,6 @@ public class UserProfileService {
                 .fullName(user.getFullName())
                 .phoneNumber(user.getPhoneNumber())
                 .roleName(roleName)
-                 .emailVerified(user.getEmailVerified())
                 .build();
     }
 }
