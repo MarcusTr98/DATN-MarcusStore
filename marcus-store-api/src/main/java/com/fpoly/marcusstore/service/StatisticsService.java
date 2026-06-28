@@ -45,8 +45,6 @@ public class StatisticsService {
             case "yesterday" -> { start = now.minusDays(1); end = now.minusDays(1); }
             case "7days"     -> start = now.minusDays(6);
             case "30days"    -> start = now.minusDays(29);
-            // FIX #5: dùng end = now thay vì start.plusDays(6)
-            // để không truy vấn các ngày tương lai trong tuần
             case "week"      -> { start = now.with(DayOfWeek.MONDAY); end = start.with(DayOfWeek.SUNDAY); }
             case "quarter"   -> {
                 int firstMonth = ((now.getMonthValue() - 1) / 3) * 3 + 1;

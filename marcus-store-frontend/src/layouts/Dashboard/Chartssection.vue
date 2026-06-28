@@ -203,6 +203,9 @@ function buildRevenueChart() {
   const pointRadiusCur = labels.map((_, i) => i === todayIdx ? 7 : 4)
   const pointStyleCur  = labels.map((_, i) => i === todayIdx ? 'star' : 'circle')
 
+  // Khi chỉ có 1 data point (lọc 1 ngày), thêm offset để điểm không dính vào trục Y
+  const isSinglePoint = labels.length <= 1
+
   revenueChart = new Chart(revenueChartRef.value, {
     type: 'line',
     data: {
@@ -238,6 +241,7 @@ function buildRevenueChart() {
       ...chartDefaults,
       scales: {
         x: {
+          offset: isSinglePoint, // 👈 FIX: thêm offset khi chỉ có 1 điểm, tránh dính vào trục Y
           ticks: { color: tickColor, font: { size: 11, weight: '600' }, maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 31 },
           grid: { color: gridColor },
         },
