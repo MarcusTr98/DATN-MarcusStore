@@ -66,11 +66,11 @@ public class UserProfileController {
         // Khách tự gửi mail xác thực cho chính mình
         @PostMapping("/send-verify-email")
         public ResponseEntity<?> sendVerifyEmail(
-                @AuthenticationPrincipal UserDetails userDetails) {
+                        @AuthenticationPrincipal UserDetails userDetails) {
                 try {
                         User user = userRepository
-                                .findByUsername(userDetails.getUsername())
-                                .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
+                                        .findByUsername(userDetails.getUsername())
+                                        .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
 
                         userServiceImpl.sendVerifyEmail(user.getUserId());
 

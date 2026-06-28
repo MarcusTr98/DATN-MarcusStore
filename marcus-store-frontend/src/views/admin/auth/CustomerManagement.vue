@@ -1,6 +1,5 @@
 <template>
   <div class="user-page">
-
     <div class="page-header">
       <div class="header-left">
         <div class="header-icon">
@@ -57,7 +56,7 @@
               class="form-control f-input"
               placeholder="Tìm theo tên, email hoặc số điện thoại"
               v-model="keyword"
-            >
+            />
           </div>
         </div>
       </div>
@@ -76,7 +75,6 @@
       @page-change="goToPage"
       @page-size-change="onPageSizeChange"
     />
-
     <UserFormModal
       :visible="isModalOpen"
       :is-edit="isEdit"
@@ -94,7 +92,6 @@
       :message="modalMessage"
       @close="modalVisible = false"
     />
-
   </div>
 </template>
 
@@ -106,38 +103,36 @@ import UserFormModal from '@/components/UserFormModal.vue'
 import BaseModal from '@/components/BaseModal.vue'
 
 // ── Data ───────────────────────────────────────────────
-const users   = ref([])
+const users = ref([])
 const keyword = ref('')
 
 // ── Pagination ─────────────────────────────────────────
 const currentPage = ref(0)
-const pageSize    = ref(5)
-const pageInfo    = ref({ totalElements: 0, totalPages: 0 })
+const pageSize = ref(5)
+const pageInfo = ref({ totalElements: 0, totalPages: 0 })
 
 // ── Stats (toàn bộ, không phụ thuộc trang) ────────────
 const stats = ref({ verified: 0, active: 0, locked: 0 })
 
 // ── Modal form ─────────────────────────────────────────
 const isModalOpen = ref(false)
-const isEdit      = ref(false)
-const saving      = ref(false)
-const editForm    = ref({})
+const isEdit = ref(false)
+const saving = ref(false)
+const editForm = ref({})
 
 // ── Modal thông báo ────────────────────────────────────
 const modalVisible = ref(false)
-const modalType    = ref('success')
-const modalTitle   = ref('')
+const modalType = ref('success')
+const modalTitle = ref('')
 const modalMessage = ref('')
-
 // ── Helpers ────────────────────────────────────────────
 const canManage = computed(() => {
   const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
   return roles.includes('ROLE_ADMIN')
 })
-
 const showModal = (type, title, message) => {
-  modalType.value    = type
-  modalTitle.value   = title
+  modalType.value = type
+  modalTitle.value = title
   modalMessage.value = message
   modalVisible.value = true
 }
@@ -145,17 +140,17 @@ const showModal = (type, title, message) => {
 // ── Load trang hiện tại ────────────────────────────────
 const loadData = async () => {
   try {
-    const res      = await adminUserApi.getAll({
-      keyword : keyword.value || undefined,
-      roles   : ['CUSTOMER'],
-      page    : currentPage.value,
-      size    : pageSize.value
+    const res = await adminUserApi.getAll({
+      keyword: keyword.value || undefined,
+      roles: ['CUSTOMER'],
+      page: currentPage.value,
+      size: pageSize.value,
     })
     const pageData = res.data.data
-    users.value    = pageData.content      || []
+    users.value = pageData.content || []
     pageInfo.value = {
-      totalElements : pageData.totalElements || 0,
-      totalPages    : pageData.totalPages    || 0
+      totalElements: pageData.totalElements || 0,
+      totalPages: pageData.totalPages || 0,
     }
   } catch {
     showModal('error', 'Lỗi tải dữ liệu', 'Không thể lấy danh sách khách hàng.')
@@ -168,19 +163,21 @@ const loadStats = async () => {
   try {
     const [allRes, activeRes] = await Promise.all([
       adminUserApi.getAll({ roles: ['CUSTOMER'], page: 0, size: 1 }),
-      adminUserApi.getAll({ roles: ['CUSTOMER'], page: 0, size: 1000 })
+      adminUserApi.getAll({ roles: ['CUSTOMER'], page: 0, size: 1000 }),
       // ↑ Tạm lấy để đếm active/verified — khi backend thêm filter active/emailVerified thì bỏ
     ])
-    const all  = activeRes.data.data.content || []
+    const all = activeRes.data.data.content || []
     const total = allRes.data.data.totalElements || 0
     stats.value = {
-      verified : all.filter(x =>  x.emailVerified).length,
-      active   : all.filter(x =>  x.active).length,
-      locked   : all.filter(x => !x.active).length
+      verified: all.filter((x) => x.emailVerified).length,
+      active: all.filter((x) => x.active).length,
+      locked: all.filter((x) => !x.active).length,
     }
     // Đảm bảo totalElements đúng kể cả khi keyword đang lọc
     pageInfo.value.totalElements = pageInfo.value.totalElements || total
-  } catch { /* stats lỗi không block UI */ }
+  } catch {
+    /* stats lỗi không block UI */
+  }
 }
 
 onMounted(() => {
@@ -195,8 +192,8 @@ watch(keyword, () => {
 
 // ── Pagination ─────────────────────────────────────────
 const pagination = computed(() => ({
-  totalElements : pageInfo.value.totalElements,
-  totalPages    : pageInfo.value.totalPages
+  totalElements: pageInfo.value.totalElements,
+  totalPages: pageInfo.value.totalPages,
 }))
 
 const goToPage = (page) => {
@@ -206,7 +203,7 @@ const goToPage = (page) => {
 }
 
 const onPageSizeChange = (size) => {
-  pageSize.value    = size
+  pageSize.value = size
   currentPage.value = 0
   loadData()
 }
@@ -215,11 +212,17 @@ const onPageSizeChange = (size) => {
 const sendVerifyEmail = async (id) => {
   try {
     await adminUserApi.sendVerifyEmail(id)
-    showModal('success', 'Đã gửi email xác thực',
-      'Email xác thực đã được gửi đến khách hàng. Khách hàng cần kiểm tra hộp thư và làm theo hướng dẫn.')
+    showModal(
+      'success',
+      'Đã gửi email xác thực',
+      'Email xác thực đã được gửi đến khách hàng. Khách hàng cần kiểm tra hộp thư và làm theo hướng dẫn.',
+    )
   } catch (e) {
-    showModal('error', 'Gửi email thất bại',
-      e.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.')
+    showModal(
+      'error',
+      'Gửi email thất bại',
+      e.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.',
+    )
   }
 }
 
@@ -231,8 +234,7 @@ const lockUser = async (id) => {
     await loadData()
     await loadStats()
   } catch (e) {
-    showModal('error', 'Khóa tài khoản thất bại',
-      e.response?.data?.message || 'Có lỗi xảy ra.')
+    showModal('error', 'Khóa tài khoản thất bại', e.response?.data?.message || 'Có lỗi xảy ra.')
   }
 }
 
@@ -243,53 +245,53 @@ const unlockUser = async (id) => {
     await loadData()
     await loadStats()
   } catch (e) {
-    showModal('error', 'Mở khóa thất bại',
-      e.response?.data?.message || 'Có lỗi xảy ra.')
+    showModal('error', 'Mở khóa thất bại', e.response?.data?.message || 'Có lỗi xảy ra.')
   }
 }
 
 // ── Modal form ─────────────────────────────────────────
 const openCreate = () => {
-  isEdit.value      = false
-  editForm.value    = {}
+  isEdit.value = false
+  editForm.value = {}
   isModalOpen.value = true
 }
-
 const openEdit = (user) => {
   isEdit.value = true
   editForm.value = {
-    userId      : user.userId,
-    fullName    : user.fullName,
-    username    : user.username,
-    email       : user.email,
-    phoneNumber : user.phoneNumber,
-    roleName    : user.roleName,
-    password    : ''
+    userId: user.userId,
+    fullName: user.fullName,
+    username: user.username,
+    email: user.email,
+    phoneNumber: user.phoneNumber,
+    roleName: user.roleName,
+    password: '',
   }
   isModalOpen.value = true
 }
 
-const closeModal = () => { isModalOpen.value = false }
+const closeModal = () => {
+  isModalOpen.value = false
+}
 
 const saveUser = async (payload) => {
   saving.value = true
   try {
     if (isEdit.value) {
       await adminUserApi.update(payload.userId, {
-        fullName    : payload.fullName,
-        email       : payload.email,
-        phoneNumber : payload.phoneNumber,
-        roleId      : 3
+        fullName: payload.fullName,
+        email: payload.email,
+        phoneNumber: payload.phoneNumber,
+        roleId: 3,
       })
       showModal('success', 'Cập nhật thành công', 'Thông tin khách hàng đã được cập nhật.')
     } else {
       await adminUserApi.create({
-        username    : payload.username,
-        password    : payload.password,
-        email       : payload.email,
-        phoneNumber : payload.phoneNumber,
-        fullName    : payload.fullName,
-        roleId      : 3
+        username: payload.username,
+        password: payload.password,
+        email: payload.email,
+        phoneNumber: payload.phoneNumber,
+        fullName: payload.fullName,
+        roleId: 3,
       })
       showModal('success', 'Thêm thành công', 'Khách hàng mới đã được tạo.')
     }
@@ -297,21 +299,22 @@ const saveUser = async (payload) => {
     await loadData()
     await loadStats()
   } catch (e) {
-    showModal('error', 'Thao tác thất bại',
-      e.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại')
+    showModal(
+      'error',
+      'Thao tác thất bại',
+      e.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại',
+    )
   } finally {
     saving.value = false
   }
 }
 </script>
-
 <style scoped>
 .user-page {
   background: #fff7fa;
   min-height: 100vh;
   padding: 24px;
 }
-
 .page-header {
   background: #ffffff;
   border: 1px solid #f3d6e3;
@@ -323,13 +326,11 @@ const saveUser = async (payload) => {
   margin-bottom: 24px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
-
 .header-left {
   display: flex;
   align-items: center;
   gap: 16px;
 }
-
 .header-icon {
   width: 48px;
   height: 48px;
@@ -342,20 +343,17 @@ const saveUser = async (payload) => {
   font-size: 20px;
   flex-shrink: 0;
 }
-
 .page-header h2 {
   color: #f55d9b;
   font-weight: 700;
   font-size: 22px;
   margin: 0;
 }
-
 .page-header p {
   color: #6b7280;
   margin: 2px 0 0;
   font-size: 14px;
 }
-
 .stat-card {
   background: #ffffff;
   border: 1px solid #f3d6e3;
@@ -363,20 +361,17 @@ const saveUser = async (payload) => {
   padding: 20px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
-
 .stat-card span {
   color: #6b7280;
   font-size: 13px;
   font-weight: 600;
 }
-
 .stat-card h3 {
   margin-top: 8px;
   color: #111827;
   font-weight: 800;
   font-size: 26px;
 }
-
 .filter-card {
   background: #ffffff;
   border: 1px solid #f3d6e3;
@@ -385,7 +380,6 @@ const saveUser = async (payload) => {
   margin-bottom: 20px;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
-
 .filter-label {
   display: block;
   font-size: 12px;
@@ -414,7 +408,6 @@ const saveUser = async (payload) => {
   pointer-events: none;
   z-index: 2;
 }
-
 .search-icon::after {
   content: '';
   position: absolute;
@@ -425,7 +418,6 @@ const saveUser = async (payload) => {
   height: 20px;
   background: #f3d6e3;
 }
-
 .f-input {
   border: 1px solid #f3d6e3;
   background: #fffafd;
@@ -435,27 +427,30 @@ const saveUser = async (payload) => {
   font-size: 14px;
   width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease;
 }
 
 .input-wrapper .f-input {
   padding-left: 50px;
 }
 
-.f-input::placeholder { color: #9ca3af; }
+.f-input::placeholder {
+  color: #9ca3af;
+}
 
 .f-input:hover {
   border-color: #efbdd2;
   background: #ffffff;
 }
-
 .f-input:focus {
   border-color: #f55d9b;
   background: #ffffff;
   box-shadow: 0 0 0 4px rgba(245, 93, 155, 0.1);
   outline: none;
 }
-
 .btn-pink {
   background: #f55d9b;
   border: none;
@@ -469,5 +464,7 @@ const saveUser = async (payload) => {
   cursor: pointer;
 }
 
-.btn-pink:hover { background: #ec4d8d; }
+.btn-pink:hover {
+  background: #ec4d8d;
+}
 </style>

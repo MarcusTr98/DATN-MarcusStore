@@ -1,10 +1,10 @@
 package com.fpoly.marcusstore.controller.admin;
+
 import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,12 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-
 import com.fpoly.marcusstore.dto.request.CreateUserRequest;
 import com.fpoly.marcusstore.dto.request.UpdateUserRequest;
 import com.fpoly.marcusstore.dto.request.VerifyOtpRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
-
 import com.fpoly.marcusstore.dto.response.UserResponse;
 import com.fpoly.marcusstore.service.impl.UserServiceImpl;
 
@@ -31,7 +29,9 @@ import lombok.RequiredArgsConstructor;
 @RequestMapping("/api/admin/user")
 @RequiredArgsConstructor
 public class AdminUserController {
+
     private final UserServiceImpl userServiceImpl;
+
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ApiResponse<Page<UserResponse>> getAll(
@@ -43,34 +43,41 @@ public class AdminUserController {
         Pageable pageable = PageRequest.of(page, size);
         return ApiResponse.success(userServiceImpl.getALL(keyword, roles, pageable));
     }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<UserResponse> create(@Valid @RequestBody CreateUserRequest request){
+    public ApiResponse<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
         return ApiResponse.success(userServiceImpl.create(request));
     }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<UserResponse> getById(@PathVariable("id") Integer id){
+    public ApiResponse<UserResponse> getById(@PathVariable("id") Integer id) {
         return ApiResponse.success(userServiceImpl.getById(id));
     }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<UserResponse> update( @PathVariable Integer id,@Valid @RequestBody UpdateUserRequest request){
+    public ApiResponse<UserResponse> update(
+            @PathVariable Integer id,
+            @Valid @RequestBody UpdateUserRequest request) {
         return ApiResponse.success(userServiceImpl.update(id, request));
     }
+
     @PutMapping("/{id}/lock")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<String> lockUser(@PathVariable Integer id){
+    public ApiResponse<String> lockUser(@PathVariable Integer id) {
         userServiceImpl.lockUser(id);
         return ApiResponse.success("Khóa tài khoản thành công");
     }
 
     @PutMapping("/{id}/unLock")
     @PreAuthorize("hasRole('ADMIN')")
-    public ApiResponse<String> unLockUser(@PathVariable Integer id){
+    public ApiResponse<String> unLockUser(@PathVariable Integer id) {
         userServiceImpl.UnLockUser(id);
         return ApiResponse.success("Mở khóa tài khoản thành công");
     }
+
     @PostMapping("/{id}/send-verify-email")
     @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<String> sendVerifyEmail(@PathVariable Integer id) {
@@ -84,11 +91,5 @@ public class AdminUserController {
     public ApiResponse<String> verifyEmail(@RequestBody @Valid VerifyOtpRequest request) {
         userServiceImpl.verifyEmailByOtp(request.getEmail(), request.getOtp());
         return ApiResponse.success("Xác thực email thành công");
-    }
-    @GetMapping("/customers")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<UserResponse>> getCustomers() {
-        List<UserResponse> customers = userServiceImpl.getCustomers();
-        return ResponseEntity.ok(customers);
     }
 }

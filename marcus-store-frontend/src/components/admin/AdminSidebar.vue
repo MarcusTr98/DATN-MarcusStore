@@ -82,27 +82,26 @@
 
     <div class="menu-section">
       <p class="menu-title">HỆ THỐNG</p>
-        <div
-    class="menu-item menu-parent"
-    :class="{
-      active:
-        $route.path.includes('/admin/employee') ||
-        $route.path.includes('/admin/customer'),
-    }"
-    @click="toggleAccountMenu"
-  >
-    <img :src="peopleIcon" class="menu-icon" />
-    <span>Quản lý tài khoản</span>
-    <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isAccountMenuOpen }" />
-  </div>
-  <div v-if="isAccountMenuOpen" class="submenu">
-    <router-link to="/admin/employee" class="submenu-item" active-class="active"
-      >Tài khoản nhân viên</router-link
-    >
-    <router-link to="/admin/customer" class="submenu-item" active-class="active"
-      >Tài khoản khách hàng</router-link
-    >
-  </div>
+      <div
+        class="menu-item menu-parent"
+        :class="{
+          active:
+            $route.path.includes('/admin/employee') || $route.path.includes('/admin/customer'),
+        }"
+        @click="toggleAccountMenu"
+      >
+        <img :src="peopleIcon" class="menu-icon" />
+        <span>Quản lý tài khoản</span>
+        <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isAccountMenuOpen }" />
+      </div>
+      <div v-if="isAccountMenuOpen" class="submenu">
+        <router-link to="/admin/employee" class="submenu-item" active-class="active"
+          >Tài khoản nhân viên</router-link
+        >
+        <router-link to="/admin/customer" class="submenu-item" active-class="active"
+          >Tài khoản khách hàng</router-link
+        >
+      </div>
       <router-link to="/admin/settings" class="menu-item" active-class="active">
         <img :src="gearIcon" class="menu-icon" />
         <span>Cấu hình chung</span>
@@ -147,10 +146,7 @@ const toggleAccountMenu = () => {
 }
 
 onMounted(() => {
-  if (
-    route.path.includes('/admin/employee') ||
-    route.path.includes('/admin/customer')
-  ) {
+  if (route.path.includes('/admin/employee') || route.path.includes('/admin/customer')) {
     isAccountMenuOpen.value = true
   }
 })

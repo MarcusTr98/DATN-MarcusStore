@@ -1,9 +1,9 @@
 package com.fpoly.marcusstore.service.impl;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,9 +26,10 @@ import com.fpoly.marcusstore.service.OtpService;
 import com.fpoly.marcusstore.service.UserService;
 
 import lombok.RequiredArgsConstructor;
+
 @Service
 @RequiredArgsConstructor
-public class UserServiceImpl implements UserService{
+public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
@@ -36,11 +37,13 @@ public class UserServiceImpl implements UserService{
     private final EmailService emailService;
     private final OtpService otpService;
     private final EmailOTPRepository emailOtpRepository;
-    private UserResponse toResponse( User user){
+
+    private UserResponse toResponse(User user) {
         BigDecimal totalSpent = BigDecimal.ZERO;
         if ("CUSTOMER".equals(user.getRole().getRoleName())) {
             totalSpent = orderRepository.sumTotalSpentByUserId(user.getUserId());
-            if (totalSpent == null) totalSpent = BigDecimal.ZERO;
+            if (totalSpent == null)
+                totalSpent = BigDecimal.ZERO;
         }
         return UserResponse.builder()
                 .userId(user.getUserId())
@@ -55,9 +58,10 @@ public class UserServiceImpl implements UserService{
                 .totalSpent(totalSpent)
                 .build();
     }
+
     @Override
     @Transactional
-    public Page<UserResponse> getALL(String keyword, List<String> roles, Pageable pageable){
+    public Page<UserResponse> getALL(String keyword, List<String> roles, Pageable pageable) {
         String normalizedKeyword = normalizeKeyword(keyword);
         List<String> normalizedRoles = normalizeRoles(roles);
         boolean rolesEmpty = normalizedRoles.isEmpty();
@@ -91,23 +95,26 @@ public class UserServiceImpl implements UserService{
                 .map(role -> role.trim().toUpperCase())
                 .toList();
     }
+
     @Override
     @Transactional
-    public UserResponse getById(Integer id){
-        User user = userRepository.findById(id).orElseThrow(()->
-                new RuntimeException("Không tìm thấy user với Id" + id));
+    public UserResponse getById(Integer id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user với Id" + id));
         return toResponse(user);
     }
+
     @Override
     @Transactional
-    public UserResponse create(CreateUserRequest request){
+    public UserResponse create(CreateUserRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new RuntimeException("Tên đã tồn tại");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new RuntimeException("Email đã tồn tại");
         }
-        Role role = roleRepository.findById(request.getRoleId()).orElseThrow(()-> new RuntimeException("Không tìm thấy role"));
+        Role role = roleRepository.findById(request.getRoleId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy role"));
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
@@ -119,12 +126,12 @@ public class UserServiceImpl implements UserService{
         user.setCreatedAt(LocalDateTime.now());
         return toResponse(userRepository.save(user));
     }
+
     @Override
     @Transactional
-    public UserResponse update(Integer Id, UpdateUserRequest request){
+    public UserResponse update(Integer Id, UpdateUserRequest request) {
         User user = userRepository.findById(Id)
-                .orElseThrow(() ->
-                        new RuntimeException("Không tìm thấy user"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user"));
 
         if (!user.getEmail().equals(request.getEmail())
                 && userRepository.existsByEmail(request.getEmail())) {
@@ -133,8 +140,7 @@ public class UserServiceImpl implements UserService{
         }
 
         Role role = roleRepository.findById(request.getRoleId())
-                .orElseThrow(() ->
-                        new RuntimeException("Không tìm thấy role"));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy role"));
         if ("ADMIN".equals(user.getRole().getRoleName())
                 && !"ADMIN".equals(role.getRoleName())) {
             throw new RuntimeException("Không thể thay đổi role của tài khoản Admin");
@@ -149,13 +155,13 @@ public class UserServiceImpl implements UserService{
 
         return toResponse(userRepository.save(user));
     }
+
     @Override
     @Transactional
     public void lockUser(Integer Id) {
 
         User user = userRepository.findById(Id)
-                .orElseThrow(() ->
-                        new RuntimeException("Không tìm thấy user với id: " + Id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + Id));
 
         if ("ADMIN".equals(user.getRole().getRoleName())) {
             throw new RuntimeException("Không thể khóa tài khoản Admin");
@@ -169,13 +175,13 @@ public class UserServiceImpl implements UserService{
 
         userRepository.save(user);
     }
+
     @Override
     @Transactional
     public void UnLockUser(Integer Id) {
 
         User user = userRepository.findById(Id)
-                .orElseThrow(() ->
-                        new RuntimeException("Không tìm thấy user với id: " + Id));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy user với id: " + Id));
 
         if (Boolean.TRUE.equals(user.getIsActive())) {
             throw new RuntimeException("Tài khoản đang hoạt động");
@@ -230,13 +236,5 @@ public class UserServiceImpl implements UserService{
         userRepository.save(user);
 
         System.out.println("After: " + user.getEmailVerified());
-    }
-    @Override
-    @Transactional(readOnly = true)
-    public List<UserResponse> getCustomers() {
-        // roleId = 3 là CUSTOMER
-        return userRepository.findByRoleRoleId(3).stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
     }
 }

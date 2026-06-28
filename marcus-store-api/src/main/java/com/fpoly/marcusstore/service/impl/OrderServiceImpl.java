@@ -361,7 +361,8 @@ public class OrderServiceImpl implements OrderService {
                 LocalDateTime now = LocalDateTime.now();
 
                 // Chỉ hoàn quota nếu voucher còn hiệu lực (chưa hết hạn)
-                // Nếu voucher đã hết hạn thì KHÔNG tăng quantity (voucher chết không dùng lại được)
+                // Nếu voucher đã hết hạn thì KHÔNG tăng quantity (voucher chết không dùng lại
+                // được)
                 if (voucher.getEndDate() == null || voucher.getEndDate().isAfter(now)) {
                     voucher.setQuantity(voucher.getQuantity() + 1);
                     voucherRepository.save(voucher);
@@ -370,14 +371,14 @@ public class OrderServiceImpl implements OrderService {
                 // Reset UserVoucher.isUsed = false (cho cả ALL và SPECIFIC)
                 Integer userId = order.getUser().getUserId();
                 userVoucherRepository
-                    .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
-                    .ifPresent(userVoucher -> {
-                        if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
-                            userVoucher.setIsUsed(false);
-                            userVoucher.setUsedAt(null);
-                            userVoucherRepository.save(userVoucher);
-                        }
-                    });
+                        .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
+                        .ifPresent(userVoucher -> {
+                            if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
+                                userVoucher.setIsUsed(false);
+                                userVoucher.setUsedAt(null);
+                                userVoucherRepository.save(userVoucher);
+                            }
+                        });
             }
         }
 
