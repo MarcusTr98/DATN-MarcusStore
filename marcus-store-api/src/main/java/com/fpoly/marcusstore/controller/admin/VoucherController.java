@@ -20,10 +20,9 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasAuthority('MARKETING_VIEW')")
+@PreAuthorize("hasAuthority('USER_VIEW')")
 @RequiredArgsConstructor
 public class VoucherController {
-
     private final VoucherService voucherService;
 
     @GetMapping("/vouchers")
@@ -43,7 +42,7 @@ public class VoucherController {
         return voucherService.getVouchersPage(keyword, discountType, isActive, pageable);
     }
 
-    // Lấy thống kê voucher
+    // lấy danh sách thống kê theo tổng số, đang sử dụng, thoe loại
     @GetMapping("/vouchers/stats")
     public VoucherStatsResponse getVoucherStats(
             @RequestParam(required = false) String keyword,
@@ -53,53 +52,38 @@ public class VoucherController {
         return voucherService.getVoucherStats(keyword, discountType, isActive);
     }
 
-    // Lấy chi tiết voucher
+    // lấy chi tiết 1 voucher theo voucherID
     @GetMapping("/voucher/{voucherId}")
     public VoucherResponse getVoucherById(@PathVariable("voucherId") Integer voucherId) {
         return voucherService.getVoucherById(voucherId);
     }
 
-    // Xóa voucher
-    // @DeleteMapping("/voucher/{voucherId}")
-    // @PreAuthorize("hasAuthority('MARKETING_DELETE')")
-    // public ResponseEntity<Void> removeVoucher(@PathVariable("voucherId") Integer voucherId){
-    //     voucherService.deleteVoucherById(voucherId);
-    //     return ResponseEntity.noContent().build();
-    // }
-
-    // Thêm voucher
+    // thêm mới voucher
     @PostMapping("/voucher")
-    @PreAuthorize("hasAuthority('MARKETING_CREATE')")
+    @PreAuthorize("hasAuthority('USER_CREATE')")
     public ResponseEntity<VoucherResponse> addVoucher(@Valid @RequestBody AddVoucherRequest request) {
         VoucherResponse response = voucherService.addVoucher(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // Cập nhật voucher
+    // cập nhật thông tin của voucher
     @PutMapping("/voucher/{voucherId}")
-    @PreAuthorize("hasAuthority('MARKETING_UPDATE')")
-    public ResponseEntity<VoucherResponse> updateVoucher(
-            @PathVariable("voucherId") Integer voucherId,
-            @Valid @RequestBody AddVoucherRequest request) {
-
+    @PreAuthorize("hasAuthority('USER_UPDATE')")
+    public ResponseEntity<VoucherResponse> updateVoucher(@PathVariable("voucherId") Integer voucherId, @Valid @RequestBody AddVoucherRequest request) {
         VoucherResponse response = voucherService.updateVoucher(voucherId, request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
-    // Lấy danh sách user đã dùng voucher
+    //lấy danh sách các user đã dùng voucher này
     @GetMapping("/voucher/{voucherId}/usage")
-    public ResponseEntity<List<VoucherUsageResponse>> getVoucherUsageHistory(
-            @PathVariable("voucherId") Integer voucherId) {
-
+    public ResponseEntity<List<VoucherUsageResponse>> getVoucherUsageHistory(@PathVariable("voucherId") Integer voucherId) {
         List<VoucherUsageResponse> usages = voucherService.getVoucherUsageHistory(voucherId);
         return ResponseEntity.ok(usages);
     }
 
-    // Đếm số lần voucher được sử dụng
+    // đến số lần mà voucher đang được sử dụng
     @GetMapping("/voucher/{voucherId}/usage-count")
-    public ResponseEntity<Long> getVoucherUsedCount(
-            @PathVariable("voucherId") Integer voucherId) {
-
+    public ResponseEntity<Long> getVoucherUsedCount(@PathVariable("voucherId") Integer voucherId) {
         long count = voucherService.getVoucherUsedCount(voucherId);
         return ResponseEntity.ok(count);
     }
