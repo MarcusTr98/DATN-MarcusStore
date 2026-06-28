@@ -20,11 +20,6 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy user: " + username));
-
-        if (!user.getIsActive()) {
-            throw new RuntimeException("Tài khoản đã bị khóa!");
-        }
-
         return CustomUserDetails.build(user);
     }
 }

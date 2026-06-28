@@ -78,7 +78,6 @@ public class AdminUserController {
     }
 
     @PostMapping("/{id}/send-verify-email")
-    @PreAuthorize("hasAuthority('USER_MANAGE')")
     public ApiResponse<String> sendVerifyEmail(@PathVariable Integer id) {
         userServiceImpl.sendVerifyEmail(id);
         return ApiResponse.success("Email xác thực đã được gửi đến khách hàng");

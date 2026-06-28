@@ -25,7 +25,7 @@ public class CustomUserDetails implements UserDetails {
     private String password;
 
     private Collection<? extends GrantedAuthority> authorities;
-
+    private Boolean isActive;
     public static CustomUserDetails build(User user) {
         // Lấy tên Role (VD: ADMIN, STAFF) ép thành Authority chuẩn của Spring
         List<GrantedAuthority> authorities = new ArrayList<>();
@@ -49,7 +49,8 @@ public class CustomUserDetails implements UserDetails {
                 user.getUsername(),
                 user.getEmail(),
                 user.getPasswordHash(),
-                authorities);
+                authorities,
+                user.getIsActive());
     }
 
     @Override
@@ -84,6 +85,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return Boolean.TRUE.equals(isActive);
     }
 }
