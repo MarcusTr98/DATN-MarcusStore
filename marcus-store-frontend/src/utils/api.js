@@ -59,21 +59,29 @@ api.interceptors.response.use(
 
           break
         }
-case 403: {
-  const token = localStorage.getItem('ACCESS_TOKEN')
+// case 403: {
+//   const token = localStorage.getItem('ACCESS_TOKEN')
 
-  if (token) {
-    localStorage.removeItem('ACCESS_TOKEN')
-    localStorage.removeItem('USERNAME')
-    localStorage.removeItem('USER_ROLE')
+//   if (token) {
+//     localStorage.removeItem('ACCESS_TOKEN')
+//     localStorage.removeItem('USERNAME')
+//     localStorage.removeItem('USER_ROLE')
 
-    window.dispatchEvent(new Event('auth-changed'))
+//     window.dispatchEvent(new Event('auth-changed'))
 
-    window.location.href = '/auth/login'
-  }
+//     window.location.href = '/auth/login'
+//   }
+
+//   break
+// }
+case 403:
+  console.error("403: Bạn không có quyền truy cập API này")
+
+  // KHÔNG logout
+  // KHÔNG xóa token
+  // KHÔNG redirect login
 
   break
-}
         case 500:
           console.error('Lỗi 500: Server Backend lỗi!')
           break

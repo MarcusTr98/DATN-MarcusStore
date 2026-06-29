@@ -13,7 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/attributes")
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+@PreAuthorize("hasAuthority('ATTRIBUTE_VIEW')")
 public class AttributeController {
 
     @Autowired
@@ -25,6 +25,7 @@ public class AttributeController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('ATTRIBUTE_CREATE')")
     public ResponseEntity<ApiResponse<Attribute>> create(@RequestBody Map<String, String> body) {
         try {
             return ResponseEntity.ok(ApiResponse.success(attributeService.createAttribute(body.get("name"))));
@@ -34,6 +35,7 @@ public class AttributeController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_UPDATE')")
     public ResponseEntity<ApiResponse<Attribute>> update(@PathVariable Integer id,
             @RequestBody Map<String, String> body) {
         try {
@@ -44,6 +46,7 @@ public class AttributeController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_DELETE')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable Integer id) {
         try {
             attributeService.deleteAttribute(id);

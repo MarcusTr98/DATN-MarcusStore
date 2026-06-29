@@ -7,7 +7,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
+import org.springframework.security.access.AccessDeniedException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -42,6 +42,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleGlobalExceptions(Exception ex) {
         ApiResponse<Object> response = new ApiResponse<>(500, "Đã xảy ra lỗi hệ thống: " + ex.getMessage(), null);
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
+       }
 
+    @ExceptionHandler(AccessDeniedException.class)
+public ResponseEntity<ApiResponse<Object>> handleAccessDenied(
+        AccessDeniedException ex){
+
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ApiResponse.error(
+                    403,
+                    "Bạn không có quyền truy cập"));
+
+}
 }

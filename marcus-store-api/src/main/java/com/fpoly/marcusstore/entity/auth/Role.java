@@ -7,7 +7,8 @@ import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.HashSet;
+import java.util.Set;
 @Entity
 @Table(name = "Roles")
 @Getter
@@ -29,5 +30,5 @@ public class Role {
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "Role_Permissions", joinColumns = @JoinColumn(name = "role_id"), inverseJoinColumns = @JoinColumn(name = "permission_id"))
     @JsonIgnore
-    private List<Permission> permissions = new ArrayList<>();
+    private Set<Permission> permissions = new HashSet<>();
 }

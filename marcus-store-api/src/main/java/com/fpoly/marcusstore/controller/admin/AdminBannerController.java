@@ -6,12 +6,14 @@ import com.fpoly.marcusstore.dto.response.BannerResponseDTO;
 import com.fpoly.marcusstore.service.BannerService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/banners")
+@PreAuthorize("hasAuthority('MARKETING_VIEW')")
 public class AdminBannerController {
 
     @Autowired
@@ -31,18 +33,21 @@ public class AdminBannerController {
 
     // thêm banner mới
     @PostMapping
+    @PreAuthorize("hasAuthority('MARKETING_CREATE')")
     public ApiResponse<BannerResponseDTO> add(@Valid @RequestBody BannerRequestDTO req) {
         return ApiResponse.success(bannerService.add(req));
     }
 
     // sửa banner
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('MARKETING_UPDATE')")
     public ApiResponse<BannerResponseDTO> update( @PathVariable Integer id, @Valid @RequestBody BannerRequestDTO req) {
         return ApiResponse.success(bannerService.update(id, req));
     }
 
     //xóa mềm banner
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('MARKETING_DELETE')")
     public ApiResponse<String> remove(@PathVariable Integer id) {
         bannerService.remove(id);
         return ApiResponse.success("Xóa banner thành công");
