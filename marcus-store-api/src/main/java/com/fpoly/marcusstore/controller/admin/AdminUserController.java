@@ -34,7 +34,6 @@ public class AdminUserController {
     private final UserServiceImpl userServiceImpl;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
     public ApiResponse<Page<UserResponse>> getAll(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) List<String> roles,
