@@ -53,14 +53,20 @@ public class AuthController {
                         List<String> roles = userDetails.getAuthorities()
                                         .stream()
                                         .map(GrantedAuthority::getAuthority)
-                                        .collect(Collectors.toList());
-
+                                        .filter(a -> a.startsWith("ROLE_"))
+                                        .toList();
+                        List<String> permissions = userDetails.getAuthorities()
+                                        .stream()
+                                        .map(GrantedAuthority::getAuthority)
+                                        .filter(a -> !a.startsWith("ROLE_"))
+                                        .toList();
                         JwtResponse jwtResponse = new JwtResponse(
                                         jwt,
                                         userDetails.getUserId(),
                                         userDetails.getUsername(),
                                         userDetails.getEmail(),
-                                        roles);
+                                        roles,
+                                        permissions);
 
                         return ResponseEntity.ok(
                                         ApiResponse.success(jwtResponse));

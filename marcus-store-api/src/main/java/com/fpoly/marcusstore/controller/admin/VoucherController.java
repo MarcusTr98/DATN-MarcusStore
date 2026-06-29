@@ -13,12 +13,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
+@PreAuthorize("hasAuthority('MARKETING_VIEW')")
 @RequiredArgsConstructor
 public class VoucherController {
     private final VoucherService voucherService;
@@ -58,6 +60,7 @@ public class VoucherController {
 
     // thêm mới voucher
     @PostMapping("/voucher")
+    @PreAuthorize("hasAuthority('MARKETING_CREATE')")
     public ResponseEntity<VoucherResponse> addVoucher(@Valid @RequestBody AddVoucherRequest request) {
         VoucherResponse response = voucherService.addVoucher(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -65,6 +68,7 @@ public class VoucherController {
 
     // cập nhật thông tin của voucher
     @PutMapping("/voucher/{voucherId}")
+    @PreAuthorize("hasAuthority('MARKETING_UPDATE')")
     public ResponseEntity<VoucherResponse> updateVoucher(@PathVariable("voucherId") Integer voucherId, @Valid @RequestBody AddVoucherRequest request) {
         VoucherResponse response = voucherService.updateVoucher(voucherId, request);
         return ResponseEntity.status(HttpStatus.OK).body(response);

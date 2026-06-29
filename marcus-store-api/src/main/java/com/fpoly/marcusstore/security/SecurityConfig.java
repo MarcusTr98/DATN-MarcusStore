@@ -1,6 +1,9 @@
 package com.fpoly.marcusstore.security;
 
 import com.fpoly.marcusstore.security.jwt.AuthTokenFilter;
+
+import jakarta.servlet.http.HttpServletResponse;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -49,6 +52,30 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configure(http))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                                .exceptionHandling(exception -> exception
+        .authenticationEntryPoint((request, response, ex) -> {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("""
+            {
+              "code":401,
+              "message":"Unauthorized",
+              "data":null
+            }
+            """);
+        })
+        .accessDeniedHandler((request, response, ex) -> {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write("""
+            {
+              "code":403,
+              "message":"Access Denied",
+              "data":null
+            }
+            """);
+        })
+)
                 .authorizeHttpRequests(auth -> auth
                         // 1. Nhóm API mở tự do (Không cần Token)
                         .requestMatchers("/api/auth/**").permitAll() // Ngọc: Đăng nhập, Đăng ký, Quên MK
@@ -60,9 +87,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/user/**").authenticated() // Đạt, Đức: Checkout, Giỏ hàng, Wishlist, Đgiá
 
                         // 3. Nhóm API dành riêng cho Quản trị viên
+                        .requestMatchers("/api/admin/roles/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Ngọc, Huy: Quản lý User,Thống
                                                                                        // kê
-                        .requestMatchers("/api/admin/roles/**").hasRole("ADMIN")
+                        
 
                         // Khóa mọi request khác đi lạc
                         .anyRequest().authenticated());

@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.security;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fpoly.marcusstore.entity.auth.Permission;
 import com.fpoly.marcusstore.entity.auth.User;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -24,18 +25,32 @@ public class CustomUserDetails implements UserDetails {
     private String password;
 
     private Collection<? extends GrantedAuthority> authorities;
-
+    private Boolean isActive;
     public static CustomUserDetails build(User user) {
         // Lấy tên Role (VD: ADMIN, STAFF) ép thành Authority chuẩn của Spring
         List<GrantedAuthority> authorities = new ArrayList<>();
+         String roleName = user.getRole().getRoleName();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getRoleName()));
+        if ("ADMIN".equalsIgnoreCase(roleName)) {
+            authorities.add(new SimpleGrantedAuthority("SUPER_ADMIN"));
+        }
 
+        // Thêm toàn bộ permission
+        if (user.getRole().getPermissions() != null) {
+            for (Permission permission : user.getRole().getPermissions()) {
+                authorities.add(
+                        new SimpleGrantedAuthority(permission.getPermissionName())
+                );
+            }
+        }
         return new CustomUserDetails(
                 user.getUserId(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getPasswordHash(),
-                authorities);
+                authorities,
+                user.getIsActive()
+            );
     }
 
     @Override
@@ -70,6 +85,6 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return Boolean.TRUE.equals(isActive);
     }
 }

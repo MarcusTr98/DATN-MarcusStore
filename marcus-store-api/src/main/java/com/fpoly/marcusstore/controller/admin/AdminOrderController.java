@@ -9,12 +9,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin")
+@PreAuthorize("hasAuthority('ORDER_VIEW')")
 @RequiredArgsConstructor
 public class AdminOrderController {
     private final OrderService orderService;
@@ -46,6 +48,7 @@ public class AdminOrderController {
         return orderService.getOrderDetailResponse(orderCode);
     }
     @PutMapping("/order/{orderCode}")
+    @PreAuthorize("hasAuthority('ORDER_PROCESS')")
     public OrderDetailResponse updateStatusOrder(@PathVariable("orderCode") String orderCode,@RequestBody UpdateOrderStatusRequest request){
         return orderService.updateStatusOrder(orderCode, request);
     }

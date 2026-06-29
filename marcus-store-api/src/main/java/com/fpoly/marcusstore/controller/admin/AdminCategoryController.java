@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,6 +19,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/admin/categories")
+@PreAuthorize("hasAuthority('CATEGORY_VIEW')")
 public class AdminCategoryController {
     @Autowired
     CategoriesService categoriesService;
@@ -28,6 +30,7 @@ public class AdminCategoryController {
     }
 
     @PostMapping(consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('CATEGORY_CREATE')")
     public ApiResponse<CategoryResponse> createCategory(
             @RequestParam("categoryName") String categoryName,
             @RequestParam(value = "parentId", required = false) Integer parentId,
@@ -44,6 +47,7 @@ public class AdminCategoryController {
     }
 
     @PutMapping(value = "/{id}", consumes = "multipart/form-data")
+    @PreAuthorize("hasAuthority('CATEGORY_UPDATE')")
     public ApiResponse<CategoryResponse> updateCategory(
             @PathVariable Integer id,
             @RequestParam("categoryName") String categoryName,
@@ -58,6 +62,7 @@ public class AdminCategoryController {
     }
 
     @PutMapping("/hidden/{id}")
+    @PreAuthorize("hasAuthority('CATEGORY_MANAGE')")
     public ApiResponse<CategoryResponse> hiddenCategory(@PathVariable Integer id) {
         return ApiResponse.success(categoriesService.hiddenCategory(id));
     }

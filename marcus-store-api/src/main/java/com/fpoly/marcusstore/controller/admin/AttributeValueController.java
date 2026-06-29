@@ -14,7 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/attribute-values")
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+@PreAuthorize("hasAuthority('ATTRIBUTE_VIEW')")
 public class AttributeValueController {
 
     @Autowired
@@ -30,17 +30,20 @@ public class AttributeValueController {
 
     // Marcus sửa vì đã thêm dto, nâng cấp tiếp theo demo
     @PostMapping
+    @PreAuthorize("hasAuthority('ATTRIBUTE_CREATE')")
     public ApiResponse<AttributeValue> create(@RequestBody AttributeValueRequest req) {
         return ApiResponse
                 .success(valueService.createValue(req.getAttributeId(), req.getValueString(), req.getValueMeta()));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_UPDATE')")
     public ApiResponse<AttributeValue> update(@PathVariable Integer id, @RequestBody AttributeValueRequest req) {
         return ApiResponse.success(valueService.updateValue(id, req.getValueString(), req.getValueMeta()));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ATTRIBUTE_DELETE')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable Integer id) {
         try {
             valueService.deleteValue(id);

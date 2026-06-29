@@ -4,6 +4,7 @@ import com.fpoly.marcusstore.dto.response.VoucherResponse;
 import com.fpoly.marcusstore.service.UserVoucherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class UserVoucherAdminController {
 
     // thêm voucher cho từng user
     @PostMapping("/assign")
+    @PreAuthorize("hasAuthority('MARKETING_CREATE')")
     public ResponseEntity<Void> assignVoucherToUsers(
             @RequestParam Integer voucherId,
             @RequestBody List<Integer> userIds) {
@@ -33,6 +35,7 @@ public class UserVoucherAdminController {
 
     // update thêm user mới xóa bỏ user cũ
     @PutMapping("/voucher/{voucherId}/users")
+    @PreAuthorize("hasAuthority('MARKETING_UPDATE')")
     public ResponseEntity<Void> reassignVoucherUsers(
             @PathVariable Integer voucherId,
             @RequestBody List<Integer> userIds) {
