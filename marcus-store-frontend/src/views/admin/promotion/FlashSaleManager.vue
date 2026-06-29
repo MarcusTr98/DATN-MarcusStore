@@ -576,9 +576,7 @@
             <button type="button" class="btn btn-soft" @click="resetForm">
               <i class="bi bi-arrow-counterclockwise"></i>Làm mới
             </button>
-            <button type="button" class="btn btn-preview" @click="previewSlot">
-              <i class="bi bi-eye"></i>Xem trước
-            </button>
+
             <button type="submit" class="btn btn-primary-action" :disabled="saving">
               <i class="bi bi-check2-circle"></i>
               {{ saving ? 'Đang lưu...' : 'Lưu chiến dịch' }}
@@ -1375,11 +1373,6 @@ async function saveSlot() {
   closeModal()
 }
 
-function previewSlot() {
-  const name = form.name || '(chua dat ten)'
-  const count = selectedItemPids.value.length
-  showToast({type: 'info', title: 'Xem truoc', message: `"${name}" - ${count} san pham`})
-}
 
 /* ── DELETE ── */
 const showDelModal = ref(false)
