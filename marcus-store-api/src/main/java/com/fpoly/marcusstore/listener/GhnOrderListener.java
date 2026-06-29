@@ -61,7 +61,7 @@ public class GhnOrderListener {
                         int paymentTypeId = 1;
 
                         GhnCreateOrderRequest request = GhnCreateOrderRequest.builder()
-                                        .paymentTypeId(paymentTypeId)
+                                        .paymentTypeId(1) // Marcus trả phí để ko bị thu 2 lần
                                         .serviceTypeId(2)
                                         .note(order.getRecipientName())
                                         .requiredNote("KHONGCHOXEMHANG")
@@ -71,8 +71,10 @@ public class GhnOrderListener {
                                         .toDistrictId(order.getToDistrictId())
                                         .toWardCode(order.getToWardCode())
                                         .weight(totalWeight)
-                                        .codAmount(isCod ? order.getFinalAmount().intValue() : 0)
-                                        .insuranceValue(order.getTotalAmount().intValue())
+                                        .codAmount(isCod ? order.getFinalAmount().intValue() : 0) // Tiền thu hộ =
+                                                                                                  // FinalAmount
+                                        // FIX BẢO HIỂM đúng với GHN:
+                                        .insuranceValue(Math.min(order.getTotalAmount().intValue(), 5000000))
                                         .items(order.getOrderItems().stream()
                                                         .map(i -> GhnCreateOrderRequest.Item.builder()
                                                                         .name(i.getSku().getProduct().getProductName())
