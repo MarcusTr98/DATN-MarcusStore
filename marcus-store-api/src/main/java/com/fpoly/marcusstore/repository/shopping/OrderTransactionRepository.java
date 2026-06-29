@@ -1,0 +1,15 @@
+package com.fpoly.marcusstore.repository.shopping;
+
+import com.fpoly.marcusstore.entity.shopping.OrderTransaction;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+import java.util.List;
+
+@Repository
+public interface OrderTransactionRepository extends JpaRepository<OrderTransaction, Integer> {
+    List<OrderTransaction> findByOrder_OrderId(Integer orderId);
+
+    @Query("SELECT t FROM OrderTransaction t JOIN FETCH t.order ORDER BY t.createdAt DESC")
+    List<OrderTransaction> findAllTransactionsWithOrder();
+}

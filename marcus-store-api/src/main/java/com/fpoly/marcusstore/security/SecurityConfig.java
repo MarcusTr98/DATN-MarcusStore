@@ -52,36 +52,38 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configure(http))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                                .exceptionHandling(exception -> exception
-        .authenticationEntryPoint((request, response, ex) -> {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("""
-            {
-              "code":401,
-              "message":"Unauthorized",
-              "data":null
-            }
-            """);
-        })
-        .accessDeniedHandler((request, response, ex) -> {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("""
-            {
-              "code":403,
-              "message":"Access Denied",
-              "data":null
-            }
-            """);
-        })
-)
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, ex) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("""
+                                    {
+                                      "code":401,
+                                      "message":"Unauthorized",
+                                      "data":null
+                                    }
+                                    """);
+                        })
+                        .accessDeniedHandler((request, response, ex) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.getWriter().write("""
+                                    {
+                                      "code":403,
+                                      "message":"Access Denied",
+                                      "data":null
+                                    }
+                                    """);
+                        }))
                 .authorizeHttpRequests(auth -> auth
                         // 1. Nhóm API mở tự do (Không cần Token)
                         .requestMatchers("/api/auth/**").permitAll() // Ngọc: Đăng nhập, Đăng ký, Quên MK
                         .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/admin/user/verify-email").permitAll() // Cho phep khach hang nhap OTP xac thuc email
+                        .requestMatchers("/api/admin/user/verify-email").permitAll() // Cho phep khach hang nhap OTP xac
+                                                                                     // thuc email
                         .requestMatchers("/api/vnpay/**").permitAll() // Marcus test môi trường Ngrok webhook Vnpay
+                        .requestMatchers("/api/ghn/webhook").permitAll() // Marcus test môi trường Ngrok webhook GHN
+
                         .requestMatchers("/ws-endpoint/**").permitAll() // Marcus thêm để làm websocket
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập
                         .requestMatchers("/api/user/**").authenticated() // Đạt, Đức: Checkout, Giỏ hàng, Wishlist, Đgiá
@@ -90,7 +92,6 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/roles/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Ngọc, Huy: Quản lý User,Thống
                                                                                        // kê
-                        
 
                         // Khóa mọi request khác đi lạc
                         .anyRequest().authenticated());
