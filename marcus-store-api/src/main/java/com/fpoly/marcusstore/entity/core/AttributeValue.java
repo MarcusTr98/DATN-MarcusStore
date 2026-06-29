@@ -23,4 +23,7 @@ public class AttributeValue {
 
     @Column(name = "value_string", nullable = false, length = 100)
     private String valueString;
+
+    @Column(name = "value_meta", length = 50)
+    private String valueMeta;
 }

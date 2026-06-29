@@ -2,7 +2,10 @@ package com.fpoly.marcusstore.controller.client;
 
 import com.fpoly.marcusstore.config.VnPayConfig;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +15,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -25,13 +27,8 @@ public class VnPayController {
 
     private final VnPayConfig vnPayConfig;
     private final OrderRepository orderRepository;
+    private final OrderStatusHistoryRepository orderStatusHistoryRepository;
 
-    /**
-     * IPN VNPAY gọi endpoint này server-to-server sau khi khách hoàn tất thanh
-     * toán.
-     * Không được bọc ApiResponse ở ngoài, phải trả đúng format
-     * {"RspCode":"00","Message":"Confirm Success"}.
-     */
     @Transactional
     @GetMapping("/ipn")
     public ResponseEntity<Map<String, String>> receiveIPN(HttpServletRequest request) {
@@ -112,24 +109,34 @@ public class VnPayController {
         }
 
         // ── Bước 7: Cập nhật trạng thái theo kết quả giao dịch
-        // Trong VnPayController.receiveIPN (phần Bước 7)
         if ("00".equals(responseCode)) {
             order.setPaymentStatus("PAID");
-            order.setOrderStatus("PROCESSING");
-            order.setTransactionId(transactionId);
 
-            // Ghi lại thời điểm thanh toán thành công từ VNPAY
+            // Chỉ set PAID, KHÔNG SET PROCESSING.
+            // orderStatus là "PENDING" để Admin vào bấm "Xác nhận đơn"
+            order.setOrderStatus("PENDING");
+
+            order.setTransactionId(transactionId);
             order.setPaymentDate(LocalDateTime.now());
 
-            log.info("[VNPAY IPN] Thanh toán thành công. Order={}, TxnNo={}", orderCode, transactionId);
+            log.info("[VNPAY IPN] Thanh toán thành công. Đơn hàng {} chuyển sang PENDING để Admin xác nhận.",
+                    orderCode);
         } else {
-            // Khách hủy hoặc giao dịch thất bại
+            // Thanh toán thất bại, hủy đơn luôn
             order.setPaymentStatus("FAILED");
             order.setOrderStatus("CANCELLED");
-            log.info("[VNPAY IPN] Thanh toán thất bại/hủy. Order={}, RspCode={}", orderCode, responseCode);
+            log.info("[VNPAY IPN] Thanh toán thất bại/hủy. Order={}", orderCode);
         }
 
         orderRepository.save(order);
+        // Lưu lịch sử trạng thái để Admin biết đơn đã thanh toán
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(order);
+        history.setStatus(order.getOrderStatus());
+        history.setTitle("Đã thanh toán VNPAY");
+        history.setNote("Giao dịch VNPAY thành công: " + transactionId);
+        orderStatusHistoryRepository.save(history);
+
         return ok("00", "Confirm Success");
     }
 

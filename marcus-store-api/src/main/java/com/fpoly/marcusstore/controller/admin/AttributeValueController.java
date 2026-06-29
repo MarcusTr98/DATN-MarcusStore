@@ -28,15 +28,16 @@ public class AttributeValueController {
         return ResponseEntity.ok(ApiResponse.success(list));
     }
 
-    // Marcus sửa vì đã thêm dto
+    // Marcus sửa vì đã thêm dto, nâng cấp tiếp theo demo
     @PostMapping
     public ApiResponse<AttributeValue> create(@RequestBody AttributeValueRequest req) {
-        return ApiResponse.success(valueService.createValue(req.getAttributeId(), req.getValueString()));
+        return ApiResponse
+                .success(valueService.createValue(req.getAttributeId(), req.getValueString(), req.getValueMeta()));
     }
 
     @PutMapping("/{id}")
     public ApiResponse<AttributeValue> update(@PathVariable Integer id, @RequestBody AttributeValueRequest req) {
-        return ApiResponse.success(valueService.updateValue(id, req.getValueString()));
+        return ApiResponse.success(valueService.updateValue(id, req.getValueString(), req.getValueMeta()));
     }
 
     @DeleteMapping("/{id}")

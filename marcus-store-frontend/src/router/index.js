@@ -161,6 +161,12 @@ const routes = [
         meta: { roles: ['ROLE_ADMIN'] },
       },
       {
+        path: 'contact-management',
+        name: 'ContactManagement',
+        component: () => import('@/views/admin/contact/ContactManagement.vue'),
+        meta: { roles: ['ROLE_ADMIN'] },
+      },
+      {
         path: 'order',
         name: 'OrderList',
         component: () => import('@/views/admin/order/OrderList.vue'),

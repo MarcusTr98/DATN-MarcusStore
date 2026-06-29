@@ -34,12 +34,28 @@ public class ProductConfigService {
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại!"));
 
+        // Dùng Set để chặn trùng lặp mã SKU ngay trong chính danh sách gửi lên
+        java.util.Set<String> uniqueCodes = new java.util.HashSet<>();
+
         for (SkuBatchCreateRequest.SkuItem item : request.getSkus()) {
+            // Kiểm tra trùng lặp trong payload
+            if (!uniqueCodes.add(item.getSkuCode())) {
+                throw new RuntimeException(
+                        "Mã SKU [" + item.getSkuCode() + "] bị trùng lặp trong chính danh sách bạn đang tạo!");
+            }
+
+            // Kiểm tra trùng lặp dưới Database
+            if (skuRepository.existsBySkuCode(item.getSkuCode())) {
+                throw new RuntimeException(
+                        "Mã SKU [" + item.getSkuCode() + "] đã tồn tại trong hệ thống. Vui lòng đổi mã khác!");
+            }
+
             ProductSku sku = new ProductSku();
             sku.setProduct(product);
             sku.setSkuCode(item.getSkuCode());
             sku.setPrice(item.getPrice());
             sku.setStockQuantity(item.getStock());
+            sku.setWeightGram(500);
             sku.setIsActive(true);
 
             List<AttributeValue> attributeValues = attributeValueRepository.findAllById(item.getValueIds());
@@ -48,7 +64,7 @@ public class ProductConfigService {
             }
             sku.setAttributeValues(attributeValues);
 
-            skuRepository.save(sku); // Save từng cái — IDENTITY tự tăng đúng
+            skuRepository.save(sku);
         }
     }
 

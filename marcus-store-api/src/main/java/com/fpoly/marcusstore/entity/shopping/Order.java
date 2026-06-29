@@ -31,7 +31,6 @@ public class Order {
     @Column(name = "order_code", nullable = false, unique = true, length = 50)
     private String orderCode;
 
-    // Snapshot: Lưu đứt đoạn tên người nhận và địa chỉ lúc đặt hàng
     @Column(name = "recipient_name", nullable = false, length = 100)
     private String recipientName;
 
@@ -41,7 +40,6 @@ public class Order {
     @Column(name = "shipping_address", nullable = false, length = 500)
     private String shippingAddress;
 
-    // Tài chính (Luôn dùng BigDecimal cho tiền bạc)
     @Column(name = "total_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal totalAmount;
 
@@ -74,30 +72,33 @@ public class Order {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // Marcus thêm để tính phí GHN
     @Column(name = "shipping_fee", precision = 18, scale = 2)
     private BigDecimal shippingFee;
-    // Marcus thêm để tính phí GHN
+
     @Column(name = "tracking_code", length = 100)
     private String trackingCode;
 
-    // Marcus thêm để webhook thời gian thanh toán
     @Column(name = "payment_date")
     private LocalDateTime paymentDate;
 
-    // Khóa ngoại trỏ về người đặt
+    // Marcus bổ sung: để GhnOrderListener map được to_district_id và to_ward_code
+    // Lưu khi user checkout, lấy từ địa chỉ GHN đã chọn
+    @Column(name = "to_district_id")
+    private Integer toDistrictId;
+
+    @Column(name = "to_ward_code", length = 20)
+    private String toWardCode;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
     private User user;
 
-    // Khóa ngoại trỏ về mã giảm giá (Nếu có)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "voucher_id")
     @JsonIgnore
     private Voucher voucher;
 
-    // Danh sách các món hàng
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<OrderItem> orderItems = new ArrayList<>();

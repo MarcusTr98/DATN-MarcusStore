@@ -9,6 +9,7 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.event.OrderConfirmedEvent;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
@@ -19,6 +20,7 @@ import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,27 +42,20 @@ public class OrderServiceImpl implements OrderService {
     private final ProductSkuRepository productSkuRepository;
     private final VoucherRepository voucherRepository;
     private final UserVoucherRepository userVoucherRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private String normalizeKeyword(String keyword) {
-        return keyword == null || keyword.isBlank()
-                ? null
-                : keyword.trim();
+        return keyword == null || keyword.isBlank() ? null : keyword.trim();
     }
 
     private String normalizePaymentMethod(String paymentMethod) {
-        return paymentMethod == null ||
-                paymentMethod.isBlank() ||
-                "ALL".equalsIgnoreCase(paymentMethod)
-                        ? null
-                        : paymentMethod.trim();
+        return paymentMethod == null || paymentMethod.isBlank() || "ALL".equalsIgnoreCase(paymentMethod) ? null
+                : paymentMethod.trim();
     }
 
     private String normalizeOrderStatus(String orderStatus) {
-        return orderStatus == null ||
-                orderStatus.isBlank() ||
-                "ALL".equalsIgnoreCase(orderStatus)
-                        ? null
-                        : orderStatus.trim();
+        return orderStatus == null || orderStatus.isBlank() || "ALL".equalsIgnoreCase(orderStatus) ? null
+                : orderStatus.trim();
     }
 
     private String normalizeStatusValue(String status) {
@@ -69,16 +63,11 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private String getUserDisplayName(User user) {
-        if (user == null) {
+        if (user == null)
             return null;
-        }
-        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+        if (user.getFullName() != null && !user.getFullName().isBlank())
             return user.getFullName();
-        }
-        if (user.getUsername() != null && !user.getUsername().isBlank()) {
-            return user.getUsername();
-        }
-        return user.getEmail();
+        return user.getUsername();
     }
 
     private OrderResponse toResponse(Order order) {
@@ -93,162 +82,9 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .orderStatus(order.getOrderStatus())
                 .createdAt(order.getCreatedAt()).build();
-
     }
 
-    @Override
-    public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus,
-            Pageable pageable) {
-        String normalizeKeyword = normalizeKeyword(keyword);
-        String normalizePaymentMethod = normalizePaymentMethod(paymentMethod);
-        String normalizeOrderStatus = normalizeOrderStatus(orderStatus);
-
-        return orderRepository
-                .searchOrders(normalizeKeyword, normalizePaymentMethod, normalizeOrderStatus, pageable)
-                .map(this::toResponse);
-    }
-
-    // hàm gọi tổng đơn hàng và số lượng trạng thái đơn hàng
-    @Override
-    public OrderStatsResponse getOrderStats(String keyword, String paymentMethod, String orderStatus) {
-        String normalizedKeyword = normalizeKeyword(keyword);
-        String normalizedPaymentMethod = normalizePaymentMethod(paymentMethod);
-        String normalizedOrderStatus = normalizeOrderStatus(orderStatus);
-
-        return OrderStatsResponse.builder()
-                .total(orderRepository.countOrders(
-                        normalizedKeyword,
-                        normalizedPaymentMethod,
-                        normalizedOrderStatus))
-                .pending(orderRepository.countPendingOrders(
-                        normalizedKeyword,
-                        normalizedPaymentMethod,
-                        normalizedOrderStatus))
-                .confirmed(orderRepository.countConfirmedOrders(
-                        normalizedKeyword,
-                        normalizedPaymentMethod,
-                        normalizedOrderStatus))
-                .shipping(orderRepository.countShippingOrders(
-                        normalizedKeyword,
-                        normalizedPaymentMethod,
-                        normalizedOrderStatus))
-                .completed(orderRepository.countCompletedOrders(
-                        normalizedKeyword,
-                        normalizedPaymentMethod,
-                        normalizedOrderStatus))
-                .cancelled(orderRepository.countCancelledOrders(
-                        normalizedKeyword,
-                        normalizedPaymentMethod,
-                        normalizedOrderStatus))
-                .build();
-    }
-
-    @Override
-    public List<String> getPaymentMethods() {
-        return orderRepository.findDistinctPaymentMethods();
-    }
-
-    @Override
-    public List<String> getOrderStatuses() {
-        return orderRepository.findDistinctOrderStatuses();
-    }
-
-    @Override
-    @Transactional
-    public OrderDetailResponse getOrderDetailResponse(String orderCode) {
-        // Lấy chi tiết đơn hàng theo mã đơn hàng
-        Order order = orderRepository.findDetailByOrderCode(orderCode)
-                .orElseThrow(() -> new RuntimeException("không tìm thấy đơn hàng "));
-        if (ensureTrackingCodeForShipping(order)) {
-            orderRepository.saveAndFlush(order);
-        }
-        // lấy trạng thái lịch sử đơn hàng
-        List<OrderStatusHistory> histories = orderStatusHistoryRepository
-                .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
-        // map từ Entity sang DTO
-        // mỗi dòng khi được tách ra sẽ là một trạng thái của đơn hàng khi hiển thị lên
-        // FE
-        List<OrderStatusHistoryResponse> historyResponses = histories.stream()
-                .map(history -> OrderStatusHistoryResponse.builder()
-                        .status(history.getStatus())
-                        .title(history.getTitle())
-                        .note(history.getNote())
-                        .createdAt(history.getCreatedAt())
-                        .createdByName(getUserDisplayName(history.getCreatedBy()))
-
-                        .build())
-                .toList();
-        // map từ Entity sang DTO
-        return OrderDetailResponse.builder()
-                .orderCode(order.getOrderCode())
-                .orderStatus(order.getOrderStatus())
-                .createdAt(order.getCreatedAt())
-                .updatedAt(order.getUpdatedAt())
-                .recipientName(order.getRecipientName())
-                .recipientPhone(order.getRecipientPhone())
-                .shippingAddress(order.getShippingAddress())
-                .totalAmount(order.getTotalAmount())
-                .discountAmount(order.getDiscountAmount())
-                .shippingFee(order.getShippingFee())
-                .finalAmount(order.getFinalAmount())
-                .paymentMethod(order.getPaymentMethod())
-                .paymentStatus(order.getPaymentStatus())
-                .transactionId(order.getTransactionId())
-                .paymentDate(order.getPaymentDate()) // marcus thêm
-                .trackingCode(order.getTrackingCode())
-                .userId(order.getUser().getUserId())
-                .fullName(order.getUser().getFullName())
-                .email(order.getUser().getEmail())
-                .phoneNumber(order.getUser().getPhoneNumber())
-                .voucherCode(order.getVoucher() != null ? order.getVoucher().getVoucherCode() : null)
-                .voucherDiscountType(order.getVoucher() != null ? order.getVoucher().getDiscountType() : null)
-                .voucherDiscountValue(order.getVoucher() != null ? order.getVoucher().getDiscountValue() : null)
-                .voucherMaxDiscount(order.getVoucher() != null ? order.getVoucher().getMaxDiscountAmount() : null)
-                .items(
-                        order.getOrderItems().stream().map(orderItem -> {
-                            ProductSku sku = orderItem.getSku();
-                            Product product = sku.getProduct();
-                            return OrderItemDetailResponse.builder()
-                                    .skuId(sku.getSkuId())
-                                    .skuCode(sku.getSkuCode())
-                                    .productId(product.getProductId())
-                                    .productName(product.getProductName())
-                                    .productImage(
-                                            sku.getSkuImageUrl() != null
-                                                    ? sku.getSkuImageUrl()
-                                                    : product.getThumbnailUrl())
-                                    .quantity(orderItem.getQuantity())
-                                    .priceAtPurchase(orderItem.getPriceAtPurchase())
-                                    .lineTotal(
-                                            orderItem.getPriceAtPurchase()
-                                                    .multiply(BigDecimal.valueOf(orderItem.getQuantity())))
-                                    .imeis(
-                                            orderItem.getProductItems().stream()
-                                                    .map(item -> ImeiResponse.builder()
-                                                            .imeiCode(item.getImeiCode())
-
-                                                            .build())
-                                                    .toList())
-
-                                    .build();
-                        })
-                                .toList())
-                // ghép dto orderDetail và dto History
-                .history(historyResponses)
-                .build();
-
-    }
-
-    // logic đổi trạng thái đơn hàng
-    // Những trạng thái có thể đổi
     private boolean canChangeStatus(String currentStatus, String newStatus) {
-        if (currentStatus == null || newStatus == null) {
-            return false;
-        }
-
-        currentStatus = normalizeStatusValue(currentStatus);
-        newStatus = normalizeStatusValue(newStatus);
-
         return switch (currentStatus) {
             case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
             case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
@@ -276,26 +112,6 @@ public class OrderServiceImpl implements OrderService {
         };
     }
 
-    private String generateTrackingCode(Order order) {
-        String randomPart = UUID.randomUUID().toString()
-                .replace("-", "")
-                .substring(0, 10)
-                .toUpperCase();
-        return "GHN" + randomPart;
-    }
-
-    private boolean ensureTrackingCodeForShipping(Order order) {
-        boolean isShipping = "SHIPPING".equals(normalizeStatusValue(order.getOrderStatus()));
-        boolean missingTrackingCode = order.getTrackingCode() == null || order.getTrackingCode().isBlank();
-
-        if (isShipping && missingTrackingCode) {
-            order.setTrackingCode(generateTrackingCode(order));
-            return true;
-        }
-
-        return false;
-    }
-
     private void markPaymentPaidWhenCompleted(Order order) {
         if ("COMPLETED".equals(normalizeStatusValue(order.getOrderStatus()))) {
             order.setPaymentStatus("PAID");
@@ -321,12 +137,14 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
+
         String newStatus = request.getStatus();
         if (newStatus == null || newStatus.isBlank()) {
             throw new RuntimeException("Trạng thái mới không hợp lệ");
         }
-
         newStatus = normalizeStatusValue(newStatus);
+
+        boolean isJustConfirmed = "PENDING".equals(currentStatus) && "CONFIRMED".equals(newStatus);
 
         if (!canChangeStatus(currentStatus, newStatus)) {
             throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
@@ -361,14 +179,12 @@ public class OrderServiceImpl implements OrderService {
                 LocalDateTime now = LocalDateTime.now();
 
                 // Chỉ hoàn quota nếu voucher còn hiệu lực (chưa hết hạn)
-                // Nếu voucher đã hết hạn thì KHÔNG tăng quantity (voucher chết không dùng lại
-                // được)
                 if (voucher.getEndDate() == null || voucher.getEndDate().isAfter(now)) {
                     voucher.setQuantity(voucher.getQuantity() + 1);
                     voucherRepository.save(voucher);
                 }
 
-                // Reset UserVoucher.isUsed = false (cho cả ALL và SPECIFIC)
+                // Reset UserVoucher.isUsed = false
                 Integer userId = order.getUser().getUserId();
                 userVoucherRepository
                         .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
@@ -383,25 +199,134 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setOrderStatus(newStatus);
-        ensureTrackingCodeForShipping(order);
         markPaymentPaidWhenCompleted(order);
         orderRepository.save(order);
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
 
+        // TRIGGER BẮN ĐƠN SANG GHN KHI XÁC NHẬN
+        if (isJustConfirmed) {
+            eventPublisher.publishEvent(new OrderConfirmedEvent(this, order));
+        }
+
         return getOrderDetailResponse(orderCode);
     }
 
-    // lấy danh sách đơn hàng của user theo ID
+    @Override
+    public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus,
+            Pageable pageable) {
+        return orderRepository.searchOrders(
+                normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
+                pageable)
+                .map(this::toResponse);
+    }
+
+    @Override
+    public OrderStatsResponse getOrderStats(String keyword, String paymentMethod, String orderStatus) {
+        String kw = normalizeKeyword(keyword);
+        String pm = normalizePaymentMethod(paymentMethod);
+        String os = normalizeOrderStatus(orderStatus);
+
+        return OrderStatsResponse.builder()
+                .total(orderRepository.countOrders(kw, pm, os))
+                .pending(orderRepository.countPendingOrders(kw, pm, os))
+                .confirmed(orderRepository.countConfirmedOrders(kw, pm, os))
+                .shipping(orderRepository.countShippingOrders(kw, pm, os))
+                .completed(orderRepository.countCompletedOrders(kw, pm, os))
+                .cancelled(orderRepository.countCancelledOrders(kw, pm, os))
+                .build();
+    }
+
+    @Override
+    public List<String> getPaymentMethods() {
+        return orderRepository.findDistinctPaymentMethods();
+    }
+
+    @Override
+    public List<String> getOrderStatuses() {
+        return orderRepository.findDistinctOrderStatuses();
+    }
+
+    @Override
+    @Transactional
+    public OrderDetailResponse getOrderDetailResponse(String orderCode) {
+        Order order = orderRepository.findDetailByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        List<OrderStatusHistory> histories = orderStatusHistoryRepository
+                .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
+
+        List<OrderStatusHistoryResponse> historyResponses = histories.stream()
+                .map(history -> OrderStatusHistoryResponse.builder()
+                        .status(history.getStatus())
+                        .title(history.getTitle())
+                        .note(history.getNote())
+                        .createdAt(history.getCreatedAt())
+                        .createdByName(getUserDisplayName(history.getCreatedBy()))
+                        .build())
+                .toList();
+
+        return OrderDetailResponse.builder()
+                .orderCode(order.getOrderCode())
+                .orderStatus(order.getOrderStatus())
+                .createdAt(order.getCreatedAt())
+                .updatedAt(order.getUpdatedAt())
+                .recipientName(order.getRecipientName())
+                .recipientPhone(order.getRecipientPhone())
+                .shippingAddress(order.getShippingAddress())
+                .totalAmount(order.getTotalAmount())
+                .discountAmount(order.getDiscountAmount())
+                .shippingFee(order.getShippingFee())
+                .finalAmount(order.getFinalAmount())
+                .paymentMethod(order.getPaymentMethod())
+                .paymentStatus(order.getPaymentStatus())
+                .transactionId(order.getTransactionId())
+                .paymentDate(order.getPaymentDate())
+                .trackingCode(order.getTrackingCode())
+                .userId(order.getUser().getUserId())
+                .fullName(order.getUser().getFullName())
+                .email(order.getUser().getEmail())
+                .phoneNumber(order.getUser().getPhoneNumber())
+                .voucherCode(order.getVoucher() != null ? order.getVoucher().getVoucherCode() : null)
+                .voucherDiscountType(order.getVoucher() != null ? order.getVoucher().getDiscountType() : null)
+                .voucherDiscountValue(order.getVoucher() != null ? order.getVoucher().getDiscountValue() : null)
+                .voucherMaxDiscount(order.getVoucher() != null ? order.getVoucher().getMaxDiscountAmount() : null)
+                .items(
+                        order.getOrderItems().stream().map(orderItem -> {
+                            ProductSku sku = orderItem.getSku();
+                            Product product = sku.getProduct();
+                            return OrderItemDetailResponse.builder()
+                                    .skuId(sku.getSkuId())
+                                    .skuCode(sku.getSkuCode())
+                                    .productId(product.getProductId())
+                                    .productName(product.getProductName())
+                                    .productImage(
+                                            sku.getSkuImageUrl() != null
+                                                    ? sku.getSkuImageUrl()
+                                                    : product.getThumbnailUrl())
+                                    .quantity(orderItem.getQuantity())
+                                    .priceAtPurchase(orderItem.getPriceAtPurchase())
+                                    .lineTotal(
+                                            orderItem.getPriceAtPurchase()
+                                                    .multiply(BigDecimal.valueOf(orderItem.getQuantity())))
+                                    .imeis(
+                                            orderItem.getProductItems().stream()
+                                                    .map(item -> ImeiResponse.builder()
+                                                            .imeiCode(item.getImeiCode())
+                                                            .build())
+                                                    .toList())
+                                    .build();
+                        }).toList())
+                .history(historyResponses)
+                .build();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<OrderResponse> getUserOrder() {
         Integer userId = SecurityUtils.getCurrentUserId();
-        return orderRepository.findByUserUserIdOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(this::toResponse)
-                .toList();
+        return orderRepository.findByUserUserIdOrderByCreatedAtDesc(userId).stream().map(this::toResponse).toList();
     }
 
     @Override
@@ -409,11 +334,9 @@ public class OrderServiceImpl implements OrderService {
     public OrderDetailResponse getUserOrderDetail(String orderCode) {
         Integer userId = SecurityUtils.getCurrentUserId();
         OrderDetailResponse response = getOrderDetailResponse(orderCode);
-
         if (!userId.equals(response.getUserId())) {
             throw new RuntimeException("Không có quyền xem");
         }
-
         return response;
     }
 }

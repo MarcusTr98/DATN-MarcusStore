@@ -60,9 +60,11 @@ cloudinary.api-secret=IiIrPDrALvo70daj_FVpCciOuWM
 # GIAO HANG NHANH (GHN) - MOI TRUONG TEST
 ghn.api.token=a5435b66-68cc-11f1-a973-aee5264794df
 ghn.api.shop-id=200703
-
-#URL
 ghn.api.url.fee=https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/fee
-
+ghn.api.url.create=https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/create
 ghn.store.district-id=1526
 ghn.store.ward-code=20310
+
+# token verify webhook từ GHN Dashboard
+# Nếu chưa có thì để trống, webhook sẽ không verify (dùng khi test Ngrok)
+ghn.webhook.token=

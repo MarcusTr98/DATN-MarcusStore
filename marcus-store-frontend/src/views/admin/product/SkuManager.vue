@@ -17,7 +17,6 @@
     </div>
 
     <div class="manage-grid">
-      <!-- ───────── CỘT TRÁI: THIẾT LẬP THUỘC TÍNH ───────── -->
       <div class="card config-card">
         <div class="card-header-row no-pointer">
           <div class="card-title-group">
@@ -83,7 +82,6 @@
         </div>
       </div>
 
-      <!-- ───────── CỘT PHẢI: DANH SÁCH SKU SINH RA ───────── -->
       <div class="card results-card">
         <div class="card-header-row no-pointer">
           <div class="card-title-group">
@@ -101,7 +99,7 @@
           <button
             v-if="generatedSkus.length > 0"
             class="btn-primary btn-save"
-            :disabled="isSaving"
+            :disabled="isSaving || hasAnyDuplicate"
             @click="saveAllSkus"
           >
             <span v-if="isSaving" class="spinner"></span>
@@ -174,31 +172,57 @@
                       <span class="variant-label">{{ sku.variantName }}</span>
                     </div>
                   </td>
+
                   <td>
                     <input
                       v-model="sku.skuCode"
+                      @input="clearFieldError(index, 'skuCode')"
                       class="table-input mono"
-                      placeholder="VD: IPH-RED-128"
+                      :class="{
+                        'is-invalid':
+                          fieldErrors[`skus[${index}].skuCode`] ||
+                          isDuplicateSku(sku.skuCode, index),
+                      }"
+                      placeholder="VD: IP16-BLK-256"
                     />
+                    <div class="error-text" v-if="isDuplicateSku(sku.skuCode, index)">
+                      Mã SKU bị trùng lặp trong bảng!
+                    </div>
+                    <div class="error-text" v-else-if="fieldErrors[`skus[${index}].skuCode`]">
+                      {{ fieldErrors[`skus[${index}].skuCode`] }}
+                    </div>
                   </td>
+
                   <td>
                     <input
                       v-model="sku.price"
+                      @input="clearFieldError(index, 'price')"
                       type="number"
                       class="table-input"
+                      :class="{ 'is-invalid': fieldErrors[`skus[${index}].price`] }"
                       placeholder="0"
                       min="0"
                     />
+                    <div class="error-text" v-if="fieldErrors[`skus[${index}].price`]">
+                      {{ fieldErrors[`skus[${index}].price`] }}
+                    </div>
                   </td>
+
                   <td>
                     <input
                       v-model="sku.stock"
+                      @input="clearFieldError(index, 'stock')"
                       type="number"
                       class="table-input narrow"
+                      :class="{ 'is-invalid': fieldErrors[`skus[${index}].stock`] }"
                       placeholder="0"
                       min="0"
                     />
+                    <div class="error-text" v-if="fieldErrors[`skus[${index}].stock`]">
+                      {{ fieldErrors[`skus[${index}].stock`] }}
+                    </div>
                   </td>
+
                   <td>
                     <button
                       class="btn-row-del"
@@ -247,12 +271,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-// TODO: Thay đổi đường dẫn import này cho khớp với file cấu hình Axios của bạn
+import { ref, computed, onMounted } from 'vue'
 import api from '@/utils/api'
 import '@/assets/css/sku.css'
 
-//1. STATE DỮ LIỆU
+// 1. STATE DỮ LIỆU
 const products = ref([])
 const selectedProductId = ref('')
 const options = ref([{ name: '', rawValues: '' }])
@@ -261,16 +284,29 @@ const bulkPrice = ref('')
 const bulkStock = ref('')
 const isSaving = ref(false)
 const alertModal = ref({ show: false, message: '', type: 'success' })
+const fieldErrors = ref({})
+
+// Hàm check trùng lặp để bôi đỏ trên giao diện
+const isDuplicateSku = (code, currentIndex) => {
+  if (!code) return false
+  return (
+    generatedSkus.value.findIndex((s, idx) => idx !== currentIndex && s.skuCode === code) !== -1
+  )
+}
+
+// Khóa nút Lưu khi phát hiện trùng
+const hasAnyDuplicate = computed(() => {
+  const codes = generatedSkus.value.map((s) => s.skuCode).filter((c) => c)
+  return new Set(codes).size !== codes.length
+})
 
 // 2. API CALLS
 const fetchProducts = async () => {
   try {
     const res = await api.get('/admin/products')
     products.value = res.data
-  } catch (err) {
+  } catch {
     console.warn('Backend báo lỗi 403. Tạm thời dùng dữ liệu Mock để test UI!')
-    console.error('Lỗi tải sản phẩm', err)
-    // Bơm dữ liệu giả đợi Đức làm Product CRUD xong
     products.value = [
       { id: 1, name: 'iPhone 15 Pro Max (Mock)' },
       { id: 2, name: 'Samsung Galaxy S24 Ultra (Mock)' },
@@ -300,7 +336,7 @@ const getValidOptions = () =>
         .filter((v) => v !== ''),
     }))
 
-//4. THUẬT TOÁN SINH MÃ
+// 4. THUẬT TOÁN SINH MÃ (ĐÃ FIX LOGIC ĐỎ/ĐEN)
 const getInitials = (str) => {
   const cleanStr = str
     .normalize('NFD')
@@ -322,18 +358,29 @@ const getInitials = (str) => {
 }
 
 const generateValueCode = (val) => {
-  const cleanStr = val
+  const clean = val
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[đĐ]/g, 'd')
+    .replace(/[đĐ]/g, 'D') // Chuẩn hóa Đ thành D
     .replace(/[^a-zA-Z0-9 ]/g, '')
     .toUpperCase()
 
-  const words = cleanStr.split(' ').filter((w) => w.length > 0)
-  if (words.length === 1 && /\d/.test(words[0])) {
-    return words[0].substring(0, 5)
+  const words = clean.split(' ').filter((w) => w.length > 0)
+  if (words.length === 0) return ''
+
+  // 1. Có số (512GB) -> 5 ký tự đầu
+  if (words.length === 1 && /\d/.test(words[0])) return words[0].substring(0, 5)
+
+  // 2. Chỉ có 1 chữ (Đỏ, Đen, Vàng) -> 3 ký tự (DO, DEN, VAN)
+  if (words.length === 1) return words[0].substring(0, 3)
+
+  // 3. Nhiều chữ (Titan Đen) -> 1 chữ đầu + 2 chữ cuối (TDE)
+  let code = ''
+  for (let i = 0; i < words.length - 1; i++) {
+    code += words[i][0]
   }
-  return words.map((w) => w[0]).join('')
+  code += words[words.length - 1].substring(0, 2)
+  return code
 }
 
 const cartesian = (args) =>
@@ -342,7 +389,7 @@ const cartesian = (args) =>
     [[]],
   )
 
-//5. SINH TỔ HỢP MA TRẬN
+// 5. SINH TỔ HỢP MA TRẬN
 const generateVariants = () => {
   const validOptions = getValidOptions()
   if (validOptions.length === 0)
@@ -355,61 +402,53 @@ const generateVariants = () => {
   generatedSkus.value = combinations.map((combo) => ({
     variantName: combo.join(' - '),
     skuCode: `${baseCode}-${combo.map(generateValueCode).join('-')}`, // Auto Gen Mã
-    price: bulkPrice.value || 0,
-    stock: bulkStock.value || 0,
-    comboValues: combo, // Giữ lại mảng giá trị để map ID khi lưu BE
+    price: bulkPrice.value || '',
+    stock: bulkStock.value || '',
+    comboValues: combo,
   }))
 }
 
-//6. XỬ LÝ HÀNG LOẠT
+// 6. XỬ LÝ HÀNG LOẠT & VALIDATION UI
 const applyBulkSettings = () => {
   if (generatedSkus.value.length === 0) return
-
   generatedSkus.value.forEach((sku) => {
     if (bulkPrice.value !== '') sku.price = Number(bulkPrice.value)
     if (bulkStock.value !== '') sku.stock = Number(bulkStock.value)
   })
 }
 
-//7. LƯU VÀO BACKEND
+const clearFieldError = (index, fieldName) => {
+  const key = `skus[${index}].${fieldName}`
+  if (fieldErrors.value[key]) {
+    delete fieldErrors.value[key]
+  }
+}
+
+// 7. LƯU VÀO BACKEND
 const saveAllSkus = async () => {
-  if (!selectedProductId.value) return showAlert('Chưa chọn sản phẩm gốc!', 'error')
-  if (generatedSkus.value.length === 0) return showAlert('Chưa có biến thể nào được tạo!', 'error')
-
+  if (!selectedProductId.value || generatedSkus.value.length === 0) return
   isSaving.value = true
+  fieldErrors.value = {} // Reset lỗi cũ trước khi gửi request mới
+
   try {
-    //Lưu Options lên DB & lập Value ID
-    const globalValueIdMap = {}
-    for (const opt of getValidOptions()) {
-      const res = await api.post(`/admin/products/${selectedProductId.value}/options`, {
-        name: opt.name,
-        values: opt.values,
-      })
-      Object.assign(globalValueIdMap, res.data.valueIds)
+    const payload = {
+      productId: selectedProductId.value,
+      skus: generatedSkus.value.map((sku) => ({
+        skuCode: sku.skuCode,
+        price: Number(sku.price),
+        stock: Number(sku.stock),
+      })),
     }
-
-    //Map ID và đẩy đồng loạt SKU lên Server
-    await Promise.all(
-      generatedSkus.value.map((sku) =>
-        api.post(`/admin/products/${selectedProductId.value}/skus`, {
-          skuCode: sku.skuCode,
-          price: sku.price,
-          stock: sku.stock,
-          imageUrl: '',
-          optionValueIds: sku.comboValues.map((val) => globalValueIdMap[val]),
-        }),
-      ),
-    )
-
-    showAlert(
-      `Đã lưu toàn bộ ${generatedSkus.value.length} SKU vào Database thành công!`,
-      'success',
-    )
+    await api.post('/admin/skus/batch', payload)
+    showAlert(`Đã lưu ${generatedSkus.value.length} SKU thành công!`, 'success')
     generatedSkus.value = []
-    options.value = [{ name: '', rawValues: '' }]
   } catch (error) {
-    console.error('Lỗi khi lưu dữ liệu:', error)
-    showAlert('Hệ thống từ chối lưu: ' + (error.response?.data?.message || error.message), 'error')
+    if (error.response?.status === 400 && error.response?.data?.data) {
+      fieldErrors.value = error.response.data.data
+      showAlert('Vui lòng kiểm tra lại các trường báo đỏ trong bảng!', 'error')
+    } else {
+      showAlert(error.response?.data?.message || 'Có lỗi khi lưu SKU vào CSDL', 'error')
+    }
   } finally {
     isSaving.value = false
   }
@@ -419,7 +458,7 @@ const showAlert = (msg, type = 'success') => {
   alertModal.value = { show: true, message: msg, type }
 }
 
-// 8. MÀU GỢI Ý CHO CHẤM TRÒN BIẾN THỂ (đồng bộ với màn Tạo SKU)
+// 8. MÀU GỢI Ý CHO CHẤM TRÒN BIẾN THỂ
 const colorKeywords = {
   đen: '#1a1a2e',
   black: '#1a1a2e',
@@ -452,4 +491,17 @@ const getColorStyle = (valueStr) => {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+/* CSS cho báo lỗi đỏ */
+.table-input.is-invalid {
+  border-color: #ef4444 !important;
+  background-color: #fef2f2 !important;
+}
+.error-text {
+  color: #ef4444;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 4px;
+  text-align: left;
+}
+</style>
