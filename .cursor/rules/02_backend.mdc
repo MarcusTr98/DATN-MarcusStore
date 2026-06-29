@@ -1,0 +1,95 @@
+# Backend Development Rules
+
+## Scope
+
+Only modify code directly related to the requested feature.
+
+Never modify unrelated business logic.
+
+Never expand the scope.
+
+---
+
+## Existing Code First
+
+Always search for existing implementations.
+
+Reuse existing:
+
+- services
+- repositories
+- DTOs
+- validators
+- utilities
+- helpers
+
+Never duplicate logic.
+
+---
+
+## File Management
+
+Never create:
+
+- Service
+- Repository
+- DTO
+- Entity
+- Utility
+- Helper
+- Config
+
+without user approval.
+
+---
+
+## Architecture
+
+Respect the existing architecture.
+
+Never introduce a different architecture.
+
+Never move business logic between layers.
+
+Keep responsibilities clear.
+
+---
+
+## Code Quality
+
+Write production-ready code.
+
+Keep methods focused.
+
+Keep classes focused.
+
+Avoid unnecessary abstraction.
+
+Avoid overengineering.
+
+Prefer simple and maintainable solutions.
+
+---
+
+## Database
+
+Never change:
+
+- database schema
+- entities
+- migrations
+- relationships
+
+without explicit user approval.
+
+Never modify SQL unless requested.
+
+---
+
+## API
+
+Do not change API contracts unless requested.
+
+Do not change request or response structures without approval.
+
+Maintain backward compatibility whenever possible.

@@ -1,0 +1,37 @@
+# Frontend Development Rules
+
+Follow the existing frontend architecture.
+
+Reuse existing components whenever possible.
+
+Never create new components without approval.
+
+Never duplicate UI logic.
+
+Never duplicate CSS.
+
+Reuse existing styles.
+
+Maintain consistency across the application.
+
+Keep components simple.
+
+Avoid unnecessary complexity.
+
+Keep state management consistent.
+
+Never redesign unrelated pages.
+
+Never change routing without approval.
+
+Never introduce new frontend libraries without approval.
+
+Always ensure responsive layouts.
+
+Always consider accessibility.
+
+Keep interactions predictable.
+
+Do not introduce unnecessary animations.
+
+Respect the existing design language.

@@ -5,6 +5,7 @@
 *.iws
 .DS_Store
 .env
+.cursor/rules
 
 # Bỏ qua rác Node.js nếu lỡ gõ nhầm npm install ở ngoài cùng
 node_modules/
