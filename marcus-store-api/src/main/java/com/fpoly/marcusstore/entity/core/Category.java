@@ -25,6 +25,9 @@ public class Category {
     @Column(name = "status")
     private Boolean status = true;
 
+    @Column(name = "categori_img", length = 500)
+    private String categoriImg;
+
     @Column(name = "slug", unique = true, length = 255)
     private String slug;
 

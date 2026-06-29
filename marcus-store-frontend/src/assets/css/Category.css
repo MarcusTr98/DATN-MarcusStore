@@ -571,7 +571,9 @@ input.f-input {
   font-size: 0.9rem;
 }
 
-.cat-folder { font-size: .9rem; }
+.cat-folder {
+  font-size: 0.9rem;
+}
 
 .pagination-bar {
   display: flex;
@@ -676,4 +678,40 @@ input.f-input {
     order: -1;
     width: 100%;
   }
+}
+.thumb-img {
+  width: 64px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  background: #fff;
+  padding: 4px;
+}
+
+.thumb-placeholder {
+  width: 64px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border-radius: 6px;
+  color: #bbb;
+  font-size: 18px;
+}
+.preview-thumb {
+  width: 200px;
+  height: 100px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #f3d6e3;
+  background: #fffafd;
+  padding: 6px;
+}
+
+.upload-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }

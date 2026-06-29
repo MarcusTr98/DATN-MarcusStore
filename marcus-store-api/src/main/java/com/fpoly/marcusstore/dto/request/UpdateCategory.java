@@ -19,4 +19,6 @@ public class UpdateCategory {
     private Boolean status;
     
     private Integer parentId;
+
+    private String categoryImg;
 }

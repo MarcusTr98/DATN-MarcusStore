@@ -71,6 +71,7 @@
             <thead>
               <tr>
                 <th class="th">#</th>
+                <th class="th">Ảnh</th>
                 <th class="th">Tên danh mục</th>
                 <th class="th">Slug</th>
                 <th class="th">Danh mục cha</th>
@@ -80,13 +81,25 @@
             </thead>
             <tbody>
               <tr v-if="!pagedRows.length">
-                <td colspan="6" class="text-center py-5 text-muted">
+                <td colspan="7" class="text-center py-5 text-muted">
                   <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
                   Không có dữ liệu
                 </td>
               </tr>
               <tr v-for="(item, i) in pagedRows" :key="item.categoryId">
                 <td class="text-muted small">{{ currentPage * pageSize + i + 1 }}</td>
+
+                <td>
+                  <img
+                    v-if="item.categoryImg"
+                    :src="item.categoryImg"
+                    class="thumb-img"
+                    :alt="item.categoryName"
+                  />
+                  <div v-else class="thumb-placeholder">
+                    <i class="bi bi-image"></i>
+                  </div>
+                </td>
 
                 <td>
                   <div class="cat-name" :style="{ paddingLeft: item.level * 28 + 'px' }">
@@ -143,7 +156,7 @@
           </table>
         </div>
 
-        <!-- Pagination theo chuẩn mẫu -->
+        <!-- Pagination -->
         <div v-if="totalElements > 0" class="pagination-bar">
           <div class="pagination-total">
             Tổng <strong>{{ totalElements }}</strong> danh mục
@@ -228,6 +241,39 @@
               </select>
             </div>
 
+            <!-- Logo danh mục -->
+            <div class="mb-3">
+              <label class="flabel">Ảnh logo danh mục</label>
+              <div class="upload-section">
+                <div class="input-group">
+                  <input
+                    type="file"
+                    class="form-control finput"
+                    accept="image/*"
+                    ref="logoFileInput"
+                    @change="onLogoSelect"
+                  />
+                </div>
+
+                <div v-if="logoPreview" class="upload-preview mt-3">
+                  <img :src="logoPreview" alt="preview" class="preview-thumb" />
+                  <span class="preview-name ms-2 text-muted small">{{ logoFile?.name }}</span>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger ms-auto"
+                    @click="clearLogo"
+                  >
+                    <i class="bi bi-x"></i>
+                  </button>
+                </div>
+
+                <div v-else-if="isEdit && currentLogoUrl" class="upload-preview mt-3">
+                  <img :src="currentLogoUrl" alt="current logo" class="preview-thumb" />
+                  <span class="preview-name ms-2 text-muted small">Ảnh hiện tại</span>
+                </div>
+              </div>
+            </div>
+
             <div class="mb-2" v-if="isEdit">
               <label class="flabel">Trạng thái</label>
               <div class="d-flex gap-4 mt-1">
@@ -280,9 +326,15 @@ const BASE_URL = '/admin/categories'
 const categoryApi = {
   getAll: () => api.get(BASE_URL, { params: { page: 0, size: 999 } }),
 
-  create: (payload) => api.post(BASE_URL, payload),
+  create: (formData) =>
+    api.post(BASE_URL, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 
-  update: (id, payload) => api.put(`${BASE_URL}/${id}`, payload),
+  update: (id, formData) =>
+    api.put(`${BASE_URL}/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 
   hide: (id) => api.put(`${BASE_URL}/hidden/${id}`),
 }
@@ -298,11 +350,12 @@ const err = ref({})
 const modalEl = ref(null)
 let bsModal = null
 
+// Pagination state
 const currentPage = ref(0)
 const pageSize = ref(5)
 const totalElements = ref(0)
-const totalPages = computed(() => Math.max(1, Math.ceil(totalElements.value / pageSize.value)))
 
+// Modal state
 const baseModal = ref({
   visible: false,
   type: 'error',
@@ -310,6 +363,42 @@ const baseModal = ref({
   message: '',
   onConfirm: null,
 })
+
+// Logo state
+const logoFileInput = ref(null)
+const logoFile = ref(null)
+const logoPreview = ref(null)
+const currentLogoUrl = ref(null)
+
+function onLogoSelect(event) {
+  const file = event.target.files[0]
+  if (!file) return
+  logoFile.value = file
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    logoPreview.value = e.target.result
+  }
+  reader.readAsDataURL(file)
+}
+
+function clearLogo() {
+  logoFile.value = null
+  logoPreview.value = null
+  if (logoFileInput.value) logoFileInput.value.value = ''
+}
+
+function buildCategoryFormData(payload, file) {
+  const formData = new FormData()
+  formData.append('categoryName', payload.categoryName)
+  if (payload.parentId !== null && payload.parentId !== undefined) {
+    formData.append('parentId', payload.parentId)
+  }
+  if (payload.status !== undefined) {
+    formData.append('status', payload.status)
+  }
+  if (file) formData.append('file', file)
+  return formData
+}
 
 const stats = computed(() => [
   { label: 'Tổng danh mục', value: allCategories.value.length, highlight: false },
@@ -373,10 +462,7 @@ const parentOptions = computed(() =>
   allCategories.value.filter((c) => c.categoryId !== editId.value),
 )
 
-watch(filteredList, () => {
-  totalElements.value = treeRows.value.length
-})
-
+const totalPages = computed(() => Math.max(1, Math.ceil(treeRows.value.length / pageSize.value)))
 const pagedRows = computed(() => {
   const start = currentPage.value * pageSize.value
   return treeRows.value.slice(start, start + pageSize.value)
@@ -428,11 +514,17 @@ async function fetchAll() {
 async function doCreate() {
   saving.value = true
   try {
-    await categoryApi.create({
-      categoryName: form.value.categoryName,
-      parentId: form.value.parentId,
-    })
+    const formData = buildCategoryFormData(
+      {
+        categoryName: form.value.categoryName,
+        parentId: form.value.parentId,
+      },
+      logoFile.value,
+    )
+    await categoryApi.create(formData)
+
     showModal('success', 'Thành công', 'Thêm danh mục thành công!')
+    clearLogo()
     bsModal.hide()
     await fetchAll()
   } catch (e) {
@@ -445,12 +537,18 @@ async function doCreate() {
 async function doUpdate() {
   saving.value = true
   try {
-    await categoryApi.update(editId.value, {
-      categoryName: form.value.categoryName,
-      parentId: form.value.parentId,
-      status: form.value.status,
-    })
+    const formData = buildCategoryFormData(
+      {
+        categoryName: form.value.categoryName,
+        parentId: form.value.parentId,
+        status: form.value.status,
+      },
+      logoFile.value,
+    )
+    await categoryApi.update(editId.value, formData)
+
     showModal('success', 'Thành công', 'Cập nhật thành công!')
+    clearLogo()
     bsModal.hide()
     await fetchAll()
   } catch (e) {
@@ -482,6 +580,8 @@ function openCreate() {
   editId.value = null
   form.value = { categoryName: '', parentId: null, status: true }
   err.value = {}
+  currentLogoUrl.value = null
+  clearLogo()
   bsModal.show()
 }
 
@@ -494,6 +594,8 @@ function openEdit(item) {
     status: item.status,
   }
   err.value = {}
+  currentLogoUrl.value = item.categoryImg ?? null
+  clearLogo()
   bsModal.show()
 }
 
@@ -523,5 +625,4 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>
