@@ -5,6 +5,7 @@ target/
 *.war
 *.class
 *.log
+.cursor/rules
 
 # OS & IDE
 .DS_Store
