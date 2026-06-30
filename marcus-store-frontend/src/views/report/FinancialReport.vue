@@ -142,7 +142,11 @@
                   <div class="mt-2" style="color: #6b7280">Không có giao dịch nào phù hợp.</div>
                 </td>
               </tr>
-              <tr v-else v-for="(item, index) in pagedTransactions" :key="item.transactionId">
+              <tr
+                v-else
+                v-for="(item, index) in pagedTransactions"
+                :key="item.orderCode + '-' + item.createdAt"
+              >
                 <td>{{ (currentPage - 1) * pageSize + index + 1 }}</td>
                 <td class="fw-bold">{{ item.orderCode || item.order?.orderCode || '---' }}</td>
                 <td>
@@ -290,8 +294,10 @@ const fetchTransactions = async () => {
   try {
     const res = await financialApi.getTransactions()
 
-    // FIX: Xử lý linh hoạt mọi loại wrapper từ Backend
-    let rawData = res.data?.data || res.data || res || []
+    // FIX: Backend giờ trả object { transactions: [...], totalCount, ... }
+    // nên phải lấy field transactions ra, không lấy thẳng object làm mảng
+    const payload = res.data?.data || res.data || res || {}
+    let rawData = Array.isArray(payload) ? payload : payload.transactions || []
 
     if (Array.isArray(rawData)) {
       // Ép kiểu sắp xếp mới nhất lên đầu
@@ -352,7 +358,9 @@ const filteredTransactions = computed(() => {
     const kw = filters.keyword.trim().toLowerCase()
     if (kw) {
       const matchKw =
-        item.order?.orderCode?.toLowerCase().includes(kw) || item.note?.toLowerCase().includes(kw)
+        item.orderCode?.toLowerCase().includes(kw) ||
+        item.order?.orderCode?.toLowerCase().includes(kw) ||
+        item.note?.toLowerCase().includes(kw)
       if (!matchKw) return false
     }
     if (filters.type && item.type !== filters.type) return false

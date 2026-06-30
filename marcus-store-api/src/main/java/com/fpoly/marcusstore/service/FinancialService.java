@@ -62,6 +62,17 @@ public class FinancialService {
     public FinancialReportResponse getFinancialReport() {
         var all = transactionRepository.findAllTransactionsWithOrder();
 
+        var dtoList = all.stream()
+                .map(t -> TransactionResponse.builder()
+                        .orderCode(t.getOrder().getOrderCode())
+                        .amount(t.getAmount())
+                        .type(t.getType())
+                        .status(t.getStatus())
+                        .note(t.getNote())
+                        .createdAt(t.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+
         BigDecimal success = all.stream().filter(t -> "SUCCESS".equals(t.getStatus())).map(OrderTransaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal pending = all.stream().filter(t -> "PENDING".equals(t.getStatus())).map(OrderTransaction::getAmount)
@@ -72,6 +83,6 @@ public class FinancialService {
         long successCount = all.stream().filter(t -> "SUCCESS".equals(t.getStatus())).count();
         double rate = all.isEmpty() ? 0 : (double) successCount / all.size() * 100;
 
-        return new FinancialReportResponse(all, all.size(), success, pending, failed, rate);
+        return new FinancialReportResponse(dtoList, all.size(), success, pending, failed, rate);
     }
 }
