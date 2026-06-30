@@ -31,11 +31,6 @@ public class FinancialController {
     }
 
     @GetMapping("/list")
-    public ResponseEntity<?> getTransactionList() {
-        return ResponseEntity.ok(financialService.getAllTransactions());
-    }
-
-    @GetMapping("/list")
     public ResponseEntity<FinancialReportResponse> getFinancialReport() {
         return ResponseEntity.ok(financialService.getFinancialReport());
     }
