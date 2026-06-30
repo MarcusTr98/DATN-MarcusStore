@@ -321,7 +321,7 @@
   .toolbar-panel .row > div {
     margin-bottom: 12px;
   }
-  
+
   .toolbar-panel .row > div:last-child {
     margin-bottom: 0;
   }
@@ -931,7 +931,8 @@
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 4px;
+  padding-top: 19px;
+
   border-top: 1px solid #f3d6e3;
 }
 

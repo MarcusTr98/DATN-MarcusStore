@@ -1,55 +1,55 @@
 <template>
   <div class="flashsale-page">
     <Transition name="fade">
-      <div v-if="toast.show" class="fs-toast" :class="toast.type">
+      <div v-if="toast.show" class="toast-alert" :class="toast.type">
         <strong>{{ toast.title }}</strong>
         <span>{{ toast.message }}</span>
       </div>
     </Transition>
 
-    <div class="fs-shell">
+    <div class="flashsale-shell">
       <!-- HERO -->
-      <section class="fs-hero">
-        <div class="fs-hero-title">
-          <div class="fs-hero-icon">
+      <section class="flashsale-hero">
+        <div class="hero-title">
+          <div class="hero-icon">
             <i class="bi bi-lightning-charge-fill"></i>
           </div>
           <div>
-            <h1>Quan ly Flash Sale</h1>
-            <p>Tao va quan ly cac dot giam gia nhanh theo khung gio.</p>
+            <h1>Quản lý Flash Sale</h1>
+            <p>Tạo và quản lý các đợt giảm giá nhanh theo khung giờ.</p>
           </div>
         </div>
-        <button type="button" class="fs-btn-primary" @click="openCreateModal">
+        <button type="button" class="btn-primary-action" @click="openCreateModal">
           <i class="bi bi-plus-lg"></i>
-          Tao Flash Sale
+          Tạo Flash Sale
         </button>
       </section>
 
       <!-- STATS -->
-      <section class="fs-stats">
-        <article class="fs-stat">
-          <span>Tong chien dich</span>
+      <section class="stats-grid">
+        <article class="stat-card">
+          <span>Tổng chiến dịch</span>
           <strong>{{ stats.total }}</strong>
         </article>
-        <article class="fs-stat">
-          <span>Dang dien ra</span>
+        <article class="stat-card">
+          <span>Đang diễn ra</span>
           <strong class="accent">{{ stats.active }}</strong>
         </article>
-        <article class="fs-stat">
-          <span>Sap dien ra</span>
+        <article class="stat-card">
+          <span>Sắp diễn ra</span>
           <strong>{{ stats.upcoming }}</strong>
         </article>
-        <article class="fs-stat">
-          <span>Tong SP sale</span>
+        <article class="stat-card">
+          <span>Tổng SP sale</span>
           <strong>{{ stats.totalProducts }}</strong>
         </article>
       </section>
 
       <!-- TOOLBAR -->
-      <section class="fs-toolbar">
+      <section class="toolbar-panel">
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-6 col-lg-5">
-            <label class="form-label">Tim kiem</label>
+            <label class="form-label">Tìm kiếm</label>
             <div class="input-group">
               <span class="input-group-text">
                 <i class="bi bi-search"></i>
@@ -58,63 +58,69 @@
                 v-model.trim="filters.keyword"
                 type="text"
                 class="form-control"
-                placeholder="Tim theo ten chien dich..."
+                placeholder="Tìm theo tên chiến dịch..."
               />
             </div>
           </div>
 
           <div class="col-12 col-md-6 col-lg">
-            <label class="form-label">Trang thai</label>
+            <label class="form-label">Trạng thái</label>
             <select v-model="filters.status" class="form-select">
-              <option value="ALL">Tat ca</option>
-              <option value="ACTIVE">Dang dien ra</option>
-              <option value="SCHEDULED">Da len lich</option>
-              <option value="UPCOMING">Sap dien ra</option>
-              <option value="ENDED">Da ket thuc</option>
-              <option value="CANCELLED">Da huy</option>
-              <option value="PENDING">Cho xu ly</option>
+              <option value="ALL">Tất cả</option>
+              <option value="ACTIVE">Đang diễn ra</option>
+              <option value="SCHEDULED">Đã lên lịch</option>
+              <option value="UPCOMING">Sắp diễn ra</option>
+              <option value="ENDED">Đã kết thúc</option>
+              <option value="CANCELLED">Đã hủy</option>
+              <option value="PENDING">Chờ xử lý</option>
             </select>
           </div>
 
           <div class="col-12 col-md-6 col-lg-auto">
-            <button type="button" class="btn btn-soft w-100" title="Xoa loc" @click="resetFilters">
+            <button type="button" class="btn-soft w-100" title="Xóa lọc" @click="resetFilters">
               <i class="bi bi-arrow-counterclockwise"></i>
             </button>
           </div>
+
+
         </div>
       </section>
 
       <!-- TABLE -->
-      <section class="fs-table-panel">
+      <section class="table-panel">
         <div class="table-responsive">
-          <table class="table align-middle fs-table mb-0">
+          <table class="table align-middle flashsale-table mb-0">
             <thead>
             <tr>
-              <th class="fs-th-w60">ID</th>
-              <th>Ten chien dich</th>
-              <th>Thoi gian</th>
-              <th class="text-center">So SP</th>
-              <th>Trang thai</th>
-              <th class="text-center">Kich hoat</th>
-              <th class="text-center fs-th-w100">Thao tac</th>
+              <th>ID</th>
+              <th>Tên chiến dịch</th>
+              <th>Thời gian</th>
+              <th class="text-center">Số SP</th>
+              <th>Trạng thái</th>
+              <th class="text-center">Kích hoạt</th>
+              <th class="text-center">Thao tác</th>
             </tr>
             </thead>
             <tbody>
             <tr v-for="slot in filteredSlots" :key="slot.slotId">
-              <td><span class="fs-id-text">#{{ String(slot.slotId).padStart(3,'0') }}</span></td>
-              <td><span class="fs-slot-name">{{ slot.name }}</span></td>
+              <td><span class="id-text">#{{ String(slot.slotId).padStart(3, '0') }}</span></td>
+              <td><span class="slot-name">{{ slot.name }}</span></td>
               <td>
-                <div class="fs-time-line">
-                  <div><span class="fs-label">Tu</span><span>{{ formatDateTime(slot.startDate) }}</span></div>
-                  <div><span class="fs-label">Den</span><span>{{ formatDateTime(slot.endDate) }}</span></div>
+                <div class="time-line">
+                  <div><span class="time-label">Từ</span><span>{{
+                      formatDateTime(slot.startDate)
+                    }}</span></div>
+                  <div><span class="time-label">Đến</span><span>{{
+                      formatDateTime(slot.endDate)
+                    }}</span></div>
                 </div>
               </td>
               <td class="text-center">
-                <span class="fs-item-count">{{ slot.items.length }}</span>
+                <span class="item-count">{{ slot.items.length }}</span>
               </td>
               <td>
-                <span class="fs-badge" :class="statusBadgeClass(slot)">
-                  <span class="fs-dot"></span>{{ statusBadgeLabel(slot) }}
+                <span class="status-badge" :class="statusBadgeClass(slot)">
+                  {{ statusBadgeLabel(slot) }}
                 </span>
               </td>
               <td class="text-center">
@@ -124,14 +130,14 @@
                     :checked="slot.status === 2"
                     @change="toggleActive(slot, $event.target.checked)"
                   />
-                  <div class="fs-tog-track"><div class="fs-tog-thumb"></div></div>
+                  <span class="fs-tog-track"><span class="fs-tog-thumb"></span></span>
                 </label>
               </td>
               <td class="text-center">
-                <button class="fs-icon-btn fs-icon-edit" title="Sua" @click="openEditModal(slot)">
+                <button class="icon-button" title="Sửa" @click="openEditModal(slot)">
                   <i class="bi bi-pencil-square"></i>
                 </button>
-                <button class="fs-icon-btn fs-icon-del ms-1" title="Xoa" @click="openDelModal(slot)">
+                <button class="icon-button danger ms-1" title="Xóa" @click="openDelModal(slot)">
                   <i class="bi bi-trash3"></i>
                 </button>
               </td>
@@ -141,71 +147,95 @@
         </div>
 
         <!-- EMPTY -->
-        <div v-if="!loading && localSlots.length === 0" class="fs-empty">
+        <div v-if="!loading && localSlots.length === 0" class="empty-state">
           <i class="bi bi-lightning"></i>
-          <p>Chua co Flash Sale nao</p>
-          <div class="fs-hint-text">Tao chien dich Flash Sale dau tien de bat dau.</div>
+          <p>Chưa có Flash Sale nào</p>
+          <span class="fs-hint-text">Tạo chiến dịch Flash Sale đầu tiên để bắt đầu.</span>
         </div>
 
         <!-- LOADING -->
-        <div v-if="loading" class="fs-empty">
+        <div v-if="loading" class="empty-state">
           <div class="spinner-border text-primary" role="status"></div>
-          <p class="mt-2">Dang tai...</p>
+          <p class="mt-2">Đang tải...</p>
         </div>
       </section>
     </div>
 
     <!-- CRUD MODAL -->
     <div
-      class="fs-modal-overlay"
-      :class="{ show: isModalOpen }"
+      class="modal-backdrop-custom"
+      v-if="isModalOpen"
       @click.self="closeModal"
     >
-      <div class="fs-modal-box">
-        <div class="fs-modal-hd">
-          <h3>{{ isEditing ? 'Chinh sua Flash Sale' : 'Tao Flash Sale moi' }}</h3>
-          <button class="fs-modal-close" @click="closeModal">
+      <div class="flashsale-modal">
+        <div class="modal-head">
+          <div>
+            <h2>{{ isEditing ? 'Chỉnh sửa Flash Sale' : 'Tạo Flash Sale mới' }}</h2>
+            <p>Thiết lập thông tin chiến dịch và các sản phẩm áp dụng.</p>
+          </div>
+          <button type="button" class="icon-button" title="Đóng" @click="closeModal">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
 
-        <div class="fs-modal-body">
+        <form class="voucher-form" novalidate @submit.prevent="saveSlot">
           <!-- BASIC INFO -->
-          <div class="fs-form-group">
-            <label class="fs-form-label">Ten chien dich <span class="text-danger">*</span></label>
-            <input
-              v-model="form.name"
-              type="text"
-              class="fs-input"
-              :class="{ 'is-invalid': submitted && errors.name }"
-              placeholder="VD: Flash Sale Thu 6 - iPhone Series"
-            />
-            <div v-if="submitted && errors.name" class="fs-form-error">{{ errors.name }}</div>
+          <div class="form-section">
+            <div class="section-title">
+              <span>1</span>
+              <div>
+                <h3>Thông tin chiến dịch</h3>
+                <p>Đặt tên và khoảng thời gian diễn ra Flash Sale.</p>
+              </div>
+            </div>
+
+            <div class="full-width-field">
+              <label class="form-label">Tên chiến dịch <span class="text-danger">*</span></label>
+              <input
+                v-model="form.name"
+                type="text"
+                class="form-control"
+                :class="{ 'is-invalid': submitted && errors.name }"
+                placeholder="VD: Flash Sale Thứ 6 - iPhone Series"
+              />
+              <div v-if="submitted && errors.name" class="invalid-feedback">{{ errors.name }}</div>
+            </div>
+
+            <div class="row g-3 mt-1">
+              <div class="col-12 col-md-6">
+                <label class="form-label">Thời gian bắt đầu <span
+                  class="text-danger">*</span></label>
+                <input
+                  v-model="form.startDate"
+                  type="datetime-local"
+                  class="form-control"
+                  :class="{ 'is-invalid': submitted && errors.startDate }"
+                />
+                <div v-if="submitted && errors.startDate" class="invalid-feedback">
+                  {{ errors.startDate }}
+                </div>
+              </div>
+              <div class="col-12 col-md-6">
+                <label class="form-label">Thời gian kết thúc <span
+                  class="text-danger">*</span></label>
+                <input
+                  v-model="form.endDate"
+                  type="datetime-local"
+                  class="form-control"
+                  :class="{ 'is-invalid': submitted && errors.endDate }"
+                />
+                <div v-if="submitted && errors.endDate" class="invalid-feedback">{{
+                    errors.endDate
+                  }}
+                </div>
+              </div>
+            </div>
+            <div v-if="submitted && errors.time" class="invalid-feedback mt-2">{{
+                errors.time
+              }}
+            </div>
           </div>
 
-          <div class="row g-3">
-            <div class="col-6">
-              <label class="fs-form-label">Thoi gian bat dau <span class="text-danger">*</span></label>
-              <input
-                v-model="form.startDate"
-                type="datetime-local"
-                class="fs-input fs-input-fix"
-                :class="{ 'is-invalid': submitted && errors.startDate }"
-              />
-              <div v-if="submitted && errors.startDate" class="fs-form-error">{{ errors.startDate }}</div>
-            </div>
-            <div class="col-6">
-              <label class="fs-form-label">Thoi gian ket thuc <span class="text-danger">*</span></label>
-              <input
-                v-model="form.endDate"
-                type="datetime-local"
-                class="fs-input fs-input-fix"
-                :class="{ 'is-invalid': submitted && errors.endDate }"
-              />
-              <div v-if="submitted && errors.endDate" class="fs-form-error">{{ errors.endDate }}</div>
-            </div>
-          </div>
-          <div v-if="submitted && errors.time" class="fs-form-error mb-3">{{ errors.time }}</div>
 
           <!-- TABS -->
           <div class="fs-tabs">
@@ -214,166 +244,394 @@
               :class="{ active: activeTab === 0 }"
               @click="switchTab(0)"
             >
-              <i class="bi bi-box-seam"></i> Chon san pham
+              <i class="bi bi-box-seam"></i> Chọn sản phẩm
             </button>
             <button
               class="fs-tab-btn"
               :class="{ active: activeTab === 1 }"
               @click="switchTab(1)"
             >
-              <i class="bi bi-grid-3x3-gap"></i> Theo danh muc
+              <i class="bi bi-grid-3x3-gap"></i> Theo danh mục
             </button>
           </div>
 
           <!-- TAB 0: SELECT PRODUCTS -->
           <div v-show="activeTab === 0" class="fs-tab-content">
-            <div class="fs-prod-search">
-              <div class="input-group">
-                <input
-                  v-model="productSearchQuery"
-                  type="text"
-                  class="fs-input"
-                  placeholder="Tim san pham..."
-                  @focus="openProdDrop"
-                />
-                <button class="fs-btn-soft" type="button" @click="openProdDrop">
-                  <i class="bi bi-search"></i>
-                </button>
-              </div>
-              <div v-if="showProdDrop" class="fs-prod-dropdown" id="prodDropdown">
-                <div
-                  v-for="p in filteredProducts"
-                  :key="p.id"
-                  class="fs-prod-row"
-                  @click="toggleProduct(p.id)"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="selectedItemPids.includes(p.id)"
-                    @click.stop
-                    @change="toggleProduct(p.id)"
-                  />
-                  <div class="fs-prod-thumb">{{ p.emoji }}</div>
-                  <div class="fs-prod-info">
-                    <strong>{{ p.name }}</strong>
-                    <small>Ton kho: {{ p.stock }} | Gia goc: {{ formatVND(p.price) }}</small>
+            <!-- CASCADING PICKER -->
+            <div class="fs-cascade-wrap">
+              <button
+                type="button"
+                class="fs-cascade-trigger"
+                :class="{ active: cascadeOpen, has: selectedItemPids.length > 0 }"
+                @click.stop="cascadeOpen = !cascadeOpen"
+              >
+                <i class="bi bi-diagram-3"></i>
+                <span class="fs-cascade-trigger-text">
+                  <template v-if="selectedItemPids.length > 0">
+                    <span class="fs-cascade-dot"></span>
+                    Đã chọn {{ selectedItemPids.length }} sản phẩm
+                  </template>
+                  <template v-else>
+                    Chọn thương hiệu / dòng sản phẩm...
+                  </template>
+                </span>
+                <i class="bi bi-chevron-down fs-cascade-chevron"></i>
+              </button>
+
+              <Transition name="fs-panel">
+                <div v-if="cascadeOpen" class="fs-cascade-panel" @click.stop>
+                  <div class="fs-cascade-cols">
+                    <!-- LEFT COLUMN: Brands (~40%) -->
+                    <ul class="fs-cascade-left">
+                      <li
+                        v-for="b in BRAND_SERIES"
+                        :key="b.key"
+                        class="fs-cascade-brand"
+                        :class="{ active: cascadeBrand === b.key }"
+                        @mouseenter="setCascadeBrand(b.key)"
+                        @click="setCascadeBrand(b.key)"
+                      >
+                        <i class="bi" :class="b.icon"></i>
+                        <span>{{ b.label }}</span>
+                        <i class="bi bi-chevron-right fs-cascade-arrow"></i>
+                      </li>
+                    </ul>
+
+                    <!-- RIGHT COLUMN: Series + Products (~60%) -->
+                    <div class="fs-cascade-right">
+                      <template v-if="cascadeBrand">
+                        <div class="fs-cascade-right-hd">
+                          <strong>{{
+                              BRAND_SERIES.find(x => x.key === cascadeBrand)?.label
+                            }}</strong>
+                          <button
+                            type="button"
+                            class="fs-cascade-addall"
+                            @click.stop="selectAllInBrand(cascadeBrand)"
+                          >
+                            <input
+                              type="checkbox"
+                              class="fs-cascade-addall-cb"
+                              :checked="brandFullySelected(cascadeBrand)"
+                              @click.stop="toggleAllInBrand(cascadeBrand)"
+                            />
+                            <span>Chọn tất cả</span>
+                          </button>
+                        </div>
+
+                        <div class="fs-cascade-right-body">
+                          <div
+                            v-for="s in (BRAND_SERIES.find(x => x.key === cascadeBrand)?.series || [])"
+                            :key="s"
+                            class="fs-cascade-series"
+                          >
+                            <button
+                              type="button"
+                              class="fs-cascade-series-btn"
+                              :class="{ active: cascadeSeries === s }"
+                              @click.stop="cascadeSeries = cascadeSeries === s ? null : s"
+                            >
+                              <input
+                                type="checkbox"
+                                class="fs-cascade-addall-cb"
+                                :checked="seriesFullySelected(cascadeBrand, s)"
+                                @click.stop="toggleAllInSeries(cascadeBrand, s)"
+                              />
+                              <span class="fs-cascade-series-name">{{ s }}</span>
+                              <i
+                                class="bi"
+                                :class="cascadeSeries === s ? 'bi-chevron-up' : 'bi-chevron-down'"
+                              ></i>
+                            </button>
+
+                            <div v-if="cascadeSeries === s" class="fs-cascade-items">
+                              <div
+                                v-for="p in PRODUCTS.filter(x => x.brand === cascadeBrand && matchSeries(x.name, s))"
+                                :key="p.id"
+                                class="fs-cascade-item"
+                                :class="{ checked: selectedItemPids.includes(p.id) }"
+                                @click.stop="toggleProduct(p.id)"
+                              >
+                                <div class="fs-cascade-check">
+                                  <i v-if="selectedItemPids.includes(p.id)"
+                                     class="bi bi-check-lg"></i>
+                                </div>
+                                <div class="fs-cascade-thumb">{{ p.emoji }}</div>
+                                <div class="fs-cascade-info">
+                                  <strong>{{ p.name }}</strong>
+                                  <small>Tồn kho: {{ p.stock }} | {{ formatVND(p.price) }}</small>
+                                </div>
+                              </div>
+                              <div
+                                v-if="PRODUCTS.filter(x => x.brand === cascadeBrand && matchSeries(x.name, s)).length === 0"
+                                class="fs-cascade-empty"
+                              >
+                                Không có sản phẩm nào trong dòng này.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+
+                      <div v-else class="fs-cascade-right-empty">
+                        <i class="bi bi-arrow-left-circle"></i>
+                        <span>Chọn thương hiệu bên trái để xem dòng sản phẩm.</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- BOTTOM FOOTER -->
+                  <div class="fs-cascade-footer">
+                    <span class="fs-cascade-footer-count">
+                      Đã chọn <strong>{{ selectedItemPids.length }}</strong> sản phẩm
+                    </span>
+                    <div class="fs-cascade-footer-actions">
+                      <button
+                        type="button"
+                        class="fs-link-btn"
+                        :disabled="selectedItemPids.length === 0"
+                        @click="removeAllSelected"
+                      >
+                        <i class="bi bi-x-circle"></i> Xóa chọn
+                      </button>
+                      <button type="button" class="fs-link-btn primary" @click="closeCascade">
+                        Áp dụng
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div v-if="filteredProducts.length === 0" class="fs-dropdown-empty">
-                  Khong tim thay san pham
-                </div>
-              </div>
+              </Transition>
             </div>
 
             <!-- SELECTED ITEMS -->
-            <div v-if="selectedItemPids.length > 0" class="fs-sel-table-wrap">
+            <div v-if="selectedItemPids.length > 0" class="fs-sel-table-wrap mt-3">
               <table class="table fs-sel-table mb-0">
                 <thead>
-                  <tr>
-                    <th>San pham</th>
-                    <th>Gia goc</th>
-                    <th>Gia Flash Sale</th>
-                    <th>Chiet khau (%)</th>
-                    <th>So luong</th>
-                    <th></th>
-                  </tr>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>Giá gốc</th>
+                  <th>Giá Flash Sale</th>
+                  <th>Chiết khấu (%)</th>
+                  <th>Số lượng</th>
+                  <th></th>
+                </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="pid in selectedItemPids" :key="pid">
-                    <td><strong>{{ getProductName(pid) }}</strong></td>
-                    <td>{{ formatVND(getProductPrice(pid)) }}</td>
-                    <td>
-                      <input
-                        type="number"
-                        class="fs-input"
-                        :value="selItems[pid]?.flashSalePrice || 0"
-                        @input="onPriceChange(pid, $event.target.value)"
-                        min="0"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        class="fs-input"
-                        :value="selItems[pid]?.discountPercent || 0"
-                        @input="onDiscountChange(pid, $event.target.value)"
-                        min="0"
-                        max="100"
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        class="fs-input"
-                        :class="{ 'is-invalid': qtyError[pid] }"
-                        :value="selItems[pid]?.flashSaleQuantity || 0"
-                        @input="onQtyChange(pid, $event.target.value)"
-                        min="0"
-                      />
-                      <div v-if="qtyError[pid]" class="fs-form-error">Qua ton kho</div>
-                    </td>
-                    <td>
-                      <button class="fs-rm-btn" @click="removeItem(pid)">
-                        <i class="bi bi-x"></i>
-                      </button>
-                    </td>
-                  </tr>
+                <tr v-for="pid in selectedItemPids" :key="pid">
+                  <td><strong>{{ getProductName(pid) }}</strong></td>
+                  <td>{{ formatVND(getProductPrice(pid)) }}</td>
+                  <td>
+                    <input
+                      type="number"
+                      class="fs-input"
+                      :value="selItems[pid]?.flashSalePrice || 0"
+                      @input="onPriceChange(pid, $event.target.value)"
+                      min="0"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      class="fs-input"
+                      :value="selItems[pid]?.discountPercent || 0"
+                      @input="onDiscountChange(pid, $event.target.value)"
+                      min="0"
+                      max="100"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      class="fs-input"
+                      :class="{ 'is-invalid': qtyError[pid] }"
+                      :value="selItems[pid]?.flashSaleQuantity || 0"
+                      @input="onQtyChange(pid, $event.target.value)"
+                      min="0"
+                    />
+                    <div v-if="qtyError[pid]" class="invalid-feedback">Quá tồn kho</div>
+                  </td>
+                  <td>
+                    <button class="fs-rm-btn" @click="removeProduct(pid)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </td>
+                </tr>
                 </tbody>
               </table>
             </div>
           </div>
 
           <!-- TAB 1: BY CATEGORY -->
-          <div v-show="activeTab === 1" class="fs-coming-soon">
-            <i class="bi bi-grid-3x3-gap-fill fs-coming-soon-icon"></i>
-            <h3>Flash Sale toan danh muc</h3>
-            <p>Tinh nang nay dang duoc phat trien va se ra mat som.</p>
-          </div>
-        </div>
+          <div v-show="activeTab === 1" class="fs-tab-content">
+            <div class="fs-cat-row">
+              <div class="fs-cat-wrap">
+                <button
+                  type="button"
+                  class="fs-cat-trigger"
+                  :class="{ active: catOpen, has: activeCategoryId !== null }"
+                  @click.stop="catOpen = !catOpen"
+                >
+                  <i class="bi bi-grid-3x3-gap"></i>
+                  <span class="fs-cat-trigger-text">
+                    <template v-if="activeCategoryId !== null">
+                      <i class="bi bi-tag-fill fs-cat-tag"></i>
+                      {{ getCategoryName(activeCategoryId) }}
+                    </template>
+                    <template v-else>
+                      Chọn danh mục toàn bộ...
+                    </template>
+                  </span>
+                  <i class="bi bi-chevron-down fs-cat-chevron"></i>
+                </button>
+                <Transition name="fs-panel">
+                  <ul v-if="catOpen" class="fs-cat-panel" @click.stop>
+                    <li
+                      v-for="c in CATEGORIES"
+                      :key="c.id"
+                      class="fs-cat-item"
+                      :class="{ active: activeCategoryId === c.id }"
+                      @click="selectCategory(c.id)"
+                    >
+                      <i class="bi bi-grid-3x3-gap"></i>
+                      <span>{{ c.name }}</span>
+                      <small>{{ PRODUCTS.filter(p => p.categoryId === c.id).length }} SP</small>
+                      <i v-if="activeCategoryId === c.id" class="bi bi-check2 fs-cat-check"></i>
+                    </li>
+                  </ul>
+                </Transition>
+              </div>
+              <button
+                v-if="selectedItemPids.length > 0"
+                type="button"
+                class="fs-link-btn"
+                @click="removeAllSelected"
+              >
+                <i class="bi bi-x-circle"></i> Xóa chọn
+              </button>
+            </div>
+            <div v-if="activeCategoryId !== null" class="fs-cat-summary">
+              Đã thêm <strong>{{ lastCategoryCount }}</strong> sản phẩm từ danh mục
+              <strong>{{ getCategoryName(activeCategoryId) }}</strong>.
+            </div>
 
-        <div class="fs-modal-footer">
-          <button type="button" class="fs-btn-white" @click="resetForm">
-            <i class="bi bi-arrow-counterclockwise"></i>Lam moi
-          </button>
-          <button type="button" class="fs-btn-soft" @click="previewSlot">
-            <i class="bi bi-eye"></i>Xem truoc
-          </button>
-          <button type="button" class="fs-btn-primary" :disabled="saving" @click="saveSlot">
-            {{ saving ? 'Dang luu...' : 'Luu chien dich' }}
-          </button>
-        </div>
+            <!-- SELECTED ITEMS (same table as Tab 0) -->
+            <div v-if="selectedItemPids.length > 0" class="fs-sel-table-wrap mt-3">
+              <table class="table fs-sel-table mb-0">
+                <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>Giá gốc</th>
+                  <th>Giá Flash Sale</th>
+                  <th>Chiết khấu (%)</th>
+                  <th>Số lượng</th>
+                  <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr v-for="pid in selectedItemPids" :key="pid">
+                  <td><strong>{{ getProductName(pid) }}</strong></td>
+                  <td>{{ formatVND(getProductPrice(pid)) }}</td>
+                  <td>
+                    <input
+                      type="number"
+                      class="fs-input"
+                      :value="selItems[pid]?.flashSalePrice || 0"
+                      @input="onPriceChange(pid, $event.target.value)"
+                      min="0"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      class="fs-input"
+                      :value="selItems[pid]?.discountPercent || 0"
+                      @input="onDiscountChange(pid, $event.target.value)"
+                      min="0"
+                      max="100"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      class="fs-input"
+                      :class="{ 'is-invalid': qtyError[pid] }"
+                      :value="selItems[pid]?.flashSaleQuantity || 0"
+                      @input="onQtyChange(pid, $event.target.value)"
+                      min="0"
+                    />
+                    <div v-if="qtyError[pid]" class="invalid-feedback">Quá tồn kho</div>
+                  </td>
+                  <td>
+                    <button class="fs-rm-btn" @click="removeProduct(pid)">
+                      <i class="bi bi-x"></i>
+                    </button>
+                  </td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-soft" @click="resetForm">
+              <i class="bi bi-arrow-counterclockwise"></i>Làm mới
+            </button>
+
+            <button type="submit" class="btn btn-primary-action" :disabled="saving">
+              <i class="bi bi-check2-circle"></i>
+              {{ saving ? 'Đang lưu...' : 'Lưu chiến dịch' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
     <!-- DELETE CONFIRM -->
     <div
-      class="fs-del-overlay"
-      :class="{ show: showDelModal }"
+      class="modal-backdrop-custom"
+      v-if="showDelModal"
       @click.self="closeDelModal"
     >
-      <div class="fs-del-box">
-        <div class="fs-del-icon"><i class="bi bi-trash3-fill"></i></div>
-        <h5>Xoa chien dich nay?</h5>
-        <p>
-          Chien dich <strong>{{ delTarget?.name }}</strong> se bi xoa vinh vien.
-          Hanh dong nay khong the hoan tac.
-        </p>
-        <div class="fs-del-actions">
-          <button type="button" class="fs-btn-white" @click="closeDelModal">Huy bo</button>
-          <button type="button" class="fs-btn-primary fs-btn-danger" @click="confirmDel">
-            <i class="bi bi-trash3"></i>Xoa ngay
+      <div class="flashsale-modal flashsale-modal--sm">
+        <div class="modal-head">
+          <div>
+            <h2>Xóa chiến dịch này?</h2>
+            <p>Hành động này không thể hoàn tác.</p>
+          </div>
+          <button class="modal-close-btn" @click="closeDelModal">
+            <i class="bi bi-x-lg"></i>
           </button>
+        </div>
+        <div class="voucher-form">
+          <div class="form-section">
+            <div class="section-title">
+              <span><i class="bi bi-trash3"></i></span>
+              <div>
+                <h3>{{ delTarget?.name }}</h3>
+                <p>Chiến dịch sẽ bị xóa vĩnh viễn khỏi hệ thống.</p>
+              </div>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-soft" @click="closeDelModal">
+              <i class="bi bi-x-circle"></i>Hủy bỏ
+            </button>
+            <button type="button" class="btn-primary-action" style="background:#dc3545"
+                    @click="confirmDel">
+              <i class="bi bi-trash3"></i>Xóa ngay
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </template>
-
 <script setup>
-import { computed, reactive, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import {computed, reactive, ref, watch, onMounted, onUnmounted, nextTick} from 'vue'
 import '@/assets/css/FlashSale.css'
 
 /* ── MOCK DATA MODE ── */
+// eslint-disable-next-line no-unused-vars
 const USE_MOCK_DATA = true
 
 /* ── MOCK SLOTS (6 trang thai khac nhau) ── */
@@ -392,8 +650,22 @@ const MOCK_SLOTS = [
     endDate: d(1),
     status: 2, // ACTIVE
     items: [
-      { skuId: 1, productName: 'iPhone 15 Pro Max 256GB', originalPrice: 34990000, flashSalePrice: 29990000, flashSaleQuantity: 50, soldQuantity: 23 },
-      { skuId: 2, productName: 'iPhone 15 Pro 128GB', originalPrice: 27990000, flashSalePrice: 23990000, flashSaleQuantity: 30, soldQuantity: 18 },
+      {
+        skuId: 1,
+        productName: 'iPhone 15 Pro Max 256GB',
+        originalPrice: 34990000,
+        flashSalePrice: 29990000,
+        flashSaleQuantity: 50,
+        soldQuantity: 23
+      },
+      {
+        skuId: 2,
+        productName: 'iPhone 15 Pro 128GB',
+        originalPrice: 27990000,
+        flashSalePrice: 23990000,
+        flashSaleQuantity: 30,
+        soldQuantity: 18
+      },
     ]
   },
   {
@@ -403,8 +675,22 @@ const MOCK_SLOTS = [
     endDate: d(3),
     status: 1, // SCHEDULED
     items: [
-      { skuId: 3, productName: 'Samsung Galaxy S24 Ultra', originalPrice: 29990000, flashSalePrice: 25990000, flashSaleQuantity: 25, soldQuantity: 0 },
-      { skuId: 4, productName: 'Samsung Galaxy S24+', originalPrice: 21990000, flashSalePrice: 18990000, flashSaleQuantity: 40, soldQuantity: 0 },
+      {
+        skuId: 3,
+        productName: 'Samsung Galaxy S24 Ultra',
+        originalPrice: 29990000,
+        flashSalePrice: 25990000,
+        flashSaleQuantity: 25,
+        soldQuantity: 0
+      },
+      {
+        skuId: 4,
+        productName: 'Samsung Galaxy S24+',
+        originalPrice: 21990000,
+        flashSalePrice: 18990000,
+        flashSaleQuantity: 40,
+        soldQuantity: 0
+      },
     ]
   },
   {
@@ -414,7 +700,14 @@ const MOCK_SLOTS = [
     endDate: d(6),
     status: 1, // UPCOMING (startDate > now)
     items: [
-      { skuId: 5, productName: 'Xiaomi 14 Ultra', originalPrice: 22990000, flashSalePrice: 19990000, flashSaleQuantity: 35, soldQuantity: 0 },
+      {
+        skuId: 5,
+        productName: 'Xiaomi 14 Ultra',
+        originalPrice: 22990000,
+        flashSalePrice: 19990000,
+        flashSaleQuantity: 35,
+        soldQuantity: 0
+      },
     ]
   },
   {
@@ -424,7 +717,14 @@ const MOCK_SLOTS = [
     endDate: d(-2),
     status: 3, // ENDED
     items: [
-      { skuId: 6, productName: 'OPPO Find X7 Pro', originalPrice: 19990000, flashSalePrice: 16990000, flashSaleQuantity: 60, soldQuantity: 60 },
+      {
+        skuId: 6,
+        productName: 'OPPO Find X7 Pro',
+        originalPrice: 19990000,
+        flashSalePrice: 16990000,
+        flashSaleQuantity: 60,
+        soldQuantity: 60
+      },
     ]
   },
   {
@@ -434,7 +734,14 @@ const MOCK_SLOTS = [
     endDate: d(1),
     status: 4, // CANCELLED
     items: [
-      { skuId: 7, productName: 'Vivo X100 Pro', originalPrice: 17990000, flashSalePrice: 14990000, flashSaleQuantity: 20, soldQuantity: 0 },
+      {
+        skuId: 7,
+        productName: 'Vivo X100 Pro',
+        originalPrice: 17990000,
+        flashSalePrice: 14990000,
+        flashSaleQuantity: 20,
+        soldQuantity: 0
+      },
     ]
   },
   {
@@ -444,7 +751,14 @@ const MOCK_SLOTS = [
     endDate: null,
     status: 0, // PENDING
     items: [
-      { skuId: 8, productName: 'Google Pixel 8 Pro', originalPrice: 22990000, flashSalePrice: 19990000, flashSaleQuantity: 15, soldQuantity: 0 },
+      {
+        skuId: 8,
+        productName: 'Google Pixel 8 Pro',
+        originalPrice: 22990000,
+        flashSalePrice: 19990000,
+        flashSaleQuantity: 15,
+        soldQuantity: 0
+      },
     ]
   },
 ]
@@ -468,7 +782,7 @@ function resolveStatus(slot) {
 }
 
 const slotsWithStatus = computed(() =>
-  localSlots.value.map(s => ({ ...s, resolvedStatus: resolveStatus(s) }))
+  localSlots.value.map(s => ({...s, resolvedStatus: resolveStatus(s)}))
 )
 
 /* ── FILTERS ── */
@@ -479,7 +793,8 @@ const filters = reactive({
 
 watch(
   () => [filters.keyword, filters.status],
-  () => {}
+  () => {
+  }
 )
 
 const filteredSlots = computed(() => {
@@ -531,25 +846,25 @@ function formatDateTime(value) {
 
 function statusBadgeLabel(slot) {
   const map = {
-    ACTIVE: 'Dang dien ra',
-    SCHEDULED: 'Da len lich',
-    UPCOMING: 'Sap dien ra',
-    ENDED: 'Da ket thuc',
-    CANCELLED: 'Da huy',
-    PENDING: 'Cho xu ly',
+    ACTIVE: 'Đang diễn ra',
+    SCHEDULED: 'Đã lên lịch',
+    UPCOMING: 'Sắp diễn ra',
+    ENDED: 'Đã kết thúc',
+    CANCELLED: 'Đã hủy',
+    PENDING: 'Chờ xử lý',
   }
   return map[slot.resolvedStatus] || slot.resolvedStatus
 }
 
 function statusBadgeClass(slot) {
   return {
-    ACTIVE: 'fs-badge-active',
-    SCHEDULED: 'fs-badge-scheduled',
-    UPCOMING: 'fs-badge-scheduled',
-    ENDED: 'fs-badge-ended',
-    CANCELLED: 'fs-badge-cancelled',
-    PENDING: 'fs-badge-pending',
-  }[slot.resolvedStatus] || 'fs-badge-pending'
+    ACTIVE: '',
+    SCHEDULED: 'warning',
+    UPCOMING: 'warning',
+    ENDED: 'inactive',
+    CANCELLED: 'danger',
+    PENDING: 'info',
+  }[slot.resolvedStatus] || 'info'
 }
 
 /* ── TOGGLE ACTIVE ── */
@@ -560,7 +875,11 @@ function toggleActive(slot, checked) {
       ...localSlots.value[idx],
       status: checked ? 2 : 3
     }
-    showToast({ type: 'success', title: 'Thanh cong', message: checked ? 'Da kich hoat chien dich.' : 'Da tat chien dich.' })
+    showToast({
+      type: 'success',
+      title: 'Thành công',
+      message: checked ? 'Đã kích hoạt chiến dịch.' : 'Đã tắt chiến dịch.'
+    })
   }
 }
 
@@ -579,7 +898,7 @@ const defaultForm = {
   endDate: '',
 }
 
-const form = reactive({ ...defaultForm })
+const form = reactive({...defaultForm})
 
 const errors = computed(() => {
   if (!submitted.value) return {}
@@ -597,86 +916,321 @@ const errors = computed(() => {
     const s = new Date(form.startDate)
     const e = new Date(form.endDate)
     if (e <= s) {
-      result.time = 'Thoi gian ket thuc phai sau thoi gian bat dau'
+      result.time = 'Thời gian kết thúc phải sau thời gian bắt đầu'
     }
   }
   return result
 })
 
 /* ── PRODUCT SELECTION ── */
+// categoryId: 1 = Điện thoại, 2 = Phụ kiện, 3 = Laptop
 const PRODUCTS = [
-  { id: 1, name: 'iPhone 15 Pro Max 256GB', emoji: '📱', price: 34990000, stock: 50 },
-  { id: 2, name: 'iPhone 15 Pro 128GB', emoji: '📱', price: 27990000, stock: 30 },
-  { id: 3, name: 'Samsung Galaxy S24 Ultra', emoji: '📲', price: 29990000, stock: 30 },
-  { id: 4, name: 'Samsung Galaxy S24+', emoji: '📲', price: 21990000, stock: 40 },
-  { id: 5, name: 'Xiaomi 14 Ultra', emoji: '🖤', price: 22990000, stock: 45 },
-  { id: 6, name: 'OPPO Find X7 Pro', emoji: '🟢', price: 19990000, stock: 25 },
-  { id: 7, name: 'Vivo X100 Pro', emoji: '🔵', price: 17990000, stock: 60 },
-  { id: 8, name: 'Google Pixel 8 Pro', emoji: '🌈', price: 22990000, stock: 20 },
+  {
+    id: 1,
+    name: 'iPhone 15 Pro Max 256GB',
+    emoji: '📱',
+    price: 34990000,
+    stock: 50,
+    brand: 'iphone',
+    categoryId: 1
+  },
+  {
+    id: 2,
+    name: 'iPhone 15 Pro 128GB',
+    emoji: '📱',
+    price: 27990000,
+    stock: 30,
+    brand: 'iphone',
+    categoryId: 1
+  },
+  {
+    id: 3,
+    name: 'iPhone 14 Pro Max 256GB',
+    emoji: '📱',
+    price: 28990000,
+    stock: 25,
+    brand: 'iphone',
+    categoryId: 1
+  },
+  {
+    id: 4,
+    name: 'iPhone 14 128GB',
+    emoji: '📱',
+    price: 19990000,
+    stock: 40,
+    brand: 'iphone',
+    categoryId: 1
+  },
+  {
+    id: 5,
+    name: 'Samsung Galaxy S24 Ultra',
+    emoji: '📲',
+    price: 29990000,
+    stock: 30,
+    brand: 'samsung',
+    categoryId: 1
+  },
+  {
+    id: 6,
+    name: 'Samsung Galaxy S24+',
+    emoji: '📲',
+    price: 21990000,
+    stock: 40,
+    brand: 'samsung',
+    categoryId: 1
+  },
+  {
+    id: 7,
+    name: 'Samsung Galaxy A55',
+    emoji: '📲',
+    price: 9990000,
+    stock: 60,
+    brand: 'samsung',
+    categoryId: 1
+  },
+  {
+    id: 8,
+    name: 'Xiaomi 14 Ultra',
+    emoji: '🖤',
+    price: 22990000,
+    stock: 45,
+    brand: 'xiaomi',
+    categoryId: 1
+  },
+  {
+    id: 9,
+    name: 'OPPO Find X7 Pro',
+    emoji: '🟢',
+    price: 19990000,
+    stock: 25,
+    brand: 'oppo',
+    categoryId: 1
+  },
+  {
+    id: 10,
+    name: 'Vivo X100 Pro',
+    emoji: '🔵',
+    price: 17990000,
+    stock: 60,
+    brand: 'vivo',
+    categoryId: 1
+  },
+  {
+    id: 11,
+    name: 'Google Pixel 8 Pro',
+    emoji: '🌈',
+    price: 22990000,
+    stock: 20,
+    brand: 'google',
+    categoryId: 1
+  },
+  {
+    id: 12,
+    name: 'Tai nghe Bluetooth AirPro',
+    emoji: '🎧',
+    price: 1490000,
+    stock: 100,
+    brand: 'iphone',
+    categoryId: 2
+  },
+  {
+    id: 13,
+    name: 'Sac nhanh 65W Type-C',
+    emoji: '🔌',
+    price: 590000,
+    stock: 80,
+    brand: 'samsung',
+    categoryId: 2
+  },
+  {
+    id: 14,
+    name: 'MacBook Air M3 13"',
+    emoji: '💻',
+    price: 27990000,
+    stock: 15,
+    brand: 'iphone',
+    categoryId: 3
+  },
 ]
+
+// Level-1 (parent) = Brand, Level-2 (child) = Series dẽ từ tên SP
+const BRAND_SERIES = [
+  {
+    key: 'iphone',
+    label: 'iPhone',
+    icon: 'bi-apple',
+    series: ['iPhone 15 Series', 'iPhone 14 Series']
+  },
+  {
+    key: 'samsung',
+    label: 'Samsung',
+    icon: 'bi-phone',
+    series: ['Galaxy S24 Series', 'Galaxy A Series']
+  },
+  {key: 'xiaomi', label: 'Xiaomi', icon: 'bi-phone-fill', series: ['Xiaomi 14 Series']},
+  {key: 'oppo', label: 'OPPO', icon: 'bi-phone-vibrate', series: ['Find X Series']},
+  {key: 'vivo', label: 'Vivo', icon: 'bi-phone', series: ['X Series']},
+  {key: 'google', label: 'Google', icon: 'bi-google', series: ['Pixel Series']},
+]
+
+const CATEGORIES = [
+  {id: 1, name: 'Điện thoại'},
+  {id: 2, name: 'Phụ kiện'},
+  {id: 3, name: 'Laptop'},
+]
+
+function matchSeries(productName, seriesLabel) {
+  const slug = seriesLabel.toLowerCase().replace(/\s*series$/, '').trim()
+  return productName.toLowerCase().includes(slug)
+}
 
 const selItems = reactive({})
 const selectedItemPids = ref([])
-const productSearchQuery = ref('')
-const showProdDrop = ref(false)
 const qtyError = reactive({})
 
-const filteredProducts = computed(() => {
-  const q = productSearchQuery.value.toLowerCase()
-  return PRODUCTS.filter(p => p.name.toLowerCase().includes(q))
-})
+/* ── CASCADING PICKER (Tab 0) ── */
+const cascadeOpen = ref(false)
+const cascadeBrand = ref(null)
+const cascadeSeries = ref(null)
+
+/* ── CATEGORY PICKER (Tab 1) ── */
+const activeCategoryId = ref(null)
+const catOpen = ref(false)
+const lastCategoryCount = ref(0)
 
 function getProductName(pid) {
   return PRODUCTS.find((p) => p.id === pid)?.name || `SP #${pid}`
 }
+
 function getProductPrice(pid) {
   return PRODUCTS.find((p) => p.id === pid)?.price ?? 0
 }
+
 function getProductStock(pid) {
   return PRODUCTS.find((p) => p.id === pid)?.stock ?? 0
 }
 
-function openProdDrop() {
-  showProdDrop.value = true
-}
-function closeProdDrop() {
-  showProdDrop.value = false
-}
-function toggleProduct(pid) {
-  const idx = selectedItemPids.value.indexOf(pid)
-  if (idx > -1) {
-    selectedItemPids.value.splice(idx, 1)
-    delete selItems[pid]
-    delete qtyError[pid]
-  } else {
-    selectedItemPids.value.push(pid)
-    const p = PRODUCTS.find((x) => x.id === pid)
-    selItems[pid] = { discountPercent: 15, flashSalePrice: Math.round((p?.price ?? 0) * 0.85), flashSaleQuantity: 10 }
+function addProduct(pid) {
+  if (selectedItemPids.value.includes(pid)) return
+  selectedItemPids.value.push(pid)
+  const p = PRODUCTS.find((x) => x.id === pid)
+  selItems[pid] = {
+    discountPercent: 15,
+    flashSalePrice: Math.round((p?.price ?? 0) * 0.85),
+    flashSaleQuantity: 10
   }
 }
-function onDiscountChange(pid, value) {
-  const disc = parseFloat(value) || 0
-  const orig = getProductPrice(pid)
-  const fp = Math.round(orig * (1 - disc / 100))
-  selItems[pid] = { ...selItems[pid], discountPercent: disc, flashSalePrice: fp }
-}
-function onPriceChange(pid, value) {
-  const fp = parseFloat(value) || 0
-  const orig = getProductPrice(pid)
-  const disc = orig > 0 ? parseFloat(((1 - fp / orig) * 100).toFixed(1)) : 0
-  selItems[pid] = { ...selItems[pid], flashSalePrice: fp, discountPercent: disc }
-}
-function onQtyChange(pid, value) {
-  const v = parseInt(value) || 0
-  const stock = getProductStock(pid)
-  qtyError[pid] = v > stock
-  selItems[pid] = { ...selItems[pid], flashSaleQuantity: v }
-}
-function removeItem(pid) {
+
+function removeProduct(pid) {
   const idx = selectedItemPids.value.indexOf(pid)
   if (idx > -1) selectedItemPids.value.splice(idx, 1)
   delete selItems[pid]
   delete qtyError[pid]
+}
+
+function toggleProduct(pid) {
+  if (selectedItemPids.value.includes(pid)) {
+    removeProduct(pid)
+  } else {
+    addProduct(pid)
+  }
+}
+
+function removeAllSelected() {
+  selectedItemPids.value = []
+  Object.keys(selItems).forEach((k) => delete selItems[k])
+  Object.keys(qtyError).forEach((k) => delete qtyError[k])
+}
+
+function closeCascade() {
+  cascadeOpen.value = false
+}
+
+function setCascadeBrand(key) {
+  cascadeBrand.value = key
+  cascadeSeries.value = null
+}
+
+function selectAllInBrand(brandKey) {
+  PRODUCTS.filter((p) => p.brand === brandKey).forEach((p) => addProduct(p.id))
+}
+
+function toggleAllInBrand(brandKey) {
+  const list = PRODUCTS.filter((p) => p.brand === brandKey)
+  if (brandFullySelected(brandKey)) {
+    list.forEach((p) => removeProduct(p.id))
+  } else {
+    list.forEach((p) => addProduct(p.id))
+  }
+}
+
+function toggleAllInSeries(brandKey, seriesLabel) {
+  const list = PRODUCTS.filter(
+    (p) => p.brand === brandKey && matchSeries(p.name, seriesLabel)
+  )
+  if (seriesFullySelected(brandKey, seriesLabel)) {
+    list.forEach((p) => removeProduct(p.id))
+  } else {
+    list.forEach((p) => addProduct(p.id))
+  }
+}
+
+function brandFullySelected(brandKey) {
+  const list = PRODUCTS.filter((p) => p.brand === brandKey)
+  return list.length > 0 && list.every((p) => selectedItemPids.value.includes(p.id))
+}
+
+function seriesFullySelected(brandKey, seriesLabel) {
+  const list = PRODUCTS.filter(
+    (p) => p.brand === brandKey && matchSeries(p.name, seriesLabel)
+  )
+  return list.length > 0 && list.every((p) => selectedItemPids.value.includes(p.id))
+}
+
+function selectCategory(catId) {
+  activeCategoryId.value = catId
+  catOpen.value = false
+  const list = PRODUCTS.filter((p) => p.categoryId === catId)
+  let added = 0
+  list.forEach((p) => {
+    if (!selectedItemPids.value.includes(p.id)) {
+      addProduct(p.id)
+      added++
+    }
+  })
+  lastCategoryCount.value = added
+  if (added > 0) {
+    showToast({
+      type: 'success',
+      title: 'Thành công',
+      message: `Đã thêm ${added} sản phẩm từ danh mục.`
+    })
+  }
+}
+
+function getCategoryName(catId) {
+  return CATEGORIES.find((c) => c.id === catId)?.name || ''
+}
+
+function onDiscountChange(pid, value) {
+  const disc = parseFloat(value) || 0
+  const orig = getProductPrice(pid)
+  const fp = Math.round(orig * (1 - disc / 100))
+  selItems[pid] = {...selItems[pid], discountPercent: disc, flashSalePrice: fp}
+}
+
+function onPriceChange(pid, value) {
+  const fp = parseFloat(value) || 0
+  const orig = getProductPrice(pid)
+  const disc = orig > 0 ? parseFloat(((1 - fp / orig) * 100).toFixed(1)) : 0
+  selItems[pid] = {...selItems[pid], flashSalePrice: fp, discountPercent: disc}
+}
+
+function onQtyChange(pid, value) {
+  const v = parseInt(value) || 0
+  const stock = getProductStock(pid)
+  qtyError[pid] = v > stock
+  selItems[pid] = {...selItems[pid], flashSaleQuantity: v}
 }
 
 /* ════════════════════════════════════
@@ -733,8 +1287,12 @@ function resetForm(clearStatus = true) {
   selectedItemPids.value = []
   Object.keys(selItems).forEach((k) => delete selItems[k])
   Object.keys(qtyError).forEach((k) => delete qtyError[k])
-  productSearchQuery.value = ''
-  showProdDrop.value = false
+  cascadeOpen.value = false
+  cascadeBrand.value = null
+  cascadeSeries.value = null
+  catOpen.value = false
+  activeCategoryId.value = null
+  lastCategoryCount.value = 0
 }
 
 function toLocalDatetime(value) {
@@ -751,7 +1309,7 @@ async function saveSlot() {
 
   const pids = selectedItemPids.value
   if (pids.length === 0) {
-    showToast({ type: 'error', title: 'Loi', message: 'Vui long chon it nhat 1 san pham.' })
+    showToast({type: 'error', title: 'Loi', message: 'Vui long chon it nhat 1 san pham.'})
     return
   }
   let hasQtyErr = false
@@ -766,7 +1324,7 @@ async function saveSlot() {
     }
   })
   if (hasQtyErr) {
-    showToast({ type: 'error', title: 'Loi', message: 'Kiem tra lai so luong san pham.' })
+    showToast({type: 'error', title: 'Loi', message: 'Kiem tra lai so luong san pham.'})
     return
   }
 
@@ -799,27 +1357,22 @@ async function saveSlot() {
   if (isEditing.value) {
     const idx = localSlots.value.findIndex(s => s.slotId === editSlotId.value)
     if (idx !== -1) {
-      localSlots.value[idx] = { ...localSlots.value[idx], ...payload }
+      localSlots.value[idx] = {...localSlots.value[idx], ...payload}
     }
-    showToast({ type: 'success', title: 'Thanh cong', message: 'Cap nhat Flash Sale thanh cong!' })
+    showToast({type: 'success', title: 'Thành công', message: 'Cập nhật Flash Sale thành công!'})
   } else {
     const newSlot = {
       ...payload,
       slotId: Math.max(...localSlots.value.map(s => s.slotId), 0) + 1,
     }
     localSlots.value.unshift(newSlot)
-    showToast({ type: 'success', title: 'Thanh cong', message: 'Tao Flash Sale thanh cong!' })
+    showToast({type: 'success', title: 'Thành công', message: 'Tạo Flash Sale thành công!'})
   }
 
   saving.value = false
   closeModal()
 }
 
-function previewSlot() {
-  const name = form.name || '(chua dat ten)'
-  const count = selectedItemPids.value.length
-  showToast({ type: 'info', title: 'Xem truoc', message: `"${name}" - ${count} san pham` })
-}
 
 /* ── DELETE ── */
 const showDelModal = ref(false)
@@ -829,15 +1382,17 @@ function openDelModal(slot) {
   delTarget.value = slot
   showDelModal.value = true
 }
+
 function closeDelModal() {
   showDelModal.value = false
   delTarget.value = null
 }
+
 async function confirmDel() {
   if (!delTarget.value) return
   await new Promise(r => setTimeout(r, 200))
   localSlots.value = localSlots.value.filter(s => s.slotId !== delTarget.value.slotId)
-  showToast({ type: 'success', title: 'Thanh cong', message: 'Da xoa Flash Sale.' })
+  showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
   closeDelModal()
 }
 
@@ -852,7 +1407,8 @@ const toast = reactive({
 })
 
 let toastTimer = null
-function showToast({ type = 'success', title, message }) {
+
+function showToast({type = 'success', title, message}) {
   toast.show = false
   clearTimeout(toastTimer)
   nextTick(() => {
@@ -870,11 +1426,18 @@ onUnmounted(() => {
   clearTimeout(toastTimer)
 })
 
-// Close dropdown on outside click
+// Close dropdowns on outside click / Escape
 onMounted(() => {
   document.addEventListener('click', (e) => {
-    if (showProdDrop.value && !e.target.closest('.fs-prod-search')) {
-      showProdDrop.value = false
+    const inCascade = e.target.closest('.fs-cascade-wrap')
+    const inCat = e.target.closest('.fs-cat-wrap')
+    if (!inCascade) cascadeOpen.value = false
+    if (!inCat) catOpen.value = false
+  })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      cascadeOpen.value = false
+      catOpen.value = false
     }
   })
 })
