@@ -9,7 +9,6 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
-import com.fpoly.marcusstore.event.OrderConfirmedEvent;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
@@ -18,9 +17,11 @@ import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.service.OrderPaymentService;
 import com.fpoly.marcusstore.service.OrderService;
+import com.fpoly.marcusstore.service.OrderShippingService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -42,7 +43,8 @@ public class OrderServiceImpl implements OrderService {
     private final ProductSkuRepository productSkuRepository;
     private final VoucherRepository voucherRepository;
     private final UserVoucherRepository userVoucherRepository;
-    private final ApplicationEventPublisher eventPublisher;
+    private final OrderShippingService orderShippingService;
+    private final OrderPaymentService orderPaymentService;
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -205,9 +207,8 @@ public class OrderServiceImpl implements OrderService {
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
 
-        // TRIGGER BẮN ĐƠN SANG GHN KHI XÁC NHẬN
         if (isJustConfirmed) {
-            eventPublisher.publishEvent(new OrderConfirmedEvent(this, order));
+            orderShippingService.processCreateGhnOrder(order);
         }
 
         return getOrderDetailResponse(orderCode);

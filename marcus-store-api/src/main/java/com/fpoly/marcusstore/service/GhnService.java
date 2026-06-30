@@ -57,10 +57,12 @@ public class GhnService {
             payload.put("to_ward_code", toWardCode);
             payload.put("weight", totalWeight > 0 ? totalWeight : 500);
 
-            // Marcus BỔ SUNG PHÍ KHAI GIÁ ĐỂ GHN TÍNH KÈM BẢO HIỂM
+            // FIX: giá trị khai giá tối đa 5 triệu theo chuẩn GHN
             if (insuranceValue != null && insuranceValue > 0) {
-                payload.put("insurance_value", insuranceValue);
+                int validInsurance = Math.min(insuranceValue, 5000000);
+                payload.put("insurance_value", validInsurance);
             }
+
             HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
             ResponseEntity<Map> response = restTemplate.postForEntity(ghnFeeUrl, request, Map.class);
 
@@ -73,7 +75,7 @@ public class GhnService {
             throw new RuntimeException("GHN trả về 200 OK nhưng không có field 'total'");
         } catch (Exception e) {
             log.error("❌ Exception nội bộ tính phí GHN: ", e);
-            return 30000;
+            return 30000; // Phí fallback an toàn
         }
     }
 

@@ -79,6 +79,13 @@
         <span>Quản lý liên hệ</span>
       </router-link>
     </div>
+    <div class="menu-section">
+      <p class="menu-title">BÁO CÁO</p>
+      <router-link to="/admin/finance-reports" class="menu-item" active-class="active">
+        <i class="bi bi-wallet2 menu-icon"></i>
+        <span>Quản lý đối soát</span>
+      </router-link>
+    </div>
 
     <div class="menu-section">
       <p class="menu-title">HỆ THỐNG</p>
