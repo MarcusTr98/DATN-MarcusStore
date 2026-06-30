@@ -1,9 +1,7 @@
 package com.fpoly.marcusstore.security;
 
 import com.fpoly.marcusstore.security.jwt.AuthTokenFilter;
-
 import jakarta.servlet.http.HttpServletResponse;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,7 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
-@EnableMethodSecurity // Cho phép dùng @PreAuthorize trên Controller
+@EnableMethodSecurity
 public class SecurityConfig {
 
     @Autowired
@@ -77,21 +75,25 @@ public class SecurityConfig {
                         }))
                 .authorizeHttpRequests(auth -> auth
                         // 1. Nhóm API mở tự do (Không cần Token)
-                        .requestMatchers("/api/auth/**").permitAll() // Ngọc: Đăng nhập, Đăng ký, Quên MK
+                        .requestMatchers("/api/auth/**").permitAll() // Đăng nhập, Đăng ký, Quên MK
                         .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/admin/user/verify-email").permitAll() // Cho phep khach hang nhap OTP xac
-                                                                                     // thuc email
+                        .requestMatchers("/api/admin/user/verify-email").permitAll() // Khách hàng nhập OTP xác thực
+                                                                                     // email
                         .requestMatchers("/api/vnpay/**").permitAll() // Marcus test môi trường Ngrok webhook Vnpay
-                        .requestMatchers("/api/ghn/webhook").permitAll() // Marcus test môi trường Ngrok webhook GHN
+
+                        // FIX TẠI ĐÂY: Mở khóa toàn bộ nhánh GHN và mở endpoint báo lỗi của Spring Boot
+                        .requestMatchers("/api/ghn/**").permitAll()
+                        .requestMatchers("/error").permitAll()
 
                         .requestMatchers("/ws-endpoint/**").permitAll() // Marcus thêm để làm websocket
-                        // 2. Nhóm API dành cho Khách hàng đã đăng nhập
-                        .requestMatchers("/api/user/**").authenticated() // Đạt, Đức: Checkout, Giỏ hàng, Wishlist, Đgiá
 
+                        // 2. Nhóm API dành cho Khách hàng đã đăng nhập
+                        .requestMatchers("/api/user/**").authenticated() // Checkout, Giỏ hàng, Wishlist, Đgiá
+                        // Thêm quyền cho nhánh finance-reports
+                        .requestMatchers("/api/admin/finance-reports/**").hasAnyRole("ADMIN", "STAFF")
                         // 3. Nhóm API dành riêng cho Quản trị viên
                         .requestMatchers("/api/admin/roles/**").hasRole("ADMIN")
-                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Ngọc, Huy: Quản lý User,Thống
-                                                                                       // kê
+                        .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Quản lý User, Thống kê
 
                         // Khóa mọi request khác đi lạc
                         .anyRequest().authenticated());

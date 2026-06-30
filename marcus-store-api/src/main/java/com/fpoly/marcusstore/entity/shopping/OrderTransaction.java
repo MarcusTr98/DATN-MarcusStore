@@ -5,6 +5,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Entity
 @Table(name = "Order_Transactions")
 @Data
@@ -41,4 +43,10 @@ public class OrderTransaction {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
+
+    @JsonProperty("orderCode")
+    public String getOrderCode() {
+        return this.order != null ? this.order.getOrderCode() : "N/A";
+    }
+
 }

@@ -10,6 +10,7 @@ import java.io.IOException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
+import com.fpoly.marcusstore.dto.response.FinancialReportResponse;
 import com.fpoly.marcusstore.service.FinancialService;
 
 import lombok.RequiredArgsConstructor;
@@ -32,5 +33,10 @@ public class FinancialController {
     @GetMapping("/list")
     public ResponseEntity<?> getTransactionList() {
         return ResponseEntity.ok(financialService.getAllTransactions());
+    }
+
+    @GetMapping("/list")
+    public ResponseEntity<FinancialReportResponse> getFinancialReport() {
+        return ResponseEntity.ok(financialService.getFinancialReport());
     }
 }

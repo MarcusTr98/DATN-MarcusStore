@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.response.FinancialReportResponse;
 import com.fpoly.marcusstore.dto.response.TransactionResponse;
 import com.fpoly.marcusstore.entity.shopping.OrderTransaction;
 import com.fpoly.marcusstore.repository.shopping.OrderTransactionRepository;
@@ -9,6 +10,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -57,4 +59,19 @@ public class FinancialService {
         }
     }
 
+    public FinancialReportResponse getFinancialReport() {
+        var all = transactionRepository.findAllTransactionsWithOrder();
+
+        BigDecimal success = all.stream().filter(t -> "SUCCESS".equals(t.getStatus())).map(OrderTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal pending = all.stream().filter(t -> "PENDING".equals(t.getStatus())).map(OrderTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal failed = all.stream().filter(t -> "FAILED".equals(t.getStatus())).map(OrderTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        long successCount = all.stream().filter(t -> "SUCCESS".equals(t.getStatus())).count();
+        double rate = all.isEmpty() ? 0 : (double) successCount / all.size() * 100;
+
+        return new FinancialReportResponse(all, all.size(), success, pending, failed, rate);
+    }
 }

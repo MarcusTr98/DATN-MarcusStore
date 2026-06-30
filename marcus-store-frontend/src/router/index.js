@@ -221,6 +221,11 @@ const routes = [
         name: 'RoleManager',
         component: () => import('@/views/admin/auth/RoleManager.vue'),
       },
+      {
+        path: 'finance-reports',
+        name: 'FinancialReport',
+        component: () => import('@/views/report/FinancialReport.vue'),
+      },
     ],
   },
 

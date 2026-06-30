@@ -8,7 +8,6 @@ import java.util.List;
 
 @Repository
 public interface OrderTransactionRepository extends JpaRepository<OrderTransaction, Integer> {
-    List<OrderTransaction> findByOrder_OrderId(Integer orderId);
 
     @Query("SELECT t FROM OrderTransaction t JOIN FETCH t.order ORDER BY t.createdAt DESC")
     List<OrderTransaction> findAllTransactionsWithOrder();
