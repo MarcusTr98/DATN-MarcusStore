@@ -508,30 +508,46 @@
               <span>Tạm tính</span>
               <span>{{ cartData.totalAmount?.toLocaleString('vi-VN') }}₫</span>
             </div>
+
             <div class="order-totals__row order-totals__row--discount" v-if="discountAmount > 0">
               <span><i class="fas fa-tag me-1"></i>Giảm giá Voucher</span>
               <span>-{{ discountAmount.toLocaleString('vi-VN') }}₫</span>
             </div>
+
             <div class="order-totals__row align-items-center">
               <span>Phí vận chuyển (GHN)</span>
               <span v-if="isFeeLoading" class="text-muted" style="font-size: 12px">
                 <i class="fas fa-spinner fa-spin"></i>
               </span>
               <div v-else-if="toWardCode" class="d-flex align-items-center gap-2">
-                <span v-if="hasFreeshipVoucher" class="text-success fw-bold">
+                <!-- Trường hợp 1: Freeship toàn phần (do voucher hoặc trợ giá >= phí ship) -->
+                <span
+                  v-if="hasFreeshipVoucher || shippingData.isFreeship"
+                  class="text-success fw-bold"
+                >
                   <i class="fas fa-truck-fast me-1"></i>Miễn phí
                 </span>
+
+                <!-- Trường hợp 2: Có tính phí (bao gồm cả trường hợp được trợ giá 1 phần) -->
                 <template v-else>
+                  <!-- Hiển thị giá gốc bị gạch ngang nếu có trợ giá -->
                   <del
                     v-if="shippingData.standardShippingFee > shippingData.discountedShippingFee"
                     style="font-size: 12px; color: #9ca3af; font-weight: 500"
                   >
                     {{ shippingData.standardShippingFee?.toLocaleString('vi-VN') }}₫
                   </del>
-                  <span v-if="shippingData.isFreeship" class="text-success fw-bold">
-                    Miễn phí
+
+                  <!-- Nhãn Hỗ trợ phí nếu được trợ giá 1 phần -->
+                  <span
+                    v-if="shippingData.standardShippingFee > shippingData.discountedShippingFee"
+                    class="badge-subsidy"
+                  >
+                    <i class="fas fa-hand-holding-usd"></i> Đã hỗ trợ
                   </span>
-                  <span v-else class="text-danger fw-bold">
+
+                  <!-- Phí khách phải trả cuối cùng -->
+                  <span class="text-danger fw-bold">
                     +{{ shippingData.discountedShippingFee?.toLocaleString('vi-VN') }}₫
                   </span>
                 </template>
@@ -772,7 +788,7 @@ const formatDeliveryDate = (isoDate) => {
   try {
     const d = new Date(isoDate)
     return `Dự kiến giao ${d.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'numeric' })}`
-  } catch (e) {
+  } catch {
     return ''
   }
 }
@@ -875,7 +891,7 @@ const calculateShippingFee = async () => {
     } else {
       throw new Error('Không thể lấy thông tin phí vận chuyển')
     }
-  } catch (error) {
+  } catch {
     shippingData.value = {
       standardShippingFee: 0,
       discountedShippingFee: 0,

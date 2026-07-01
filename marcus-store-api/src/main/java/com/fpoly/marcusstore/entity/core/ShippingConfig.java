@@ -27,6 +27,13 @@ public class ShippingConfig {
     @Column(name = "min_order_value")
     private BigDecimal minOrderValue;
 
+    // Marcus bổ sung
+    @Column(name = "max_freeship_amount", precision = 18, scale = 2)
+    private BigDecimal maxFreeshipAmount;
+
+    @Column(name = "max_insurance_value", precision = 18, scale = 2)
+    private BigDecimal maxInsuranceValue;
+
     @Column(name = "is_active")
     private Boolean isActive;
 

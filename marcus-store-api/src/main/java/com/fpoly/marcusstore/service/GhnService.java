@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import com.fpoly.marcusstore.dto.request.GhnCreateOrderRequest;
+import com.fpoly.marcusstore.entity.core.ShippingConfig;
+import com.fpoly.marcusstore.repository.core.ShippingConfigRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +35,6 @@ public class GhnService {
     @Value("${ghn.api.url.create}")
     private String ghnCreateUrl;
 
-    // Thêm link check detail
     @Value("${ghn.api.url.detail:https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/detail}")
     private String ghnDetailUrl;
 
@@ -44,10 +45,21 @@ public class GhnService {
     private String fromWardCode;
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ShippingConfigRepository shippingConfigRepository;
 
     public Integer calculateShippingFee(Integer toDistrictId, String toWardCode, Integer totalWeight,
             Integer insuranceValue) {
         try {
+            // 1. Lấy giới hạn bảo hiểm từ DB (nếu k có thì dùng mức an toàn 5 củ)
+            // mục đích đợi GHN nâng cấp API để khai báo bảo hiểm động coa hơn
+            ShippingConfig config = shippingConfigRepository.findFirstByIsActiveTrueOrderByCreatedAtDesc()
+                    .orElse(null);
+
+            int maxInsuranceLimit = 5000000;
+            if (config != null && config.getMaxInsuranceValue() != null) {
+                maxInsuranceLimit = config.getMaxInsuranceValue().intValue();
+            }
+
             HttpHeaders headers = buildHeaders();
 
             Map<String, Object> payload = new HashMap<>();
@@ -57,9 +69,9 @@ public class GhnService {
             payload.put("to_ward_code", toWardCode);
             payload.put("weight", totalWeight > 0 ? totalWeight : 500);
 
-            // FIX: giá trị khai giá tối đa 5 triệu theo chuẩn GHN
+            // 2. Kích hoạt logic khai giá động thay vì hardcode
             if (insuranceValue != null && insuranceValue > 0) {
-                int validInsurance = Math.min(insuranceValue, 5000000);
+                int validInsurance = Math.min(insuranceValue, maxInsuranceLimit);
                 payload.put("insurance_value", validInsurance);
             }
 
@@ -105,7 +117,6 @@ public class GhnService {
         return null;
     }
 
-    // Hàm lấy trạng thái GHN (Đã sửa link thành DEV URL)
     public String getTrackingStatus(String trackingCode) {
         try {
             HttpHeaders headers = buildHeaders();
