@@ -10,6 +10,11 @@ const financialApi = {
       responseType: 'blob',
     })
   },
+  reconcile(id, status) {
+    return api.post(`/admin/finance-reports/${id}/reconcile`, status, {
+      headers: { 'Content-Type': 'application/json' },
+    })
+  },
 }
 
 export default financialApi
