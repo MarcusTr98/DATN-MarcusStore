@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/statistics")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('DASHBOARD_VIEW')")
 public class AdminStatisticsController {
 
     @Autowired

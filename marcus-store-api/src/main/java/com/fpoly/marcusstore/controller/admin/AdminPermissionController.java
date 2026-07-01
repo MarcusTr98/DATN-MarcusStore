@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 
-import com.fpoly.marcusstore.dto.request.UpdateRolePermissionRequest;
+import com.fpoly.marcusstore.dto.request.UpdateUserPermissionRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.dto.response.PermissionResponse;
 import com.fpoly.marcusstore.service.PermissionService;
@@ -19,7 +19,7 @@ import com.fpoly.marcusstore.service.PermissionService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/admin/permissions")
+@RequestMapping("/api/admin/staff-permissions")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminPermissionController {
@@ -34,20 +34,22 @@ public class AdminPermissionController {
 
     }
 
-    @GetMapping("/role/{roleId}")
+    @GetMapping("/{userId}")
+    public ApiResponse<List<Integer>> getPermissionOfUser(
+            @PathVariable Integer userId) {
 
-    public ApiResponse<List<Integer>> getPermissionOfRole(@PathVariable Integer roleId) {
-
-        return ApiResponse.success(permissionService.getPermissionOfRole(roleId));
-
+        return ApiResponse.success(
+                permissionService.getPermissionOfUser(userId)
+        );
     }
 
-    @PutMapping("/role/{roleId}")
+    @PutMapping("/{userId}")
+    public ApiResponse<String> update(
+            @PathVariable Integer userId,
+            @RequestBody UpdateUserPermissionRequest request) {
 
-    public ApiResponse<String> update(@PathVariable Integer roleId, @RequestBody UpdateRolePermissionRequest request) {
-          permissionService.updateRolePermission(roleId,request);
+        permissionService.updateUserPermission(userId, request);
 
-        return ApiResponse.success("OK");
-
+        return ApiResponse.success("Cập nhật thành công");
     }
 }

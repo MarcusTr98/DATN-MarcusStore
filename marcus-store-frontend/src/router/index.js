@@ -142,89 +142,97 @@ const routes = [
         path: 'category',
         name: 'CategoryManager',
         component: () => import('@/views/admin/product/CategoryManager.vue'),
+        meta: { permission: 'CATEGORY_VIEW' },
       },
       {
         path: 'product',
         name: 'ProductManager',
         component: () => import('@/views/admin/product/ProductManager.vue'),
+        meta: { permission: 'PRODUCT_VIEW' },
       },
       {
         path: 'attribute',
         name: 'AttributeManager',
         component: () => import('@/views/admin/product/Attributemanager.vue'),
-        meta: { roles: ['ROLE_ADMIN'] },
+        meta: { permission: 'ATTRIBUTE_VIEW' },
       },
       {
         path: 'skugenerator',
         name: 'Skugeneratorview',
         component: () => import('@/views/admin/product/Skugeneratorview.vue'),
-        meta: { roles: ['ROLE_ADMIN'] },
+        meta: { permission: 'SKU_CREATE' },
       },
       {
         path: 'contact-management',
         name: 'ContactManagement',
         component: () => import('@/views/admin/contact/ContactManagement.vue'),
-        meta: { roles: ['ROLE_ADMIN'] },
+        meta: { permission: 'CONTACT_VIEW' },
       },
       {
         path: 'order',
         name: 'OrderList',
         component: () => import('@/views/admin/order/OrderList.vue'),
+        meta: { permission: 'ORDER_VIEW' },
       },
       {
         path: 'order/:id',
         name: 'AdminOrderDetail',
         component: () => import('@/views/admin/order/OrderDetail.vue'),
+        meta: { permission: 'ORDER_VIEW' },
       },
       {
         path: 'voucher',
         name: 'VoucherManager',
         component: () => import('@/views/admin/promotion/VoucherManager.vue'),
+        meta: { permission: 'VOUCHER_VIEW' },
       },
       {
         path: 'flash-sale',
         name: 'FlashSaleManager',
         component: () => import('@/views/admin/promotion/FlashSaleManager.vue'),
+        meta: { permission: 'FLASHSALE_VIEW' },
       },
       {
         path: 'banner',
         name: 'BannerManager',
         component: () => import('@/views/admin/cms/BannerManager.vue'),
+        meta: { permission: 'BANNER_VIEW' },
       },
       {
         path: 'post',
         name: 'PostManager',
         component: () => import('@/views/admin/cms/PostManager.vue'),
+        meta: { permission: 'POST_VIEW' },
       },
       {
         path: 'settings',
         name: 'SystemSettings',
         component: () => import('@/views/admin/settings/SystemSettings.vue'),
-      },
-      {
-        path: 'contact-management',
-        name: 'ContactManagement',
-        component: () => import('@/views/admin/contact/ContactManagement.vue'),
+        meta: { permission: 'SYSTEM_VIEW' },
       },
       {
         path: 'employee',
         name: 'EmployeeManagement',
         component: () => import('@/views/admin/auth/EmployeeManagement.vue'),
+        meta: {roles: ['ROLE_ADMIN']},
       },
       {
         path: 'customer',
         name: 'CustomerManagement',
         component: () => import('@/views/admin/auth/CustomerManagement.vue'),
+        meta: { permission: 'USER_VIEW' },
       },
       {
         path: 'role',
         name: 'RoleManager',
         component: () => import('@/views/admin/auth/RoleManager.vue'),
+         meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'finance-reports',
         name: 'FinancialReport',
         component: () => import('@/views/report/FinancialReport.vue'),
+        meta: { permission: 'DONGTIEN_VIEW' },
       },
     ],
   },
@@ -240,13 +248,20 @@ const router = createRouter({
     return { top: 0, behavior: 'smooth' }
   },
 })
+
 router.beforeEach((to) => {
   const token = localStorage.getItem('ACCESS_TOKEN')
   const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
-  const isAdminOrStaff = roles.includes('ROLE_ADMIN') || roles.includes('ROLE_STAFF')
+  const permissions = JSON.parse(localStorage.getItem('USER_PERMISSIONS') || '[]')
+  const isAdmin = roles.includes('ROLE_ADMIN')
+  const isAdminOrStaff = isAdmin || roles.includes('ROLE_STAFF')
 
   // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào admin
-  if (token && isAdminOrStaff && (to.path === '/' || to.path.startsWith('/auth/login'))) {
+  if (
+    token &&
+    isAdminOrStaff &&
+    (to.path === '/' || to.path.startsWith('/auth/login'))
+  ) {
     return '/admin/dashboard'
   }
 
@@ -260,15 +275,26 @@ router.beforeEach((to) => {
     return '/'
   }
 
-  // Kiểm tra quyền riêng từng màn hình
+  // Kiểm tra theo role (chặn thô, vd chỉ ADMIN mới được vào trang)
   const requiredRoles = to.meta.roles
   if (requiredRoles) {
-    const hasPermission = roles.some((role) => requiredRoles.includes(role))
-    if (!hasPermission) {
+    const hasRole = roles.some((role) => requiredRoles.includes(role))
+    if (!hasRole) {
       alert('Bạn không có quyền truy cập trang này')
       return '/admin/dashboard'
     }
   }
+
+  // Kiểm tra theo permission cụ thể (chặn chi tiết theo từng chức năng)
+  // ADMIN luôn được bypass, không cần check permission lẻ
+  const requiredPermission = to.meta.permission
+  if (requiredPermission && !isAdmin) {
+    if (!permissions.includes(requiredPermission)) {
+      alert('Bạn không có quyền truy cập chức năng này')
+      return '/admin/dashboard'
+    }
+  }
+
   return true
 })
 

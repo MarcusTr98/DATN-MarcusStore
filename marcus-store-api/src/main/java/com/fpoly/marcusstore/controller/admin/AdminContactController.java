@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/contacts")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('CONTACT_VIEW')")
 @RequiredArgsConstructor
 public class AdminContactController {
 
@@ -29,6 +29,7 @@ public class AdminContactController {
 
     // Đánh dấu một yêu cầu liên hệ là ĐÃ RESOLVED
     @PutMapping("/{id}/resolve")
+    @PreAuthorize("hasAuthority('CONTACT_PROCESS')")
     public ApiResponse<String> resolveContact(@PathVariable("id") Integer id) {
         contactService.resolveContact(id);
         return ApiResponse.success("Đã xử lý xong yêu cầu liên hệ");

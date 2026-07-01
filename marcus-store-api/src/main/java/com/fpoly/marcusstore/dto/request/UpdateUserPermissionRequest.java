@@ -8,6 +8,6 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class UpdateRolePermissionRequest {
+public class UpdateUserPermissionRequest {
      private List<Integer> permissionIds;
 }

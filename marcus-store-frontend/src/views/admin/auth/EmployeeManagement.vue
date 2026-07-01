@@ -12,7 +12,7 @@
         </div>
       </div>
 
-      <button v-if="canManage" class="btn-pink" @click="openCreate">
+      <button v-if="canCreate" class="btn-pink" @click="openCreate">
         <i class="bi bi-plus-circle"></i>
         Thêm nhân viên
       </button>
@@ -76,7 +76,9 @@
 
     <EmployeeTable
       :users="users"
-      :can-manage="canManage"
+      :can-edit="canEdit"
+      :can-lock="canLock"
+      :can-unlock="canUnlock"
       :pagination="pagination"
       :current-page="currentPage"
       :page-size="pageSize"
@@ -145,11 +147,22 @@ const modalType    = ref('success')
 const modalTitle   = ref('')
 const modalMessage = ref('')
 
-// ── Helpers ────────────────────────────────────────────
-const canManage = computed(() => {
+// ── Helpers: check theo PERMISSION cụ thể, không hardcode role ──
+// Trang này quản lý cả Admin lẫn Staff nên chỉ ADMIN mới thao tác được
+// (khớp với route 'employee' trong router.js: meta.roles = ['ROLE_ADMIN'])
+const isAdmin = computed(() => {
   const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
   return roles.includes('ROLE_ADMIN')
 })
+const permissions = computed(() =>
+  JSON.parse(localStorage.getItem('USER_PERMISSIONS') || '[]'),
+)
+const hasPermission = (perm) => isAdmin.value || permissions.value.includes(perm)
+
+const canCreate = computed(() => hasPermission('USER_CREATE'))
+const canEdit = computed(() => hasPermission('USER_UPDATE'))
+const canLock = computed(() => hasPermission('USER_LOCK'))
+const canUnlock = computed(() => hasPermission('USER_UNLOCK'))
 
 const showModal = (type, title, message) => {
   modalType.value    = type

@@ -11,13 +11,13 @@
           <th>Ngày tạo</th>
           <th>Email Verify</th>
           <th>Trạng thái</th>
-          <th v-if="canManage" class="action-col">Thao tác</th>
+          <th v-if="showActionCol" class="action-col">Thao tác</th>
         </tr>
       </thead>
 
       <tbody>
         <tr v-if="!users.length">
-          <td :colspan="canManage ? 9 : 8" class="empty-state">
+          <td :colspan="showActionCol ? 9 : 8" class="empty-state">
             <i class="bi bi-person-x"></i>
             <h3>Không có khách hàng nào</h3>
             <p>Hãy thay đổi từ khóa tìm kiếm.</p>
@@ -73,14 +73,19 @@
           </td>
 
           <!-- Thao tác -->
-          <td v-if="canManage" class="action-cell">
+          <td v-if="showActionCol" class="action-cell">
             <div class="action-group">
-              <button class="btn-action btn-edit" title="Chỉnh sửa" @click="$emit('edit', item)">
+              <button
+                v-if="canEdit"
+                class="btn-action btn-edit"
+                title="Chỉnh sửa"
+                @click="$emit('edit', item)"
+              >
                 <i class="bi bi-pencil-square"></i>
               </button>
 
               <button
-                v-if="!item.emailVerified"
+                v-if="canSendVerify && !item.emailVerified"
                 class="btn-action btn-verify"
                 title="Gửi email xác thực"
                 @click="$emit('send-verify', item.userId)"
@@ -89,7 +94,7 @@
               </button>
 
               <button
-                v-if="item.active"
+                v-if="canLock && item.active"
                 class="btn-action btn-lock"
                 title="Khóa tài khoản"
                 @click="$emit('lock', item.userId)"
@@ -98,7 +103,7 @@
               </button>
 
               <button
-                v-else
+                v-if="canUnlock && !item.active"
                 class="btn-action btn-unlock"
                 title="Mở khóa tài khoản"
                 @click="$emit('unlock', item.userId)"
@@ -155,17 +160,18 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 const props = defineProps({
   users: {
     type: Array,
     default: () => [],
   },
-  canManage: {
-    type: Boolean,
-    default: false,
-  },
+  // ── Mỗi quyền kiểm soát riêng 1 hành động ──
+  canEdit: { type: Boolean, default: false },
+  canLock: { type: Boolean, default: false },
+  canUnlock: { type: Boolean, default: false },
+  canSendVerify: { type: Boolean, default: false },
   pagination: {
     type: Object,
     default: () => ({ totalElements: 0, totalPages: 0 }),
@@ -188,6 +194,11 @@ const emit = defineEmits([
   'page-change',
   'page-size-change',
 ])
+
+// Chỉ hiện cột "Thao tác" nếu có ít nhất 1 quyền hành động nào đó
+const showActionCol = computed(
+  () => props.canEdit || props.canLock || props.canUnlock || props.canSendVerify,
+)
 
 const localPageSize = ref(props.pageSize)
 

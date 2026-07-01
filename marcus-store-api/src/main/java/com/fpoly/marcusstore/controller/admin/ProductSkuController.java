@@ -16,7 +16,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/skus")
-@PreAuthorize("hasAuthority('PRODUCT_VIEW')")
+@PreAuthorize("hasAuthority('SKU_CREATE')")
 public class ProductSkuController {
 
     @Autowired
@@ -30,7 +30,6 @@ public class ProductSkuController {
 
     // Nhận Ma trận SKU từ Frontend và lưu
     @PostMapping("/batch")
-    @PreAuthorize("hasAuthority('PRODUCT_CREATE')")
     public ApiResponse<String> batchCreateSkus(@Valid @RequestBody SkuBatchCreateRequest request) {
         configService.batchCreateSkus(request);
         return ApiResponse.success("Đã lưu thành công ma trận SKU!");
@@ -38,7 +37,6 @@ public class ProductSkuController {
 
     // Cập nhật giá, tồn kho đồng loạt
     @PutMapping("/bulk-update")
-    @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
     public ApiResponse<String> bulkUpdateSkus(@RequestBody SkuBulkUpdateRequest request) {
         configService.bulkUpdateSkus(request);
         return ApiResponse.success("Cập nhật đồng loạt thành công!");
@@ -46,7 +44,6 @@ public class ProductSkuController {
 
     // Cập nhật 1 SKU lẻ
     @PutMapping("/{skuId}")
-    @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
     public ApiResponse<ProductSku> updateSingleSku(
             @PathVariable Integer skuId,
             @Valid @RequestBody SkuSingleUpdateRequest request) {
@@ -56,7 +53,6 @@ public class ProductSkuController {
 
     // Xóa mềm SKU
     @DeleteMapping("/{skuId}")
-    @PreAuthorize("hasAuthority('PRODUCT_DELETE')")
     public ApiResponse<String> deleteSku(@PathVariable Integer skuId) {
         configService.deleteSku(skuId);
         return ApiResponse.success("Đã vô hiệu hóa SKU thành công!");

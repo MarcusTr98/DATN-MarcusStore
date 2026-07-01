@@ -9,13 +9,13 @@
           <th>Vai trò</th>
           <th>Trạng thái</th>
           <th>Ngày tạo</th>
-          <th v-if="canManage" class="action-col">Thao tác</th>
+          <th v-if="showActionCol" class="action-col">Thao tác</th>
         </tr>
       </thead>
 
       <tbody>
         <tr v-if="!users.length">
-          <td :colspan="canManage ? 7 : 6" class="empty-state">
+          <td :colspan="showActionCol ? 7 : 6" class="empty-state">
             <i class="bi bi-people"></i>
             <h3>Không có tài khoản nào</h3>
             <p>Hãy thêm nhân viên mới hoặc thay đổi từ khóa tìm kiếm.</p>
@@ -55,21 +55,29 @@
             {{ item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '' }}
           </td>
 
-          <td v-if="canManage" class="action-cell">
+          <td v-if="showActionCol" class="action-cell">
             <div class="action-group">
-              <button class="btn-action btn-edit" @click="$emit('edit', item)">
+              <button
+                v-if="canEdit"
+                class="btn-action btn-edit"
+                @click="$emit('edit', item)"
+              >
                 <i class="bi bi-pencil-square"></i>
               </button>
 
               <button
-                v-if="item.active"
+                v-if="canLock && item.active"
                 class="btn-action btn-lock"
                 @click="$emit('lock', item.userId)"
               >
                 <i class="bi bi-lock"></i>
               </button>
 
-              <button v-else class="btn-action btn-unlock" @click="$emit('unlock', item.userId)">
+              <button
+                v-if="canUnlock && !item.active"
+                class="btn-action btn-unlock"
+                @click="$emit('unlock', item.userId)"
+              >
                 <i class="bi bi-unlock"></i>
               </button>
             </div>
@@ -122,17 +130,17 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 
 const props = defineProps({
   users: {
     type: Array,
     default: () => [],
   },
-  canManage: {
-    type: Boolean,
-    default: false,
-  },
+  // ── Mỗi quyền kiểm soát riêng 1 hành động ──
+  canEdit: { type: Boolean, default: false },
+  canLock: { type: Boolean, default: false },
+  canUnlock: { type: Boolean, default: false },
   pagination: {
     type: Object,
     default: () => ({ totalElements: 0, totalPages: 0 }),
@@ -148,6 +156,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['edit', 'lock', 'unlock', 'page-change', 'page-size-change'])
+
+// Chỉ hiện cột "Thao tác" nếu có ít nhất 1 quyền hành động nào đó
+const showActionCol = computed(() => props.canEdit || props.canLock || props.canUnlock)
 
 const localPageSize = ref(props.pageSize)
 

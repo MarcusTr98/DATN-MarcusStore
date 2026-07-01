@@ -134,6 +134,7 @@ const showModal = (type, title, message) => {
   modal.message = message
   modal.visible = true
 }
+
 const handleLogin = async () => {
   errorMessage.value = ''
 
@@ -162,6 +163,7 @@ const handleLogin = async () => {
     localStorage.setItem('ACCESS_TOKEN', userData.token)
     localStorage.setItem('USERNAME', userData.username)
     localStorage.setItem('USER_ROLE', JSON.stringify(userData.roles))
+    localStorage.setItem('USER_PERMISSIONS', JSON.stringify(userData.permissions || []))
 
     window.dispatchEvent(new Event('auth-changed'))
 
