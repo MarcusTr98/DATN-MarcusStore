@@ -8,10 +8,19 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 public class TransactionResponse {
+    private Integer transactionId; // mã nội bộ
     private String orderCode;
     private BigDecimal amount;
     private String type;
     private String status;
     private String note;
     private LocalDateTime createdAt;
+
+    // bổ sung thông tin vào modal chi tiết
+    private String recipientName;
+    private String recipientPhone;
+    private String shippingAddress;
+
+    // bổ sung tích đối soát
+    private Boolean isReconciled;
 }

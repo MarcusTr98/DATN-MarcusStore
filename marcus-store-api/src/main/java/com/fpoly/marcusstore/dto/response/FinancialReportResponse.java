@@ -4,10 +4,11 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record FinancialReportResponse(
-                List<TransactionResponse> transactions,
-                long totalCount,
-                BigDecimal totalSuccessAmount,
-                BigDecimal totalPendingAmount,
-                BigDecimal totalFailedAmount,
-                double successRate) {
+        List<TransactionResponse> transactions,
+        long totalCount,
+        BigDecimal totalSuccessAmount,
+        BigDecimal totalPendingAmount,
+        BigDecimal totalFailedAmount,
+        double successRate) {
+
 }

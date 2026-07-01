@@ -2,24 +2,18 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
+import VueApexCharts from 'vue3-apexcharts'
 
-// 1. Import Bootstrap 5 CSS & Bundle JS
+// Import CSS
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
-
-// 2. Import Bootstrap Icons
 import 'bootstrap-icons/font/bootstrap-icons.css'
-
-// 3. Import File CSS
 import './assets/css/main.css'
 
-const app = createApp(App)
+const app = createApp(App) // 2. Tạo app trước
 
-// Gắn Pinia (quản lý state Giỏ hàng/Token)
 app.use(createPinia())
-
-// Gắn Vue Router
 app.use(router)
+app.use(VueApexCharts)
 
-// Mount ứng dụng vào thẻ <div id="app"> trong index.html
 app.mount('#app')

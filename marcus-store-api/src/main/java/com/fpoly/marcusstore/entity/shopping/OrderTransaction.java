@@ -49,4 +49,7 @@ public class OrderTransaction {
         return this.order != null ? this.order.getOrderCode() : "N/A";
     }
 
+    @Column(name = "is_reconciled", nullable = false)
+    private Boolean isReconciled = false; // mặc định là chưa đối soát
+
 }
