@@ -21,8 +21,8 @@
           </td>
         </tr>
 
-        <tr v-for="(b, i) in banners" :key="b.id">
-          <td class="idx">{{ i + 1 }}</td>
+        <tr v-for="(b, i) in pagedBanners" :key="b.id">
+          <td class="idx">{{ (currentPage - 1) * pageSize + i + 1 }}</td>
 
           <td>
             <div v-if="b.imageUrl" class="img-preview">
@@ -81,15 +81,29 @@
     </table>
 
     <div class="pagination">
-      <span class="page-info">Hiển thị 1–{{ banners.length }} / {{ banners.length }}</span>
+      <span class="page-info">
+        Hiển thị {{ banners.length ? (currentPage - 1) * pageSize + 1 : 0 }}–{{ Math.min(currentPage * pageSize, banners.length) }} / {{ banners.length }}
+      </span>
       <div class="page-btns">
-        <button class="pbtn active">1</button>
+        <button class="pbtn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">‹</button>
+        <button
+          v-for="p in totalPages"
+          :key="p"
+          class="pbtn"
+          :class="{ active: p === currentPage }"
+          @click="goToPage(p)"
+        >
+          {{ p }}
+        </button>
+        <button class="pbtn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">›</button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref, computed, watch } from 'vue';
+
 const props = defineProps({
   banners: {
     type: Array,
@@ -97,16 +111,36 @@ const props = defineProps({
   },
   positions: {
     type: Array,
-    default: () => [
-      { value: 'homepage', label: 'Trang chủ' },
-      { value: 'product', label: 'Trang sản phẩm' },
-      { value: 'sidebar', label: 'Sidebar' },
-      { value: 'popup', label: 'Popup' },
-    ],
+    default: () => [], // positionId thật là số, nên không dùng default giả dạng string nữa
   },
 });
 
 defineEmits(['edit', 'delete']);
+
+// ---- Phân trang (client-side) ----
+const currentPage = ref(1);
+const pageSize = 10;
+
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(props.banners.length / pageSize))
+);
+
+const pagedBanners = computed(() => {
+  const start = (currentPage.value - 1) * pageSize;
+  return props.banners.slice(start, start + pageSize);
+});
+
+// Khi danh sách lọc thay đổi (search/filter khác), quay về trang 1
+watch(
+  () => props.banners.length,
+  () => {
+    currentPage.value = 1;
+  }
+);
+
+function goToPage(p) {
+  if (p >= 1 && p <= totalPages.value) currentPage.value = p;
+}
 
 // ---- Helpers ----
 function positionLabel(positionId) {
@@ -379,6 +413,10 @@ defineExpose({ statusOf });
   padding: 4px 10px;
   font-size: 12px;
   cursor: pointer;
+}
+.pbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .pbtn.active {
   background: #f55d9b;

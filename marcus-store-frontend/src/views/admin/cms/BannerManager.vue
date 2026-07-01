@@ -52,10 +52,10 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue';
-import BannerFilter from './BannerFilter.vue';
-import BannerTable from './BannerTable.vue';
-import BannerModal from './BannerModal.vue';
-import { bannerApi } from '@/api/bannerApi';
+import BannerFilter from './Bannerfilter.vue';
+import BannerTable from './Bannertable.vue';
+import BannerModal from './Bannermodal.vue';
+import { bannerApi } from '@/api/BannerApi';
 
 // ---- State chính ----
 const banners = ref([]); // dữ liệu thật từ API, field khớp BannerResponseDTO
@@ -85,9 +85,17 @@ function toDateInput(isoDateTime) {
   return isoDateTime.slice(0, 10); // lấy phần YYYY-MM-DD
 }
 
-function toApiDateTime(dateInput) {
+// Tách riêng start/end vì start nên tính từ đầu ngày, còn end phải tính tới
+// cuối ngày (23:59:59) để banner không bị coi là "hết hạn" ngay từ 00:00:01
+// của chính ngày kết thúc.
+function toApiStartDateTime(dateInput) {
   if (!dateInput) return null;
-  return `${dateInput}T00:00:00`; // backend nhận LocalDateTime
+  return `${dateInput}T00:00:00`;
+}
+
+function toApiEndDateTime(dateInput) {
+  if (!dateInput) return null;
+  return `${dateInput}T23:59:59`;
 }
 
 // Chuyển 1 banner từ response backend -> format mà các component con đang dùng
@@ -115,8 +123,8 @@ function mapBannerToApi(form) {
     targetUrl: form.linkUrl?.trim() || null,
     displayOrder: form.displayOrder ?? 0,
     isActive: !!form.isActive,
-    startDate: toApiDateTime(form.startDate),
-    endDate: toApiDateTime(form.endDate),
+    startDate: toApiStartDateTime(form.startDate),
+    endDate: toApiEndDateTime(form.endDate),
     positionId: form.positionId ? Number(form.positionId) : null, // đảm bảo gửi số nguyên
   };
 }
@@ -217,7 +225,11 @@ async function handleDelete(banner) {
   if (!confirm(`Xóa banner "${banner.title}"?`)) return;
   try {
     await bannerApi.remove(banner.id);
-    // Backend xóa mềm (set isActive = false), nên cập nhật trạng thái local tương ứng
+    // Backend hiện chỉ trả về message dạng string (không trả BannerResponseDTO),
+    // nên cập nhật isActive = false cục bộ ở FE để phản ánh đúng hành vi xóa mềm.
+    // Nếu sau này backend đổi remove() để trả về banner đã cập nhật, thay đoạn dưới bằng:
+    //   const updated = await bannerApi.remove(banner.id);
+    //   if (idx > -1) banners.value[idx] = mapBannerFromApi(updated);
     const idx = banners.value.findIndex((b) => b.id === banner.id);
     if (idx > -1) banners.value[idx].isActive = false;
   } catch (err) {

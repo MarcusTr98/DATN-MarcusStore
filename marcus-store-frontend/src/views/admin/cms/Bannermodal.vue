@@ -18,6 +18,7 @@
             class="form-input"
             type="text"
             v-model="form.title"
+            maxlength="255"
             placeholder="VD: Banner khuyến mãi mùa hè"
           />
         </div>
@@ -126,12 +127,7 @@ const props = defineProps({
   nextOrder: { type: Number, default: 1 }, // số lượng banner hiện tại + 1
   positions: {
     type: Array,
-    default: () => [
-      { value: 'homepage', label: 'Trang chủ' },
-      { value: 'product', label: 'Trang sản phẩm' },
-      { value: 'sidebar', label: 'Sidebar' },
-      { value: 'popup', label: 'Popup' },
-    ],
+    default: () => [], // positionId thật là số, nên không dùng default giả dạng string nữa
   },
 });
 
@@ -175,8 +171,15 @@ const dateInvalid = computed(() => {
 });
 
 // Validate bắt buộc: title, positionId, imageUrl (@NotBlank/@NotNull trong BannerRequestDTO)
+// + chặn lưu khi ảnh preview lỗi (imgBroken), tránh lưu banner với URL ảnh không load được
 const canSave = computed(() => {
-  return !!form.title?.trim() && !!form.positionId && !!form.imageUrl && !dateInvalid.value;
+  return (
+    !!form.title?.trim() &&
+    !!form.positionId &&
+    !!form.imageUrl &&
+    !dateInvalid.value &&
+    !imgBroken.value
+  );
 });
 
 function closeIfOutside(e) {

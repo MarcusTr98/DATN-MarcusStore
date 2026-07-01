@@ -45,12 +45,7 @@ defineProps({
   },
   positions: {
     type: Array,
-    default: () => [
-      { value: 'homepage', label: 'Trang chủ' },
-      { value: 'product', label: 'Trang sản phẩm' },
-      { value: 'sidebar', label: 'Sidebar' },
-      { value: 'popup', label: 'Popup' },
-    ],
+    default: () => [], // positionId thật là số, nên không dùng default giả dạng string nữa
   },
 });
 
