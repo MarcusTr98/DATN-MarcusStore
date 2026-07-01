@@ -1,8 +1,11 @@
 package com.fpoly.marcusstore.repository.promotion;
 
 import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -12,4 +15,28 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
     // Tìm khung giờ đang chạy (Trạng thái = 2)
     @Query("SELECT f FROM FlashSaleSlot f WHERE f.status = 2 AND f.startDate <= :now AND f.endDate >= :now")
     List<FlashSaleSlot> findActiveSlots(LocalDateTime now);
+
+
+    // Đếm tổng số lượng sản phẩm trong 1 slot
+    @Query("SELECT COALESCE(SUM(f.flashSaleQuantity), 0) FROM FlashSaleItem f WHERE f.slot.slotId = :slotId")
+    Integer countTotalQuantityBySlotId(@Param("slotId") Integer slotId);
+    //phân trang
+    @Query("""
+            SELECT f FROM FlashSaleSlot f
+            WHERE (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:status IS NULL OR f.status = :status)
+            """)
+    Page<FlashSaleSlot> searchFlashSaleSlots(
+            @Param("keyword") String keyword,
+            @Param("status") Short status,
+            Pageable pageable
+    );
+    // Tổng số slot theo filter hiện tại
+    @Query("""
+            SELECT COUNT(f) FROM FlashSaleSlot f
+            WHERE (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:status IS NULL OR f.status = :status)
+            """)
+    long countFlashSaleSlots(@Param("keyword") String keyword, @Param("status") Short status);
+    
 }
