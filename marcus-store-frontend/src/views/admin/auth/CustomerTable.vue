@@ -216,10 +216,36 @@ function onPageSizeChange() {
 // ── Hạng thành viên ────────────────────────────────────
 function getTier(totalSpent) {
   const amount = Number(totalSpent) || 0
-  if (amount >= 10_000_000) return { label: 'Kim Cương', icon: '💎', cls: 'diamond' }
-  if (amount >= 2_000_000) return { label: 'Vàng', icon: '🥇', cls: 'gold' }
-  if (amount >= 500_000) return { label: 'Bạc', icon: '🥈', cls: 'silver' }
-  return { label: 'Đồng', icon: '🥉', cls: 'bronze' }
+
+  if (amount >= 300_000_000) {
+    return {
+      label: 'Kim Cương',
+      icon: '💎',
+      cls: 'diamond',
+    }
+  }
+
+  if (amount >= 150_000_000) {
+    return {
+      label: 'Vàng',
+      icon: '🥇',
+      cls: 'gold',
+    }
+  }
+
+  if (amount >= 50_000_000) {
+    return {
+      label: 'Bạc',
+      icon: '🥈',
+      cls: 'silver',
+    }
+  }
+
+  return {
+    label: 'Đồng',
+    icon: '🥉',
+    cls: 'bronze',
+  }
 }
 
 // ── Format tiền VNĐ ────────────────────────────────────

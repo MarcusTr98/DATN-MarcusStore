@@ -14,42 +14,47 @@
     </div>
 
     <!-- Chọn nhân viên -->
-    <div class="staff-select-card">
-      <label
-        class="staff-label"
-        for="staff-select"
-      >
-        Nhân viên
-      </label>
+<!-- Chọn nhân viên -->
+<div class="staff-select-card">
+  <label
+    class="staff-label"
+    for="staff-select"
+  >
+    Nhân viên
+  </label>
 
-      <select
-        id="staff-select"
-        class="staff-select"
-        v-model="selectedStaff"
-        @change="onStaffChange"
-      >
-        <option value="">
-          -- Chọn nhân viên --
-        </option>
+  <select
+    id="staff-select"
+    class="staff-select"
+    v-model="selectedStaff"
+    @change="onStaffChange"
+  >
+    <option value="">
+      -- Chọn nhân viên --
+    </option>
 
-        <option
-          v-for="s in staffList"
-          :key="s.userId"
-          :value="s.userId"
-        >
-          {{ s.fullName }}
-        </option>
-      </select>
+    <option
+      v-for="s in staffList"
+      :key="s.userId"
+      :value="s.userId"
+    >
+      {{ s.fullName }}
+    </option>
+  </select>
 
-      <span class="staff-hint">
-        {{
-          selectedStaff
-            ? `Đang chỉnh quyền: ${selectedStaffName}`
-            : "Chọn nhân viên để xem quyền hiện tại"
-        }}
-      </span>
-    </div>
+  <span class="staff-hint">
+    {{
+      selectedStaff
+        ? `Đang chỉnh quyền: ${selectedStaffName}`
+        : "Chọn nhân viên để xem quyền hiện tại"
+    }}
+  </span>
 
+  <span v-if="selectedStaff" class="total-perm-badge">
+    <i class="bi bi-key-fill"></i>
+    Tổng số quyền của nhân viên: <strong>{{ totalChecked }}</strong> / {{ totalAll }}
+  </span>
+</div>
     <!-- Sections -->
     <template
       v-for="(section, sIndex) in permissionData"
@@ -67,80 +72,41 @@
       </div>
 
       <!-- Các module trong section, xếp thành hàng cột -->
+      <!-- Module có subs (vd: Bài viết -> Bài viết / Danh mục bài viết) được -->
+      <!-- "làm phẳng" thành từng card riêng để tự chảy vào lưới chung, -->
+      <!-- tránh bị chiếm nguyên 1 hàng gây thừa khoảng trống. -->
       <div class="modules-row">
 
         <div
-          v-for="mod in section.modules"
-          :key="mod.key"
+          v-for="card in getCards(section)"
+          :key="card.key"
           class="module-col"
         >
 
           <div class="module-title">
-            <i :class="['bi', mod.icon]"></i>
-            {{ mod.name }}
+            <i :class="['bi', card.icon]"></i>
+            {{ card.name }}
           </div>
 
-          <!-- Module có nhiều nhóm con -->
-          <template v-if="mod.subs">
+          <label
+            v-for="perm in card.perms"
+            :key="perm.code"
+            class="perm-row"
+            :class="{
+              disabled: isPermDisabled(perm, card.perms)
+            }"
+          >
 
-            <div
-              v-for="sub in mod.subs"
-              :key="sub.key"
-              class="sub-block"
+            <input
+              type="checkbox"
+              v-model="perm.checked"
+              :disabled="isPermDisabled(perm, card.perms)"
+              @change="onPermChange(perm, card.perms)"
             >
 
-              <div class="sub-title">
-                {{ sub.label }}
-              </div>
+            {{ perm.label }}
 
-              <label
-                v-for="perm in sub.perms"
-                :key="perm.code"
-                class="perm-row"
-                :class="{
-                  disabled: isPermDisabled(perm, sub.perms)
-                }"
-              >
-
-                <input
-                  type="checkbox"
-                  v-model="perm.checked"
-                  :disabled="isPermDisabled(perm, sub.perms)"
-                  @change="onPermChange(perm, sub.perms)"
-                >
-
-                {{ perm.label }}
-
-              </label>
-
-            </div>
-
-          </template>
-
-          <!-- Module không có nhóm con -->
-          <template v-else>
-
-            <label
-              v-for="perm in mod.perms"
-              :key="perm.code"
-              class="perm-row"
-              :class="{
-                disabled: isPermDisabled(perm, mod.perms)
-              }"
-            >
-
-              <input
-                type="checkbox"
-                v-model="perm.checked"
-                :disabled="isPermDisabled(perm, mod.perms)"
-                @change="onPermChange(perm, mod.perms)"
-              >
-
-              {{ perm.label }}
-
-            </label>
-
-          </template>
+          </label>
 
         </div>
 
@@ -398,6 +364,48 @@ function toggleModule(key) {
   expanded[key] = !expanded[key]
 }
 
+// Làm phẳng modules trong 1 section thành danh sách card để hiển thị
+// trên lưới. Module có subs (vd: "Bài viết" -> "Bài viết" / "Danh mục
+// bài viết") sẽ được tách thành từng card riêng, mỗi sub 1 card, thay vì
+// gộp chung 1 khối chiếm hết chiều ngang. Nhờ vậy các card tự chảy vào
+// lưới cùng các module khác (Quản lý Banner, Quản lý liên hệ...), không
+// còn bị thừa khoảng trống ở giữa nữa.
+function getCards(section) {
+
+  const cards = []
+
+  section.modules.forEach(mod => {
+
+    if (mod.subs) {
+
+      mod.subs.forEach(sub => {
+
+        cards.push({
+          key: `${mod.key}_${sub.key}`,
+          icon: mod.icon,
+          name: sub.label,
+          perms: sub.perms || []
+        })
+
+      })
+
+      return
+
+    }
+
+    cards.push({
+      key: mod.key,
+      icon: mod.icon,
+      name: mod.name,
+      perms: mod.perms || []
+    })
+
+  })
+
+  return cards
+
+}
+
 // Lấy toàn bộ perms của 1 module, kể cả khi module có subs
 function getAllPerms(module) {
 
@@ -544,6 +552,7 @@ const totalChecked = computed(() => {
 .page-header {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 16px;
   background: #fff;
   border: 1px solid #f3d6e3;
@@ -563,6 +572,12 @@ const totalChecked = computed(() => {
   align-items:center;
   font-size:22px;
   color:#fff;
+  flex-shrink: 0;
+}
+
+.header-text{
+  text-align: left;
+  margin-right: auto;
 }
 
 .header-text h2{
@@ -570,12 +585,14 @@ const totalChecked = computed(() => {
   font-size:20px;
   font-weight:700;
   color:#f55d9b;
+  text-align: left;
 }
 
 .header-text p{
   margin-top:4px;
   color:#6b7280;
   font-size:14px;
+  text-align: left;
 }
 
 /* ================= STAFF ================= */
@@ -590,6 +607,7 @@ const totalChecked = computed(() => {
   padding:18px 20px;
   margin-bottom:25px;
   box-shadow:0 2px 10px rgba(0,0,0,.05);
+  flex-wrap: wrap;
 }
 
 .staff-label{
@@ -619,6 +637,28 @@ const totalChecked = computed(() => {
   font-weight:600;
 }
 
+.total-perm-badge{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  background:#fff0f5;
+  color:#f55d9b;
+  font-size:13px;
+  font-weight:700;
+  padding:8px 14px;
+  border-radius:10px;
+  border:1px solid #f3d6e3;
+  white-space: nowrap;
+}
+
+.total-perm-badge i{
+  font-size:14px;
+}
+
+.total-perm-badge strong{
+  color:#c33d7a;
+}
+
 /* ================= SECTION ================= */
 
 .section-label{
@@ -642,12 +682,18 @@ const totalChecked = computed(() => {
   grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
   gap:32px;
   margin-bottom:6px;
+  align-items:start;
 }
 
 .module-col{
   display:flex;
   flex-direction:column;
   gap:10px;
+}
+
+/* Module có subs (vd: Sản phẩm) chiếm full chiều ngang của hàng */
+.module-col-wide{
+  grid-column: 1 / -1;
 }
 
 .module-title{
@@ -665,6 +711,15 @@ const totalChecked = computed(() => {
   font-size:17px;
 }
 
+/* ================= SUBS GRID (xếp các sub-block theo hàng ngang) ================= */
+
+.subs-grid{
+  display:flex;
+  flex-wrap:wrap;
+  gap:32px;
+  align-items: start;
+}
+
 /* ================= SUB ================= */
 
 .sub-block{
@@ -672,6 +727,8 @@ const totalChecked = computed(() => {
   flex-direction:column;
   gap:8px;
   margin-bottom:8px;
+  flex:1 1 200px;
+  min-width:200px;
 }
 
 .sub-title{
@@ -780,6 +837,10 @@ const totalChecked = computed(() => {
     margin-left:0;
   }
 
+  .total-perm-badge{
+    margin-left:0;
+  }
+
   .save-bar{
     flex-direction:column;
     gap:15px;
@@ -792,6 +853,11 @@ const totalChecked = computed(() => {
 
   .modules-row{
     grid-template-columns:1fr;
+    gap:20px;
+  }
+
+  .subs-grid{
+    flex-direction:column;
     gap:20px;
   }
 }

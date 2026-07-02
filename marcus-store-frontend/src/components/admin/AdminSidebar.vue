@@ -27,6 +27,12 @@
         <span>Quản lý danh mục</span>
       </router-link>
 
+      <router-link v-if="canAccessRoute('/admin/inventoryManager')" to="/admin/inventoryManager" class="menu-item"
+        active-class="active">
+        <i class="bi bi-box-seam menu-icon" style="font-size: 16px"></i>
+        <span>Quản lý kho</span>
+      </router-link>
+
       <template v-if="showProductParent">
         <div class="menu-item menu-parent" :class="{ active: isProductMenuActive }" @click="toggleProductMenu">
           <img :src="boxIcon" class="menu-icon" />
@@ -91,6 +97,16 @@
         <i class="bi bi-wallet2 menu-icon"></i>
         <span>Quản lý đối soát</span>
       </router-link>
+        <router-link
+    v-if="canAccessRoute('/admin/activity-log')"
+    to="/admin/activity-log"
+    class="menu-item"
+    active-class="active"
+  >
+    <i class="bi bi-clock-history menu-icon"></i>
+    <span>Quản lý thao tác</span>
+  </router-link>
+
     </div>
 
     <div v-if="showHeThong" class="menu-section">
@@ -121,12 +137,6 @@
         active-class="active">
         <img :src="gearIcon" class="menu-icon" />
         <span>Cấu hình chung</span>
-      </router-link>
-
-      <router-link to="/admin/inventoryManager" class="menu-item"
-        active-class="active">
-        <i class="bi bi-box-seam menu-icon" style="font-size:16px"></i>
-        <span>Quản lý kho</span>
       </router-link>
     </div>
   </aside>
@@ -227,6 +237,7 @@ const showAccountParent = computed(() => {
 const showSanPhamKho = computed(() => {
   return (
     canAccessRoute("/admin/category") ||
+    canAccessRoute("/admin/inventoryManager") ||
     showProductParent.value
   );
 });
@@ -248,7 +259,10 @@ const showNoiDung = computed(() => {
 });
 
 const showBaoCao = computed(() => {
-  return canAccessRoute("/admin/finance-reports");
+  return (
+    canAccessRoute("/admin/finance-reports") ||
+    canAccessRoute("/admin/activity-log")
+  );
 });
 
 const showHeThong = computed(() => {

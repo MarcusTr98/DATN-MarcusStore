@@ -239,6 +239,11 @@ const routes = [
         name: 'InventoryManager',
         component: () => import('@/views/admin/auth/InventoryManager.vue'),
       },
+                  {
+        path: 'activity-log',
+        name: 'ActivityLog',
+        component: () => import('@/views/admin/auth/ActivityLog.vue'),
+      },
     ],
   },
 
