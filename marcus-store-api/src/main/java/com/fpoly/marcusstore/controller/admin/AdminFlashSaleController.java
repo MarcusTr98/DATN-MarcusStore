@@ -25,10 +25,9 @@ public class AdminFlashSaleController {
             @RequestParam(required = false) Short status) {
         Pageable pageable = PageRequest.of(
                 Math.max(page, 0),
-                Math.max(size, 1),
-                Sort.by(Sort.Direction.DESC, "slotId")
+                Math.max(size, 1)
         );
-        return flashSaleService.getFlashSaleSlotsPage(keyword, status,pageable);
+        return flashSaleService.getFlashSaleSlotsPage(keyword, status, pageable);
     }
     @GetMapping("/flashsales/stats")
     public FlashSaleStatsResponse getFlashSaleStats(

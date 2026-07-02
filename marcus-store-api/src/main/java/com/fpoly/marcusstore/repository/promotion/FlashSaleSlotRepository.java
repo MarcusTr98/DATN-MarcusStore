@@ -21,14 +21,30 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
     @Query("SELECT COALESCE(SUM(f.flashSaleQuantity), 0) FROM FlashSaleItem f WHERE f.slot.slotId = :slotId")
     Integer countTotalQuantityBySlotId(@Param("slotId") Integer slotId);
     // Phân trang
-    @Query("""
-            SELECT f FROM FlashSaleSlot f
-            WHERE (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
-              AND (:status IS NULL OR f.status = :status)
-            """)
+    // Phân trang - sắp xếp: ACTIVE trước, sau đó UPCOMING, còn lại theo startDate DESC
+    @Query(value = """
+        SELECT f FROM FlashSaleSlot f
+        WHERE (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+          AND (:status IS NULL OR f.status = :status)
+        ORDER BY
+          CASE
+            WHEN f.status = 2 AND f.startDate <= :now AND f.endDate >= :now THEN 1
+            WHEN f.status = 1 AND f.startDate >  :now                       THEN 2
+            WHEN f.status = 3                                                THEN 3
+            WHEN f.status = 4                                                THEN 4
+            ELSE 5
+          END,
+          f.startDate ASC
+        """,
+            countQuery = """
+        SELECT COUNT(f) FROM FlashSaleSlot f
+        WHERE (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
+          AND (:status IS NULL OR f.status = :status)
+        """)
     Page<FlashSaleSlot> searchFlashSaleSlots(
             @Param("keyword") String keyword,
             @Param("status") Short status,
+            @Param("now") LocalDateTime now,
             Pageable pageable
     );
     // Tổng số slot theo filter hiện tại

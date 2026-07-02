@@ -756,8 +756,25 @@ function resolveStatus(slot) {
   return 'PENDING'
 }
 
+const statusPriority = {
+  ACTIVE: 1,
+  UPCOMING: 2,
+  SCHEDULED: 3,
+  ENDED: 4,
+  CANCELLED: 5,
+  PENDING: 6,
+}
+
 const slotsWithStatus = computed(() =>
-  slots.value.map(s => ({...s, resolvedStatus: resolveStatus(s)}))
+  [...slots.value]
+    .map(s => ({ ...s, resolvedStatus: resolveStatus(s) }))
+    .sort((a, b) => {
+      const pa = statusPriority[a.resolvedStatus] ?? 99
+      const pb = statusPriority[b.resolvedStatus] ?? 99
+      if (pa !== pb) return pa - pb
+      // cùng nhóm thì slot bắt đầu sớm hơn lên trước
+      return new Date(a.startDate) - new Date(b.startDate)
+    })
 )
 
 const filteredSlots = computed(() => {
