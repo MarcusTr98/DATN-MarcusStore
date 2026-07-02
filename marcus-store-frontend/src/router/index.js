@@ -234,6 +234,11 @@ const routes = [
         component: () => import('@/views/report/FinancialReport.vue'),
         meta: { permission: 'DONGTIEN_VIEW' },
       },
+            {
+        path: 'inventoryManager',
+        name: 'InventoryManager',
+        component: () => import('@/views/admin/auth/InventoryManager.vue'),
+      },
     ],
   },
 

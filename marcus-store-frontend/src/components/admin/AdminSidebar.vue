@@ -18,132 +18,297 @@
       </router-link>
     </div>
 
-    <div class="menu-section">
+    <div v-if="showSanPhamKho" class="menu-section">
       <p class="menu-title">SẢN PHẨM & KHO</p>
-      <router-link to="/admin/category" class="menu-item" active-class="active">
+
+      <router-link v-if="canAccessRoute('/admin/category')" to="/admin/category" class="menu-item"
+        active-class="active">
         <img :src="layersIcon" class="menu-icon" />
         <span>Quản lý danh mục</span>
       </router-link>
 
-      <div class="menu-item menu-parent" :class="{ active: isProductMenuActive }" @click="toggleProductMenu">
-        <img :src="boxIcon" class="menu-icon" />
-        <span>Sản phẩm</span>
-        <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isProductMenuOpen }" />
-      </div>
+      <template v-if="showProductParent">
+        <div class="menu-item menu-parent" :class="{ active: isProductMenuActive }" @click="toggleProductMenu">
+          <img :src="boxIcon" class="menu-icon" />
+          <span>Sản phẩm</span>
+          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isProductMenuOpen }" />
+        </div>
 
-      <div v-if="isProductMenuOpen" class="submenu">
-        <router-link to="/admin/product" class="submenu-item" active-class="active">Sản phẩm gốc</router-link>
-        <router-link to="/admin/attribute" class="submenu-item" active-class="active">Thuộc tính</router-link>
-        <router-link to="/admin/skugenerator" class="submenu-item" active-class="active">Tạo SKU</router-link>
-      </div>
+        <div v-if="isProductMenuOpen" class="submenu">
+          <router-link v-if="canAccessRoute('/admin/product')" to="/admin/product" class="submenu-item"
+            active-class="active">Sản phẩm gốc</router-link>
+          <router-link v-if="canAccessRoute('/admin/attribute')" to="/admin/attribute" class="submenu-item"
+            active-class="active">Thuộc tính</router-link>
+          <router-link v-if="canAccessRoute('/admin/skugenerator')" to="/admin/skugenerator" class="submenu-item"
+            active-class="active">Tạo SKU</router-link>
+        </div>
+      </template>
     </div>
 
-    <div class="menu-section">
+    <div v-if="showKenhBanHang" class="menu-section">
       <p class="menu-title">KÊNH BÁN HÀNG</p>
-      <router-link to="/admin/order" class="menu-item" active-class="active">
+
+      <router-link v-if="canAccessRoute('/admin/order')" to="/admin/order" class="menu-item" active-class="active">
         <img :src="cartIcon" class="menu-icon" />
         <span>Quản lý đơn hàng</span>
       </router-link>
-      <router-link to="/admin/voucher" class="menu-item" active-class="active">
+
+      <router-link v-if="canAccessRoute('/admin/voucher')" to="/admin/voucher" class="menu-item" active-class="active">
         <img :src="tagsIcon" class="menu-icon" />
         <span>Quản lý voucher</span>
       </router-link>
-      <router-link to="/admin/flash-sale" class="menu-item" active-class="active">
+
+      <router-link v-if="canAccessRoute('/admin/flash-sale')" to="/admin/flash-sale" class="menu-item"
+        active-class="active">
         <img :src="tagsIcon" class="menu-icon" />
         <span>Flash Sale</span>
       </router-link>
     </div>
 
-    <div class="menu-section">
+    <div v-if="showNoiDung" class="menu-section">
       <p class="menu-title">NỘI DUNG</p>
-      <router-link to="/admin/post" class="menu-item" active-class="active">
+
+      <router-link v-if="canAccessRoute('/admin/post')" to="/admin/post" class="menu-item" active-class="active">
         <img :src="newspaperIcon" class="menu-icon" />
         <span>Bài viết</span>
       </router-link>
-      <router-link to="/admin/banner" class="menu-item" active-class="active">
+
+      <router-link v-if="canAccessRoute('/admin/banner')" to="/admin/banner" class="menu-item" active-class="active">
         <img :src="barChartIcon" class="menu-icon" />
         <span>Quản lý Banner</span>
       </router-link>
-      <router-link to="/admin/contact-management" class="menu-item" active-class="active">
+
+      <router-link v-if="canAccessRoute('/admin/contact-management')" to="/admin/contact-management" class="menu-item"
+        active-class="active">
         <i class="fa-solid fa-headset menu-icon" style="font-size: 16px"></i>
         <span>Quản lý liên hệ</span>
       </router-link>
     </div>
-    <div class="menu-section">
+    <div v-if="showBaoCao" class="menu-section">
       <p class="menu-title">BÁO CÁO</p>
-      <router-link to="/admin/finance-reports" class="menu-item" active-class="active">
+      <router-link v-if="canAccessRoute('/admin/finance-reports')" to="/admin/finance-reports" class="menu-item"
+        active-class="active">
         <i class="bi bi-wallet2 menu-icon"></i>
         <span>Quản lý đối soát</span>
       </router-link>
     </div>
 
-    <div class="menu-section">
+    <div v-if="showHeThong" class="menu-section">
       <p class="menu-title">HỆ THỐNG</p>
-      <div class="menu-item menu-parent" :class="{
-        active:
-          $route.path.includes('/admin/employee') || $route.path.includes('/admin/customer'),
-      }" @click="toggleAccountMenu">
-        <img :src="peopleIcon" class="menu-icon" />
-        <span>Quản lý tài khoản</span>
-        <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isAccountMenuOpen }" />
-      </div>
-      <div v-if="isAccountMenuOpen" class="submenu">
-        <router-link to="/admin/employee" class="submenu-item" active-class="active">Tài khoản nhân viên</router-link>
-        <router-link to="/admin/customer" class="submenu-item" active-class="active">Tài khoản khách hàng</router-link>
-        <router-link to="role" class="submenu-item" active-class="active">
-          Phân quyền nhân viên
-        </router-link>
-      </div>
-      <router-link to="/admin/settings" class="menu-item" active-class="active">
+
+      <!-- Quản lý tài khoản: chỉ còn Tài khoản nhân viên + Tài khoản khách hàng -->
+      <template v-if="showAccountParent">
+        <div class="menu-item menu-parent" :class="{ active: isAccountMenuActive }" @click="toggleAccountMenu">
+          <img :src="peopleIcon" class="menu-icon" />
+          <span>Quản lý tài khoản</span>
+          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isAccountMenuOpen }" />
+        </div>
+        <div v-if="isAccountMenuOpen" class="submenu">
+          <router-link v-if="canAccessRoute('/admin/employee')" to="/admin/employee" class="submenu-item"
+            active-class="active">Tài khoản nhân viên</router-link>
+          <router-link v-if="canAccessRoute('/admin/customer')" to="/admin/customer" class="submenu-item"
+            active-class="active">Tài khoản khách hàng</router-link>
+        </div>
+      </template>
+
+      <!-- Quản lý phân quyền: route chỉ yêu cầu roles: ['ROLE_ADMIN'], không có permission -->
+      <router-link v-if="canAccessRoute('/admin/role')" to="/admin/role" class="menu-item" active-class="active">
+        <i class="fa-solid fa-shield-halved menu-icon" style="font-size: 16px"></i>
+        <span>Quản lý phân quyền</span>
+      </router-link>
+
+      <router-link v-if="canAccessRoute('/admin/settings')" to="/admin/settings" class="menu-item"
+        active-class="active">
         <img :src="gearIcon" class="menu-icon" />
         <span>Cấu hình chung</span>
+      </router-link>
+
+      <router-link to="/admin/inventoryManager" class="menu-item"
+        active-class="active">
+        <i class="bi bi-box-seam menu-icon" style="font-size:16px"></i>
+        <span>Quản lý kho</span>
       </router-link>
     </div>
   </aside>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import pieChartIcon from '/src/assets/icons/pie-chart.svg'
-import layersIcon from '/src/assets/icons/layers.svg'
-import boxIcon from '/src/assets/icons/box.svg'
-import cartIcon from '/src/assets/icons/cart.svg'
-import peopleIcon from '/src/assets/icons/people.svg'
-import tagsIcon from '/src/assets/icons/tags.svg'
-import newspaperIcon from '/src/assets/icons/newspaper.svg'
-import barChartIcon from '/src/assets/icons/bar-chart-line.svg'
-import chevronDownIcon from '/src/assets/icons/chevron-down.svg'
-import gearIcon from '/src/assets/icons/gear.svg'
+import { ref, computed, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
-const route = useRoute()
-const isProductMenuOpen = ref(false)
+import pieChartIcon from "/src/assets/icons/pie-chart.svg";
+import layersIcon from "/src/assets/icons/layers.svg";
+import boxIcon from "/src/assets/icons/box.svg";
+import cartIcon from "/src/assets/icons/cart.svg";
+import peopleIcon from "/src/assets/icons/people.svg";
+import tagsIcon from "/src/assets/icons/tags.svg";
+import newspaperIcon from "/src/assets/icons/newspaper.svg";
+import barChartIcon from "/src/assets/icons/bar-chart-line.svg";
+import chevronDownIcon from "/src/assets/icons/chevron-down.svg";
+import gearIcon from "/src/assets/icons/gear.svg";
 
-const isProductMenuActive = computed(() =>
-  ['/admin/product', '/admin/sku', '/admin/attribute'].some((path) => route.path.includes(path)),
-)
+const route = useRoute();
+const router = useRouter();
+
+/* ===========================
+   USER INFO
+=========================== */
+
+const roles = JSON.parse(localStorage.getItem("USER_ROLE") || "[]");
+
+const permissions = JSON.parse(
+  localStorage.getItem("USER_PERMISSIONS") || "[]"
+);
+
+const userRoles = ref(Array.isArray(roles) ? roles : [roles]);
+
+const myPermissions = ref(
+  Array.isArray(permissions) ? permissions : [permissions]
+);
+
+const isAdmin = computed(() =>
+  userRoles.value.includes("ROLE_ADMIN")
+);
+
+/* ===========================
+   CHECK ROUTE PERMISSION
+=========================== */
+
+function canAccessRoute(path) {
+  if (isAdmin.value) return true;
+
+  const resolved = router.resolve(path);
+
+  if (!resolved.matched.length) {
+    return false;
+  }
+
+  const requiredRoles = resolved.meta?.roles || [];
+  const requiredPermission = resolved.meta?.permission;
+
+  if (
+    requiredRoles.length &&
+    !userRoles.value.some(role =>
+      requiredRoles.includes(role)
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    requiredPermission &&
+    !myPermissions.value.includes(requiredPermission)
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+/* ===========================
+   SHOW MENU
+=========================== */
+
+const showProductParent = computed(() => {
+  return (
+    canAccessRoute("/admin/product") ||
+    canAccessRoute("/admin/attribute") ||
+    canAccessRoute("/admin/skugenerator")
+  );
+});
+
+const showAccountParent = computed(() => {
+  return (
+    canAccessRoute("/admin/employee") ||
+    canAccessRoute("/admin/customer")
+  );
+});
+
+const showSanPhamKho = computed(() => {
+  return (
+    canAccessRoute("/admin/category") ||
+    showProductParent.value
+  );
+});
+
+const showKenhBanHang = computed(() => {
+  return (
+    canAccessRoute("/admin/order") ||
+    canAccessRoute("/admin/voucher") ||
+    canAccessRoute("/admin/flash-sale")
+  );
+});
+
+const showNoiDung = computed(() => {
+  return (
+    canAccessRoute("/admin/post") ||
+    canAccessRoute("/admin/banner") ||
+    canAccessRoute("/admin/contact-management")
+  );
+});
+
+const showBaoCao = computed(() => {
+  return canAccessRoute("/admin/finance-reports");
+});
+
+const showHeThong = computed(() => {
+  return (
+    showAccountParent.value ||
+    canAccessRoute("/admin/role") ||
+    canAccessRoute("/admin/settings")
+  );
+});
+
+/* ===========================
+   SUBMENU
+=========================== */
+
+const isProductMenuOpen = ref(false);
+
+const isAccountMenuOpen = ref(false);
+
+const isProductMenuActive = computed(() => {
+  return [
+    "/admin/product",
+    "/admin/attribute",
+    "/admin/skugenerator",
+  ].some(path => route.path.startsWith(path));
+});
+
+const isAccountMenuActive = computed(() => {
+  return [
+    "/admin/employee",
+    "/admin/customer",
+  ].some(path => route.path.startsWith(path));
+});
+/* ===========================
+   TOGGLE MENU
+=========================== */
 
 const toggleProductMenu = () => {
-  isProductMenuOpen.value = !isProductMenuOpen.value
-}
-
-onMounted(() => {
-  if (isProductMenuActive.value) isProductMenuOpen.value = true
-})
-
-const isAccountMenuOpen = ref(false)
+  isProductMenuOpen.value = !isProductMenuOpen.value;
+};
 
 const toggleAccountMenu = () => {
-  isAccountMenuOpen.value = !isAccountMenuOpen.value
-}
+  isAccountMenuOpen.value = !isAccountMenuOpen.value;
+};
+
+/* ===========================
+   INIT
+=========================== */
 
 onMounted(() => {
-  if (route.path.includes('/admin/employee') || route.path.includes('/admin/customer')) {
-    isAccountMenuOpen.value = true
+  // Tự động mở submenu Sản phẩm nếu đang ở các trang liên quan
+  if (isProductMenuActive.value) {
+    isProductMenuOpen.value = true;
   }
-})
-</script>
 
+  // Tự động mở submenu Quản lý tài khoản nếu đang ở các trang liên quan
+  if (isAccountMenuActive.value) {
+    isAccountMenuOpen.value = true;
+  }
+});
+</script>
 <style scoped>
 /* Sidebar tổng thể: Nền trắng sạch, viền nhẹ */
 .sidebar {

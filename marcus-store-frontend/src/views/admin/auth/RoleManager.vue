@@ -6,6 +6,7 @@
       <div class="header-icon">
         <i class="bi bi-shield-check"></i>
       </div>
+
       <div class="header-text">
         <h2>Phân quyền nhân viên</h2>
         <p>Cấp hoặc thu hồi quyền truy cập từng chức năng</p>
@@ -14,7 +15,10 @@
 
     <!-- Chọn nhân viên -->
     <div class="staff-select-card">
-      <label class="staff-label" for="staff-select">
+      <label
+        class="staff-label"
+        for="staff-select"
+      >
         Nhân viên
       </label>
 
@@ -24,7 +28,9 @@
         v-model="selectedStaff"
         @change="onStaffChange"
       >
-        <option value="">-- Chọn nhân viên --</option>
+        <option value="">
+          -- Chọn nhân viên --
+        </option>
 
         <option
           v-for="s in staffList"
@@ -46,129 +52,61 @@
 
     <!-- Sections -->
     <template
-      v-for="section in permissionData"
+      v-for="(section, sIndex) in permissionData"
       :key="section.section"
     >
+
+      <!-- Gạch ngang phân cách giữa các section -->
+      <div
+        v-if="sIndex > 0"
+        class="section-divider"
+      ></div>
 
       <div class="section-label">
         {{ section.section }}
       </div>
 
-      <!-- Module -->
-      <div
-        v-for="mod in section.modules"
-        :key="mod.key"
-        class="module-card"
-      >
+      <!-- Các module trong section, xếp thành hàng cột -->
+      <div class="modules-row">
 
-        <!-- Header -->
         <div
-          class="module-head"
-          @click="toggleModule(mod.key)"
+          v-for="mod in section.modules"
+          :key="mod.key"
+          class="module-col"
         >
 
-          <div class="module-name">
+          <div class="module-title">
             <i :class="['bi', mod.icon]"></i>
             {{ mod.name }}
           </div>
 
-          <div class="module-right">
-
-            <span
-              :class="['badge', badgeClass(mod)]"
-            >
-              {{ checkedCount(mod) }}/{{ totalCount(mod) }}
-            </span>
-
-            <i
-              :class="[
-                'bi',
-                'bi-chevron-down',
-                'chevron',
-                { open: expanded[mod.key] }
-              ]"
-            ></i>
-
-          </div>
-
-        </div>
-
-        <!-- Body -->
-        <div
-          v-if="expanded[mod.key]"
-          class="module-body"
-        >
-
-          <!-- Module có sub -->
+          <!-- Module có nhiều nhóm con -->
           <template v-if="mod.subs">
 
             <div
               v-for="sub in mod.subs"
               :key="sub.key"
-              class="sub-section"
+              class="sub-block"
             >
 
-              <div class="sub-header">
-
-                <div class="sub-title">
-                  {{ sub.label }}
-                </div>
-
-                <div class="sub-count">
-                  {{ (sub.perms || []).filter(p => p.checked).length }}
-                  /
-                  {{ (sub.perms || []).length }}
-                </div>
-
+              <div class="sub-title">
+                {{ sub.label }}
               </div>
-
-              <div class="perms-grid">
-
-                <label
-                  v-for="perm in sub.perms"
-                  :key="perm.code"
-                  class="perm-label"
-                  :class="{
-                    disabled: isPermDisabled(perm, sub.perms)
-                  }"
-                >
-
-                  <input
-                    type="checkbox"
-                    v-model="perm.checked"
-                    :disabled="isPermDisabled(perm, sub.perms)"
-                    @change="onPermChange(perm, sub.perms)"
-                  >
-
-                  {{ perm.label }}
-
-                </label>
-
-              </div>
-
-            </div>
-
-          </template>
-
-          <!-- Module thường -->
-          <template v-else>
-
-            <div class="perms-grid">
 
               <label
-                v-for="perm in mod.perms"
+                v-for="perm in sub.perms"
                 :key="perm.code"
-                class="perm-label"
+                class="perm-row"
                 :class="{
-                  disabled: isPermDisabled(perm, mod.perms)
+                  disabled: isPermDisabled(perm, sub.perms)
                 }"
               >
 
                 <input
                   type="checkbox"
                   v-model="perm.checked"
-                  :disabled="isPermDisabled(perm, mod.perms)"
-                  @change="onPermChange(perm, mod.perms)"
+                  :disabled="isPermDisabled(perm, sub.perms)"
+                  @change="onPermChange(perm, sub.perms)"
                 >
 
                 {{ perm.label }}
@@ -176,6 +114,31 @@
               </label>
 
             </div>
+
+          </template>
+
+          <!-- Module không có nhóm con -->
+          <template v-else>
+
+            <label
+              v-for="perm in mod.perms"
+              :key="perm.code"
+              class="perm-row"
+              :class="{
+                disabled: isPermDisabled(perm, mod.perms)
+              }"
+            >
+
+              <input
+                type="checkbox"
+                v-model="perm.checked"
+                :disabled="isPermDisabled(perm, mod.perms)"
+                @change="onPermChange(perm, mod.perms)"
+              >
+
+              {{ perm.label }}
+
+            </label>
 
           </template>
 
@@ -207,6 +170,15 @@
 
     </div>
 
+    <!-- Modal thông báo (thành công / lỗi) -->
+    <BaseModal
+      :visible="modal.visible"
+      :type="modal.type"
+      :title="modal.title"
+      :message="modal.message"
+      @close="closeModal"
+    />
+
   </div>
 </template>
 
@@ -214,11 +186,32 @@
 import { ref, computed, reactive, onMounted } from "vue"
 import permissionService from "@/api/permissionService"
 import permissionMenu from "@/api/permissionMenu"
+// TODO: đổi đúng đường dẫn tới component modal của bạn nếu khác chỗ này
+import BaseModal from "@/components/BaseModal.vue"
 
 const staffList = ref([])
 const selectedStaff = ref(null)
 const permissionData = ref([])
 const expanded = reactive({})
+
+// ===== State cho modal thông báo =====
+const modal = reactive({
+  visible: false,
+  type: "info", // success | error | confirm | info
+  title: "",
+  message: ""
+})
+
+function showModal(type, title, message) {
+  modal.type = type
+  modal.title = title
+  modal.message = message
+  modal.visible = true
+}
+
+function closeModal() {
+  modal.visible = false
+}
 
 const selectedStaffName = computed(() => {
   const staff = staffList.value.find(
@@ -242,6 +235,7 @@ async function loadStaff() {
 
   } catch (e) {
     console.log(e)
+    showModal("error", "Không tải được danh sách nhân viên", "Vui lòng thử tải lại trang.")
   }
 }
 
@@ -314,6 +308,7 @@ async function loadPermissions() {
   } catch (e) {
 
     console.log(e)
+    showModal("error", "Không tải được danh sách quyền", "Vui lòng thử tải lại trang.")
 
   }
 
@@ -348,6 +343,7 @@ async function onStaffChange() {
   } catch (e) {
 
     console.log(e)
+    showModal("error", "Không tải được quyền của nhân viên", "Vui lòng chọn lại nhân viên hoặc thử lại sau.")
 
   }
 
@@ -380,11 +376,12 @@ async function savePermissions() {
       permissionIds
     )
 
-    alert("Lưu thành công")
+    showModal("success", "Lưu thành công", `Đã cập nhật quyền cho ${selectedStaffName.value}.`)
 
   } catch (e) {
 
     console.log(e)
+    showModal("error", "Lưu thất bại", "Có lỗi xảy ra khi lưu quyền, vui lòng thử lại.")
 
   }
 
@@ -560,19 +557,19 @@ const totalChecked = computed(() => {
   width:48px;
   height:48px;
   border-radius:12px;
-  background:#fff0f7;
+  background:#f55d9b;
   display:flex;
   justify-content:center;
   align-items:center;
   font-size:22px;
-  color:#f55d9b;
+  color:#fff;
 }
 
 .header-text h2{
   margin:0;
   font-size:20px;
   font-weight:700;
-  color:#1f2937;
+  color:#f55d9b;
 }
 
 .header-text p{
@@ -596,7 +593,7 @@ const totalChecked = computed(() => {
 }
 
 .staff-label{
-  font-weight:600;
+  font-weight:700;
   color:#374151;
 }
 
@@ -619,187 +616,95 @@ const totalChecked = computed(() => {
   margin-left:auto;
   color:#6b7280;
   font-size:13px;
+  font-weight:600;
 }
 
 /* ================= SECTION ================= */
 
 .section-label{
-  margin:24px 0 10px;
+  margin:24px 0 14px;
   color:#c33d7a;
-  font-weight:700;
-  font-size:13px;
+  font-weight:800;
+  font-size:15px;
   text-transform:uppercase;
   letter-spacing:1px;
 }
 
-/* ================= MODULE ================= */
-
-.module-card{
-  background:#fff;
-  border:1px solid #f3d6e3;
-  border-radius:14px;
-  margin-bottom:14px;
-  overflow:hidden;
-  box-shadow:0 2px 10px rgba(0,0,0,.05);
+.section-divider{
+  border-top: 2px dashed #e8b8cf;
+  margin: 26px 0;
 }
 
-.module-head{
+/* ================= MODULES ROW (dạng cột như hình mẫu) ================= */
+
+.modules-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:32px;
+  margin-bottom:6px;
+}
+
+.module-col{
   display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:16px 20px;
-  cursor:pointer;
-  transition:.2s;
+  flex-direction:column;
+  gap:10px;
 }
 
-.module-head:hover{
-  background:#fff3f8;
-}
-
-.module-name{
+.module-title{
   display:flex;
   align-items:center;
-  gap:12px;
-  font-size:15px;
-  font-weight:600;
-  color:#374151;
+  gap:8px;
+  font-size:16px;
+  font-weight:800;
+  color:#1f2937;
+  margin-bottom:4px;
 }
 
-.module-name i{
+.module-title i{
   color:#f55d9b;
-  font-size:18px;
-}
-
-.module-right{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.chevron{
-  transition:.25s;
-  color:#b4557d;
-}
-
-.chevron.open{
-  transform:rotate(180deg);
-}
-
-/* ================= BADGE ================= */
-
-.badge{
-  min-width:52px;
-  text-align:center;
-  padding:5px 12px;
-  border-radius:20px;
-  font-size:12px;
-  font-weight:700;
-}
-
-.badge-none{
-  background:#f3f4f6;
-  color:#6b7280;
-}
-
-.badge-some{
-  background:#fff0f7;
-  color:#d63384;
-}
-
-.badge-all{
-  background:#e8fff2;
-  color:#15803d;
-}
-
-/* ================= BODY ================= */
-
-.module-body{
-  padding:18px 20px;
-  border-top:1px solid #f3d6e3;
-  background:#fffdfd;
+  font-size:17px;
 }
 
 /* ================= SUB ================= */
 
-.sub-section{
-  margin-bottom:22px;
-}
-
-.sub-section:last-child{
-  margin-bottom:0;
-}
-
-.sub-header{
+.sub-block{
   display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:14px;
+  flex-direction:column;
+  gap:8px;
+  margin-bottom:8px;
 }
 
 .sub-title{
-  font-size:17px;
-  font-weight:600;
-  color:#374151;
+  font-size:14px;
+  font-weight:800;
+  color:#c33d7a;
 }
 
-.sub-count{
-  background:#fff0f7;
-  color:#d63384;
-  padding:4px 12px;
-  border-radius:20px;
-  font-size:13px;
-  font-weight:700;
-}
+/* ================= PERMISSIONS (dạng dòng, không có khung) ================= */
 
-/* ================= PERMISSIONS ================= */
-
-.perms-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
-  gap:12px;
-}
-
-.perm-label{
+.perm-row{
   display:flex;
   align-items:center;
-  gap:12px;
-
-  background:#fff;
-
-  border:1px solid #f3d6e3;
-  border-radius:10px;
-
-  padding:12px 14px;
+  gap:10px;
 
   cursor:pointer;
 
-  transition:.2s;
+  font-weight:700;
+  font-size:14.5px;
+  color:#1f2937;
 
-  color:#374151;
-  font-size:14px;
+  padding:2px 0;
 }
 
-.perm-label:hover{
-  background:#fff5f9;
-  border-color:#f55d9b;
-  transform:translateY(-1px);
-}
-
-.perm-label input{
+.perm-row input{
   width:17px;
   height:17px;
   accent-color:#f55d9b;
 }
 
-.perm-label.disabled{
+.perm-row.disabled{
   opacity:.45;
   cursor:not-allowed;
-}
-
-.perm-label.disabled:hover{
-  transform:none;
-  border-color:#f3d6e3;
-  background:#fff;
 }
 
 /* ================= SAVE ================= */
@@ -823,6 +728,7 @@ const totalChecked = computed(() => {
 .perm-counter{
   color:#6b7280;
   font-size:14px;
+  font-weight:600;
 }
 
 .perm-counter strong{
@@ -844,7 +750,7 @@ const totalChecked = computed(() => {
 
   border-radius:10px;
 
-  font-weight:600;
+  font-weight:700;
 
   cursor:pointer;
 
@@ -884,8 +790,9 @@ const totalChecked = computed(() => {
     justify-content:center;
   }
 
-  .perms-grid{
+  .modules-row{
     grid-template-columns:1fr;
+    gap:20px;
   }
 }
 </style>
