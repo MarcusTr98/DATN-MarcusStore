@@ -198,8 +198,8 @@ onUnmounted(() => {
                 <span v-if="wishlistCount > 0" class="cart-count">{{ wishlistCount }}</span>
               </div>
               <div class="h-action-text d-none d-xl-block">
-                <span class="h-action-sub">Yêu thích</span>
-                <span class="h-action-main">Sản phẩm</span>
+                <span class="h-action-sub d-block">Yêu thích</span>
+                <span class="h-action-main d-block">Sản phẩm</span>
               </div>
             </router-link>
 
