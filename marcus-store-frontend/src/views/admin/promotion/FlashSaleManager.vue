@@ -102,8 +102,8 @@
             </tr>
             </thead>
             <tbody>
-            <tr v-for="slot in filteredSlots" :key="slot.slotId">
-              <td><span class="id-text">#{{ String(slot.slotId).padStart(3, '0') }}</span></td>
+            <tr v-for="(slot, index) in slotsWithStatus" :key="slot.slotId">
+              <td><span class="id-text">#{{ currentPage * pageSize + index + 1 }}</span></td>
               <td><span class="slot-name">{{ slot.name }}</span></td>
               <td>
                 <div class="time-line">
@@ -147,7 +147,7 @@
         </div>
 
         <!-- EMPTY -->
-        <div v-if="!loading && localSlots.length === 0" class="empty-state">
+        <div v-if="!loading && slots.length === 0" class="empty-state">
           <i class="bi bi-lightning"></i>
           <p>Chưa có Flash Sale nào</p>
           <span class="fs-hint-text">Tạo chiến dịch Flash Sale đầu tiên để bắt đầu.</span>
@@ -157,6 +157,43 @@
         <div v-if="loading" class="empty-state">
           <div class="spinner-border text-primary" role="status"></div>
           <p class="mt-2">Đang tải...</p>
+        </div>
+
+        <!-- PAGINATION -->
+        <div v-if="pagination.totalPages > 0" class="flashsale-pagination">
+          <div class="pagination-summary">
+            Tổng <strong>{{ pagination.totalElements }}</strong> chiến dịch
+          </div>
+          <div class="pagination-controls">
+            <label class="page-size-control">
+              <span>Hiển thị</span>
+              <select v-model.number="pageSize" class="form-select form-select-sm">
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              class="pagination-button"
+              :disabled="currentPage === 0"
+              @click="goToPage(currentPage - 1)"
+            >
+              Trước
+            </button>
+            <span class="page-indicator">
+              Trang <strong>{{ currentPage + 1 }}</strong> / {{ pagination.totalPages }}
+            </span>
+            <button
+              type="button"
+              class="pagination-button"
+              :disabled="currentPage + 1 >= pagination.totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              Sau
+            </button>
+          </div>
         </div>
       </section>
     </div>
@@ -628,146 +665,84 @@
 </template>
 <script setup>
 import {computed, reactive, ref, watch, onMounted, onUnmounted, nextTick} from 'vue'
+import { storeToRefs } from 'pinia'
+import { useFlashSaleStore } from '@/stores/flashSaleStore'
 import '@/assets/css/FlashSale.css'
 
-/* ── MOCK DATA MODE ── */
-// eslint-disable-next-line no-unused-vars
-const USE_MOCK_DATA = true
+const flashSaleStore = useFlashSaleStore()
+const { slots, loading, error, fieldErrors, pagination, stats } = storeToRefs(flashSaleStore)
 
-/* ── MOCK SLOTS (6 trang thai khac nhau) ── */
 const now = new Date()
-const d = (offsetDays) => {
-  const dt = new Date(now)
-  dt.setDate(dt.getDate() + offsetDays)
-  return dt.toISOString()
+
+/* ── FILTERS ── */
+const filters = reactive({
+  keyword: '',
+  status: 'ALL',
+})
+
+function resetFilters() {
+  filters.keyword = ''
+  filters.status = 'ALL'
 }
 
-const MOCK_SLOTS = [
-  {
-    slotId: 1,
-    name: 'Flash Sale Thu 6 - iPhone 15 Series',
-    startDate: d(0),
-    endDate: d(1),
-    status: 2, // ACTIVE
-    items: [
-      {
-        skuId: 1,
-        productName: 'iPhone 15 Pro Max 256GB',
-        originalPrice: 34990000,
-        flashSalePrice: 29990000,
-        flashSaleQuantity: 50,
-        soldQuantity: 23
-      },
-      {
-        skuId: 2,
-        productName: 'iPhone 15 Pro 128GB',
-        originalPrice: 27990000,
-        flashSalePrice: 23990000,
-        flashSaleQuantity: 30,
-        soldQuantity: 18
-      },
-    ]
-  },
-  {
-    slotId: 2,
-    name: 'Flash Sale Cuoi Tuan - Samsung Galaxy',
-    startDate: d(2),
-    endDate: d(3),
-    status: 1, // SCHEDULED
-    items: [
-      {
-        skuId: 3,
-        productName: 'Samsung Galaxy S24 Ultra',
-        originalPrice: 29990000,
-        flashSalePrice: 25990000,
-        flashSaleQuantity: 25,
-        soldQuantity: 0
-      },
-      {
-        skuId: 4,
-        productName: 'Samsung Galaxy S24+',
-        originalPrice: 21990000,
-        flashSalePrice: 18990000,
-        flashSaleQuantity: 40,
-        soldQuantity: 0
-      },
-    ]
-  },
-  {
-    slotId: 3,
-    name: 'Flash Sale Sang Thu 2 - Xiaomi',
-    startDate: d(5),
-    endDate: d(6),
-    status: 1, // UPCOMING (startDate > now)
-    items: [
-      {
-        skuId: 5,
-        productName: 'Xiaomi 14 Ultra',
-        originalPrice: 22990000,
-        flashSalePrice: 19990000,
-        flashSaleQuantity: 35,
-        soldQuantity: 0
-      },
-    ]
-  },
-  {
-    slotId: 4,
-    name: 'Flash Sale Tuan Truoc - OPPO',
-    startDate: d(-3),
-    endDate: d(-2),
-    status: 3, // ENDED
-    items: [
-      {
-        skuId: 6,
-        productName: 'OPPO Find X7 Pro',
-        originalPrice: 19990000,
-        flashSalePrice: 16990000,
-        flashSaleQuantity: 60,
-        soldQuantity: 60
-      },
-    ]
-  },
-  {
-    slotId: 5,
-    name: 'Flash Sale Da Huy - Vivo',
-    startDate: d(-1),
-    endDate: d(1),
-    status: 4, // CANCELLED
-    items: [
-      {
-        skuId: 7,
-        productName: 'Vivo X100 Pro',
-        originalPrice: 17990000,
-        flashSalePrice: 14990000,
-        flashSaleQuantity: 20,
-        soldQuantity: 0
-      },
-    ]
-  },
-  {
-    slotId: 6,
-    name: 'Flash Sale Cho Xu Ly - Google Pixel',
-    startDate: null,
-    endDate: null,
-    status: 0, // PENDING
-    items: [
-      {
-        skuId: 8,
-        productName: 'Google Pixel 8 Pro',
-        originalPrice: 22990000,
-        flashSalePrice: 19990000,
-        flashSaleQuantity: 15,
-        soldQuantity: 0
-      },
-    ]
-  },
-]
+/* ── PAGINATION ── */
+const currentPage = ref(0)
+const pageSize = ref(5)
 
-/* ── LOCAL STATE (mock) ── */
-const localSlots = ref([...MOCK_SLOTS])
-const loading = ref(false)
-const submitted = ref(false)
-const saving = ref(false)
+function buildSlotQuery() {
+  return {
+    page: currentPage.value,
+    size: pageSize.value,
+    keyword: filters.keyword || undefined,
+    status: filters.status === 'ALL' ? undefined : filters.status,
+  }
+}
+
+function loadSlots() {
+  return flashSaleStore.fetchSlots(buildSlotQuery())
+}
+
+function goToPage(page) {
+  if (page < 0 || page >= pagination.value.totalPages) {
+    return
+  }
+  currentPage.value = page
+  loadSlots()
+}
+
+watch(
+  () => [filters.keyword, filters.status],
+  () => {
+    currentPage.value = 0
+    loadSlots()
+  }
+)
+
+watch(pageSize, () => {
+  currentPage.value = 0
+  loadSlots()
+})
+
+// #region DEBUG_LOG - watch stats changes
+watch(stats, (newVal) => {
+  // #region DEBUG_LOG
+  console.log('[DEBUG_STATS_VUE] stats from storeToRefs changed:', JSON.parse(JSON.stringify(newVal)))
+  fetch('http://127.0.0.1:7828/ingest/6683b584-65cf-4bee-bf05-7d2708749dc3', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '41c373' },
+    body: JSON.stringify({
+      sessionId: '41c373',
+      location: 'FlashSaleManager.vue:636',
+      message: 'stats ref from storeToRefs',
+      data: { stats: JSON.parse(JSON.stringify(newVal)) },
+      timestamp: Date.now()
+    })
+  }).catch(() => {})
+  // #endregion
+}, { deep: true })
+// #endregion
+
+
 
 function resolveStatus(slot) {
   if (slot.status === 2) return 'ACTIVE'
@@ -782,47 +757,13 @@ function resolveStatus(slot) {
 }
 
 const slotsWithStatus = computed(() =>
-  localSlots.value.map(s => ({...s, resolvedStatus: resolveStatus(s)}))
-)
-
-/* ── FILTERS ── */
-const filters = reactive({
-  keyword: '',
-  status: 'ALL',
-})
-
-watch(
-  () => [filters.keyword, filters.status],
-  () => {
-  }
+  slots.value.map(s => ({...s, resolvedStatus: resolveStatus(s)}))
 )
 
 const filteredSlots = computed(() => {
-  return slotsWithStatus.value.filter((s) => {
-    if (filters.keyword && !s.name.toLowerCase().includes(filters.keyword.toLowerCase())) {
-      return false
-    }
-    if (filters.status !== 'ALL' && s.resolvedStatus !== filters.status) {
-      return false
-    }
-    return true
-  })
+  return slotsWithStatus.value
 })
 
-function resetFilters() {
-  filters.keyword = ''
-  filters.status = 'ALL'
-}
-
-/* ── STATS ── */
-const stats = computed(() => ({
-  total: localSlots.value.length,
-  active: slotsWithStatus.value.filter((s) => s.resolvedStatus === 'ACTIVE').length,
-  upcoming: slotsWithStatus.value.filter((s) => s.resolvedStatus === 'UPCOMING' || s.resolvedStatus === 'SCHEDULED').length,
-  totalProducts: localSlots.value.reduce((a, s) => a + s.items.length, 0),
-}))
-
-/* ── FORMAT ── */
 function formatVND(value) {
   if (value === null || value === undefined || value === '') return '-'
   return new Intl.NumberFormat('vi-VN', {
@@ -867,12 +808,12 @@ function statusBadgeClass(slot) {
   }[slot.resolvedStatus] || 'info'
 }
 
-/* ── TOGGLE ACTIVE ── */
+
 function toggleActive(slot, checked) {
-  const idx = localSlots.value.findIndex(s => s.slotId === slot.slotId)
+  const idx = slots.value.findIndex(s => s.slotId === slot.slotId)
   if (idx !== -1) {
-    localSlots.value[idx] = {
-      ...localSlots.value[idx],
+    slots.value[idx] = {
+      ...slots.value[idx],
       status: checked ? 2 : 3
     }
     showToast({
@@ -883,9 +824,6 @@ function toggleActive(slot, checked) {
   }
 }
 
-/* ════════════════════════════════════
-   MODAL STATE
-═══════════════════════════════════ */
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const activeTab = ref(0)
@@ -922,8 +860,8 @@ const errors = computed(() => {
   return result
 })
 
-/* ── PRODUCT SELECTION ── */
-// categoryId: 1 = Điện thoại, 2 = Phụ kiện, 3 = Laptop
+
+
 const PRODUCTS = [
   {
     id: 1,
@@ -1233,9 +1171,7 @@ function onQtyChange(pid, value) {
   selItems[pid] = {...selItems[pid], flashSaleQuantity: v}
 }
 
-/* ════════════════════════════════════
-   CRUD
-═══════════════════════════════════ */
+
 function openCreateModal() {
   editSlotId.value = null
   isEditing.value = false
@@ -1351,21 +1287,21 @@ async function saveSlot() {
     items,
   }
 
-  // Simulate async
+
   await new Promise(r => setTimeout(r, 300))
 
   if (isEditing.value) {
-    const idx = localSlots.value.findIndex(s => s.slotId === editSlotId.value)
+    const idx = slots.value.findIndex(s => s.slotId === editSlotId.value)
     if (idx !== -1) {
-      localSlots.value[idx] = {...localSlots.value[idx], ...payload}
+      slots.value[idx] = {...slots.value[idx], ...payload}
     }
     showToast({type: 'success', title: 'Thành công', message: 'Cập nhật Flash Sale thành công!'})
   } else {
     const newSlot = {
       ...payload,
-      slotId: Math.max(...localSlots.value.map(s => s.slotId), 0) + 1,
+      slotId: Math.max(...slots.value.map(s => s.slotId), 0) + 1,
     }
-    localSlots.value.unshift(newSlot)
+    slots.value.unshift(newSlot)
     showToast({type: 'success', title: 'Thành công', message: 'Tạo Flash Sale thành công!'})
   }
 
@@ -1374,7 +1310,7 @@ async function saveSlot() {
 }
 
 
-/* ── DELETE ── */
+
 const showDelModal = ref(false)
 const delTarget = ref(null)
 
@@ -1391,14 +1327,12 @@ function closeDelModal() {
 async function confirmDel() {
   if (!delTarget.value) return
   await new Promise(r => setTimeout(r, 200))
-  localSlots.value = localSlots.value.filter(s => s.slotId !== delTarget.value.slotId)
+  slots.value = slots.value.filter(s => s.slotId !== delTarget.value.slotId)
   showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
   closeDelModal()
 }
 
-/* ════════════════════════════════════
-   TOAST
-═══════════════════════════════════ */
+
 const toast = reactive({
   show: false,
   type: 'success',
@@ -1421,13 +1355,8 @@ function showToast({type = 'success', title, message}) {
     }, 2800)
   })
 }
-
-onUnmounted(() => {
-  clearTimeout(toastTimer)
-})
-
-// Close dropdowns on outside click / Escape
-onMounted(() => {
+onMounted(async () => {
+  await loadSlots()
   document.addEventListener('click', (e) => {
     const inCascade = e.target.closest('.fs-cascade-wrap')
     const inCat = e.target.closest('.fs-cat-wrap')
@@ -1441,6 +1370,11 @@ onMounted(() => {
     }
   })
 })
+onUnmounted(() => {
+  clearTimeout(toastTimer)
+})
+
+
 </script>
 
 <style scoped>
