@@ -122,6 +122,11 @@ const routes = [
           },
         ],
       },
+      {
+        path: 'khuyen-mai',
+        name: 'FlashSalePage',
+        component: () => import('@/views/client/shop/FlashSalePage.vue'),
+      },
     ],
   },
 

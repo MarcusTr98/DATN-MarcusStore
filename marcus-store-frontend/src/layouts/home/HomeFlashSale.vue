@@ -46,7 +46,7 @@
                 <small class="sold-text">Đã bán {{ product.sold }}/{{ product.total }}</small>
               </div>
             </div>
-          </div>
+          </div>  
         </div>
       </div>
     </div>
