@@ -1,6 +1,19 @@
 <template>
   <div class="flash-sale-page">
-
+    <!-- Timeline Bar -->
+    <section class="flash-timeline">
+      <span class="timeline-label">Flash Sale hôm nay</span>
+      <div
+        v-for="(slot, index) in flashSlots"
+        :key="index"
+        class="slot"
+        :class="{ live: slot.isLive }"
+      >
+        <span class="dot"></span>
+        {{ slot.time }}
+        <span v-if="!slot.isLive" class="bell">🔔</span>
+      </div>
+    </section>
 
     <!-- Hero Banner Section -->
     <section class="flash-hero">
@@ -92,7 +105,7 @@
     <!-- Product Section -->
     <div class="section-head">
       <h2>Đang <span>cháy</span> hàng</h2>
-      <router-link to="/khuyen-mai" class="see-all">Đi đến trang khuyến mãi</router-link>
+      <router-link to="/" class="see-all">← Quay lại trang chủ</router-link>
     </div>
 
     <section class="product-grid">
@@ -140,6 +153,49 @@
         </button>
       </article>
     </section>
+
+    <!-- Promo Banners -->
+    <section class="promo-grid">
+      <div class="promo promo-b">
+        <div class="tag">Ưu đãi thêm</div>
+        <h3>Thu cũ đổi mới</h3>
+        <p>Trợ giá đến 3 triệu khi lên đời máy mới.</p>
+      </div>
+      <div class="promo promo-b">
+        <div class="tag">Thanh toán linh hoạt</div>
+        <h3>Trả góp 0%</h3>
+        <p>Duyệt nhanh 5 phút, không cần chứng minh thu nhập.</p>
+      </div>
+      <div class="promo promo-b">
+        <div class="tag">Giao hàng siêu tốc</div>
+        <h3>SHIP HỎA TỐC </h3>
+        <p>Nhận hàng ngay trong 2 giờ tại nội thành. Miễn phí vận chuyển cho đơn hàng Flash Sale.</p>
+      </div>
+      <div class="promo promo-b">
+        <div class="tag">Độc quyền MarcusStore
+        </div>
+        <h3>BẢO HÀNH 1 ĐỔI 1</h3>
+        <p>Lỗi là đổi mới trong 30 ngày đầu tiên. Bảo hành chính hãng lên đến 24 tháng.</p>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="flash-footer">
+      <div class="footer-left">
+        <router-link to="/" class="footer-logo">
+          <i class="fas fa-mobile-alt"></i>
+          <span>Marcus<strong>STORE</strong></span>
+        </router-link>
+        <p>Hệ thống cửa hàng công nghệ hàng đầu Việt Nam</p>
+      </div>
+      <div class="footer-right">
+        <router-link to="/" class="back-home">
+          <i class="fas fa-home"></i>
+          Quay về trang chủ
+        </router-link>
+      </div>
+    </footer>
+
     <!-- FOMO Popup -->
     <div class="fomo" :class="{ show: fomoVisible }" role="status" aria-live="polite">
       <button class="fomo-close" @click="closeFomo">✕</button>
