@@ -18,7 +18,6 @@
             class="form-input"
             type="text"
             v-model="form.title"
-            maxlength="255"
             placeholder="VD: Banner khuyến mãi mùa hè"
           />
         </div>
@@ -48,34 +47,72 @@
         </div>
 
         <div class="form-row">
-          <label>URL hình ảnh <span class="req">*</span></label>
+          <label>Hình ảnh banner <span class="req">*</span></label>
+
+          <!-- Dropzone upload file -->
+          <div
+            class="upload-dropzone"
+            :class="{ 'is-uploading': uploading, 'has-image': form.imageUrl && !imgBroken }"
+            @click="!uploading && $refs.fileInput.click()"
+            @dragover.prevent
+            @drop.prevent="onDrop"
+          >
+            <!-- Đang upload -->
+            <div v-if="uploading" class="upload-state">
+              <div class="upload-spinner"></div>
+              <span>Đang tải lên... {{ uploadPercent }}%</span>
+            </div>
+
+            <!-- Đã có ảnh hợp lệ -->
+            <img
+              v-else-if="form.imageUrl && !imgBroken"
+              :src="form.imageUrl"
+              alt="Preview"
+              class="upload-preview-img"
+              @error="imgBroken = true"
+              @load="imgBroken = false"
+            />
+
+            <!-- Chưa có ảnh hoặc URL lỗi -->
+            <div v-else class="upload-state">
+              <i class="ti ti-cloud-upload upload-icon"></i>
+              <span class="upload-text">Kéo thả hoặc <u>chọn ảnh từ máy</u></span>
+              <span class="upload-hint">JPG, PNG, WEBP · Tối đa 5MB</span>
+            </div>
+
+            <input
+              ref="fileInput"
+              type="file"
+              accept="image/*"
+              style="display:none"
+              @change="onFileChange"
+            />
+          </div>
+
+          <!-- Hoặc nhập URL trực tiếp -->
+          <div class="url-or">
+            <span>hoặc nhập URL trực tiếp</span>
+          </div>
           <input
             class="form-input"
             type="url"
             v-model="form.imageUrl"
-            placeholder="https://..."
+            placeholder="https://res.cloudinary.com/..."
+            @input="imgBroken = false"
           />
-          <div class="img-preview-box">
-            <img
-              v-if="form.imageUrl"
-              :src="form.imageUrl"
-              alt="Preview"
-              @error="imgBroken = true"
-              @load="imgBroken = false"
-              v-show="!imgBroken"
-            />
-            <span v-if="!form.imageUrl" class="img-hint">
-              <i class="ti ti-photo"></i>Nhập URL để xem trước ảnh
-            </span>
-            <span v-if="form.imageUrl && imgBroken" class="img-hint">
-              <i class="ti ti-photo-off"></i>URL ảnh không hợp lệ
-            </span>
+          <div v-if="uploadError" class="upload-error-msg">
+            <i class="ti ti-alert-circle"></i> {{ uploadError }}
           </div>
         </div>
 
         <div class="form-row">
-          <label>URL liên kết (tùy chọn)</label>
-          <input class="form-input" type="url" v-model="form.linkUrl" placeholder="https://..." />
+          <label>Đường dẫn khi click (tùy chọn)</label>
+          <input
+            class="form-input"
+            v-model="form.linkUrl"
+            placeholder="VD: /san-pham/iphone-15-pro-max hoặc /flash-sale"
+          />
+          <span class="field-hint">Slug nội bộ hoặc URL đầy đủ — để trống nếu banner không cần link</span>
         </div>
 
         <div class="form-row-2">
@@ -120,14 +157,15 @@
 
 <script setup>
 import { reactive, ref, computed, watch } from 'vue';
+import bannerApi from '@/api/BannerApi';
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
-  banner: { type: Object, default: null }, // null = thêm mới, object = sửa
-  nextOrder: { type: Number, default: 1 }, // số lượng banner hiện tại + 1
+  banner: { type: Object, default: null },
+  nextOrder: { type: Number, default: 1 },
   positions: {
     type: Array,
-    default: () => [], // positionId thật là số, nên không dùng default giả dạng string nữa
+    default: () => [],
   },
 });
 
@@ -135,6 +173,12 @@ const emit = defineEmits(['close', 'save']);
 
 const isEdit = computed(() => !!props.banner);
 const imgBroken = ref(false);
+
+// ---- Upload state ----
+const uploading = ref(false);
+const uploadPercent = ref(0);
+const uploadError = ref('');
+const fileInput = ref(null);
 
 const defaultForm = () => ({
   id: null,
@@ -150,17 +194,66 @@ const defaultForm = () => ({
 
 const form = reactive(defaultForm());
 
-// Mỗi khi modal mở lại (thêm mới hoặc sửa khác), nạp lại dữ liệu form
 watch(
   () => props.visible,
   (val) => {
     if (val) {
       imgBroken.value = false;
+      uploadError.value = '';
+      uploading.value = false;
+      uploadPercent.value = 0;
       const base = props.banner ? { ...props.banner } : defaultForm();
       Object.assign(form, base);
     }
   }
 );
+
+// ---- Upload ảnh qua bannerApi.uploadImage (dùng chung axios instance `api`) ----
+async function uploadToCloudinary(file) {
+  if (!file) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    uploadError.value = 'Ảnh quá lớn, tối đa 5MB';
+    return;
+  }
+  if (!file.type.startsWith('image/')) {
+    uploadError.value = 'Chỉ chấp nhận file ảnh (JPG, PNG, WEBP...)';
+    return;
+  }
+
+  uploading.value = true;
+  uploadError.value = '';
+  uploadPercent.value = 0;
+
+  try {
+    const url = await bannerApi.uploadImage(file, (e) => {
+      if (e.total) {
+        uploadPercent.value = Math.round((e.loaded / e.total) * 100);
+      }
+    });
+
+    form.imageUrl = url;
+    imgBroken.value = false;
+  } catch (err) {
+    uploadError.value =
+      err?.response?.data?.message || 'Upload thất bại, thử lại hoặc nhập URL thủ công';
+    console.error('Upload error:', err);
+  } finally {
+    uploading.value = false;
+  }
+}
+
+function onFileChange(e) {
+  const file = e.target.files?.[0];
+  if (file) uploadToCloudinary(file);
+  // Reset input để có thể chọn lại cùng file
+  e.target.value = '';
+}
+
+function onDrop(e) {
+  const file = e.dataTransfer.files?.[0];
+  if (file) uploadToCloudinary(file);
+}
 
 // Validate ngày: end phải >= start
 const dateInvalid = computed(() => {
@@ -171,15 +264,8 @@ const dateInvalid = computed(() => {
 });
 
 // Validate bắt buộc: title, positionId, imageUrl (@NotBlank/@NotNull trong BannerRequestDTO)
-// + chặn lưu khi ảnh preview lỗi (imgBroken), tránh lưu banner với URL ảnh không load được
 const canSave = computed(() => {
-  return (
-    !!form.title?.trim() &&
-    !!form.positionId &&
-    !!form.imageUrl &&
-    !dateInvalid.value &&
-    !imgBroken.value
-  );
+  return !!form.title?.trim() && !!form.positionId && !!form.imageUrl && !dateInvalid.value;
 });
 
 function closeIfOutside(e) {
@@ -445,5 +531,102 @@ function handleSave() {
   background: #f3d6e3;
   color: #b4557d;
   cursor: not-allowed;
+}
+
+/* ---- Upload dropzone ---- */
+.upload-dropzone {
+  border: 2px dashed #f3d6e3;
+  border-radius: 10px;
+  background: #fffafd;
+  min-height: 110px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.upload-dropzone:hover {
+  border-color: #f55d9b;
+  background: #fff0f7;
+}
+.upload-dropzone.is-uploading {
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+.upload-dropzone.has-image {
+  border-style: solid;
+  border-color: #f3d6e3;
+  min-height: 130px;
+}
+.upload-preview-img {
+  width: 100%;
+  max-height: 160px;
+  object-fit: contain;
+  display: block;
+}
+.upload-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px;
+  pointer-events: none;
+}
+.upload-icon {
+  font-size: 28px;
+  color: #efbdd2;
+}
+.upload-text {
+  font-size: 13px;
+  color: #b4557d;
+}
+.upload-text u {
+  color: #f55d9b;
+}
+.upload-hint {
+  font-size: 11px;
+  color: #d0a0b5;
+}
+.upload-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #f3d6e3;
+  border-top-color: #f55d9b;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.url-or {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: #b4557d;
+  font-size: 12px;
+}
+.url-or::before,
+.url-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #f3d6e3;
+}
+.upload-error-msg {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #b91c1c;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.field-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #b4557d;
 }
 </style>

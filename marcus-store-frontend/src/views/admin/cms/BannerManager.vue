@@ -1,23 +1,31 @@
 <template>
-  <div class="pg">
-    <div class="topbar">
-      <div class="topbar-left">
-        <i class="ti ti-layout-board topbar-icon"></i>
-        <span class="page-title">Quản lý Banner</span>
-        <span class="badge-count">{{ filteredBanners.length }} banner</span>
+  <div class="bm-page">
+    <div class="page-header">
+      <div class="page-header-left">
+        <div class="page-icon">
+          <i class="ti ti-layout-board"></i>
+        </div>
+        <div>
+          <h2 class="page-title">Quản lý Banner</h2>
+          <p class="page-sub">Quản lý banner quảng cáo hiển thị trên website.</p>
+        </div>
       </div>
-      <div class="topbar-right">
-        <button class="btn-add" @click="openAddModal">
-          <i class="ti ti-plus"></i>
-          Thêm banner
-        </button>
-      </div>
+      <button class="btn-add" @click="openAddModal">
+        <i class="ti ti-plus"></i> Thêm banner
+      </button>
     </div>
 
-    <div class="content">
-      <div v-if="loading" class="state-box">Đang tải dữ liệu...</div>
+    <!-- Nội dung -->
+    <div class="page-card">
+
+      <!-- Loading -->
+      <div v-if="loading" class="state-box">
+        <i class="ti ti-loader-2 spin"></i> Đang tải dữ liệu...
+      </div>
+
+      <!-- Lỗi -->
       <div v-else-if="loadError" class="state-box state-error">
-        {{ loadError }}
+        <i class="ti ti-alert-circle"></i> {{ loadError }}
         <button class="btn-retry" @click="loadAll">Thử lại</button>
       </div>
 
@@ -34,11 +42,17 @@
           :banners="filteredBanners"
           :positions="positionOptions"
           @edit="openEditModal"
-          @delete="handleDelete"
+          @delete="openDeleteConfirm"
         />
+
+        <!-- Pagination info -->
+        <div class="pagination-row">
+          <span class="pg-info">Hiển thị {{ filteredBanners.length }} / {{ banners.length }} banner</span>
+        </div>
       </template>
     </div>
 
+    <!-- Modal thêm/sửa -->
     <BannerModal
       :visible="modalVisible"
       :banner="editingBanner"
@@ -47,59 +61,95 @@
       @close="modalVisible = false"
       @save="handleSave"
     />
+
+    <!-- Modal xác nhận xóa (thay thế confirm() xấu xí) -->
+    <Teleport to="body">
+      <div v-if="deleteTarget" class="confirm-overlay" @click.self="deleteTarget = null">
+        <div class="confirm-box">
+          <div class="confirm-icon">
+            <i class="ti ti-alert-triangle"></i>
+          </div>
+          <h3 class="confirm-title">Xác nhận xóa banner</h3>
+          <p class="confirm-msg">
+            Bạn có chắc muốn xóa banner
+            <strong>"{{ deleteTarget.title }}"</strong>?<br />
+            <span class="confirm-note">Banner sẽ bị ẩn khỏi website (có thể khôi phục sau).</span>
+          </p>
+          <div class="confirm-actions">
+            <button class="btn-cancel-confirm" @click="deleteTarget = null">Hủy bỏ</button>
+            <button class="btn-confirm-del" :disabled="deleting" @click="confirmDelete">
+              <i class="ti ti-trash"></i>
+              {{ deleting ? 'Đang xóa...' : 'Xác nhận xóa' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue';
-import BannerFilter from './Bannerfilter.vue';
-import BannerTable from './Bannertable.vue';
-import BannerModal from './Bannermodal.vue';
+import BannerFilter from './BannerFilter.vue';
+import BannerTable from './BannerTable.vue';
+import BannerModal from './BannerModal.vue';
 import { bannerApi } from '@/api/BannerApi';
 
-// ---- State chính ----
-const banners = ref([]); // dữ liệu thật từ API, field khớp BannerResponseDTO
-const loading = ref(true);
-const loadError = ref('');
+// ---- State ----
+const banners    = ref([]);
+const rawPositions = ref([]); // danh sách vị trí thật từ API
+const loading    = ref(true);
+const loadError  = ref('');
+const modalVisible  = ref(false);
+const editingBanner = ref(null);
+const deleteTarget  = ref(null);
+const deleting      = ref(false);
 
-// positionOptions suy ra trực tiếp từ field positionId/positionCode/positionDescription
-// đã có sẵn trong mỗi banner (BannerService.toResponse() đã gắn kèm).
-// Lưu ý: chỉ liệt kê được vị trí đã có ít nhất 1 banner. Nếu sau này cần cả
-// vị trí "trống" chưa có banner nào, sẽ bổ sung API GET /banner-positions riêng.
-const positionOptions = computed(() => {
-  const map = new Map();
-  banners.value.forEach((b) => {
-    if (b.positionId != null && !map.has(b.positionId)) {
-      map.set(b.positionId, {
-        value: b.positionId,
-        label: b.positionDescription || b.positionCode,
-      });
-    }
-  });
-  return Array.from(map.values());
+// positionOptions: lấy từ API /banners/positions → đủ tất cả vị trí kể cả chưa có banner
+const positionOptions = computed(() =>
+  rawPositions.value.map(p => ({
+    value: p.positionId,
+    label: p.description || p.positionCode,
+  }))
+);
+
+// ---- Bộ lọc ----
+const filters = reactive({ search: '', position: '', status: '' });
+
+function computeStatus(b) {
+  if (!b.isActive) return 'hidden';
+  const now = new Date();
+  const s = b.startDate ? new Date(b.startDate) : null;
+  const e = b.endDate   ? new Date(b.endDate)   : null;
+  if (e && now > e)  return 'expired';
+  if (s && now < s)  return 'scheduled';
+  return 'active';
+}
+
+const filteredBanners = computed(() => {
+  let list = [...banners.value];
+  if (filters.search.trim()) {
+    const q = filters.search.toLowerCase();
+    list = list.filter(b => b.title?.toLowerCase().includes(q));
+  }
+  if (filters.position) {
+    list = list.filter(b => String(b.positionId) === String(filters.position));
+  }
+  if (filters.status) {
+    list = list.filter(b => computeStatus(b) === filters.status);
+  }
+  if (filters.position) {
+    list.sort((a, b) => a.displayOrder - b.displayOrder);
+  }
+  return list;
 });
 
-// ---- Convert ngày giữa input[type=date] (YYYY-MM-DD) và LocalDateTime backend (YYYY-MM-DDTHH:mm:ss) ----
-function toDateInput(isoDateTime) {
-  if (!isoDateTime) return '';
-  return isoDateTime.slice(0, 10); // lấy phần YYYY-MM-DD
-}
+// ---- Convert ngày ----
+function toDateInput(iso) { return iso ? iso.slice(0, 10) : ''; }
+function toApiDateTime(d) { return d ? `${d}T00:00:00` : null; }
 
-// Tách riêng start/end vì start nên tính từ đầu ngày, còn end phải tính tới
-// cuối ngày (23:59:59) để banner không bị coi là "hết hạn" ngay từ 00:00:01
-// của chính ngày kết thúc.
-function toApiStartDateTime(dateInput) {
-  if (!dateInput) return null;
-  return `${dateInput}T00:00:00`;
-}
-
-function toApiEndDateTime(dateInput) {
-  if (!dateInput) return null;
-  return `${dateInput}T23:59:59`;
-}
-
-// Chuyển 1 banner từ response backend -> format mà các component con đang dùng
-function mapBannerFromApi(b) {
+function mapFromApi(b) {
   return {
     id: b.id,
     title: b.title,
@@ -115,30 +165,32 @@ function mapBannerFromApi(b) {
   };
 }
 
-// Chuyển dữ liệu form -> đúng format BannerRequestDTO mà backend cần
-function mapBannerToApi(form) {
+function mapToApi(form) {
   return {
     title: form.title?.trim() || null,
     imageUrl: form.imageUrl?.trim() || null,
     targetUrl: form.linkUrl?.trim() || null,
     displayOrder: form.displayOrder ?? 0,
     isActive: !!form.isActive,
-    startDate: toApiStartDateTime(form.startDate),
-    endDate: toApiEndDateTime(form.endDate),
-    positionId: form.positionId ? Number(form.positionId) : null, // đảm bảo gửi số nguyên
+    startDate: toApiDateTime(form.startDate),
+    endDate: toApiDateTime(form.endDate),
+    positionId: form.positionId ? Number(form.positionId) : null,
   };
 }
 
-// ---- Tải dữ liệu ----
+// ---- API ----
 async function loadAll() {
   loading.value = true;
   loadError.value = '';
   try {
-    const bannerRes = await bannerApi.getAll();
-    banners.value = bannerRes.map(mapBannerFromApi);
-  } catch (err) {
+    const [bannerRes, posRes] = await Promise.all([
+      bannerApi.getAll(),
+      bannerApi.getPositions(),
+    ]);
+    banners.value    = bannerRes.map(mapFromApi);
+    rawPositions.value = posRes;
+  } catch {
     loadError.value = 'Không tải được dữ liệu banner. Vui lòng thử lại.';
-    console.error(err);
   } finally {
     loading.value = false;
   }
@@ -146,142 +198,216 @@ async function loadAll() {
 
 onMounted(loadAll);
 
-// ---- Bộ lọc ----
-const filters = reactive({
-  search: '',
-  position: '',
-  status: '',
-});
-
-// Tính trạng thái real-time cho 1 banner (đồng bộ logic với BannerTable)
-function computeStatus(b) {
-  if (!b.isActive) return 'hidden';
-  const now = new Date();
-  const start = b.startDate ? new Date(b.startDate) : null;
-  const end = b.endDate ? new Date(b.endDate) : null;
-  if (end && now > end) return 'expired';
-  if (start && now < start) return 'scheduled';
-  return 'active';
-}
-
-const filteredBanners = computed(() => {
-  let list = [...banners.value];
-
-  if (filters.search.trim()) {
-    const q = filters.search.toLowerCase();
-    list = list.filter((b) => b.title.toLowerCase().includes(q));
-  }
-  // filters.position là string từ <select>, positionId trong data là số -> so sánh ép kiểu
-  if (filters.position) {
-    list = list.filter((b) => String(b.positionId) === String(filters.position));
-  }
-  if (filters.status) {
-    list = list.filter((b) => computeStatus(b) === filters.status);
-  }
-
-  // UX logic: khi lọc theo 1 vị trí cụ thể, tự sắp xếp theo display_order tăng dần
-  if (filters.position) {
-    list.sort((a, b) => a.displayOrder - b.displayOrder);
-  }
-
-  return list;
-});
-
-// ---- Modal state ----
-const modalVisible = ref(false);
-const editingBanner = ref(null);
-
 function openAddModal() {
   editingBanner.value = null;
   modalVisible.value = true;
 }
-
 function openEditModal(banner) {
   editingBanner.value = banner;
   modalVisible.value = true;
 }
+function openDeleteConfirm(banner) {
+  deleteTarget.value = banner;
+}
 
-// ---- CRUD handlers gọi API thật ----
 async function handleSave(formData) {
   try {
-    const payload = mapBannerToApi(formData);
+    const payload = mapToApi(formData);
     if (formData.id) {
       const updated = await bannerApi.update(formData.id, payload);
-      const idx = banners.value.findIndex((b) => b.id === formData.id);
-      if (idx > -1) banners.value[idx] = mapBannerFromApi(updated);
+      const idx = banners.value.findIndex(b => b.id === formData.id);
+      if (idx > -1) banners.value[idx] = mapFromApi(updated);
     } else {
       const created = await bannerApi.create(payload);
-      banners.value.unshift(mapBannerFromApi(created));
+      banners.value.unshift(mapFromApi(created));
     }
     modalVisible.value = false;
   } catch (err) {
-    const msg = err?.response?.data?.message || 'Lưu banner thất bại. Vui lòng thử lại.';
-    alert(msg);
-    console.error(err);
+    alert(err?.response?.data?.message || 'Lưu banner thất bại. Vui lòng thử lại.');
   }
 }
 
-async function handleDelete(banner) {
-  if (!confirm(`Xóa banner "${banner.title}"?`)) return;
+async function confirmDelete() {
+  if (!deleteTarget.value) return;
+  deleting.value = true;
   try {
-    await bannerApi.remove(banner.id);
-    // Backend hiện chỉ trả về message dạng string (không trả BannerResponseDTO),
-    // nên cập nhật isActive = false cục bộ ở FE để phản ánh đúng hành vi xóa mềm.
-    // Nếu sau này backend đổi remove() để trả về banner đã cập nhật, thay đoạn dưới bằng:
-    //   const updated = await bannerApi.remove(banner.id);
-    //   if (idx > -1) banners.value[idx] = mapBannerFromApi(updated);
-    const idx = banners.value.findIndex((b) => b.id === banner.id);
+    await bannerApi.remove(deleteTarget.value.id);
+    // Soft-delete: cập nhật isActive = false thay vì xóa khỏi mảng
+    const idx = banners.value.findIndex(b => b.id === deleteTarget.value.id);
     if (idx > -1) banners.value[idx].isActive = false;
+    deleteTarget.value = null;
   } catch (err) {
-    const msg = err?.response?.data?.message || 'Xóa banner thất bại. Vui lòng thử lại.';
-    alert(msg);
-    console.error(err);
+    alert(err?.response?.data?.message || 'Xóa banner thất bại.');
+  } finally {
+    deleting.value = false;
   }
 }
 </script>
 
 <style scoped>
-.pg {
-  background: #fff7fa;
-  min-height: 100vh;
+.bm-page {
+  padding: 24px;
+  background: #f9fafb;
+  min-height: 100%;
 }
-.topbar {
-  background: #fff;
-  border-bottom: 1px solid #f3d6e3;
-  padding: 14px 20px;
+
+/* Page Header */
+.page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 24px;
 }
-.topbar-left {
+.page-header-left { display: flex; align-items: center; gap: 16px; }
+.page-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f55d9b, #ec4d8d);
   display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #f55d9b;
+  margin: 0;
+}
+.page-sub {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 2px 0 0;
+}
+.btn-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f55d9b;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-add:hover { background: #ec4d8d; }
+
+/* Card */
+.page-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+
+/* States */
+.state-box {
+  padding: 48px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 10px;
 }
-.topbar-icon {
-  font-size: 20px;
-  color: #f55d9b;
-}
-.page-title {
-  font-size: 17px;
-  font-weight: 500;
-  color: #202636;
-}
-.badge-count {
-  background: #ffe4ef;
-  color: #d63384;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 20px;
-}
-.btn-add {
+.state-error { color: #dc2626; }
+.spin { animation: spin 1s linear infinite; font-size: 24px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.btn-retry {
+  margin-top: 8px;
   background: #f55d9b;
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 8px 16px;
+  padding: 7px 18px;
   font-size: 13px;
+  cursor: pointer;
+}
+.btn-retry:hover { background: #ec4d8d; }
+
+/* Pagination row */
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 14px 24px;
+  border-top: 1px solid #f3e8ee;
+}
+.pg-info { font-size: 13px; color: #6b7280; }
+
+/* Modal xác nhận xóa */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.46);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.confirm-box {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px 28px;
+  width: 420px;
+  max-width: 95vw;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(15,23,42,0.18);
+}
+.confirm-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  font-size: 26px;
+  color: #dc2626;
+}
+.confirm-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 10px;
+}
+.confirm-msg {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0 0 24px;
+  line-height: 1.6;
+}
+.confirm-note {
+  font-size: 12px;
+  color: #9ca3af;
+}
+.confirm-actions { display: flex; gap: 10px; justify-content: center; }
+.btn-cancel-confirm {
+  padding: 9px 22px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b7280;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-cancel-confirm:hover { border-color: #d1d5db; background: #f9fafb; }
+.btn-confirm-del {
+  padding: 9px 22px;
+  border: none;
+  border-radius: 8px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   display: flex;
@@ -289,36 +415,6 @@ async function handleDelete(banner) {
   gap: 6px;
   transition: background 0.15s;
 }
-.btn-add:hover {
-  background: #ec4d8d;
-}
-.content {
-  padding: 16px 20px;
-}
-.state-box {
-  background: #fff;
-  border: 1px solid #f3d6e3;
-  border-radius: 10px;
-  padding: 40px 20px;
-  text-align: center;
-  color: #b4557d;
-  font-size: 14px;
-}
-.state-error {
-  color: #b91c1c;
-}
-.btn-retry {
-  display: block;
-  margin: 12px auto 0;
-  background: #f55d9b;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 6px 16px;
-  font-size: 13px;
-  cursor: pointer;
-}
-.btn-retry:hover {
-  background: #ec4d8d;
-}
+.btn-confirm-del:hover:not(:disabled) { background: #b91c1c; }
+.btn-confirm-del:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

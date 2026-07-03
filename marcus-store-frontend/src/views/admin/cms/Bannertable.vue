@@ -1,77 +1,64 @@
 <template>
-  <div class="table-wrap">
+  <div class="table-section">
     <table class="tbl">
       <thead>
         <tr>
-          <th style="width: 44px">#</th>
-          <th style="width: 84px">Ảnh</th>
-          <th>Tiêu đề</th>
-          <th style="width: 110px">Vị trí</th>
-          <th style="width: 80px">Thứ tự</th>
-          <th style="width: 130px">Thời gian chạy</th>
-          <th style="width: 120px">Trạng thái</th>
-          <th style="width: 110px">Hành động</th>
+          <th style="width:44px">ID</th>
+          <th style="width:80px">ẢNH</th>
+          <th>TIÊU ĐỀ</th>
+          <th style="width:150px">VỊ TRÍ</th>
+          <th style="width:70px">THỨ TỰ</th>
+          <th style="width:160px">THỜI GIAN CHẠY</th>
+          <th style="width:130px">TRẠNG THÁI</th>
+          <th style="width:100px">THAO TÁC</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="!banners.length">
-          <td colspan="8" class="empty">
+          <td colspan="8" class="empty-row">
             <i class="ti ti-inbox empty-icon"></i>
-            Không có banner nào
+            <span>Không có banner nào</span>
           </td>
         </tr>
-
-        <tr v-for="(b, i) in pagedBanners" :key="b.id">
-          <td class="idx">{{ (currentPage - 1) * pageSize + i + 1 }}</td>
-
+        <tr v-for="(b, i) in banners" :key="b.id" :class="i % 2 === 1 ? 'row-alt' : ''">
+          <td class="td-id">#{{ i + 1 }}</td>
           <td>
-            <div v-if="b.imageUrl" class="img-preview">
-              <img
-                :src="b.imageUrl"
-                :alt="b.title"
-                @error="onImgError"
-              />
-            </div>
-            <div v-else class="img-placeholder">
-              <i class="ti ti-photo"></i>
+            <div class="img-cell">
+              <img v-if="b.imageUrl" :src="b.imageUrl" :alt="b.title" class="thumb"
+                @error="e => e.target.style.display='none'" />
+              <div v-else class="thumb-placeholder"><i class="ti ti-photo"></i></div>
             </div>
           </td>
-
           <td>
-            <div class="title-text">{{ b.title }}</div>
-            <div v-if="b.linkUrl" class="link-text">
-              <i class="ti ti-link"></i> {{ truncate(b.linkUrl, 30) }}
+            <div class="title-main">{{ b.title }}</div>
+            <div v-if="b.linkUrl" class="title-sub">
+              <i class="ti ti-link" style="font-size:11px"></i> {{ b.linkUrl }}
             </div>
           </td>
-
           <td>
-            <span class="pos-tag">{{ positionLabel(b.positionId) }}</span>
+            <span class="pos-badge" :title="posLabel(b.positionId)">{{ posLabel(b.positionId) }}</span>
           </td>
-
-          <td>
-            <span class="order-num">{{ b.displayOrder }}</span>
+          <td class="td-center">
+            <span class="order-badge">{{ b.displayOrder }}</span>
           </td>
-
           <td>
-            <div class="date-range">
-              <span class="date-txt">{{ fmtDate(b.startDate) }}</span>
-              <span class="date-txt date-end">→ {{ fmtDate(b.endDate) }}</span>
+            <div class="date-col">
+              <span>{{ fmtDate(b.startDate) }}</span>
+              <span class="date-sep">→</span>
+              <span>{{ fmtDate(b.endDate) }}</span>
             </div>
           </td>
-
           <td>
-            <span class="badge" :class="statusOf(b).cls">
-              <span class="dot" :class="statusOf(b).dot"></span>
+            <span class="status-badge" :class="statusOf(b).cls">
               {{ statusOf(b).label }}
             </span>
           </td>
-
           <td>
-            <div class="action-wrap">
-              <button class="btn-edit" @click="$emit('edit', b)">
-                <i class="ti ti-edit"></i>Sửa
+            <div class="action-row">
+              <button class="btn-action btn-edit" @click="$emit('edit', b)" title="Sửa">
+                <i class="ti ti-edit"></i>
               </button>
-              <button class="btn-del" @click="$emit('delete', b)">
+              <button class="btn-action btn-del" @click="$emit('delete', b)" title="Xóa">
                 <i class="ti ti-trash"></i>
               </button>
             </div>
@@ -79,348 +66,159 @@
         </tr>
       </tbody>
     </table>
-
-    <div class="pagination">
-      <span class="page-info">
-        Hiển thị {{ banners.length ? (currentPage - 1) * pageSize + 1 : 0 }}–{{ Math.min(currentPage * pageSize, banners.length) }} / {{ banners.length }}
-      </span>
-      <div class="page-btns">
-        <button class="pbtn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">‹</button>
-        <button
-          v-for="p in totalPages"
-          :key="p"
-          class="pbtn"
-          :class="{ active: p === currentPage }"
-          @click="goToPage(p)"
-        >
-          {{ p }}
-        </button>
-        <button class="pbtn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">›</button>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
-
 const props = defineProps({
-  banners: {
-    type: Array,
-    default: () => [],
-  },
-  positions: {
-    type: Array,
-    default: () => [], // positionId thật là số, nên không dùng default giả dạng string nữa
-  },
+  banners: { type: Array, default: () => [] },
+  positions: { type: Array, default: () => [] },
 });
-
 defineEmits(['edit', 'delete']);
 
-// ---- Phân trang (client-side) ----
-const currentPage = ref(1);
-const pageSize = 10;
-
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(props.banners.length / pageSize))
-);
-
-const pagedBanners = computed(() => {
-  const start = (currentPage.value - 1) * pageSize;
-  return props.banners.slice(start, start + pageSize);
-});
-
-// Khi danh sách lọc thay đổi (search/filter khác), quay về trang 1
-watch(
-  () => props.banners.length,
-  () => {
-    currentPage.value = 1;
-  }
-);
-
-function goToPage(p) {
-  if (p >= 1 && p <= totalPages.value) currentPage.value = p;
+function posLabel(positionId) {
+  const found = props.positions.find(p => String(p.value) === String(positionId));
+  return found ? found.label : '—';
 }
-
-// ---- Helpers ----
-function positionLabel(positionId) {
-  const found = props.positions.find((p) => p.value === positionId);
-  return found ? found.label : positionId;
-}
-
 function fmtDate(d) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  });
+  return new Date(d).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
 }
-
-function truncate(str, len) {
-  if (!str) return '';
-  return str.length > len ? str.slice(0, len) + '...' : str;
-}
-
-function onImgError(e) {
-  e.target.parentElement.innerHTML = '<i class="ti ti-photo-off img-broken"></i>';
-}
-
-// Tính trạng thái real-time dựa trên is_active + start_date + end_date
 function statusOf(b) {
-  if (!b.isActive) {
-    return { label: 'Tạm ẩn', cls: 'badge-hidden', dot: 'dot-red' };
-  }
+  if (!b.isActive) return { label: 'Tạm ẩn', cls: 'st-hidden' };
   const now = new Date();
-  const start = b.startDate ? new Date(b.startDate) : null;
-  const end = b.endDate ? new Date(b.endDate) : null;
-
-  if (end && now > end) {
-    return { label: 'Hết hạn', cls: 'badge-expired', dot: 'dot-gray' };
-  }
-  if (start && now < start) {
-    return { label: 'Lên lịch chạy', cls: 'badge-scheduled', dot: 'dot-yellow' };
-  }
-  return { label: 'Đang hiển thị', cls: 'badge-active', dot: 'dot-green' };
+  const s = b.startDate ? new Date(b.startDate) : null;
+  const e = b.endDate   ? new Date(b.endDate)   : null;
+  if (e && now > e)  return { label: 'Hết hạn',      cls: 'st-expired' };
+  if (s && now < s)  return { label: 'Lên lịch chạy', cls: 'st-scheduled' };
+  return { label: 'Đang hiển thị', cls: 'st-active' };
 }
-
-defineExpose({ statusOf });
 </script>
 
 <style scoped>
-.table-wrap {
-  background: #fff;
-  border: 1px solid #f3d6e3;
-  border-radius: 10px;
-  overflow: hidden;
-}
+.table-section { overflow-x: auto; }
 .tbl {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  table-layout: fixed;
 }
-.tbl thead {
-  background: #fff0f7;
+.tbl thead tr {
+  border-bottom: 2px solid #f3e8ee;
 }
 .tbl th {
-  padding: 11px 14px;
+  padding: 12px 16px;
   text-align: left;
-  color: #b4557d;
-  font-weight: 500;
-  font-size: 12px;
-  letter-spacing: 0.03em;
-  border-bottom: 1px solid #f3d6e3;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f55d9b;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 .tbl td {
-  padding: 11px 14px;
-  color: #202636;
-  border-bottom: 1px solid #fff0f7;
+  padding: 14px 16px;
+  color: #111827;
+  border-bottom: 1px solid #f9f0f5;
   vertical-align: middle;
 }
-.tbl tr:last-child td {
-  border-bottom: none;
-}
-.tbl tr:hover td {
-  background: #fffafd;
-}
-.idx {
-  color: #b4557d;
-  font-size: 12px;
-}
-.img-preview {
-  width: 72px;
-  height: 40px;
-  border-radius: 5px;
-  background: #fff0f7;
-  border: 1px solid #f3d6e3;
+.row-alt td { background: #fdf8fb; }
+.tbl tr:hover td { background: #fff0f7; transition: background 0.1s; }
+.td-id { color: #9ca3af; font-size: 12px; font-weight: 500; }
+.td-center { text-align: center; }
+
+/* Ảnh */
+.img-cell { width: 72px; height: 42px; border-radius: 6px; overflow: hidden; background: #f9f0f5; display:flex; align-items:center; justify-content:center; }
+.thumb { width: 100%; height: 100%; object-fit: cover; }
+.thumb-placeholder { color: #e0b8cc; font-size: 20px; }
+
+/* Tiêu đề */
+.title-main {
+  font-weight: 500;
+  color: #111827;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.img-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.img-placeholder,
-.img-broken {
-  width: 72px;
-  height: 40px;
-  border-radius: 5px;
-  background: #fff0f7;
-  border: 1px solid #f3d6e3;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #efbdd2;
-  font-size: 18px;
-}
-.title-text {
-  font-weight: 500;
-  color: #202636;
-  font-size: 13px;
-}
-.link-text {
+.title-sub {
   font-size: 11px;
-  color: #b4557d;
+  color: #9ca3af;
   margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 9px;
+
+/* Vị trí — ellipsis + tooltip để tránh vỡ layout khi tên vị trí dài */
+.pos-badge {
+  display: block;
+  max-width: 100%;
+  padding: 4px 10px;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
-}
-.badge-active {
-  background: #f0fdf4;
-  color: #15803d;
-}
-.badge-scheduled {
-  background: #fff0d9;
-  color: #9a5b00;
-}
-.badge-expired {
-  background: #f1f5f9;
-  color: #64748b;
-}
-.badge-hidden {
-  background: #ffe4ef;
-  color: #c72250;
-}
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.dot-green {
-  background: #15803d;
-}
-.dot-yellow {
-  background: #9a5b00;
-}
-.dot-gray {
-  background: #94a3b8;
-}
-.dot-red {
-  background: #c72250;
-}
-.pos-tag {
   background: #fff0f7;
   color: #d63384;
   border: 1px solid #f3d6e3;
-  border-radius: 5px;
-  padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  cursor: default;
 }
-.order-num {
+
+/* Thứ tự */
+.order-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
-  background: #fff0f7;
-  border: 1px solid #f3d6e3;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f9f0f5;
   color: #d63384;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Thời gian */
+.date-col { display: flex; flex-direction: column; gap: 1px; font-size: 12px; color: #4b5563; }
+.date-sep { color: #d1d5db; font-size: 10px; }
+
+/* Trạng thái */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
 }
-.date-range {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.date-txt {
-  font-size: 12px;
-  color: #6b7280;
-}
-.date-end {
-  color: #b4557d;
-}
-.action-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.btn-edit {
-  background: #fff0f7;
-  border: 1px solid #f3d6e3;
-  color: #d63384;
-  border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 12px;
+.st-active    { background: #f0fdf4; color: #15803d; }
+.st-scheduled { background: #fff7ed; color: #c2410c; }
+.st-expired   { background: #f1f5f9; color: #64748b; }
+.st-hidden    { background: #fff0f7; color: #c72250; }
+
+/* Thao tác */
+.action-row { display: flex; gap: 6px; align-items: center; }
+.btn-action {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  font-size: 15px;
   transition: all 0.15s;
 }
-.btn-edit:hover {
-  background: #ffe4ef;
-  border-color: #efbdd2;
-}
-.btn-del {
-  background: #fef2f2;
-  border: 1px solid #f5c2c7;
-  color: #b91c1c;
-  border-radius: 6px;
-  padding: 5px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: all 0.15s;
-}
-.btn-del:hover {
-  background: #fee2e2;
-}
-.empty {
-  text-align: center;
-  padding: 40px 20px;
-  color: #b4557d;
-}
-.empty-icon {
-  font-size: 28px;
-  display: block;
-  margin: 0 auto 8px;
-  color: #efbdd2;
-}
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-top: 1px solid #f3d6e3;
-  background: #fffafd;
-}
-.page-info {
-  font-size: 12px;
-  color: #6b7280;
-}
-.page-btns {
-  display: flex;
-  gap: 4px;
-}
-.pbtn {
-  border: 1px solid #f3d6e3;
-  background: #fff;
-  color: #6b7280;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-}
-.pbtn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.pbtn.active {
-  background: #f55d9b;
-  color: #fff;
-  border-color: #f55d9b;
-}
+.btn-edit { background: #fff0f7; color: #d63384; }
+.btn-edit:hover { background: #ffe4ef; }
+.btn-del { background: #fff5f5; color: #dc2626; }
+.btn-del:hover { background: #fee2e2; }
+
+/* Empty */
+.empty-row { text-align: center; padding: 48px 20px; color: #9ca3af; }
+.empty-icon { font-size: 32px; display: block; margin: 0 auto 8px; color: #e0b8cc; }
 </style>
