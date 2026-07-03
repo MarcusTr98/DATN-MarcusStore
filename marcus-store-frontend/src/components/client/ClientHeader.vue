@@ -4,6 +4,7 @@ import { useCartStore } from '@/stores/cartStore'
 import { useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
 import BaseModal from '../BaseModal.vue'
+import wishlist from '@/composables/useWishlistShared'
 
 const router = useRouter()
 const cartStore = useCartStore()
@@ -13,7 +14,8 @@ const totalQuantity = computed(() => cartStore.totalQuantity)
 const isLoggedIn = ref(false)
 const userName = ref('')
 const searchQuery = ref('')
-//const isMobileMenuOpen = ref(false)
+
+const wishlistCount = computed(() => (wishlist.isLoaded() ? wishlist.totalCount() : 0))
 
 const { sysSettings, fetchSettings } = useSettings()
 
@@ -56,6 +58,9 @@ onMounted(() => {
 
   if (localStorage.getItem('ACCESS_TOKEN')) {
     cartStore.fetchCart()
+    wishlist.fetchIds()
+  } else {
+    wishlist.reset()
   }
 
   fetchSettings()
@@ -169,11 +174,9 @@ onUnmounted(() => {
                         <i class="far fa-id-badge me-2"></i>Tài khoản của tôi
                       </router-link>
                     </li>
+                    <li></li>
                     <li>
-
-                    </li>
-                    <li>
-                      <router-link class="dropdown-item" to="/wishlist">
+                      <router-link class="dropdown-item" to="/profile/wishlist">
                         <i class="far fa-heart me-2"></i>Sản phẩm yêu thích
                       </router-link>
                     </li>
@@ -189,11 +192,14 @@ onUnmounted(() => {
             </div>
 
             <!-- Wishlist -->
-            <router-link to="/wishlist" class="h-action-btn">
-              <div class="h-action-icon"><i class="far fa-heart"></i></div>
+            <router-link to="/profile/wishlist" class="h-action-btn">
+              <div class="h-action-icon position-relative">
+                <i class="far fa-heart"></i>
+                <span v-if="wishlistCount > 0" class="cart-count">{{ wishlistCount }}</span>
+              </div>
               <div class="h-action-text d-none d-xl-block">
-                <span class="h-action-sub">Yêu thích</span>
-                <span class="h-action-main">Sản phẩm</span>
+                <span class="h-action-sub d-block">Yêu thích</span>
+                <span class="h-action-main d-block">Sản phẩm</span>
               </div>
             </router-link>
 

@@ -111,7 +111,7 @@
                 <button
                   type="button"
                   class="icon-btn wishlist-btn"
-                  :class="{ active: wishlistMap[product.productId] }"
+                  :class="{ active: isWished(product.productId), loading: togglingIds.has(product.productId) }"
                   title="Yêu thích"
                   @click.stop.prevent="toggleWishlist(product.productId)"
                 >
@@ -225,6 +225,11 @@ import FilterModal from '@/layouts/home/FilterModal.vue'
 import VoucherCard from '@/layouts/home/VoucherCard.vue'
 import { useCartStore } from '@/stores/cartStore'
 import BaseModal from '@/components/BaseModal.vue'
+import wishlist from '@/composables/useWishlistShared'
+
+onMounted(() => {
+  wishlist.fetchIds()
+})
 
 const props = defineProps({
   mode: {
@@ -502,12 +507,25 @@ watch(
   },
 )
 
-// ---- WISHLIST (chỉ FE, chưa nối BE) ----
-const wishlistMap = reactive({})
+wishlist.fetchIds()
 
-function toggleWishlist(productId) {
-  wishlistMap[productId] = !wishlistMap[productId]
-  // TODO: nối API wishlist sau (POST/DELETE /api/wishlist/:productId)
+function isWished(productId) {
+  return wishlist.isWished(productId)
+}
+
+const togglingIds = ref(new Set())
+
+async function toggleWishlist(productId) {
+  if (togglingIds.value.has(productId)) return
+  togglingIds.value.add(productId)
+  try {
+    const result = await wishlist.toggle(productId)
+    if (!result.success) {
+      showNotify('error', 'Lỗi', result.message)
+    }
+  } finally {
+    togglingIds.value.delete(productId)
+  }
 }
 
 // ---- ADD TO CART (gọi cartStore + cartApi, backend đã sẵn sàng) ----
@@ -744,6 +762,15 @@ function formatPrice(value) {
 .wishlist-btn.active .heart-icon {
   fill: #d70018;
   stroke: #d70018;
+}
+
+.wishlist-btn.loading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.wishlist-btn.loading {
+  pointer-events: none;
+  opacity: 0.7;
 }
 
 .cart-btn .cart-icon {

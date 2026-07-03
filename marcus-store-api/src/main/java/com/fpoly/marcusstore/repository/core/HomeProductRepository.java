@@ -231,6 +231,30 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
             """, nativeQuery = true)
     List<SpecProjection> findSpecsByProductIds(@Param("productIds") List<Integer> productIds);
 
+    /**
+     * Lấy SKU rẻ nhất còn active cho danh sách productIds (dùng cho Wishlist, tránh
+     * query phức tạp + ORDER BY duplicate column của findHomeProductRawData).
+     */
+    @Query(value = """
+            SELECT
+                p.product_id       AS productId,
+                p.product_name     AS productName,
+                p.thumbnail_url    AS thumbnailUrl,
+                p.slug             AS slug,
+                sku.sku_id         AS skuId,
+                sku.price          AS price,
+                sku.original_price AS originalPrice
+            FROM Products p
+            INNER JOIN (
+                SELECT s.product_id, s.sku_id, s.price, s.original_price,
+                       ROW_NUMBER() OVER (PARTITION BY s.product_id ORDER BY s.price ASC) AS rn
+                FROM Product_Skus s
+                WHERE s.is_active = 1
+            ) sku ON sku.product_id = p.product_id AND sku.rn = 1
+            WHERE p.product_id IN :productIds
+            """, nativeQuery = true)
+    List<HomeProductRawProjection> findSkuOverviewByProductIds(@Param("productIds") List<Integer> productIds);
+
     interface HomeProductRawProjection {
         Integer getProductId();
 
