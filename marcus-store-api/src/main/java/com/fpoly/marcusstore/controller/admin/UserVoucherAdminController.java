@@ -25,7 +25,6 @@ public class UserVoucherAdminController {
 
     // thêm voucher cho từng user
     @PostMapping("/assign")
-    @PreAuthorize("hasAuthority('MARKETING_CREATE')")
     public ResponseEntity<Void> assignVoucherToUsers(
             @RequestParam Integer voucherId,
             @RequestBody List<Integer> userIds) {
@@ -35,7 +34,6 @@ public class UserVoucherAdminController {
 
     // update thêm user mới xóa bỏ user cũ
     @PutMapping("/voucher/{voucherId}/users")
-    @PreAuthorize("hasAuthority('MARKETING_UPDATE')")
     public ResponseEntity<Void> reassignVoucherUsers(
             @PathVariable Integer voucherId,
             @RequestBody List<Integer> userIds) {

@@ -5,14 +5,13 @@ import java.util.Set;
 import java.util.HashSet;
 import org.springframework.stereotype.Service;
 
-import com.fpoly.marcusstore.dto.request.UpdateRolePermissionRequest;
+import com.fpoly.marcusstore.dto.request.UpdateUserPermissionRequest;
 import com.fpoly.marcusstore.dto.response.PermissionResponse;
 import com.fpoly.marcusstore.entity.auth.Permission;
-import com.fpoly.marcusstore.entity.auth.Role;
 import com.fpoly.marcusstore.repository.auth.PermissionRepository;
-import com.fpoly.marcusstore.repository.auth.RoleRepository;
 import com.fpoly.marcusstore.service.PermissionService;
-
+import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.repository.auth.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 
@@ -23,9 +22,7 @@ public class PermissionServiceImpl
         implements PermissionService {
 
     private final PermissionRepository permissionRepository;
-
-    private final RoleRepository roleRepository;
-
+    private final UserRepository userRepository;
     @Override
     public List<PermissionResponse> getAll() {
 
@@ -49,36 +46,41 @@ public class PermissionServiceImpl
 
     }
 
-    @Override
-    public List<Integer> getPermissionOfRole(Integer roleId) {
+@Override
+public List<Integer> getPermissionOfUser(Integer userId) {
 
-        Role role = roleRepository.findById(roleId)
+    User user = userRepository.findById(userId)
+            .orElseThrow(() ->
+                    new RuntimeException("Không tìm thấy nhân viên"));
 
-                .orElseThrow();
+    return user.getPermissions()
+            .stream()
+            .map(Permission::getPermissionId)
+            .toList();
+}
 
-        return role.getPermissions()
+@Override
+public void updateUserPermission(
+        Integer userId,
+        UpdateUserPermissionRequest request) {
 
-                .stream()
+    User user = userRepository.findById(userId)
+            .orElseThrow(() ->
+                    new RuntimeException("Không tìm thấy nhân viên"));
 
-                .map(Permission::getPermissionId)
-
-                .toList();
-
+    // Chỉ cho STAFF phân quyền riêng
+    if (!"STAFF".equalsIgnoreCase(user.getRole().getRoleName())) {
+        throw new RuntimeException("Chỉ được phân quyền cho STAFF");
     }
 
-    @Override
-    public void updateRolePermission(Integer roleId, UpdateRolePermissionRequest request) {
+    Set<Permission> permissions =
+            new HashSet<>(
+                    permissionRepository.findAllById(request.getPermissionIds())
+            );
 
-        Role role = roleRepository.findById(roleId).orElseThrow();
+    user.setPermissions(permissions);
 
-        Set<Permission> permissions = new HashSet<>(permissionRepository.findAllById(request.getPermissionIds()));
-        if (role.getRoleName().equals("ADMIN")) {
-            throw new RuntimeException("Không được sửa quyền ADMIN");
-        }
-        role.setPermissions(permissions);
-
-        roleRepository.save(role);
-
-    }
+    userRepository.save(user);
+}
 
 }

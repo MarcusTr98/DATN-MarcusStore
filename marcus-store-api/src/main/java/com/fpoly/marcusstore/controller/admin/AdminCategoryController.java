@@ -62,7 +62,7 @@ public class AdminCategoryController {
     }
 
     @PutMapping("/hidden/{id}")
-    @PreAuthorize("hasAuthority('CATEGORY_MANAGE')")
+    @PreAuthorize("hasAuthority('CATEGORY_DELETE')")
     public ApiResponse<CategoryResponse> hiddenCategory(@PathVariable Integer id) {
         return ApiResponse.success(categoriesService.hiddenCategory(id));
     }

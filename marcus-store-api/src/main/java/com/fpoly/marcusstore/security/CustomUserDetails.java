@@ -25,17 +25,24 @@ public class CustomUserDetails implements UserDetails {
     private String password;
 
     private Collection<? extends GrantedAuthority> authorities;
-    private Boolean isActive;
-    public static CustomUserDetails build(User user) {
-        // Lấy tên Role (VD: ADMIN, STAFF) ép thành Authority chuẩn của Spring
-        List<GrantedAuthority> authorities = new ArrayList<>();
-         String roleName = user.getRole().getRoleName();
-        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().getRoleName()));
-        if ("ADMIN".equalsIgnoreCase(roleName)) {
-            authorities.add(new SimpleGrantedAuthority("SUPER_ADMIN"));
-        }
 
-        // Thêm toàn bộ permission
+    private Boolean isActive;
+
+    public static CustomUserDetails build(User user) {
+
+    List<GrantedAuthority> authorities = new ArrayList<>();
+
+    String roleName = user.getRole().getRoleName();
+
+    // ROLE
+    authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName));
+
+    // ADMIN có SUPER_ADMIN
+    if ("ADMIN".equalsIgnoreCase(roleName)) {
+
+        authorities.add(new SimpleGrantedAuthority("SUPER_ADMIN"));
+
+        // ADMIN lấy quyền theo Role
         if (user.getRole().getPermissions() != null) {
             for (Permission permission : user.getRole().getPermissions()) {
                 authorities.add(
@@ -43,16 +50,31 @@ public class CustomUserDetails implements UserDetails {
                 );
             }
         }
-        return new CustomUserDetails(
-                user.getUserId(),
-                user.getUsername(),
-                user.getEmail(),
-                user.getPasswordHash(),
-                authorities,
-                user.getIsActive()
-            );
+
     }
 
+    // STAFF lấy quyền riêng
+    else if ("STAFF".equalsIgnoreCase(roleName)) {
+
+        if (user.getPermissions() != null) {
+            for (Permission permission : user.getPermissions()) {
+                authorities.add(
+                        new SimpleGrantedAuthority(permission.getPermissionName())
+                );
+            }
+        }
+
+    }
+
+    return new CustomUserDetails(
+            user.getUserId(),
+            user.getUsername(),
+            user.getEmail(),
+            user.getPasswordHash(),
+            authorities,
+            user.getIsActive()
+    );
+}
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return authorities;

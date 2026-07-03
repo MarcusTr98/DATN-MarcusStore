@@ -9,6 +9,8 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "Users")
@@ -53,7 +55,14 @@ public class User {
     @JoinColumn(name = "role_id", nullable = false)
     @JsonIgnore
     private Role role;
-
+@ManyToMany(fetch = FetchType.LAZY)
+@JoinTable(
+        name = "User_Permissions",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "permission_id")
+)
+@JsonIgnore
+private Set<Permission> permissions = new HashSet<>();
     @Column(name = "email_verified")
     private Boolean emailVerified;
 }

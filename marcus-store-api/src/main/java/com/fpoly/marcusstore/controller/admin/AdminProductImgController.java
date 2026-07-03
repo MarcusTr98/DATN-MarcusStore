@@ -21,7 +21,7 @@ import com.fpoly.marcusstore.service.ProductImgService;
 
 @RestController
 @RequestMapping("/api/admin/products")
-@PreAuthorize("hasAuthority('PRODUCT_VIEW')")
+@PreAuthorize("hasAuthority('PRODUCT_IMAGE_VIEW')")
 public class AdminProductImgController {
     @Autowired
     ProductImgService productImgService;
@@ -32,7 +32,7 @@ public class AdminProductImgController {
     }
 
     @PostMapping("/{productId}/images")
-    @PreAuthorize("hasAuthority('PRODUCT_CREATE')")
+    @PreAuthorize("hasAuthority('PRODUCT_IMAGE_CREATE')")
     public ApiResponse<ProductImgResponse> createProductImg(
             @PathVariable Integer productId,
             @RequestParam("file") MultipartFile file,
@@ -47,7 +47,7 @@ public class AdminProductImgController {
     }
 
     @PutMapping("/images/{id}")
-    @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
+    @PreAuthorize("hasAuthority('PRODUCT_IMAGE_UPDATE')")
     public ApiResponse<ProductImgResponse> updateProductImg(
             @PathVariable Integer id,
             @RequestParam(value="file", required = false) MultipartFile file,
@@ -62,7 +62,7 @@ public class AdminProductImgController {
     }
 
      @DeleteMapping("/images/{id}")
-     @PreAuthorize("hasAuthority('PRODUCT_DELETE')")
+     @PreAuthorize("hasAuthority('PRODUCT_IMAGE_DELETE')")
     public ApiResponse<String> deleteProductImg(@PathVariable Integer id) {
         productImgService.deleteProductImg(id);
         return ApiResponse.success("Xóa ảnh thành công");

@@ -11,7 +11,7 @@
         </div>
       </div>
 
-      <button v-if="canManage" class="btn-pink" @click="openCreate">
+      <button v-if="canCreate" class="btn-pink" @click="openCreate">
         <i class="bi bi-plus-circle"></i>
         Thêm khách hàng
       </button>
@@ -64,7 +64,10 @@
 
     <CustomerTable
       :users="users"
-      :can-manage="canManage"
+      :can-edit="canEdit"
+      :can-lock="canLock"
+      :can-unlock="canUnlock"
+      :can-send-verify="canSendVerify"
       :pagination="pagination"
       :current-page="currentPage"
       :page-size="pageSize"
@@ -125,11 +128,24 @@ const modalVisible = ref(false)
 const modalType = ref('success')
 const modalTitle = ref('')
 const modalMessage = ref('')
-// ── Helpers ────────────────────────────────────────────
-const canManage = computed(() => {
+
+// ── Helpers: check theo PERMISSION cụ thể, không hardcode role ──
+// ADMIN luôn được bypass toàn bộ (giống logic trong router.js)
+const isAdmin = computed(() => {
   const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
   return roles.includes('ROLE_ADMIN')
 })
+const permissions = computed(() =>
+  JSON.parse(localStorage.getItem('USER_PERMISSIONS') || '[]'),
+)
+const hasPermission = (perm) => isAdmin.value || permissions.value.includes(perm)
+
+const canCreate = computed(() => hasPermission('USER_CREATE'))
+const canEdit = computed(() => hasPermission('USER_UPDATE'))
+const canLock = computed(() => hasPermission('USER_LOCK'))
+const canUnlock = computed(() => hasPermission('USER_UNLOCK'))
+const canSendVerify = computed(() => hasPermission('USER_SEND_EMAIL'))
+
 const showModal = (type, title, message) => {
   modalType.value = type
   modalTitle.value = title

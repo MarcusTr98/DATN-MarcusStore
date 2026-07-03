@@ -20,7 +20,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasAuthority('MARKETING_VIEW')")
+@PreAuthorize("hasAuthority('VOUCHER_VIEW')")
 @RequiredArgsConstructor
 public class VoucherController {
     private final VoucherService voucherService;
@@ -60,7 +60,7 @@ public class VoucherController {
 
     // thêm mới voucher
     @PostMapping("/voucher")
-    @PreAuthorize("hasAuthority('MARKETING_CREATE')")
+    @PreAuthorize("hasAuthority('VOUCHER_CREATE')")
     public ResponseEntity<VoucherResponse> addVoucher(@Valid @RequestBody AddVoucherRequest request) {
         VoucherResponse response = voucherService.addVoucher(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -68,7 +68,7 @@ public class VoucherController {
 
     // cập nhật thông tin của voucher
     @PutMapping("/voucher/{voucherId}")
-    @PreAuthorize("hasAuthority('MARKETING_UPDATE')")
+    @PreAuthorize("hasAuthority('VOUCHER_UPDATE')")
     public ResponseEntity<VoucherResponse> updateVoucher(@PathVariable("voucherId") Integer voucherId, @Valid @RequestBody AddVoucherRequest request) {
         VoucherResponse response = voucherService.updateVoucher(voucherId, request);
         return ResponseEntity.status(HttpStatus.OK).body(response);
