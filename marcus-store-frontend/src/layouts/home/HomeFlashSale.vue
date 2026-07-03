@@ -1,62 +1,169 @@
 <template>
-  <section class="flash-sale-section mb-4">
-    <div
-      class="flash-sale-header d-flex align-items-center justify-content-between px-3 py-2 rounded-top"
-    >
-      <div class="d-flex align-items-center gap-3">
-        <span class="flash-icon">⚡</span>
-        <h3 class="flash-title mb-0">FLASH SALE</h3>
-        <div class="countdown d-flex align-items-center gap-1">
-          <span class="countdown-label">Kết thúc trong:</span>
-          <span class="countdown-block">{{ timer.hours }}</span>
-          <span class="countdown-sep">:</span>
-          <span class="countdown-block">{{ timer.minutes }}</span>
-          <span class="countdown-sep">:</span>
-          <span class="countdown-block">{{ timer.seconds }}</span>
+  <div class="flash-sale-page">
+
+
+    <!-- Hero Banner Section -->
+    <section class="flash-hero">
+      <div class="hero-bg">
+        <!-- Wave shapes -->
+        <div class="wave wave-1"></div>
+        <div class="wave wave-2"></div>
+        <div class="wave wave-3"></div>
+
+        <!-- Decorative circles -->
+        <div class="deco-circle deco-1"></div>
+        <div class="deco-circle deco-2"></div>
+
+        <!-- Lightning decorations -->
+        <div class="lightning-deco lightning-1">
+          <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
+        </div>
+        <div class="lightning-deco lightning-2">
+          <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
+        </div>
+
+        <!-- Falling Dots Container - inside hero-bg for proper positioning -->
+        <div class="falling-dots" ref="fallingDotsContainer"></div>
+      </div>
+
+      <div class="hero-content">
+        <div class="hero-left">
+          <div class="hero-badge">
+            <span class="badge-icon">⚡</span>
+            <span>FLASH SALE</span>
+          </div>
+          <h1 class="hero-title">
+            <span class="title-line">MARCUS</span>
+            <span class="title-line accent">FLASH SALE</span>
+          </h1>
+          <p class="hero-subtitle">Giảm đến <strong>50%++</strong> cho hàng ngàn sản phẩm công nghệ</p>
+
+          <div class="countdown-wrapper">
+            <span class="countdown-label">Kết thúc sau</span>
+            <div class="countdown" id="countdown">
+              <div class="unit">
+                <div class="digits">
+                  <span class="digit">{{ timer.hours[0] }}</span>
+                  <span class="digit">{{ timer.hours[1] }}</span>
+                </div>
+                <div class="unit-label">Giờ</div>
+              </div>
+              <div class="colon">:</div>
+              <div class="unit">
+                <div class="digits">
+                  <span class="digit">{{ timer.minutes[0] }}</span>
+                  <span class="digit">{{ timer.minutes[1] }}</span>
+                </div>
+                <div class="unit-label">Phút</div>
+              </div>
+              <div class="colon">:</div>
+              <div class="unit">
+                <div class="digits">
+                  <span class="digit">{{ timer.seconds[0] }}</span>
+                  <span class="digit">{{ timer.seconds[1] }}</span>
+                </div>
+                <div class="unit-label">Giây</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="hero-right">
+          <div class="hero-stats">
+            <div class="stat-item">
+              <span class="stat-number">200+</span>
+              <span class="stat-label">Sản phẩm</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number">50%</span>
+              <span class="stat-label">Giảm giá</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <span class="stat-number">24h</span>
+              <span class="stat-label">Chỉ hôm nay</span>
+            </div>
+          </div>
         </div>
       </div>
-      <a href="#" class="flash-view-all">Xem tất cả →</a>
+    </section>
+
+    <!-- Product Section -->
+    <div class="section-head">
+      <h2>Đang <span>cháy</span> hàng</h2>
+      <router-link to="/khuyen-mai" class="see-all">Đi đến trang khuyến mãi</router-link>
     </div>
 
-    <div class="flash-sale-body px-2 py-3">
-      <div class="horizontal-scroll-wrapper">
-        <div class="d-flex gap-3 pb-2">
-          <div
-            v-for="product in flashSaleProducts"
-            :key="product.id"
-            class="flash-card flex-shrink-0"
-          >
-            <div class="discount-badge">-{{ product.discount }}%</div>
-            <div class="product-img-wrapper">
-              <div class="product-emoji-img">{{ product.emoji }}</div>
-            </div>
-            <div class="product-card-body">
-              <p class="product-name">{{ product.name }}</p>
-              <div class="price-row d-flex align-items-center gap-2 mb-1">
-                <span class="price-current">{{ formatPrice(product.price) }}</span>
-                <span class="price-original">{{ formatPrice(product.originalPrice) }}</span>
-              </div>
-              <div class="sold-bar-wrapper">
-                <div class="progress sold-progress" style="height: 6px">
-                  <div
-                    class="progress-bar bg-danger"
-                    :style="{ width: (product.sold / product.total) * 100 + '%' }"
-                  ></div>
-                </div>
-                <small class="sold-text">Đã bán {{ product.sold }}/{{ product.total }}</small>
-              </div>
-            </div>
-          </div>  
+    <section class="product-grid">
+      <article
+        v-for="(product, index) in flashSaleProducts"
+        :key="product.id"
+        class="flash-card"
+        :class="{ 'low-stock': product.left <= 3 }"
+        :style="{ '--enter-delay': (index * 80) + 'ms' }"
+        @click="goToProduct(product)"
+      >
+        <span class="card-tag" :style="{ animationDelay: (index * 0.35) + 's' }">
+          <svg viewBox="0 0 24 24" class="lightning-icon"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
+          SALE
+        </span>
+        <span class="card-discount">-{{ product.discount }}%</span>
+        <div class="thumb">
+          <span class="product-emoji">{{ product.emoji }}</span>
         </div>
+        <div class="card-name">{{ product.name }}</div>
+        <div class="card-spec">{{ product.spec }}</div>
+        <div class="price-row">
+          <span class="price-now">{{ formatPrice(product.displayPrice) }}</span>
+          <span class="price-old">{{ formatPrice(product.originalPrice) }}</span>
+        </div>
+        <div class="scarcity">
+          <div class="bar-row">
+            <span>Đã bán {{ product.soldPercent }}%</span>
+            <span class="blink">Sắp cháy · Còn {{ product.left }} SP</span>
+          </div>
+          <div class="bar-track">
+            <div class="bar-fill" :style="{ width: product.soldPercent + '%' }">
+              <span class="bar-shimmer"></span>
+            </div>
+          </div>
+        </div>
+        <button type="button" class="cta" @click.stop="handleBuyClick($event, product)">
+          Mua ngay
+          <span
+            v-for="ripple in product.ripples"
+            :key="ripple.id"
+            class="ripple"
+            :style="{ left: ripple.x + 'px', top: ripple.y + 'px' }"
+          ></span>
+        </button>
+      </article>
+    </section>
+    <!-- FOMO Popup -->
+    <div class="fomo" :class="{ show: fomoVisible }" role="status" aria-live="polite">
+      <button class="fomo-close" @click="closeFomo">✕</button>
+      <div class="fomo-dot">
+        <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
+      </div>
+      <div class="fomo-text">
+        <b>{{ fomoMessage }}</b>
+        <span>{{ fomoSub }}</span>
+      </div>
+      <div class="fomo-progress-track">
+        <div v-if="fomoVisible" :key="fomoKey" class="fomo-progress-bar"></div>
       </div>
     </div>
-  </section>
+  </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import '@/assets/css/FlashSalePage.css'
+const router = useRouter()
 
-// ---- COUNTDOWN TIMER (giữ fix cứng tạm thời) ----
+// Countdown Timer
 const timer = ref({ hours: '05', minutes: '32', seconds: '47' })
 let timerInterval = null
 
@@ -65,19 +172,9 @@ const tickTimer = () => {
   let m = parseInt(timer.value.minutes)
   let s = parseInt(timer.value.seconds)
   s--
-  if (s < 0) {
-    s = 59
-    m--
-  }
-  if (m < 0) {
-    m = 59
-    h--
-  }
-  if (h < 0) {
-    h = 0
-    m = 0
-    s = 0
-  }
+  if (s < 0) { s = 59; m-- }
+  if (m < 0) { m = 59; h-- }
+  if (h < 0) { h = 0; m = 0; s = 0 }
   timer.value = {
     hours: String(h).padStart(2, '0'),
     minutes: String(m).padStart(2, '0'),
@@ -85,276 +182,184 @@ const tickTimer = () => {
   }
 }
 
-onMounted(() => {
-  timerInterval = setInterval(tickTimer, 1000)
-})
-onUnmounted(() => {
-  clearInterval(timerInterval)
-})
+// Timeline slots
+const flashSlots = ref([
+  { time: 'Đang diễn ra · 09:00–12:00', isLive: true },
+  { time: '12:00 SA', isLive: false },
+  { time: '16:00 CH', isLive: false },
+  { time: '20:00 CH', isLive: false },
+])
 
-// ---- FLASH SALE PRODUCTS (giữ fix cứng tạm thời) ----
+// Products
 const flashSaleProducts = ref([
-  {
-    id: 1,
-    name: 'iPhone 15 128GB',
-    emoji: '📱',
-    price: 19990000,
-    originalPrice: 24990000,
-    discount: 20,
-    sold: 78,
-    total: 100,
-  },
-  {
-    id: 2,
-    name: 'Samsung S24 FE 256GB',
-    emoji: '📱',
-    price: 12490000,
-    originalPrice: 16990000,
-    discount: 26,
-    sold: 55,
-    total: 80,
-  },
-  {
-    id: 3,
-    name: 'OPPO Find X8 256GB',
-    emoji: '📱',
-    price: 14990000,
-    originalPrice: 19990000,
-    discount: 25,
-    sold: 40,
-    total: 60,
-  },
-  {
-    id: 4,
-    name: 'AirPods 4 (ANC)',
-    emoji: '🎧',
-    price: 3990000,
-    originalPrice: 5290000,
-    discount: 25,
-    sold: 90,
-    total: 100,
-  },
-  {
-    id: 5,
-    name: 'Apple Watch Series 10',
-    emoji: '⌚',
-    price: 9990000,
-    originalPrice: 13490000,
-    discount: 26,
-    sold: 35,
-    total: 50,
-  },
-  {
-    id: 6,
-    name: 'iPad Air M2 11-inch WiFi',
-    emoji: '📟',
-    price: 15990000,
-    originalPrice: 20990000,
-    discount: 24,
-    sold: 22,
-    total: 40,
-  },
-  {
-    id: 7,
-    name: 'Xiaomi 14T Pro 512GB',
-    emoji: '📱',
-    price: 13490000,
-    originalPrice: 17990000,
-    discount: 25,
-    sold: 60,
-    total: 100,
-  },
-  {
-    id: 8,
-    name: 'Laptop ASUS Vivobook 15',
-    emoji: '💻',
-    price: 11990000,
-    originalPrice: 15990000,
-    discount: 25,
-    sold: 18,
-    total: 30,
-  },
+  { id: 1, name: 'iPhone 15 Pro Max 256GB', slug: 'iphone-15-pro-max', spec: 'Titan tự nhiên · 5G', emoji: '📱', price: 27990000, originalPrice: 34990000, discount: 20, soldPercent: 85, left: 6, displayPrice: 0, ripples: [] },
+  { id: 2, name: 'Samsung Galaxy S24 Ultra', slug: 'samsung-galaxy-s24-ultra', spec: '12GB/256GB · Galaxy AI', emoji: '📱', price: 22490000, originalPrice: 29990000, discount: 25, soldPercent: 92, left: 3, displayPrice: 0, ripples: [] },
+  { id: 3, name: 'MacBook Air M2 13"', slug: 'macbook-air-m2', spec: '8GB/256GB · Midnight', emoji: '💻', price: 21990000, originalPrice: 28990000, discount: 24, soldPercent: 78, left: 9, displayPrice: 0, ripples: [] },
+  { id: 4, name: 'Laptop Gaming ROG Strix', slug: 'rog-strix', spec: 'RTX 4060 · 16GB/512GB', emoji: '💻', price: 26990000, originalPrice: 35990000, discount: 25, soldPercent: 64, left: 12, displayPrice: 0, ripples: [] },
+  { id: 5, name: 'Apple Watch Series 9', slug: 'apple-watch-series-9', spec: 'GPS · 45mm', emoji: '⌚', price: 8490000, originalPrice: 11990000, discount: 29, soldPercent: 97, left: 2, displayPrice: 0, ripples: [] },
+  { id: 6, name: 'Samsung Galaxy Watch 6', slug: 'galaxy-watch-6', spec: 'Bluetooth · 44mm', emoji: '⌚', price: 5290000, originalPrice: 7490000, discount: 29, soldPercent: 70, left: 14, displayPrice: 0, ripples: [] },
+  { id: 7, name: 'Loa JBL Flip 6', slug: 'jbl-flip-6', spec: 'Chống nước IP67', emoji: '🔊', price: 2190000, originalPrice: 3290000, discount: 33, soldPercent: 99, left: 3, displayPrice: 0, ripples: [] },
+  { id: 8, name: 'AirPods Pro 2', slug: 'airpods-pro-2', spec: 'Chống ồn chủ động', emoji: '🎧', price: 4990000, originalPrice: 6490000, discount: 23, soldPercent: 88, left: 7, displayPrice: 0, ripples: [] },
 ])
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
+
+const goToProduct = (product) => {
+  router.push(`/product/${product.slug}`)
+}
+
+// --- Hiệu ứng "đếm số" cho giá khi card xuất hiện ---
+const animateCountUp = (product, delayMs = 0) => {
+  const duration = 900
+  const to = product.price
+  let startTs = null
+
+  const step = (now) => {
+    if (startTs === null) startTs = now + delayMs
+    if (now < startTs) {
+      requestAnimationFrame(step)
+      return
+    }
+    const elapsed = now - startTs
+    const t = Math.min(elapsed / duration, 1)
+    const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
+    product.displayPrice = Math.round(to * eased)
+    if (t < 1) requestAnimationFrame(step)
+    else product.displayPrice = to
+  }
+  requestAnimationFrame(step)
+}
+
+// --- Hiệu ứng ripple khi bấm "Mua ngay" ---
+const handleBuyClick = (event, product) => {
+  const btn = event.currentTarget
+  const rect = btn.getBoundingClientRect()
+  const ripple = {
+    id: Date.now() + Math.random(),
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  }
+  product.ripples.push(ripple)
+  setTimeout(() => {
+    product.ripples = product.ripples.filter((r) => r.id !== ripple.id)
+  }, 650)
+
+  // TODO: gắn logic thêm vào giỏ hàng thật ở đây
+}
+
+// FOMO popup
+const fomoVisible = ref(false)
+const fomoMessage = ref('')
+const fomoSub = ref('')
+const fomoKey = ref(0)
+const fomoMessages = [
+  ['Anh T. vừa mua iPhone 15 Pro Max', 'TP. Hồ Chí Minh · 1 phút trước'],
+  ['Chỉ còn 3 chiếc Loa JBL Flip 6 cuối cùng!', 'Kho Hà Nội · vừa xong'],
+  ['Chị H. vừa đặt Samsung Galaxy S24 Ultra', 'Đà Nẵng · 3 phút trước'],
+  ['Apple Watch Series 9 sắp hết size 45mm', 'Kho Hà Nội · vừa xong'],
+  ['Anh K. vừa mua AirPods Pro 2', 'Hải Phòng · 4 phút trước'],
+]
+let fomoIdx = 0
+let fomoTimer = null
+
+const showNextFomo = () => {
+  const [msg, sub] = fomoMessages[fomoIdx % fomoMessages.length]
+  fomoMessage.value = msg
+  fomoSub.value = sub
+  fomoVisible.value = true
+  fomoKey.value++ // ép progress-bar remount để chạy lại animation từ đầu
+  fomoIdx++
+  setTimeout(() => { fomoVisible.value = false }, 4200)
+}
+
+const closeFomo = () => {
+  fomoVisible.value = false
+  clearInterval(fomoTimer)
+}
+
+// Special Effects: Falling Dots
+const fallingDotsContainer = ref(null)
+
+const createFallingDots = () => {
+  const container = fallingDotsContainer.value
+  if (!container) {
+    console.log('Container not found')
+    return
+  }
+
+  const isMobile = window.innerWidth < 640
+  const count = isMobile ? 60 : 120
+
+  // Quãng đường rơi = đúng chiều cao thật của banner (thay vì số cứng 400px)
+  const fallDistance = container.offsetHeight || 340
+
+  container.innerHTML = '' // Clear existing
+
+  for (let i = 0; i < count; i++) {
+    const dot = document.createElement('div')
+    dot.classList.add('falling-dot')
+
+    // Random properties với distribution đều
+    const x = Math.random() * 100 // 0% - 100% spread evenly
+    const size = 3 + Math.random() * 8
+    const duration = 2.5 + Math.random() * 4 // 2.5s - 6.5s
+    const delay = Math.random() * 6 // 0s - 6s spread
+    const isWhite = Math.random() > 0.4
+
+    // Gán trực tiếp từng style property
+    dot.style.position = 'absolute'
+    dot.style.left = `${x}%`
+    dot.style.top = '-20px' // Fixed start position above
+    dot.style.width = `${size}px`
+    dot.style.height = `${size}px`
+    dot.style.background = isWhite ? '#fff' : '#fbbf24'
+    dot.style.borderRadius = '50%'
+    dot.style.setProperty('--fall-distance', `${fallDistance}px`)
+    dot.style.animationName = 'fallDown'
+    dot.style.animationDuration = `${duration}s`
+    dot.style.animationDelay = `${delay}s`
+    dot.style.animationTimingFunction = 'linear'
+    dot.style.animationIterationCount = 'infinite'
+    dot.style.boxShadow = `0 0 ${size}px ${isWhite ? 'rgba(255,255,255,0.9)' : 'rgba(251,191,36,0.9)'}`
+    dot.style.opacity = '0' // Start invisible
+
+    container.appendChild(dot)
+  }
+  console.log('Created', count, 'falling dots')
+}
+
+let resizeHandler = null
+
+onMounted(() => {
+  timerInterval = setInterval(tickTimer, 1000)
+  createFallingDots()
+
+  // Tạo lại các chấm khi resize để quãng rơi luôn khớp chiều cao banner
+  resizeHandler = () => createFallingDots()
+  window.addEventListener('resize', resizeHandler)
+
+  // Đếm số giá tăng dần, chạy sau khi card entrance animation gần xong, so le từng card
+  flashSaleProducts.value.forEach((product, index) => {
+    animateCountUp(product, 300 + index * 80)
+  })
+
+  setTimeout(showNextFomo, 1800)
+  fomoTimer = setInterval(showNextFomo, 6000)
+})
+
+onUnmounted(() => {
+  clearInterval(timerInterval)
+  clearInterval(fomoTimer)
+  if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+})
 </script>
 
 <style scoped>
-.flash-sale-section {
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  border: 1px solid var(--cps-border);
-}
-.flash-sale-header {
-  background: linear-gradient(120deg, #ff2d3a 0%, var(--cps-red) 50%, var(--cps-red-dark) 100%);
-  color: #fff;
-  padding-top: 12px;
-  padding-bottom: 12px;
-}
-.flash-icon {
-  font-size: 1.6rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
-}
-.flash-title {
-  font-size: 1.35rem;
-  font-weight: 800;
-  font-family: var(--font-display);
-  letter-spacing: 1.5px;
-  color: #fb4141;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-}
-.countdown {
-  gap: 6px;
-}
-.countdown-label {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #fb4141;
-  opacity: 0.95;
-}
-.countdown-block {
-  background: #1a1a1a;
-  color: #fffefc;
-  font-size: 0.95rem;
-  font-weight: 800;
-  padding: 4px 9px;
-  border-radius: 6px;
-  min-width: 34px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-}
-.countdown-sep {
-  font-weight: 800;
-  font-size: 1.1rem;
-  color: #fff;
-}
-.flash-view-all {
-  color: #fff;
-  text-decoration: none;
-  font-size: 0.85rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.flash-view-all:hover {
-  text-decoration: underline;
-}
-.flash-sale-body {
-  background: #fff9fa;
-}
-.horizontal-scroll-wrapper {
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #ddd transparent;
-}
-.flash-card {
-  width: 170px;
-  background: #fff;
-  border: 1px solid var(--cps-border);
-  border-radius: 20px;
-  overflow: hidden;
-  cursor: pointer;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    border-color 0.2s ease;
-  position: relative;
-}
-.flash-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
-  border-color: var(--cps-red-light);
-}
-.discount-badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: var(--cps-red);
-  color: #fff;
-  font-size: 0.7rem;
-  font-weight: 700;
-  font-family: var(--font-display);
-  padding: 3px 8px;
-  border-radius: 4px;
-  z-index: 1;
-  letter-spacing: 0.2px;
-}
-.product-img-wrapper {
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fff;
-  height: 150px;
-}
-.product-actual-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.flash-slot-banner-overlay {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 56px;
-  height: 56px;
-  object-fit: contain;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
-  pointer-events: none;
-  z-index: 2;
-}
-.product-emoji-img {
-  font-size: 3rem;
-  user-select: none;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.08));
-}
-.product-card-body {
-  padding: 0 14px 16px;
-}
-.product-name {
-  font-size: 0.86rem;
-  font-weight: 600;
-  font-family: var(--font-body);
-  color: var(--cps-text);
-  margin-bottom: 8px;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.price-current {
-  font-size: 1.02rem;
-  font-weight: 800;
-  font-family: var(--font-display);
-  color: var(--cps-red);
-  letter-spacing: -0.2px;
-}
-.price-original {
-  font-size: 0.78rem;
-  color: var(--cps-text-light);
-  text-decoration: line-through;
-}
-.sold-bar-wrapper {
-  margin-top: 8px;
-}
-.sold-progress {
-  border-radius: 10px;
-  background: var(--cps-red-tint);
-}
-.sold-text {
-  font-size: 0.66rem;
-  color: var(--cps-text-light);
-}
 
-@media (max-width: 768px) {
-  .flash-title {
-    font-size: 0.95rem;
-  }
-  .countdown-label {
-    display: none;
-  }
-}
+</style>
+
+
+<style>
+
 </style>
