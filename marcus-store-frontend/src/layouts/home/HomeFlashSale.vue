@@ -288,6 +288,23 @@ const formatPrice = (price) =>
   background: #fff;
   height: 150px;
 }
+.product-actual-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.flash-slot-banner-overlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+  z-index: 2;
+}
 .product-emoji-img {
   font-size: 3rem;
   user-select: none;

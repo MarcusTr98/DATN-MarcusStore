@@ -74,6 +74,14 @@ public class VoucherController {
         return ResponseEntity.status(HttpStatus.OK).body(response);
     }
 
+    // ngừng hoạt động (soft-delete) voucher - chỉ cần ID, không cần body
+    @DeleteMapping("/voucher/{voucherId}")
+    @PreAuthorize("hasAuthority('VOUCHER_UPDATE')")
+    public ResponseEntity<Void> deleteVoucher(@PathVariable("voucherId") Integer voucherId) {
+        voucherService.deleteVoucher(voucherId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
     //lấy danh sách các user đã dùng voucher này
     @GetMapping("/voucher/{voucherId}/usage")
     public ResponseEntity<List<VoucherUsageResponse>> getVoucherUsageHistory(@PathVariable("voucherId") Integer voucherId) {

@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.entity.promotion;
 
+import com.fpoly.marcusstore.dto.response.FlashSaleResponse;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -45,4 +46,6 @@ public class FlashSaleSlot {
 
     @OneToMany(mappedBy = "slot", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FlashSaleItem> flashSaleItems = new ArrayList<>();
+
+
 }

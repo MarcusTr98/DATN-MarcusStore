@@ -356,7 +356,7 @@
               </div>
 
               <div v-if="form.discount_type === 'PERCENT'">
-                <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
+                <label class="form-label">Giảm tối đa <span>*</span></label>
                 <div class="input-group">
                   <input
                     :value="formatNumberInput(form.max_discount_amount)"
@@ -873,7 +873,7 @@
     <BaseModal
       :visible="deleteConfirm.visible"
       type="confirm"
-      title="Xóa voucher"
+      title="Ngừng hoạt động voucher"
       :message="deleteConfirm.message"
       @close="closeDeleteConfirm"
       @confirm="confirmDeleteVoucher"
@@ -894,7 +894,7 @@ import {computed, reactive, ref, watch, onMounted, onUnmounted} from 'vue'
 import {storeToRefs} from 'pinia'
 import {useVoucherStore} from '@/stores/voucherStore'
 import api from '@/utils/api'
-
+import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/Voucher.css'
 
 const voucherStore = useVoucherStore()
@@ -913,7 +913,7 @@ const showUserDropdown = ref(false)
 onMounted(() => {
   loadVouchers()
   loadUsers()
-  
+
   // Close dropdown when clicking outside
   document.addEventListener('click', handleClickOutside)
 })
@@ -1011,6 +1011,15 @@ const previewVoucher = computed(() => {
 })
 
 const filteredVouchers = computed(() => {
+  // Tôn trọng bộ lọc status của UI - không double-filter cứng isActive=true
+  // BE đã trả về đúng dữ liệu theo filters.status rồi
+  if (filters.status === 'ACTIVE') {
+    return vouchers.value.filter((voucher) => voucher.isActive === true)
+  }
+  if (filters.status === 'INACTIVE') {
+    return vouchers.value.filter((voucher) => voucher.isActive === false)
+  }
+  // ALL: hiển thị tất cả
   return vouchers.value
 })
 const filteredUsers = computed(() => {
@@ -1125,9 +1134,9 @@ const errors = computed(() => {
 async function loadUsers() {
   try {
     loadingUsers.value = true
-    // Chỉ lấy users có role_id = 3 (CUSTOMER)
     const res = await api.get('/admin/user/customers')
-    allUsers.value = res.data || []
+    // ApiResponse<Page<UserResponse>> -> res.data.data.content
+    allUsers.value = res.data?.data?.content || []
   } catch (error) {
     console.error('Lỗi khi tải danh sách users:', error)
     allUsers.value = []
@@ -1409,7 +1418,7 @@ async function saveVoucher() {
 
 function deleteVoucher(voucher) {
   deleteConfirm.voucher = voucher
-  deleteConfirm.message = `Bạn có chắc muốn xóa voucher ${voucher.voucherCode} không?`
+  deleteConfirm.message = `Bạn có chắc muốn ngừng hoạt động voucher ${voucher.voucherCode} không?`
   deleteConfirm.visible = true
 }
 
@@ -1426,20 +1435,41 @@ async function confirmDeleteVoucher() {
 
   const success = await voucherStore.deleteVoucherById(voucher.voucherId)
 
-  if (success) {
+  if (!success) {
     closeDeleteConfirm()
-    await loadVouchers()
-
-    if (currentPage.value > 0 && currentPage.value >= pagination.value.totalPages) {
-      currentPage.value = Math.max(pagination.value.totalPages - 1, 0)
-      await loadVouchers()
-    }
-
-    showSuccessModal({
-      title: 'Xóa voucher thành công',
-      message: `Voucher ${voucher.voucherCode} đã được xóa khỏi danh sách.`,
+    showToast({
+      type: 'error',
+      title: 'Ngừng hoạt động voucher thất bại',
+      message: voucherStore.error || 'Vui lòng thử lại.',
     })
+    return
   }
+
+  closeDeleteConfirm()
+
+  // Load lại để có totalElements / totalPages mới nhất từ server
+  await loadVouchers()
+
+  // Sau khi load: nếu currentPage vượt quá totalPages (do xóa hết các item ở trang cuối)
+  // → lùi currentPage về trang cuối còn data
+  if (currentPage.value >= pagination.value.totalPages) {
+    currentPage.value = Math.max(0, pagination.value.totalPages - 1)
+  }
+
+  // Nếu vẫn còn data, load lại với currentPage mới (nếu có thay đổi)
+  // để đảm bảo FE hiển thị đúng các item ở trang hiện tại
+  if (pagination.value.totalElements > 0) {
+    await loadVouchers()
+  } else {
+    // Hết sạch voucher → reset về trang 0
+    currentPage.value = 0
+    await loadVouchers()
+  }
+
+  showSuccessModal({
+    title: 'Ngừng hoạt động voucher thành công',
+    message: `Voucher ${voucher.voucherCode} đã được chuyển sang trạng thái ngừng hoạt động.`,
+  })
 }
 
 function formatDiscountValue(voucher) {

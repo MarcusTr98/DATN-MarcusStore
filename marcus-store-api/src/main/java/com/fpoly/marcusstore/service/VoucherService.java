@@ -23,6 +23,8 @@ public interface VoucherService {
     VoucherResponse addVoucher(AddVoucherRequest request);
     // update voucher
     VoucherResponse updateVoucher(Integer voucherId, AddVoucherRequest request);
+    // ngừng hoạt động (soft-delete) voucher theo ID
+    void deleteVoucher(Integer voucherId);
     // áp dụng voucher vào đơn và return về tiền giảm
     VoucherApplyResult applyVoucher(ApplyVoucherRequest request, Integer userId);
     // Xac nhan viec su dung voucher (luu vao database)

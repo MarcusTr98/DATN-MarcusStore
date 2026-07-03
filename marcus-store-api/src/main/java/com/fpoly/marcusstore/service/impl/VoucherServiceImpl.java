@@ -75,9 +75,12 @@ public class VoucherServiceImpl implements VoucherService {
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedDiscountType = normalizeDiscountType(discountType);
 
-        return voucherRepository
-                .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, pageable)
-                .map(this::toResponse);
+        Page<Voucher> pageResult = voucherRepository
+                .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, pageable);
+
+        // FE sẽ tự xử lý logic lùi trang khi currentPage vượt quá totalPages
+        // (không fallback ở BE nữa để tránh nhầm lẫn giữa 2 tầng xử lý)
+        return pageResult.map(this::toResponse);
     }
 
     // lấy danh sách thống kê voucher
@@ -408,6 +411,20 @@ public class VoucherServiceImpl implements VoucherService {
         }
 
         return toResponse(voucherRepository.save(voucher));
+    }
+
+    // ngừng hoạt động (soft-delete) voucher theo ID - chỉ cần ID, không cần body
+    @Override
+    @Transactional
+    public void deleteVoucher(Integer voucherId) {
+        Voucher voucher = voucherRepository.findById(voucherId).orElseThrow(
+                () -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy voucher"
+                ));
+
+        voucher.setIsActive(false);
+        voucherRepository.save(voucher);
     }
 
     // Helper: tự động deactivate voucher nếu hết quantity hoặc quá hạn

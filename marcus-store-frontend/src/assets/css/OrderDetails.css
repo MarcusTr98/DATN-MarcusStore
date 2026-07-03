@@ -594,3 +594,398 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================================
+   PRINT STYLES - In chi tiết đơn hàng
+   ============================================================ */
+
+/* Phần header chỉ hiển thị khi in */
+.print-only-header {
+  display: none;
+}
+
+@media print {
+  /* Reset nền và màu chữ cho bản in */
+  html,
+  body {
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Khi in: page co lại vừa vùng in. JS sẽ set inline
+     transform: scale(S) và width = 186mm/S sau khi đo vùng in thực tế.
+     Ở đây chỉ chuẩn bị transform-origin để scale từ góc trên-trái. */
+  .order-detail-page {
+    color: #000 !important;
+    background: #ffffff !important;
+    font-size: 9pt;
+    line-height: 1.3;
+    box-sizing: border-box !important;
+    transform-origin: top left;
+  }
+
+  /* Wrapper có position:relative để giữ chỗ cho nội dung đã scale,
+     tránh phần còn lại của page bị xê dịch khi in */
+  .print-scaler {
+    position: relative !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Reset layout admin: bỏ flex, full width */
+  .admin-layout,
+  .admin-layout .main-content,
+  .admin-layout .admin-view {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .detail-layout {
+    display: block !important;
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .left-column {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-template-columns: 1fr !important;
+    gap: 6px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Mọi khối bên trong phải nằm gọn trong 100% parent */
+  .card,
+  .summary-card,
+  .section-card,
+  .table-wrap,
+  table {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Ẩn mọi thành phần được đánh dấu no-print:
+     - sidebar + header của admin
+     - page-actions (Quay lại, In đơn hàng) */
+  .no-print,
+  .admin-layout > .sidebar,
+  .admin-layout > aside,
+  .admin-layout .header,
+  .admin-layout .main-content > .header,
+  .admin-layout .header,
+  .admin-layout .admin-header,
+  .admin-layout .admin-sidebar,
+  .order-detail-toast {
+    display: none !important;
+  }
+
+  /* Ẩn cột điều phối đơn (cập nhật trạng thái) - không cần in */
+  .dispatch-card,
+  .right-column {
+    display: none !important;
+  }
+
+  /* Tiêu đề trang in */
+  .page-heading {
+    display: none !important;
+  }
+
+  /* Hiện header riêng cho bản in */
+  .print-only-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1.5px solid #ff4d94;
+    color: #000;
+  }
+
+  .print-only-header h1 {
+    margin: 0 0 2px 0;
+    color: #ff4d94;
+    font-size: 16pt;
+    font-weight: 800;
+  }
+
+  .print-only-header p {
+    margin: 1px 0;
+    font-size: 9pt;
+    color: #333;
+  }
+
+  /* Card / section: bỏ shadow, nền, viền đậm hơn để in rõ */
+  .card,
+  .summary-card,
+  .section-card {
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: 1px solid #d0d0d0 !important;
+    border-radius: 0 !important;
+    padding: 5px 8px !important;
+    margin: 0 0 4px 0 !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  /* Summary card: hiển thị dạng lưới ngang */
+  .summary-card {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 4px !important;
+  }
+
+  .summary-item {
+    color: #000 !important;
+  }
+
+  .summary-label {
+    color: #555 !important;
+    font-size: 8pt;
+  }
+
+  .summary-value {
+    color: #000 !important;
+    font-size: 9pt;
+  }
+
+  .summary-value.money {
+    color: #c00 !important;
+  }
+
+  /* Section header */
+  .section-header h4 {
+    color: #000 !important;
+    font-size: 11pt;
+    margin: 0 0 2px 0;
+  }
+
+  .section-header p {
+    color: #555 !important;
+    font-size: 8pt;
+    margin: 0 0 4px 0;
+  }
+
+  /* Info grid: 2 cột khi in */
+  .info-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 4px 12px !important;
+  }
+
+  .info-box {
+    color: #000 !important;
+  }
+
+  .info-box.full {
+    grid-column: 1 / -1 !important;
+  }
+
+  .info-label {
+    color: #555 !important;
+    font-size: 8pt;
+  }
+
+  .info-value {
+    color: #000 !important;
+    font-size: 9pt;
+  }
+
+  /* Bảng sản phẩm */
+  .table-wrap {
+    overflow: visible !important;
+  }
+
+  table,
+  .table-wrap table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+    table-layout: fixed !important;
+  }
+
+  table thead,
+  .table-wrap table thead {
+    display: table-header-group;
+  }
+
+  table tr,
+  .table-wrap table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  table th,
+  .table-wrap table th,
+  table td,
+  .table-wrap table td {
+    background: #ffffff !important;
+    color: #000 !important;
+    border: 1px solid #999 !important;
+    padding: 2px 4px !important;
+    font-size: 8.5pt;
+    text-align: left;
+    line-height: 1.2;
+    box-sizing: border-box !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    vertical-align: top;
+  }
+
+  table th,
+  .table-wrap table th {
+    background: #f0f0f0 !important;
+    font-weight: 700;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  /* Cố định độ rộng cột để cột "Sản phẩm" không phình ra
+     Tổng = 38 + 13 + 7 + 19 + 23 = 100% */
+  table th:nth-child(1),
+  .table-wrap table th:nth-child(1),
+  table td:nth-child(1),
+  .table-wrap table td:nth-child(1) {
+    width: 38% !important;
+  }
+
+  table th:nth-child(2),
+  .table-wrap table th:nth-child(2),
+  table td:nth-child(2),
+  .table-wrap table td:nth-child(2) {
+    width: 13% !important;
+    font-size: 7.5pt;
+    word-break: break-all;
+  }
+
+  table th:nth-child(3),
+  .table-wrap table th:nth-child(3),
+  table td:nth-child(3),
+  .table-wrap table td:nth-child(3) {
+    width: 7% !important;
+    text-align: center !important;
+  }
+
+  table th:nth-child(4),
+  .table-wrap table th:nth-child(4),
+  table td:nth-child(4),
+  .table-wrap table td:nth-child(4) {
+    width: 19% !important;
+    text-align: right !important;
+    font-variant-numeric: tabular-nums;
+  }
+
+  table th:nth-child(5),
+  .table-wrap table th:nth-child(5),
+  table td:nth-child(5),
+  .table-wrap table td:nth-child(5) {
+    width: 23% !important;
+    text-align: right !important;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Cột sản phẩm: hiển thị gọn */
+  .product-cell {
+    display: block !important;
+  }
+
+  .product-cell .main-line {
+    display: block;
+    font-weight: 700;
+    font-size: 8.5pt;
+    line-height: 1.25;
+    /* Giới hạn 2 dòng, phần thừa ẩn đi */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .product-cell .product-thumb {
+    display: none !important;
+  }
+
+  .money {
+    color: #000 !important;
+  }
+
+  /* Table summary (tổng tiền) */
+  .table-summary {
+    margin-top: 4px;
+    page-break-inside: avoid;
+  }
+
+  .summary-row {
+    color: #000 !important;
+    border-bottom: 1px dashed #ccc !important;
+    padding: 2px 0;
+    font-size: 9pt;
+  }
+
+  .summary-row.total {
+    font-size: 11pt;
+    font-weight: 800;
+    color: #c00 !important;
+    border-top: 1.5px solid #000 !important;
+    border-bottom: 1.5px solid #000 !important;
+    padding: 3px 0;
+  }
+
+  /* Timeline */
+  .timeline {
+    page-break-inside: avoid;
+  }
+
+  .timeline-item {
+    color: #000 !important;
+    margin-bottom: 2px;
+  }
+
+  .timeline-title {
+    color: #000 !important;
+    font-size: 9pt;
+  }
+
+  .timeline-note,
+  .timeline-time {
+    color: #555 !important;
+    font-size: 8pt;
+    margin: 0;
+  }
+
+  /* Badge: dùng chữ đen, viền đen */
+  .badge {
+    background: #ffffff !important;
+    color: #000 !important;
+    border: 1px solid #000 !important;
+    padding: 0 4px !important;
+    font-size: 8pt !important;
+  }
+
+  /* Ẩn breadcrumb */
+  .breadcrumb {
+    display: none !important;
+  }
+
+  /* Ẩn page-actions (nút Quay lại, In đơn hàng) */
+  .page-actions {
+    display: none !important;
+  }
+
+  /* Cấu hình trang in A4.
+     KHÔNG ép margin: để user chọn lề trong Chrome (Default/Minimum/Custom).
+     Content đã hard-code width: 186mm (A4 210mm - 2*12mm) để luôn fit với mọi lề. */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
