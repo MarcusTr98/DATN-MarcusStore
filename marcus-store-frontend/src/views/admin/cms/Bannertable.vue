@@ -3,20 +3,20 @@
     <table class="tbl">
       <thead>
         <tr>
-          <th style="width:44px">ID</th>
-          <th style="width:80px">ẢNH</th>
+          <th style="width:30px">ID</th>
+          <th style="width:90px">ẢNH</th>
           <th>TIÊU ĐỀ</th>
-          <th style="width:150px">VỊ TRÍ</th>
-          <th style="width:70px">THỨ TỰ</th>
-          <th style="width:160px">THỜI GIAN CHẠY</th>
-          <th style="width:130px">TRẠNG THÁI</th>
-          <th style="width:100px">THAO TÁC</th>
+          <th style="width:170px">VỊ TRÍ</th>
+          <th style="width:50px">THỨ TỰ</th>
+          <th style="width:110px">THỜI GIAN CHẠY</th>
+          <th style="width:110px">TRẠNG THÁI</th>
+          <th style="width:70px">THAO TÁC</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="!banners.length">
           <td colspan="8" class="empty-row">
-            <i class="ti ti-inbox empty-icon"></i>
+            <i class="bi bi-inbox empty-icon"></i>
             <span>Không có banner nào</span>
           </td>
         </tr>
@@ -26,13 +26,13 @@
             <div class="img-cell">
               <img v-if="b.imageUrl" :src="b.imageUrl" :alt="b.title" class="thumb"
                 @error="e => e.target.style.display='none'" />
-              <div v-else class="thumb-placeholder"><i class="ti ti-photo"></i></div>
+              <div v-else class="thumb-placeholder"><i class="bi bi-image"></i></div>
             </div>
           </td>
-          <td>
+          <td class="title-cell">
             <div class="title-main">{{ b.title }}</div>
             <div v-if="b.linkUrl" class="title-sub">
-              <i class="ti ti-link" style="font-size:11px"></i> {{ b.linkUrl }}
+              <i class="bi bi-link-45deg" style="font-size:11px"></i> {{ b.linkUrl }}
             </div>
           </td>
           <td>
@@ -56,10 +56,10 @@
           <td>
             <div class="action-row">
               <button class="btn-action btn-edit" @click="$emit('edit', b)" title="Sửa">
-                <i class="ti ti-edit"></i>
+                <i class="bi bi-pencil-square"></i>
               </button>
               <button class="btn-action btn-del" @click="$emit('delete', b)" title="Xóa">
-                <i class="ti ti-trash"></i>
+                <i class="bi bi-trash"></i>
               </button>
             </div>
           </td>
@@ -98,36 +98,38 @@ function statusOf(b) {
 <style scoped>
 .table-section { overflow-x: auto; }
 .tbl {
-  width: 100%;
+ width: 100%;
+  min-width: 1250px;      /* thêm dòng này */
   border-collapse: collapse;
   font-size: 13px;
-  table-layout: fixed;
+  table-layout: auto;
 }
 .tbl thead tr {
   border-bottom: 2px solid #f3e8ee;
 }
 .tbl th {
-  padding: 12px 16px;
+ padding: 14px 24px;
   text-align: left;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: #f55d9b;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   white-space: nowrap;
+  vertical-align: middle;
 }
 .tbl td {
-  padding: 14px 16px;
+  padding: 10px 12px;
   color: #111827;
   border-bottom: 1px solid #f9f0f5;
   vertical-align: middle;
 }
 .row-alt td { background: #fdf8fb; }
 .tbl tr:hover td { background: #fff0f7; transition: background 0.1s; }
-.td-id { color: #9ca3af; font-size: 12px; font-weight: 500; }
+.td-id { color: #9ca3af; font-size: 11px; font-weight: 500; }
 .td-center { text-align: center; }
 
 /* Ảnh */
-.img-cell { width: 72px; height: 42px; border-radius: 6px; overflow: hidden; background: #f9f0f5; display:flex; align-items:center; justify-content:center; }
+.img-cell { width:72px; min-width:72px; max-width:72px; height:42px; border-radius: 6px; overflow: hidden; background: #f9f0f5; display:flex; align-items:center; justify-content:center; }
 .thumb { width: 100%; height: 100%; object-fit: cover; }
 .thumb-placeholder { color: #e0b8cc; font-size: 20px; }
 
@@ -150,18 +152,18 @@ function statusOf(b) {
 
 /* Vị trí — ellipsis + tooltip để tránh vỡ layout khi tên vị trí dài */
 .pos-badge {
-  display: block;
+  display: inline-block;
   max-width: 100%;
-  padding: 4px 10px;
-  border-radius: 20px;
+  padding: 3px 8px;
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
   background: #fff0f7;
   color: #d63384;
   border: 1px solid #f3d6e3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
   box-sizing: border-box;
   cursor: default;
 }
@@ -218,7 +220,21 @@ function statusOf(b) {
 .btn-del { background: #fff5f5; color: #dc2626; }
 .btn-del:hover { background: #fee2e2; }
 
+
+/* Sticky action column */
+.tbl th:last-child,
+.tbl td:last-child{
+ position:sticky;
+ right:0;
+ background:#fff;
+ z-index:3;
+}
+.row-alt td:last-child{background:#fdf8fb;}
+.tbl tr:hover td:last-child{background:#fff0f7;}
+
 /* Empty */
 .empty-row { text-align: center; padding: 48px 20px; color: #9ca3af; }
 .empty-icon { font-size: 32px; display: block; margin: 0 auto 8px; color: #e0b8cc; }
 </style>
+
+.title-cell{overflow:hidden;min-width:250px;}

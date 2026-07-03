@@ -3,7 +3,7 @@
     <div class="filter-group">
       <label class="filter-label">TÌM KIẾM</label>
       <div class="search-box">
-        <i class="ti ti-search search-icon"></i>
+        <i class="bi bi-search search-icon"></i>
         <input
           class="filter-input"
           type="text"
@@ -27,7 +27,7 @@
             {{ p.label }}
           </option>
         </select>
-        <i class="ti ti-chevron-down select-arrow"></i>
+        <i class="bi bi-chevron-down select-arrow"></i>
       </div>
     </div>
 
@@ -45,12 +45,12 @@
           <option value="hidden">Tạm ẩn</option>
           <option value="expired">Hết hạn</option>
         </select>
-        <i class="ti ti-chevron-down select-arrow"></i>
+        <i class="bi bi-chevron-down select-arrow"></i>
       </div>
     </div>
 
     <button class="btn-reset" @click="onReset" title="Đặt lại">
-      <i class="ti ti-refresh"></i>
+      <i class="bi bi-arrow-clockwise"></i>
     </button>
   </div>
 </template>

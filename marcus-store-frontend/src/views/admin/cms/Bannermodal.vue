@@ -7,7 +7,7 @@
             {{ isEdit ? 'Chỉnh sửa banner' : 'Thêm banner mới' }}
           </span>
           <button class="btn-close" @click="$emit('close')" aria-label="Đóng">
-            <i class="ti ti-x"></i>
+            <i class="bi bi-x-lg"></i>
           </button>
         </div>
 
@@ -75,7 +75,7 @@
 
             <!-- Chưa có ảnh hoặc URL lỗi -->
             <div v-else class="upload-state">
-              <i class="ti ti-cloud-upload upload-icon"></i>
+              <i class="bi bi-cloud-upload upload-icon"></i>
               <span class="upload-text">Kéo thả hoặc <u>chọn ảnh từ máy</u></span>
               <span class="upload-hint">JPG, PNG, WEBP · Tối đa 5MB</span>
             </div>
@@ -101,7 +101,7 @@
             @input="imgBroken = false"
           />
           <div v-if="uploadError" class="upload-error-msg">
-            <i class="ti ti-alert-circle"></i> {{ uploadError }}
+            <i class="bi bi-exclamation-circle"></i> {{ uploadError }}
           </div>
         </div>
 
@@ -127,14 +127,14 @@
         </div>
 
         <div v-if="dateInvalid" class="date-alert show">
-          <i class="ti ti-alert-triangle"></i>
+          <i class="bi bi-exclamation-triangle"></i>
           Ngày kết thúc không được nhỏ hơn ngày bắt đầu
         </div>
 
         <div class="toggle-section">
           <div class="toggle-row">
             <span class="toggle-label">
-              <i class="ti ti-eye"></i>Hiển thị banner
+              <i class="bi bi-eye"></i>Hiển thị banner
             </span>
             <label class="toggle">
               <input type="checkbox" v-model="form.isActive" />
@@ -147,7 +147,7 @@
       <div class="bn-modal-footer">
         <button class="btn-cancel" @click="$emit('close')">Hủy bỏ</button>
         <button class="btn-save" :disabled="!canSave" @click="handleSave">
-          <i class="ti ti-check"></i>Lưu banner
+          <i class="bi bi-check-lg"></i>Lưu banner
         </button>
       </div>
     </div>

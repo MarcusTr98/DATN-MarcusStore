@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="page-header-left">
         <div class="page-icon">
-          <i class="ti ti-layout-board"></i>
+          <i class="bi bi-images"></i>
         </div>
         <div>
           <h2 class="page-title">Quản lý Banner</h2>
@@ -11,7 +11,7 @@
         </div>
       </div>
       <button class="btn-add" @click="openAddModal">
-        <i class="ti ti-plus"></i> Thêm banner
+        <i class="bi bi-plus-lg"></i> Thêm banner
       </button>
     </div>
 
@@ -20,12 +20,12 @@
 
       <!-- Loading -->
       <div v-if="loading" class="state-box">
-        <i class="ti ti-loader-2 spin"></i> Đang tải dữ liệu...
+        <i class="bi bi-arrow-repeat spin"></i> Đang tải dữ liệu...
       </div>
 
       <!-- Lỗi -->
       <div v-else-if="loadError" class="state-box state-error">
-        <i class="ti ti-alert-circle"></i> {{ loadError }}
+        <i class="bi bi-exclamation-circle"></i> {{ loadError }}
         <button class="btn-retry" @click="loadAll">Thử lại</button>
       </div>
 
@@ -67,7 +67,7 @@
       <div v-if="deleteTarget" class="confirm-overlay" @click.self="deleteTarget = null">
         <div class="confirm-box">
           <div class="confirm-icon">
-            <i class="ti ti-alert-triangle"></i>
+            <i class="bi bi-exclamation-triangle"></i>
           </div>
           <h3 class="confirm-title">Xác nhận xóa banner</h3>
           <p class="confirm-msg">
@@ -78,7 +78,7 @@
           <div class="confirm-actions">
             <button class="btn-cancel-confirm" @click="deleteTarget = null">Hủy bỏ</button>
             <button class="btn-confirm-del" :disabled="deleting" @click="confirmDelete">
-              <i class="ti ti-trash"></i>
+              <i class="bi bi-trash"></i>
               {{ deleting ? 'Đang xóa...' : 'Xác nhận xóa' }}
             </button>
           </div>
@@ -91,9 +91,9 @@
 
 <script setup>
 import { reactive, ref, computed, onMounted } from 'vue';
-import BannerFilter from './BannerFilter.vue';
-import BannerTable from './BannerTable.vue';
-import BannerModal from './BannerModal.vue';
+import BannerFilter from './Bannerfilter.vue';
+import BannerTable from './Bannertable.vue';
+import BannerModal from './Bannermodal.vue';
 import { bannerApi } from '@/api/BannerApi';
 
 // ---- State ----
