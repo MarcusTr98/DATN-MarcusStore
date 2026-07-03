@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service.impl;
 import com.fpoly.marcusstore.dto.response.FlashSaleResponse;
 import com.fpoly.marcusstore.dto.response.FlashSaleStatsResponse;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleSlotRepository;
 import com.fpoly.marcusstore.service.FlashSaleService;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -22,19 +24,24 @@ import java.util.stream.Collectors;
 
 public class FlashSaleServiceImpl implements FlashSaleService {
      private final FlashSaleSlotRepository flashSaleSlotRepository;
-     private FlashSaleResponse toResponses(FlashSaleSlot flashSaleSlot){
-          Integer quantity = flashSaleSlotRepository.countTotalQuantityBySlotId(flashSaleSlot.getSlotId());
+     private final FlashSaleItemRepository flashSaleItemRepository;
+
+     /**
+      * Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
+      */
+     private FlashSaleResponse toResponse(FlashSaleSlot slot, Map<Integer, Integer> qtyMap) {
           return FlashSaleResponse.builder()
-                  .slotId(flashSaleSlot.getSlotId())
-                  .name(flashSaleSlot.getName())
-                  .startDate(flashSaleSlot.getStartDate())
-                  .endDate(flashSaleSlot.getEndDate())
-                  .status(flashSaleSlot.getStatus())
-                  .quantityFlashSaleSlot(quantity)
-                  .createdAt(flashSaleSlot.getCreatedAt())
-                  .updatedAt(flashSaleSlot.getUpdatedAt())
+                  .slotId(slot.getSlotId())
+                  .name(slot.getName())
+                  .startDate(slot.getStartDate())
+                  .endDate(slot.getEndDate())
+                  .status(slot.getStatus())
+                  .quantityFlashSaleSlot(qtyMap.getOrDefault(slot.getSlotId(), 0))
+                  .createdAt(slot.getCreatedAt())
+                  .updatedAt(slot.getUpdatedAt())
                   .build();
      }
+
      // chuẩn hóa keyword người dùng gửi
      private String normalizeKeyword(String keyword) {
           return (keyword == null || keyword.isBlank()) ? null : keyword.trim();
@@ -44,9 +51,22 @@ public class FlashSaleServiceImpl implements FlashSaleService {
      @Transactional(readOnly = true)
      public Page<FlashSaleResponse> getFlashSaleSlotsPage(String keyword, Short status, Pageable pageable) {
          String normalizedKeyword = normalizeKeyword(keyword);
-         return flashSaleSlotRepository
-                 .searchFlashSaleSlots(normalizedKeyword, status, LocalDateTime.now(), pageable)
-                 .map(this::toResponses);
+         Page<FlashSaleSlot> page = flashSaleSlotRepository
+                 .searchFlashSaleSlots(normalizedKeyword, status, LocalDateTime.now(), pageable);
+
+         // Lấy tổng quantity theo batch trong 1 query duy nhất
+         List<Integer> slotIds = page.getContent().stream()
+                 .map(FlashSaleSlot::getSlotId)
+                 .toList();
+
+         Map<Integer, Integer> qtyMap = slotIds.isEmpty()
+                 ? Map.of()
+                 : flashSaleItemRepository.sumFlashSaleQuantityBySlotIds(slotIds).stream()
+                         .collect(Collectors.toMap(
+                                 row -> (Integer) row[0],
+                                 row -> ((Number) row[1]).intValue()));
+
+         return page.map(slot -> toResponse(slot, qtyMap));
      }
     // lấy số lượng slot, số lượng slot đang chạy, số lượng slot sắp chạy, tổng số sản phẩm của toàn bộ slot
     @Override
@@ -73,7 +93,15 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                   .orElseThrow(() -> new ResponseStatusException(
                           HttpStatus.NOT_FOUND,
                           "Không tìm thấy flash sale với id: " + slotId));
-          return toResponses(slot);
+
+          // Vẫn dùng batch API, truyền 1 id
+          Map<Integer, Integer> qtyMap = flashSaleItemRepository.sumFlashSaleQuantityBySlotIds(List.of(slotId))
+                  .stream()
+                  .collect(Collectors.toMap(
+                          row -> (Integer) row[0],
+                          row -> ((Number) row[1]).intValue()));
+
+          return toResponse(slot, qtyMap);
      }
 
 }

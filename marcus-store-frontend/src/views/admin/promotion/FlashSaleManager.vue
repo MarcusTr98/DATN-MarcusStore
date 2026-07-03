@@ -116,7 +116,7 @@
                 </div>
               </td>
               <td class="text-center">
-                <span class="item-count">{{ slot.items.length }}</span>
+                <span class="item-count">{{ slot.quantityFlashSaleSlot ?? 0 }}</span>
               </td>
               <td>
                 <span class="status-badge" :class="statusBadgeClass(slot)">
@@ -228,13 +228,32 @@
 
             <div class="full-width-field">
               <label class="form-label">Tên chiến dịch <span class="text-danger">*</span></label>
-              <input
-                v-model="form.name"
-                type="text"
-                class="form-control"
-                :class="{ 'is-invalid': submitted && errors.name }"
-                placeholder="VD: Flash Sale Thứ 6 - iPhone Series"
-              />
+              <div class="voucher-code-control">
+                <input
+                  v-model.trim="form.name"
+                  type="text"
+                  class="form-control voucher-code-input"
+                  :class="{ 'is-invalid': submitted && errors.name }"
+                  placeholder="VD: Flash Sale Thứ 6 - iPhone Series"
+                  maxlength="100"
+                />
+                <button type="button" class="generate-code-btn" @click="generateSlotName">
+                  <i class="bi bi-stars"></i>
+                  Tạo tự động
+                </button>
+              </div>
+              <div class="voucher-code-footer">
+                <span
+                  class="voucher-char-count"
+                  :class="{ 'near-limit': nameLength >= 90, 'at-limit': nameLength >= 100 }"
+                >
+                  {{ nameLength }}/100 ký tự
+                </span>
+                <span v-if="nameLength >= 100" class="voucher-char-warning">
+                  <i class="bi bi-exclamation-circle"></i>
+                  Tên chiến dịch tối đa 100 ký tự
+                </span>
+              </div>
               <div v-if="submitted && errors.name" class="invalid-feedback">{{ errors.name }}</div>
             </div>
 
@@ -270,6 +289,111 @@
             <div v-if="submitted && errors.time" class="invalid-feedback mt-2">{{
                 errors.time
               }}
+            </div>
+          </div>
+
+
+          <!-- ẢNH BANNER SLOT -->
+          <div class="form-section">
+            <div class="section-title">
+              <span>2</span>
+              <div>
+                <h3>Ảnh banner Flash Sale</h3>
+                <p>Ảnh sẽ được overlay lên ảnh sản phẩm khi hiển thị ở trang chủ.</p>
+              </div>
+            </div>
+
+            <div class="row g-3">
+              <!-- Cột trái: chọn file + toggle URL -->
+              <div class="col-12 col-md-6">
+                <!-- TAB SWITCH: chọn file / paste URL -->
+                <div class="fs-banner-input-mode">
+                  <button
+                    type="button"
+                    class="fs-banner-mode-btn"
+                    :class="{ active: bannerInputMode === 'file' }"
+                    @click="switchBannerMode('file')"
+                  >
+                    <i class="bi bi-upload"></i> Tải ảnh lên
+                  </button>
+                  <button
+                    type="button"
+                    class="fs-banner-mode-btn"
+                    :class="{ active: bannerInputMode === 'url' }"
+                    @click="switchBannerMode('url')"
+                  >
+                    <i class="bi bi-link-45deg"></i> Dán URL
+                  </button>
+                </div>
+
+                <!-- MODE: FILE UPLOAD -->
+                <div v-show="bannerInputMode === 'file'" class="fs-banner-file-zone">
+                  <label class="fs-banner-file-label">
+                    <i class="bi bi-cloud-arrow-up"></i>
+                    <span v-if="!bannerFileName">Chọn ảnh từ thiết bị</span>
+                    <span v-else class="fs-banner-file-name">{{ bannerFileName }}</span>
+                    <small>PNG, JPG, WEBP — tối đa 2MB</small>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      hidden
+                      @change="onBannerFileChange"
+                    />
+                  </label>
+                </div>
+
+                <!-- MODE: PASTE URL -->
+                <div v-show="bannerInputMode === 'url'">
+                  <label class="form-label">URL ảnh banner <span class="text-danger">*</span></label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-image"></i>
+                    </span>
+                    <input
+                      v-model.trim="form.bannerUrl"
+                      type="text"
+                      class="form-control"
+                      :class="{ 'is-invalid': submitted && errors.bannerUrl }"
+                      placeholder="https://example.com/banner-flashsale.png"
+                      @input="onBannerUrlChange"
+                    />
+                  </div>
+                  <div v-if="submitted && errors.bannerUrl" class="invalid-feedback d-block">
+                    {{ errors.bannerUrl }}
+                  </div>
+                </div>
+
+                <small class="form-text text-muted mt-2 d-block">
+                  Khuyến nghị: ảnh vuông hoặc PNG trong suốt, kích thước 400×400 px trở lên.
+                </small>
+              </div>
+
+              <!-- Cột phải: preview ảnh -->
+              <div class="col-12 col-md-6">
+                <label class="form-label">Xem trước</label>
+                <div class="fs-banner-preview-box">
+                  <img
+                    v-if="form.bannerUrl && !bannerImageError"
+                    :src="form.bannerUrl"
+                    alt="Banner preview"
+                    class="fs-banner-preview-img"
+                    @error="onBannerImageError"
+                    @load="onBannerImageLoad"
+                  />
+                  <div v-else class="fs-banner-preview-empty">
+                    <i class="bi" :class="bannerImageError ? 'bi-exclamation-triangle' : 'bi-image-alt'"></i>
+                    <span>{{ bannerImageError ? 'Không thể tải ảnh từ URL này' : 'Chưa có ảnh banner' }}</span>
+                  </div>
+                </div>
+                <button
+                  v-if="form.bannerUrl"
+                  type="button"
+                  class="fs-banner-clear-btn mt-2"
+                  @click="clearBanner"
+                >
+                  <i class="bi bi-x-circle"></i> Xóa ảnh
+                </button>
+              </div>
             </div>
           </div>
 
@@ -317,30 +441,53 @@
 
               <Transition name="fs-panel">
                 <div v-if="cascadeOpen" class="fs-cascade-panel" @click.stop>
-                  <div class="fs-cascade-cols">
+                  <!-- LOADING -->
+                  <div v-if="cascadeLoading" class="fs-cascade-loading">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 mb-0">Đang tải cây sản phẩm...</p>
+                  </div>
+
+                  <!-- LỖI -->
+                  <div v-else-if="cascadeError" class="fs-cascade-empty">
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                    <p class="mt-2 mb-2">{{ cascadeError }}</p>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-soft"
+                      @click="flashSaleStore.fetchCascade({ includeOutOfStock: false })"
+                    >
+                      <i class="bi bi-arrow-clockwise"></i> Thử lại
+                    </button>
+                  </div>
+
+                  <!-- EMPTY -->
+                  <div v-else-if="cascadeTree.length === 0" class="fs-cascade-empty">
+                    Không có sản phẩm nào đang bán.
+                  </div>
+
+                  <!-- DATA -->
+                  <div v-else class="fs-cascade-cols">
                     <!-- LEFT COLUMN: Brands (~40%) -->
                     <ul class="fs-cascade-left">
                       <li
-                        v-for="b in BRAND_SERIES"
-                        :key="b.key"
+                        v-for="b in cascadeTree"
+                        :key="b.brand"
                         class="fs-cascade-brand"
-                        :class="{ active: cascadeBrand === b.key }"
-                        @mouseenter="setCascadeBrand(b.key)"
-                        @click="setCascadeBrand(b.key)"
+                        :class="{ active: cascadeBrand === b.brand }"
+                        @mouseenter="setCascadeBrand(b.brand)"
+                        @click="setCascadeBrand(b.brand)"
                       >
-                        <i class="bi" :class="b.icon"></i>
-                        <span>{{ b.label }}</span>
+                        <i class="bi bi-phone"></i>
+                        <span>{{ b.brand }}</span>
                         <i class="bi bi-chevron-right fs-cascade-arrow"></i>
                       </li>
                     </ul>
 
-                    <!-- RIGHT COLUMN: Series + Products (~60%) -->
+                    <!-- RIGHT COLUMN: Categories + SKUs (~60%) -->
                     <div class="fs-cascade-right">
                       <template v-if="cascadeBrand">
                         <div class="fs-cascade-right-hd">
-                          <strong>{{
-                              BRAND_SERIES.find(x => x.key === cascadeBrand)?.label
-                            }}</strong>
+                          <strong>{{ cascadeBrand }}</strong>
                           <button
                             type="button"
                             class="fs-cascade-addall"
@@ -358,52 +505,53 @@
 
                         <div class="fs-cascade-right-body">
                           <div
-                            v-for="s in (BRAND_SERIES.find(x => x.key === cascadeBrand)?.series || [])"
-                            :key="s"
+                            v-for="cat in (cascadeTree.find(x => x.brand === cascadeBrand)?.categories || [])"
+                            :key="cat.categoryId"
                             class="fs-cascade-series"
                           >
                             <button
                               type="button"
                               class="fs-cascade-series-btn"
-                              :class="{ active: cascadeSeries === s }"
-                              @click.stop="cascadeSeries = cascadeSeries === s ? null : s"
+                              :class="{ active: cascadeCategoryId === cat.categoryId }"
+                              @click.stop="toggleCategory(cat.categoryId)"
                             >
                               <input
                                 type="checkbox"
                                 class="fs-cascade-addall-cb"
-                                :checked="seriesFullySelected(cascadeBrand, s)"
-                                @click.stop="toggleAllInSeries(cascadeBrand, s)"
+                                :checked="categoryFullySelected(cascadeBrand, cat.categoryId)"
+                                @click.stop="toggleAllInCategory(cascadeBrand, cat.categoryId)"
                               />
-                              <span class="fs-cascade-series-name">{{ s }}</span>
+                              <span class="fs-cascade-series-name">{{ cat.categoryName }}</span>
                               <i
                                 class="bi"
-                                :class="cascadeSeries === s ? 'bi-chevron-up' : 'bi-chevron-down'"
+                                :class="cascadeCategoryId === cat.categoryId ? 'bi-chevron-up' : 'bi-chevron-down'"
                               ></i>
                             </button>
 
-                            <div v-if="cascadeSeries === s" class="fs-cascade-items">
+                            <div v-if="cascadeCategoryId === cat.categoryId" class="fs-cascade-items">
                               <div
-                                v-for="p in PRODUCTS.filter(x => x.brand === cascadeBrand && matchSeries(x.name, s))"
-                                :key="p.id"
+                                v-for="sku in cat.skus"
+                                :key="sku.skuId"
                                 class="fs-cascade-item"
-                                :class="{ checked: selectedItemPids.includes(p.id) }"
-                                @click.stop="toggleProduct(p.id)"
+                                :class="{ checked: selectedItemPids.includes(sku.skuId) }"
+                                @click.stop="toggleProduct(sku.skuId)"
                               >
                                 <div class="fs-cascade-check">
-                                  <i v-if="selectedItemPids.includes(p.id)"
+                                  <i v-if="selectedItemPids.includes(sku.skuId)"
                                      class="bi bi-check-lg"></i>
                                 </div>
-                                <div class="fs-cascade-thumb">{{ p.emoji }}</div>
+                                <div class="fs-cascade-thumb">📦</div>
                                 <div class="fs-cascade-info">
-                                  <strong>{{ p.name }}</strong>
-                                  <small>Tồn kho: {{ p.stock }} | {{ formatVND(p.price) }}</small>
+                                  <strong>{{ sku.productName }}</strong>
+                                  <small v-if="sku.attributes"> · {{ sku.attributes }}</small>
+                                  <small>Kho: {{ sku.stockQuantity }} | {{ formatVND(sku.originalPrice) }}</small>
                                 </div>
                               </div>
                               <div
-                                v-if="PRODUCTS.filter(x => x.brand === cascadeBrand && matchSeries(x.name, s)).length === 0"
+                                v-if="cat.skus.length === 0"
                                 class="fs-cascade-empty"
                               >
-                                Không có sản phẩm nào trong dòng này.
+                                Danh mục này hiện chưa có SKU nào còn hàng.
                               </div>
                             </div>
                           </div>
@@ -412,7 +560,7 @@
 
                       <div v-else class="fs-cascade-right-empty">
                         <i class="bi bi-arrow-left-circle"></i>
-                        <span>Chọn thương hiệu bên trái để xem dòng sản phẩm.</span>
+                        <span>Chọn thương hiệu bên trái để xem danh mục.</span>
                       </div>
                     </div>
                   </div>
@@ -523,16 +671,19 @@
                 <Transition name="fs-panel">
                   <ul v-if="catOpen" class="fs-cat-panel" @click.stop>
                     <li
-                      v-for="c in CATEGORIES"
-                      :key="c.id"
+                      v-for="c in uniqueCategories"
+                      :key="c.categoryId"
                       class="fs-cat-item"
-                      :class="{ active: activeCategoryId === c.id }"
-                      @click="selectCategory(c.id)"
+                      :class="{ active: activeCategoryId === c.categoryId }"
+                      @click="selectCategory(c.categoryId)"
                     >
                       <i class="bi bi-grid-3x3-gap"></i>
-                      <span>{{ c.name }}</span>
-                      <small>{{ PRODUCTS.filter(p => p.categoryId === c.id).length }} SP</small>
-                      <i v-if="activeCategoryId === c.id" class="bi bi-check2 fs-cat-check"></i>
+                      <span>{{ c.categoryName }}</span>
+                      <small>{{ c.count }} SP</small>
+                      <i v-if="activeCategoryId === c.categoryId" class="bi bi-check2 fs-cat-check"></i>
+                    </li>
+                    <li v-if="uniqueCategories.length === 0" class="fs-cat-empty">
+                      Chưa tải được danh mục nào.
                     </li>
                   </ul>
                 </Transition>
@@ -670,7 +821,10 @@ import { useFlashSaleStore } from '@/stores/flashSaleStore'
 import '@/assets/css/FlashSale.css'
 
 const flashSaleStore = useFlashSaleStore()
-const { slots, loading, error, fieldErrors, pagination, stats } = storeToRefs(flashSaleStore)
+const {
+  slots, loading, error, fieldErrors, pagination, stats,
+  cascadeTree, cascadeLoading, cascadeError,
+} = storeToRefs(flashSaleStore)
 
 const now = new Date()
 
@@ -722,28 +876,6 @@ watch(pageSize, () => {
   currentPage.value = 0
   loadSlots()
 })
-
-// #region DEBUG_LOG - watch stats changes
-watch(stats, (newVal) => {
-  // #region DEBUG_LOG
-  console.log('[DEBUG_STATS_VUE] stats from storeToRefs changed:', JSON.parse(JSON.stringify(newVal)))
-  fetch('http://127.0.0.1:7828/ingest/6683b584-65cf-4bee-bf05-7d2708749dc3', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '41c373' },
-    body: JSON.stringify({
-      sessionId: '41c373',
-      location: 'FlashSaleManager.vue:636',
-      message: 'stats ref from storeToRefs',
-      data: { stats: JSON.parse(JSON.stringify(newVal)) },
-      timestamp: Date.now()
-    })
-  }).catch(() => {})
-  // #endregion
-}, { deep: true })
-// #endregion
-
-
-
 function resolveStatus(slot) {
   if (slot.status === 2) return 'ACTIVE'
   if (slot.status === 3) return 'ENDED'
@@ -851,10 +983,36 @@ const defaultForm = {
   status: 1,
   startDate: '',
   endDate: '',
+  bannerUrl: '',
 }
 
 const form = reactive({...defaultForm})
 
+const nameLength = computed(() => (form.name || '').length)
+
+/**
+ * Sinh tên Flash Sale tự động theo format:
+ *   FLASH-YYMMDD-HHMM-<RANDOM4>
+ *   VD: FLASH-260703-2030-A8K2
+ * - Bắt đầu bằng prefix FLASH
+ * - Có ngày tạo (YYMMDD) để dễ tra cứu
+ * - Có HHMM để tránh trùng khi tạo nhiều slot cùng ngày
+ * - Random 4 ký tự alphanumeric để chắc chắn unique
+ * Ngắn gọn, dễ nhìn, giới hạn < 100 ký tự.
+ */
+function generateSlotName() {
+  const d = new Date()
+  const yy = String(d.getFullYear()).slice(-2)
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase()
+  form.name = `FLASH-${yy}${mm}${dd}-${hh}${mi}-${rand}`
+  submitted.value = false
+}
+const submitted = ref(false)
+const saving = ref(false)
 const errors = computed(() => {
   if (!submitted.value) return {}
   const result = {}
@@ -874,169 +1032,156 @@ const errors = computed(() => {
       result.time = 'Thời gian kết thúc phải sau thời gian bắt đầu'
     }
   }
+  if (!form.bannerUrl.trim()) {
+    result.bannerUrl = 'Vui long nhap URL anh banner'
+  } else if (!isValidUrl(form.bannerUrl)) {
+    result.bannerUrl = 'URL anh khong hop le'
+  }
   return result
 })
 
+function isValidUrl(value) {
+  if (!value) return false
+  try {
+    const u = new URL(value)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const bannerImageError = ref(false)
+const bannerInputMode = ref('file') // 'file' | 'url'
+const bannerFileName = ref('')
+
+const MAX_BANNER_SIZE = 2 * 1024 * 1024 // 2MB
+const ALLOWED_BANNER_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+
+function onBannerUrlChange() {
+  // Reset trạng thái lỗi ảnh khi URL thay đổi
+  bannerImageError.value = false
+}
+
+function onBannerImageError() {
+  bannerImageError.value = true
+}
+
+function onBannerImageLoad() {
+  bannerImageError.value = false
+}
+
+function clearBanner() {
+  form.bannerUrl = ''
+  bannerImageError.value = false
+  bannerFileName.value = ''
+}
+
+function switchBannerMode(mode) {
+  bannerInputMode.value = mode
+  // Reset trạng thái khi đổi mode
+  bannerImageError.value = false
+  bannerFileName.value = ''
+  form.bannerUrl = ''
+}
+
+function onBannerFileChange(event) {
+  const file = event.target.files?.[0]
+  if (!file) return
+
+  // Validate loại file
+  if (!ALLOWED_BANNER_TYPES.includes(file.type)) {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: 'Chỉ chấp nhận file PNG, JPG, WEBP.',
+    })
+    event.target.value = ''
+    return
+  }
+
+  // Validate dung lượng
+  if (file.size > MAX_BANNER_SIZE) {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: 'Dung lượng ảnh tối đa 2MB.',
+    })
+    event.target.value = ''
+    return
+  }
+
+  bannerFileName.value = file.name
+  bannerImageError.value = false
+
+  // Đọc file thành data URL (base64) để set vào form.bannerUrl
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    form.bannerUrl = e.target.result
+  }
+  reader.onerror = () => {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: 'Không thể đọc file ảnh.',
+    })
+    bannerFileName.value = ''
+  }
+  reader.readAsDataURL(file)
+}
 
 
-const PRODUCTS = [
-  {
-    id: 1,
-    name: 'iPhone 15 Pro Max 256GB',
-    emoji: '📱',
-    price: 34990000,
-    stock: 50,
-    brand: 'iphone',
-    categoryId: 1
-  },
-  {
-    id: 2,
-    name: 'iPhone 15 Pro 128GB',
-    emoji: '📱',
-    price: 27990000,
-    stock: 30,
-    brand: 'iphone',
-    categoryId: 1
-  },
-  {
-    id: 3,
-    name: 'iPhone 14 Pro Max 256GB',
-    emoji: '📱',
-    price: 28990000,
-    stock: 25,
-    brand: 'iphone',
-    categoryId: 1
-  },
-  {
-    id: 4,
-    name: 'iPhone 14 128GB',
-    emoji: '📱',
-    price: 19990000,
-    stock: 40,
-    brand: 'iphone',
-    categoryId: 1
-  },
-  {
-    id: 5,
-    name: 'Samsung Galaxy S24 Ultra',
-    emoji: '📲',
-    price: 29990000,
-    stock: 30,
-    brand: 'samsung',
-    categoryId: 1
-  },
-  {
-    id: 6,
-    name: 'Samsung Galaxy S24+',
-    emoji: '📲',
-    price: 21990000,
-    stock: 40,
-    brand: 'samsung',
-    categoryId: 1
-  },
-  {
-    id: 7,
-    name: 'Samsung Galaxy A55',
-    emoji: '📲',
-    price: 9990000,
-    stock: 60,
-    brand: 'samsung',
-    categoryId: 1
-  },
-  {
-    id: 8,
-    name: 'Xiaomi 14 Ultra',
-    emoji: '🖤',
-    price: 22990000,
-    stock: 45,
-    brand: 'xiaomi',
-    categoryId: 1
-  },
-  {
-    id: 9,
-    name: 'OPPO Find X7 Pro',
-    emoji: '🟢',
-    price: 19990000,
-    stock: 25,
-    brand: 'oppo',
-    categoryId: 1
-  },
-  {
-    id: 10,
-    name: 'Vivo X100 Pro',
-    emoji: '🔵',
-    price: 17990000,
-    stock: 60,
-    brand: 'vivo',
-    categoryId: 1
-  },
-  {
-    id: 11,
-    name: 'Google Pixel 8 Pro',
-    emoji: '🌈',
-    price: 22990000,
-    stock: 20,
-    brand: 'google',
-    categoryId: 1
-  },
-  {
-    id: 12,
-    name: 'Tai nghe Bluetooth AirPro',
-    emoji: '🎧',
-    price: 1490000,
-    stock: 100,
-    brand: 'iphone',
-    categoryId: 2
-  },
-  {
-    id: 13,
-    name: 'Sac nhanh 65W Type-C',
-    emoji: '🔌',
-    price: 590000,
-    stock: 80,
-    brand: 'samsung',
-    categoryId: 2
-  },
-  {
-    id: 14,
-    name: 'MacBook Air M3 13"',
-    emoji: '💻',
-    price: 27990000,
-    stock: 15,
-    brand: 'iphone',
-    categoryId: 3
-  },
-]
 
-// Level-1 (parent) = Brand, Level-2 (child) = Series dẽ từ tên SP
-const BRAND_SERIES = [
-  {
-    key: 'iphone',
-    label: 'iPhone',
-    icon: 'bi-apple',
-    series: ['iPhone 15 Series', 'iPhone 14 Series']
-  },
-  {
-    key: 'samsung',
-    label: 'Samsung',
-    icon: 'bi-phone',
-    series: ['Galaxy S24 Series', 'Galaxy A Series']
-  },
-  {key: 'xiaomi', label: 'Xiaomi', icon: 'bi-phone-fill', series: ['Xiaomi 14 Series']},
-  {key: 'oppo', label: 'OPPO', icon: 'bi-phone-vibrate', series: ['Find X Series']},
-  {key: 'vivo', label: 'Vivo', icon: 'bi-phone', series: ['X Series']},
-  {key: 'google', label: 'Google', icon: 'bi-google', series: ['Pixel Series']},
-]
+/* ── CASCADE TREE (load từ BE) ── */
+// cascadeTree, cascadeLoading, cascadeError đã lấy từ store
 
-const CATEGORIES = [
-  {id: 1, name: 'Điện thoại'},
-  {id: 2, name: 'Phụ kiện'},
-  {id: 3, name: 'Laptop'},
-]
+/* Trải phẳng toàn bộ SKU trong cây thành mảng, gắn thêm brand & category. */
+function flattenSkus(tree) {
+  const result = []
+  for (const brandNode of tree || []) {
+    for (const catNode of brandNode.categories || []) {
+      for (const sku of catNode.skus || []) {
+        result.push({
+          ...sku,
+          brand: brandNode.brand,
+          categoryId: catNode.categoryId,
+          categoryName: catNode.categoryName,
+        })
+      }
+    }
+  }
+  return result
+}
 
-function matchSeries(productName, seriesLabel) {
-  const slug = seriesLabel.toLowerCase().replace(/\s*series$/, '').trim()
-  return productName.toLowerCase().includes(slug)
+/* Computed: SKU phẳng + map tra cứu nhanh theo skuId */
+const flatSkus = computed(() => flattenSkus(cascadeTree.value))
+const skuMap = computed(() => {
+  const m = new Map()
+  flatSkus.value.forEach((s) => m.set(s.skuId, s))
+  return m
+})
+
+/* Computed: danh sách category L2 duy nhất + đếm SKU, dùng cho Tab "Theo danh mục". */
+const uniqueCategories = computed(() => {
+  const map = new Map()
+  for (const s of flatSkus.value) {
+    if (!map.has(s.categoryId)) {
+      map.set(s.categoryId, { categoryId: s.categoryId, categoryName: s.categoryName, count: 0 })
+    }
+    map.get(s.categoryId).count += 1
+  }
+  return Array.from(map.values()).sort((a, b) => a.categoryName.localeCompare(b.categoryName))
+})
+
+function getSku(skuId) {
+  return skuMap.value.get(skuId)
+}
+function skusInBrand(brandName) {
+  return flatSkus.value.filter((s) => s.brand === brandName)
+}
+function skusInCategory(brandName, categoryId) {
+  return flatSkus.value.filter(
+    (s) => s.brand === brandName && s.categoryId === categoryId
+  )
 }
 
 const selItems = reactive({})
@@ -1046,48 +1191,48 @@ const qtyError = reactive({})
 /* ── CASCADING PICKER (Tab 0) ── */
 const cascadeOpen = ref(false)
 const cascadeBrand = ref(null)
-const cascadeSeries = ref(null)
+const cascadeCategoryId = ref(null)
 
 /* ── CATEGORY PICKER (Tab 1) ── */
 const activeCategoryId = ref(null)
 const catOpen = ref(false)
 const lastCategoryCount = ref(0)
 
-function getProductName(pid) {
-  return PRODUCTS.find((p) => p.id === pid)?.name || `SP #${pid}`
+function getProductName(skuId) {
+  return getSku(skuId)?.productName || `SKU #${skuId}`
 }
 
-function getProductPrice(pid) {
-  return PRODUCTS.find((p) => p.id === pid)?.price ?? 0
+function getProductPrice(skuId) {
+  return getSku(skuId)?.originalPrice ?? 0
 }
 
-function getProductStock(pid) {
-  return PRODUCTS.find((p) => p.id === pid)?.stock ?? 0
+function getProductStock(skuId) {
+  return getSku(skuId)?.stockQuantity ?? 0
 }
 
-function addProduct(pid) {
-  if (selectedItemPids.value.includes(pid)) return
-  selectedItemPids.value.push(pid)
-  const p = PRODUCTS.find((x) => x.id === pid)
-  selItems[pid] = {
+function addProduct(skuId) {
+  if (selectedItemPids.value.includes(skuId)) return
+  selectedItemPids.value.push(skuId)
+  const sku = getSku(skuId)
+  selItems[skuId] = {
     discountPercent: 15,
-    flashSalePrice: Math.round((p?.price ?? 0) * 0.85),
-    flashSaleQuantity: 10
+    flashSalePrice: Math.round((sku?.originalPrice ?? 0) * 0.85),
+    flashSaleQuantity: 1,
   }
 }
 
-function removeProduct(pid) {
-  const idx = selectedItemPids.value.indexOf(pid)
+function removeProduct(skuId) {
+  const idx = selectedItemPids.value.indexOf(skuId)
   if (idx > -1) selectedItemPids.value.splice(idx, 1)
-  delete selItems[pid]
-  delete qtyError[pid]
+  delete selItems[skuId]
+  delete qtyError[skuId]
 }
 
-function toggleProduct(pid) {
-  if (selectedItemPids.value.includes(pid)) {
-    removeProduct(pid)
+function toggleProduct(skuId) {
+  if (selectedItemPids.value.includes(skuId)) {
+    removeProduct(skuId)
   } else {
-    addProduct(pid)
+    addProduct(skuId)
   }
 }
 
@@ -1103,53 +1248,53 @@ function closeCascade() {
 
 function setCascadeBrand(key) {
   cascadeBrand.value = key
-  cascadeSeries.value = null
+  cascadeCategoryId.value = null
+}
+
+function toggleCategory(catId) {
+  cascadeCategoryId.value = cascadeCategoryId.value === catId ? null : catId
 }
 
 function selectAllInBrand(brandKey) {
-  PRODUCTS.filter((p) => p.brand === brandKey).forEach((p) => addProduct(p.id))
+  skusInBrand(brandKey).forEach((s) => addProduct(s.skuId))
 }
 
 function toggleAllInBrand(brandKey) {
-  const list = PRODUCTS.filter((p) => p.brand === brandKey)
+  const list = skusInBrand(brandKey)
   if (brandFullySelected(brandKey)) {
-    list.forEach((p) => removeProduct(p.id))
+    list.forEach((s) => removeProduct(s.skuId))
   } else {
-    list.forEach((p) => addProduct(p.id))
+    list.forEach((s) => addProduct(s.skuId))
   }
 }
 
-function toggleAllInSeries(brandKey, seriesLabel) {
-  const list = PRODUCTS.filter(
-    (p) => p.brand === brandKey && matchSeries(p.name, seriesLabel)
-  )
-  if (seriesFullySelected(brandKey, seriesLabel)) {
-    list.forEach((p) => removeProduct(p.id))
+function toggleAllInCategory(brandKey, catId) {
+  const list = skusInCategory(brandKey, catId)
+  if (categoryFullySelected(brandKey, catId)) {
+    list.forEach((s) => removeProduct(s.skuId))
   } else {
-    list.forEach((p) => addProduct(p.id))
+    list.forEach((s) => addProduct(s.skuId))
   }
 }
 
 function brandFullySelected(brandKey) {
-  const list = PRODUCTS.filter((p) => p.brand === brandKey)
-  return list.length > 0 && list.every((p) => selectedItemPids.value.includes(p.id))
+  const list = skusInBrand(brandKey)
+  return list.length > 0 && list.every((s) => selectedItemPids.value.includes(s.skuId))
 }
 
-function seriesFullySelected(brandKey, seriesLabel) {
-  const list = PRODUCTS.filter(
-    (p) => p.brand === brandKey && matchSeries(p.name, seriesLabel)
-  )
-  return list.length > 0 && list.every((p) => selectedItemPids.value.includes(p.id))
+function categoryFullySelected(brandKey, catId) {
+  const list = skusInCategory(brandKey, catId)
+  return list.length > 0 && list.every((s) => selectedItemPids.value.includes(s.skuId))
 }
 
 function selectCategory(catId) {
   activeCategoryId.value = catId
   catOpen.value = false
-  const list = PRODUCTS.filter((p) => p.categoryId === catId)
+  const list = flatSkus.value.filter((s) => s.categoryId === catId)
   let added = 0
-  list.forEach((p) => {
-    if (!selectedItemPids.value.includes(p.id)) {
-      addProduct(p.id)
+  list.forEach((s) => {
+    if (!selectedItemPids.value.includes(s.skuId)) {
+      addProduct(s.skuId)
       added++
     }
   })
@@ -1164,28 +1309,29 @@ function selectCategory(catId) {
 }
 
 function getCategoryName(catId) {
-  return CATEGORIES.find((c) => c.id === catId)?.name || ''
+  const found = flatSkus.value.find((s) => s.categoryId === catId)
+  return found?.categoryName || `Danh mục #${catId}`
 }
 
-function onDiscountChange(pid, value) {
+function onDiscountChange(skuId, value) {
   const disc = parseFloat(value) || 0
-  const orig = getProductPrice(pid)
+  const orig = getProductPrice(skuId)
   const fp = Math.round(orig * (1 - disc / 100))
-  selItems[pid] = {...selItems[pid], discountPercent: disc, flashSalePrice: fp}
+  selItems[skuId] = {...selItems[skuId], discountPercent: disc, flashSalePrice: fp}
 }
 
-function onPriceChange(pid, value) {
+function onPriceChange(skuId, value) {
   const fp = parseFloat(value) || 0
-  const orig = getProductPrice(pid)
+  const orig = getProductPrice(skuId)
   const disc = orig > 0 ? parseFloat(((1 - fp / orig) * 100).toFixed(1)) : 0
-  selItems[pid] = {...selItems[pid], flashSalePrice: fp, discountPercent: disc}
+  selItems[skuId] = {...selItems[skuId], flashSalePrice: fp, discountPercent: disc}
 }
 
-function onQtyChange(pid, value) {
+function onQtyChange(skuId, value) {
   const v = parseInt(value) || 0
-  const stock = getProductStock(pid)
-  qtyError[pid] = v > stock
-  selItems[pid] = {...selItems[pid], flashSaleQuantity: v}
+  const stock = getProductStock(skuId)
+  qtyError[skuId] = v > stock
+  selItems[skuId] = {...selItems[skuId], flashSaleQuantity: v}
 }
 
 
@@ -1195,6 +1341,7 @@ function openCreateModal() {
   resetForm()
   isModalOpen.value = true
   activeTab.value = 0
+  flashSaleStore.fetchCascade({ includeOutOfStock: false })
 }
 
 function openEditModal(slot) {
@@ -1205,22 +1352,14 @@ function openEditModal(slot) {
   form.startDate = toLocalDatetime(slot.startDate)
   form.endDate = toLocalDatetime(slot.endDate)
   form.status = slot.status
+  form.bannerUrl = slot.imageUrl || slot.bannerUrl || ''
+  bannerInputMode.value = 'url'
 
   selectedItemPids.value = []
   Object.keys(selItems).forEach((k) => delete selItems[k])
-  slot.items.forEach((item) => {
-    const pid = item.skuId
-    if (pid) {
-      selectedItemPids.value.push(pid)
-      selItems[pid] = {
-        discountPercent: item.originalPrice > 0 ? parseFloat(((1 - item.flashSalePrice / item.originalPrice) * 100).toFixed(1)) : 0,
-        flashSalePrice: item.flashSalePrice,
-        flashSaleQuantity: item.flashSaleQuantity,
-      }
-    }
-  })
   isModalOpen.value = true
   activeTab.value = 0
+  flashSaleStore.fetchCascade({ includeOutOfStock: false })
 }
 
 function closeModal() {
@@ -1242,10 +1381,13 @@ function resetForm(clearStatus = true) {
   Object.keys(qtyError).forEach((k) => delete qtyError[k])
   cascadeOpen.value = false
   cascadeBrand.value = null
-  cascadeSeries.value = null
+  cascadeCategoryId.value = null
   catOpen.value = false
   activeCategoryId.value = null
   lastCategoryCount.value = 0
+  bannerImageError.value = false
+  bannerInputMode.value = 'file'
+  bannerFileName.value = ''
 }
 
 function toLocalDatetime(value) {
@@ -1266,13 +1408,13 @@ async function saveSlot() {
     return
   }
   let hasQtyErr = false
-  pids.forEach((pid) => {
-    const it = selItems[pid]
+  pids.forEach((skuId) => {
+    const it = selItems[skuId]
     if (!it || it.flashSaleQuantity <= 0) {
       hasQtyErr = true
     }
-    if ((it?.flashSaleQuantity ?? 0) > getProductStock(pid)) {
-      qtyError[pid] = true
+    if ((it?.flashSaleQuantity ?? 0) > getProductStock(skuId)) {
+      qtyError[skuId] = true
       hasQtyErr = true
     }
   })
@@ -1283,13 +1425,13 @@ async function saveSlot() {
 
   saving.value = true
 
-  const items = pids.map((pid) => {
-    const it = selItems[pid]
-    const p = PRODUCTS.find((x) => x.id === pid)
+  const items = pids.map((skuId) => {
+    const it = selItems[skuId]
+    const sku = getSku(skuId)
     return {
-      skuId: pid,
-      productName: p?.name || `SP #${pid}`,
-      originalPrice: p?.price ?? it.flashSalePrice,
+      skuId,
+      productName: sku?.productName || `SKU #${skuId}`,
+      originalPrice: sku?.originalPrice ?? it.flashSalePrice,
       flashSalePrice: it.flashSalePrice,
       flashSaleQuantity: it.flashSaleQuantity,
       soldQuantity: 0,
@@ -1301,6 +1443,7 @@ async function saveSlot() {
     startDate: form.startDate || null,
     endDate: form.endDate || null,
     status: Number(form.status),
+    bannerUrl: form.bannerUrl.trim(),
     items,
   }
 
@@ -1372,24 +1515,32 @@ function showToast({type = 'success', title, message}) {
     }, 2800)
   })
 }
+function handleDocClick(e) {
+  const inCascade = e.target.closest('.fs-cascade-wrap')
+  const inCat = e.target.closest('.fs-cat-wrap')
+  if (!inCascade) cascadeOpen.value = false
+  if (!inCat) catOpen.value = false
+}
+
+function handleDocKey(e) {
+  if (e.key === 'Escape') {
+    cascadeOpen.value = false
+    catOpen.value = false
+  }
+}
+
 onMounted(async () => {
   await loadSlots()
-  document.addEventListener('click', (e) => {
-    const inCascade = e.target.closest('.fs-cascade-wrap')
-    const inCat = e.target.closest('.fs-cat-wrap')
-    if (!inCascade) cascadeOpen.value = false
-    if (!inCat) catOpen.value = false
-  })
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-      cascadeOpen.value = false
-      catOpen.value = false
-    }
-  })
+  document.addEventListener('click', handleDocClick)
+  document.addEventListener('keydown', handleDocKey)
 })
+
 onUnmounted(() => {
   clearTimeout(toastTimer)
+  document.removeEventListener('click', handleDocClick)
+  document.removeEventListener('keydown', handleDocKey)
 })
+
 
 
 </script>

@@ -16,6 +16,7 @@ import com.fpoly.marcusstore.service.UserVoucherService;
 import com.fpoly.marcusstore.service.VoucherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -75,9 +76,24 @@ public class VoucherServiceImpl implements VoucherService {
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedDiscountType = normalizeDiscountType(discountType);
 
-        return voucherRepository
-                .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, pageable)
-                .map(this::toResponse);
+        Page<Voucher> pageResult = voucherRepository
+                .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, pageable);
+
+        // Nếu page yêu cầu vượt quá range (thường do vừa xóa item ở trang cuối)
+        // → tự động lùi về trang cuối cùng có data để tránh trang rỗng
+        if (pageResult.isEmpty()
+                && pageable.getPageNumber() > 0
+                && pageResult.getTotalPages() > 0) {
+            Pageable lastPageable = PageRequest.of(
+                    pageResult.getTotalPages() - 1,
+                    pageable.getPageSize(),
+                    pageable.getSort()
+            );
+            pageResult = voucherRepository
+                    .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, lastPageable);
+        }
+
+        return pageResult.map(this::toResponse);
     }
 
     // lấy danh sách thống kê voucher
@@ -408,6 +424,20 @@ public class VoucherServiceImpl implements VoucherService {
         }
 
         return toResponse(voucherRepository.save(voucher));
+    }
+
+    // ngừng hoạt động (soft-delete) voucher theo ID - chỉ cần ID, không cần body
+    @Override
+    @Transactional
+    public void deleteVoucher(Integer voucherId) {
+        Voucher voucher = voucherRepository.findById(voucherId).orElseThrow(
+                () -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy voucher"
+                ));
+
+        voucher.setIsActive(false);
+        voucherRepository.save(voucher);
     }
 
     // Helper: tự động deactivate voucher nếu hết quantity hoặc quá hạn

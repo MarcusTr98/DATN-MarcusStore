@@ -36,6 +36,25 @@ const flashSaleApi = {
   toggleFlashSaleSlot(slotId, status) {
     return api.patch(`/admin/flashsale/${slotId}/status`, { status })
   },
+
+  /**
+   * Lấy cây brand -> categoryL2 -> sku để admin chọn sản phẩm cho Flash Sale.
+   * @param {Object} options
+   * @param {boolean} options.includeOutOfStock - true = lấy cả SKU hết hàng
+   *   (stockQuantity = 0). Mặc định false cho modal Flash Sale.
+   */
+  getProductCascade({ includeOutOfStock = false } = {}) {
+    return api.get('/admin/products/cascade', {
+      params: { includeOutOfStock },
+    })
+  },
+
+  /** Lấy cây của 1 brand cụ thể (ít dùng). */
+  getProductCascadeByBrand(brand, { includeOutOfStock = false } = {}) {
+    return api.get(`/admin/products/cascade/${encodeURIComponent(brand)}`, {
+      params: { includeOutOfStock },
+    })
+  },
 }
 
 export default flashSaleApi

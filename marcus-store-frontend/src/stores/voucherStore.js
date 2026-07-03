@@ -15,8 +15,8 @@ function mapVoucher(voucher) {
     voucherCode: voucher.voucherCode,
     discountValue: Number(voucher.discountValue || 0),
     discountType: voucher.discountType,
-    maxDiscountAmount: Number(voucher.maxDiscountAmount ?? 0) || null,
-    minOrderValue: Number(voucher.minOrderValue ?? 0) || null,
+    maxDiscountAmount: voucher.maxDiscountAmount != null ? Number(voucher.maxDiscountAmount) : null,
+    minOrderValue: voucher.minOrderValue != null ? Number(voucher.minOrderValue) : null,
     startDate: voucher.startDate || null,
     endDate: voucher.endDate || null,
     quantity: Number(voucher.quantity || 0),
@@ -185,12 +185,15 @@ export const useVoucherStore = defineStore('voucher', {
         this.loading = true
         this.error = null
 
+        // Gọi API DELETE - chỉ cần voucherId, không cần body đầy đủ
+        // → Tránh được lỗi validation @NotNull khi DB có field null
         await voucherApi.deleteVoucherById(voucherId)
 
+        // Cập nhật local state - loại bỏ voucher khỏi danh sách hiển thị
         this.vouchers = this.vouchers.filter(
           (voucher) => voucher.voucherId !== voucherId
         )
-        this.stats = buildFallbackStats(this.vouchers)
+        this.stats = buildFallbackStats(this.vouchers, this.pagination.totalElements)
 
         return true
       } catch (error) {
@@ -198,7 +201,7 @@ export const useVoucherStore = defineStore('voucher', {
         this.error =
           error.response?.data?.message ||
           error.response?.data?.data ||
-          'Không thể xóa voucher'
+          'Không thể ngừng hoạt động voucher'
 
         return false
       } finally {

@@ -50,7 +50,11 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
                         @Param("brand") String brand,
                         Pageable pageable);
 
-        // list tên brand 
+        // list tên brand
         @Query("SELECT DISTINCT p.brand FROM Product p WHERE p.brand IS NOT NULL AND p.brand <> ''")
         List<String> findAllDistinctBrands();
+        // Lấy products theo brand, có category, status = true
+        @EntityGraph(attributePaths = { "category" }) // tránh N + 1 query  load category và product cùng lúc
+        @Query("SELECT p FROM Product p WHERE p.brand = :brand AND p.status = true AND p.category IS NOT NULL")
+        List<Product> findByBrandAndStatusTrue(@Param("brand") String brand);
 }

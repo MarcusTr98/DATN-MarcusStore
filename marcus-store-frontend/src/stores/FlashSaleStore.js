@@ -11,14 +11,8 @@ function mapSlot(slot) {
     startDate: slot.startDate || null,
     endDate: slot.endDate || null,
     status: Number(slot.status),
-    items: (slot.items || []).map((it) => ({
-      skuId: it.skuId,
-      productName: it.productName,
-      originalPrice: Number(it.originalPrice ?? 0),
-      flashSalePrice: Number(it.flashSalePrice ?? 0),
-      flashSaleQuantity: Number(it.flashSaleQuantity ?? 0),
-      soldQuantity: Number(it.soldQuantity ?? 0),
-    })),
+    quantityFlashSaleSlot: Number(slot.quantityFlashSaleSlot ?? 0),
+    imageUrl: slot.imageUrl || slot.bannerUrl || null,
   }
 }
 
@@ -73,14 +67,14 @@ function buildFallbackStats(slots = [], totalElements = 0) {
       upcoming++
     }
 
-    totalProducts += (slot.items || []).length
+    totalProducts += Number(slot.quantityFlashSaleSlot ?? 0)
   })
 
   return {
     total: totalElements || slots.length,
     active,
     upcoming,
-    totalProducts, // gồm cả sold
+    totalProducts,
   }
 }
 
@@ -103,6 +97,11 @@ export const useFlashSaleStore = defineStore('flashSale', {
       upcoming: 0,
       totalProducts: 0,
     },
+    // Cây sản phẩm dùng trong modal tạo/sửa Flash Sale:
+    // [{ brand, categories:[{ categoryId, categoryName, skus:[...] }] }]
+    cascadeTree: [],
+    cascadeLoading: false,
+    cascadeError: null,
   }),
 
   actions: {
@@ -124,54 +123,17 @@ export const useFlashSaleStore = defineStore('flashSale', {
 
         // Gọi thêm stats (giống pattern voucher)
         try {
-          // #region DEBUG_LOG
-          console.log('[DEBUG_STATS] fetchSlots params:', params)
-          fetch('http://127.0.0.1:7828/ingest/6683b584-65cf-4bee-bf05-7d2708749dc3', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '41c373' },
-            body: JSON.stringify({
-              sessionId: '41c373',
-              location: 'FlashSaleStore.js:126',
-              message: 'fetchSlots called with params',
-              data: { params },
-              timestamp: Date.now()
-            })
-          }).catch(() => {})
-          // #endregion
-          const statsRes = await flashSaleApi.getFlashSaleStats(params)
-          // #region DEBUG_LOG
-          console.log('[DEBUG_STATS] statsRes:', statsRes.data)
-          fetch('http://127.0.0.1:7828/ingest/6683b584-65cf-4bee-bf05-7d2708749dc3', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '41c373' },
-            body: JSON.stringify({
-              sessionId: '41c373',
-              location: 'FlashSaleStore.js:136',
-              message: 'stats API response data',
-              data: { rawResponse: statsRes.data },
-              timestamp: Date.now()
-            })
-          }).catch(() => {})
-          // #endregion
-          const data = statsRes.data || {}
-          // Map từ key BE sang key FE cho thống nhất
-          // #region DEBUG_LOG
-          console.log('[DEBUG_STATS] mapped stats:', {
-            total: data.totalSlots ?? 0,
-            active: data.activeSlots ?? 0,
-            upcoming: data.upcomingSlots ?? 0,
-            totalProducts: data.totalActiveProducts ?? 0,
+          const statsRes = await flashSaleApi.getFlashSaleStats({
+            keyword: params.keyword,
+            status: params.status,
           })
-          // #endregion
+          const data = statsRes.data
           this.stats = {
             total: data.totalSlots ?? 0,
             active: data.activeSlots ?? 0,
             upcoming: data.upcomingSlots ?? 0,
             totalProducts: data.totalActiveProducts ?? 0,
           }
-          // #region DEBUG_LOG
-          console.log('[DEBUG_STATS] this.stats after set:', JSON.parse(JSON.stringify(this.stats)))
-          // #endregion
         } catch (statsError) {
           console.warn('Stats endpoint lỗi, dùng fallback:', statsError)
           this.stats = buildFallbackStats(this.slots, pageData.totalElements || 0)
@@ -316,6 +278,33 @@ export const useFlashSaleStore = defineStore('flashSale', {
         return false
       } finally {
         this.loading = false
+      }
+    },
+
+    /**
+     * Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
+     * cho Flash Sale.
+     * @param {Object} options
+     * @param {boolean} options.includeOutOfStock mặc định false.
+     */
+    async fetchCascade({ includeOutOfStock = false } = {}) {
+      this.cascadeLoading = true
+      this.cascadeError = null
+      try {
+        const res = await flashSaleApi.getProductCascade({ includeOutOfStock })
+        // res.data là ApiResponse: { code, message, data: [...] }
+        this.cascadeTree = res.data?.data || []
+        return this.cascadeTree
+      } catch (error) {
+        console.error('lỗi fetchCascade:', error)
+        this.cascadeError =
+          error.response?.data?.message ||
+          error.response?.data?.data ||
+          'Không thể tải cây sản phẩm'
+        this.cascadeTree = []
+        return []
+      } finally {
+        this.cascadeLoading = false
       }
     },
   },

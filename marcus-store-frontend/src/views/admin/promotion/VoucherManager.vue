@@ -356,7 +356,7 @@
               </div>
 
               <div v-if="form.discount_type === 'PERCENT'">
-                <label class="form-label">Điều kiện giảm tối đa <span>*</span></label>
+                <label class="form-label">Giảm tối đa <span>*</span></label>
                 <div class="input-group">
                   <input
                     :value="formatNumberInput(form.max_discount_amount)"
@@ -873,7 +873,7 @@
     <BaseModal
       :visible="deleteConfirm.visible"
       type="confirm"
-      title="Xóa voucher"
+      title="Ngừng hoạt động voucher"
       :message="deleteConfirm.message"
       @close="closeDeleteConfirm"
       @confirm="confirmDeleteVoucher"
@@ -894,7 +894,7 @@ import {computed, reactive, ref, watch, onMounted, onUnmounted} from 'vue'
 import {storeToRefs} from 'pinia'
 import {useVoucherStore} from '@/stores/voucherStore'
 import api from '@/utils/api'
-
+import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/Voucher.css'
 
 const voucherStore = useVoucherStore()
@@ -913,7 +913,7 @@ const showUserDropdown = ref(false)
 onMounted(() => {
   loadVouchers()
   loadUsers()
-  
+
   // Close dropdown when clicking outside
   document.addEventListener('click', handleClickOutside)
 })
@@ -1011,7 +1011,7 @@ const previewVoucher = computed(() => {
 })
 
 const filteredVouchers = computed(() => {
-  return vouchers.value
+  return vouchers.value.filter((voucher) => voucher.isActive === true)
 })
 const filteredUsers = computed(() => {
   if (!userSearchQuery.value) {
@@ -1125,9 +1125,9 @@ const errors = computed(() => {
 async function loadUsers() {
   try {
     loadingUsers.value = true
-    // Chỉ lấy users có role_id = 3 (CUSTOMER)
     const res = await api.get('/admin/user/customers')
-    allUsers.value = res.data || []
+    // ApiResponse<Page<UserResponse>> -> res.data.data.content
+    allUsers.value = res.data?.data?.content || []
   } catch (error) {
     console.error('Lỗi khi tải danh sách users:', error)
     allUsers.value = []
@@ -1409,7 +1409,7 @@ async function saveVoucher() {
 
 function deleteVoucher(voucher) {
   deleteConfirm.voucher = voucher
-  deleteConfirm.message = `Bạn có chắc muốn xóa voucher ${voucher.voucherCode} không?`
+  deleteConfirm.message = `Bạn có chắc muốn ngừng hoạt động voucher ${voucher.voucherCode} không?`
   deleteConfirm.visible = true
 }
 
@@ -1428,16 +1428,24 @@ async function confirmDeleteVoucher() {
 
   if (success) {
     closeDeleteConfirm()
+
+    // Nếu trang hiện tại rỗng (do vừa xóa hết items ở trang cuối)
+    // → lùi về trang trước để tránh hiển thị trang trống
+    if (vouchers.value.length === 0 && currentPage.value > 0) {
+      currentPage.value = currentPage.value - 1
+    }
+
+    // Load lại - backend sẽ tự fallback về trang cuối có data nếu page vượt range
     await loadVouchers()
 
-    if (currentPage.value > 0 && currentPage.value >= pagination.value.totalPages) {
-      currentPage.value = Math.max(pagination.value.totalPages - 1, 0)
-      await loadVouchers()
+    // Đồng bộ currentPage với page mà backend thực sự trả về (phòng trường hợp BE fallback)
+    if (voucherStore.pagination.page !== currentPage.value) {
+      currentPage.value = voucherStore.pagination.page
     }
 
     showSuccessModal({
-      title: 'Xóa voucher thành công',
-      message: `Voucher ${voucher.voucherCode} đã được xóa khỏi danh sách.`,
+      title: 'Ngừng hoạt động voucher thành công',
+      message: `Voucher ${voucher.voucherCode} đã được chuyển sang trạng thái ngừng hoạt động.`,
     })
   }
 }

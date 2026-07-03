@@ -91,4 +91,16 @@ public class AdminUserController {
         userServiceImpl.verifyEmailByOtp(request.getEmail(), request.getOtp());
         return ApiResponse.success("Xác thực email thành công");
     }
+    @GetMapping("/customers")
+    public ApiResponse<Page<UserResponse>> getCustomers(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "1000") int size) {
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        return ApiResponse.success(
+                userServiceImpl.getALL(keyword, List.of("CUSTOMER"), pageable)
+        );
+    }
 }
