@@ -1011,7 +1011,16 @@ const previewVoucher = computed(() => {
 })
 
 const filteredVouchers = computed(() => {
-  return vouchers.value.filter((voucher) => voucher.isActive === true)
+  // Tôn trọng bộ lọc status của UI - không double-filter cứng isActive=true
+  // BE đã trả về đúng dữ liệu theo filters.status rồi
+  if (filters.status === 'ACTIVE') {
+    return vouchers.value.filter((voucher) => voucher.isActive === true)
+  }
+  if (filters.status === 'INACTIVE') {
+    return vouchers.value.filter((voucher) => voucher.isActive === false)
+  }
+  // ALL: hiển thị tất cả
+  return vouchers.value
 })
 const filteredUsers = computed(() => {
   if (!userSearchQuery.value) {
@@ -1426,28 +1435,41 @@ async function confirmDeleteVoucher() {
 
   const success = await voucherStore.deleteVoucherById(voucher.voucherId)
 
-  if (success) {
+  if (!success) {
     closeDeleteConfirm()
-
-    // Nếu trang hiện tại rỗng (do vừa xóa hết items ở trang cuối)
-    // → lùi về trang trước để tránh hiển thị trang trống
-    if (vouchers.value.length === 0 && currentPage.value > 0) {
-      currentPage.value = currentPage.value - 1
-    }
-
-    // Load lại - backend sẽ tự fallback về trang cuối có data nếu page vượt range
-    await loadVouchers()
-
-    // Đồng bộ currentPage với page mà backend thực sự trả về (phòng trường hợp BE fallback)
-    if (voucherStore.pagination.page !== currentPage.value) {
-      currentPage.value = voucherStore.pagination.page
-    }
-
-    showSuccessModal({
-      title: 'Ngừng hoạt động voucher thành công',
-      message: `Voucher ${voucher.voucherCode} đã được chuyển sang trạng thái ngừng hoạt động.`,
+    showToast({
+      type: 'error',
+      title: 'Ngừng hoạt động voucher thất bại',
+      message: voucherStore.error || 'Vui lòng thử lại.',
     })
+    return
   }
+
+  closeDeleteConfirm()
+
+  // Load lại để có totalElements / totalPages mới nhất từ server
+  await loadVouchers()
+
+  // Sau khi load: nếu currentPage vượt quá totalPages (do xóa hết các item ở trang cuối)
+  // → lùi currentPage về trang cuối còn data
+  if (currentPage.value >= pagination.value.totalPages) {
+    currentPage.value = Math.max(0, pagination.value.totalPages - 1)
+  }
+
+  // Nếu vẫn còn data, load lại với currentPage mới (nếu có thay đổi)
+  // để đảm bảo FE hiển thị đúng các item ở trang hiện tại
+  if (pagination.value.totalElements > 0) {
+    await loadVouchers()
+  } else {
+    // Hết sạch voucher → reset về trang 0
+    currentPage.value = 0
+    await loadVouchers()
+  }
+
+  showSuccessModal({
+    title: 'Ngừng hoạt động voucher thành công',
+    message: `Voucher ${voucher.voucherCode} đã được chuyển sang trạng thái ngừng hoạt động.`,
+  })
 }
 
 function formatDiscountValue(voucher) {

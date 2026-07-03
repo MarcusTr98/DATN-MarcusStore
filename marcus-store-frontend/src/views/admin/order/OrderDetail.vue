@@ -14,10 +14,17 @@
         <p v-else>Không tìm thấy dữ liệu cho đơn hàng này.</p>
       </div>
 
-      <div class="page-actions">
+      <div class="page-actions no-print">
         <RouterLink class="outline-btn" to="/admin/order">Quay lại</RouterLink>
         <button class="outline-btn" type="button" @click="printPage">In đơn hàng</button>
       </div>
+    </div>
+
+    <!-- PRINT-ONLY HEADER -->
+    <div class="print-only-header">
+      <h1>Marcus Store</h1>
+      <p>Hóa đơn bán hàng</p>
+      <p v-if="orderDetail">Mã đơn: <strong>{{ orderDetail.orderCode }}</strong></p>
     </div>
 
     <template v-if="orderDetail">
@@ -305,7 +312,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import '@/assets/css/OrderDetails.css'
 import OrderDetailApi from '@/api/orderDetailApi.js'
@@ -505,9 +512,92 @@ const saveStatusUpdate = async () => {
   }
 }
 
-const printPage = () => {
-  window.print()
+/**
+ * Reset mọi transform/scale được set từ lần in trước.
+ */
+const resetPrintScale = () => {
+  const page = document.querySelector('.order-detail-page')
+  if (page) {
+    page.style.transform = ''
+    page.style.transformOrigin = ''
+    page.style.width = ''
+    page.style.maxWidth = ''
+  }
+  const tableWrap = document.querySelector('.order-detail-page .table-wrap, .order-detail-page table')
+  if (tableWrap) {
+    tableWrap.style.transform = ''
+    tableWrap.style.transformOrigin = ''
+    tableWrap.style.width = ''
+  }
 }
+
+/**
+ * In nội dung vừa vùng in của Chrome.
+ * Cách xử lý:
+ *  - Đo width của `.order-detail-page` (chưa scale).
+ *  - Đo width vùng in = A4 (210mm) - 2 lề.
+ *    Vì JS không đọc được lề user đã chọn trong print dialog,
+ *    ta giả định "worst-case" = 12mm mỗi bên (Chrome Default).
+ *  - Nếu content > printable: scale toàn page để vừa khít.
+ */
+const getPrintableWidthPx = () => {
+  const A4_MM = 210
+  const MARGIN_MM = 12
+  const printableMm = A4_MM - 2 * MARGIN_MM
+  // CSS pixel = mm * 96/25.4 (96dpi chuẩn CSS)
+  return printableMm * (96 / 25.4)
+}
+
+const applyPrintScale = () => {
+  const page = document.querySelector('.order-detail-page')
+  if (!page) return
+
+  const contentWidth = page.scrollWidth
+  if (!contentWidth) return
+
+  const printableWidth = getPrintableWidthPx()
+
+  if (contentWidth > printableWidth) {
+    const scale = printableWidth / contentWidth
+    page.style.transformOrigin = 'top left'
+    page.style.transform = `scale(${scale})`
+    // width mới = width cũ * scale để giữ chỗ cho layout,
+    // tránh phần content cao hơn bị đẩy lệch.
+    page.style.width = `${contentWidth * scale}px`
+    page.style.maxWidth = `${contentWidth * scale}px`
+  }
+}
+
+const printPage = async () => {
+  await nextTick()
+  // Đợi 1 frame để DOM ổn định trước khi đo
+  requestAnimationFrame(() => {
+    applyPrintScale()
+    // Đợi browser paint xong rồi mới gọi print()
+    requestAnimationFrame(() => {
+      window.print()
+    })
+  })
+}
+
+// Bắt cả trường hợp user dùng Ctrl+P (không qua nút)
+const onBeforePrint = () => {
+  applyPrintScale()
+}
+const onAfterPrint = () => {
+  resetPrintScale()
+}
+
+onMounted(() => {
+  window.addEventListener('beforeprint', onBeforePrint)
+  window.addEventListener('afterprint', onAfterPrint)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeprint', onBeforePrint)
+  window.removeEventListener('afterprint', onAfterPrint)
+  resetPrintScale()
+})
 </script>
 
 <style scoped></style>

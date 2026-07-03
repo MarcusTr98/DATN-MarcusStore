@@ -16,7 +16,7 @@ public interface ProductCascadeService {
 
     ProductCascadeResponse getProductCascadeByBrand(String brand, boolean includeOutOfStock);
 
-    // ---- Overload giữ tương thích ngược, mặc định ẩn SKU hết hàng ----
+    //  Overload giữ tương thích ngược, mặc định ẩn SKU hết hàng
     default List<ProductCascadeResponse> getAllProductCascade() {
         return getAllProductCascade(false);
     }

@@ -189,11 +189,28 @@ export const useVoucherStore = defineStore('voucher', {
         // → Tránh được lỗi validation @NotNull khi DB có field null
         await voucherApi.deleteVoucherById(voucherId)
 
+        // Ghi nhớ trạng thái isActive trước khi xóa để tính totalElements đúng
+        const deletedVoucher = this.vouchers.find((v) => v.voucherId === voucherId)
+        const wasActive = deletedVoucher ? deletedVoucher.isActive !== false : true
+
         // Cập nhật local state - loại bỏ voucher khỏi danh sách hiển thị
         this.vouchers = this.vouchers.filter(
           (voucher) => voucher.voucherId !== voucherId
         )
-        this.stats = buildFallbackStats(this.vouchers, this.pagination.totalElements)
+
+        // Cập nhật totalElements / totalPages ngay để UI phản ánh đúng
+        // (chỉ giảm nếu voucher bị xóa đang được đếm trong tổng hiện tại)
+        const size = this.pagination.size || 10
+        const currentTotal = this.pagination.totalElements || 0
+        const newTotal = wasActive ? Math.max(0, currentTotal - 1) : currentTotal
+
+        this.pagination = {
+          ...this.pagination,
+          totalElements: newTotal,
+          totalPages: Math.ceil(newTotal / size),
+        }
+
+        this.stats = buildFallbackStats(this.vouchers, newTotal)
 
         return true
       } catch (error) {

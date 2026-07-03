@@ -24,7 +24,7 @@ public class ProductCascadeResponse {
     public static class CategoryL2Node {
         private Integer categoryId;
         private String categoryName;
-        private List<SkuNode> skus;     // SKU nằm trong category này
+        private List<SkuNode> skus;
     }
     @Data
     @Builder
