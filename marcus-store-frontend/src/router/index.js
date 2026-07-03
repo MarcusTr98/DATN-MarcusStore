@@ -46,11 +46,16 @@ const routes = [
         name: 'ProductDetail',
         component: () => import('@/views/client/shop/ProductDetail.vue'),
       },
-      { path: 'cart', name: 'Cart', component: () => import('@/views/client/checkout/Cart.vue') },
+      { path: 'cart',
+        name: 'Cart', 
+        component: () => import('@/views/client/checkout/Cart.vue'),
+        meta: { requiresAuth: true },
+      },
       {
         path: 'checkout',
         name: 'Checkout',
         component: () => import('@/views/client/checkout/Checkout.vue'),
+         meta: { requiresAuth: true },
       },
       {
         path: 'order-success',
@@ -97,6 +102,7 @@ const routes = [
             path: 'orders',
             name: 'MyOrders',
             component: () => import('@/views/client/account/MyOrders.vue'),
+            meta: { requiresAuth: true },
           },
           {
             path: 'orders/:id',
@@ -107,6 +113,7 @@ const routes = [
             path: 'wishlist',
             name: 'Wishlist',
             component: () => import('@/views/client/account/Wishlist.vue'),
+            meta: { requiresAuth: true },
           },
           {
             path: '/change-password',
@@ -284,7 +291,15 @@ router.beforeEach((to) => {
   if (to.path.startsWith('/admin') && !isAdminOrStaff) {
     return '/'
   }
-
+// Route client yêu cầu đăng nhập
+if (to.meta.requiresAuth && !token) {
+  return {
+    path: '/auth/login',
+    query: {
+      redirect: to.fullPath,
+    },
+  }
+}
   // Kiểm tra theo role (chặn thô, vd chỉ ADMIN mới được vào trang)
   const requiredRoles = to.meta.roles
   if (requiredRoles) {
