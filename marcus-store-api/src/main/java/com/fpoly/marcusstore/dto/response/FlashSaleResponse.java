@@ -1,9 +1,9 @@
 package com.fpoly.marcusstore.dto.response;
 
 import lombok.*;
-import org.springframework.cglib.core.Local;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -11,12 +11,18 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class FlashSaleResponse {
+
     private Integer slotId;
     private String name;
+    private String bannerImageUrl;
+
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Integer quantityFlashSaleSlot;
     private Short status;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    private List<FlashSaleItemResponse> items;
 }

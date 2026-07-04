@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.FlashSaleSlotRequest;
 import com.fpoly.marcusstore.dto.response.FlashSaleResponse;
 import com.fpoly.marcusstore.dto.response.FlashSaleStatsResponse;
 import org.springframework.data.domain.Page;
@@ -15,5 +16,7 @@ public interface FlashSaleService {
     FlashSaleStatsResponse getFlashSaleStats(String keyword, Short status);
     // Chi tiết
     FlashSaleResponse getFlashSaleSlotById(Integer slotId);
+    // Tạo mới
+  //  FlashSaleResponse createFlashSale(FlashSaleSlotRequest request);
 
 }
