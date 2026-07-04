@@ -13,7 +13,7 @@ import java.math.BigDecimal;
 @Builder
 public class FlashSaleItemRequest {
     @NotNull(message = "SKU không được để trống")
-    private Integer SkuId;
+    private Integer skuId;
     @NotNull(message = "Giá gốc không được để trống")
     private BigDecimal originalPrice;
     @NotNull(message = "Giá flash sale không được để trống")

@@ -10,9 +10,11 @@ import com.fpoly.marcusstore.entity.shopping.CartItem;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
@@ -28,6 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -52,8 +55,7 @@ public class CheckoutService {
     @Autowired
     private VoucherRepository voucherRepository;
     @Autowired
-    private VoucherService voucherService;
-
+    private VoucherService voucherService; 
     @Autowired
     private GhnService ghnService;
     @Autowired
@@ -154,10 +156,8 @@ public class CheckoutService {
             orderItem.setOrder(order);
             orderItem.setSku(sku);
             orderItem.setQuantity(buyQuantity);
-            orderItem.setPriceAtPurchase(sku.getPrice());
             order.getOrderItems().add(orderItem);
 
-            totalAmount = totalAmount.add(sku.getPrice().multiply(BigDecimal.valueOf(buyQuantity)));
             int itemWeight = (sku.getWeightGram() != null ? sku.getWeightGram() : 500) * buyQuantity;
             totalWeightGram += itemWeight;
         }

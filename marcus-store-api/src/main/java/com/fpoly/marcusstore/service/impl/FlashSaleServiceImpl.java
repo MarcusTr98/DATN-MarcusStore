@@ -1,34 +1,44 @@
 package com.fpoly.marcusstore.service.impl;
 
+import com.fpoly.marcusstore.dto.request.FlashSaleItemRequest;
+import com.fpoly.marcusstore.dto.request.FlashSaleSlotRequest;
+import com.fpoly.marcusstore.dto.response.FlashSaleItemResponse;
 import com.fpoly.marcusstore.dto.response.FlashSaleResponse;
 import com.fpoly.marcusstore.dto.response.FlashSaleStatsResponse;
+import com.fpoly.marcusstore.entity.core.ProductSku;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleItemId;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
+import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleSlotRepository;
 import com.fpoly.marcusstore.service.FlashSaleService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-
+@Slf4j
 public class FlashSaleServiceImpl implements FlashSaleService {
      private final FlashSaleSlotRepository flashSaleSlotRepository;
      private final FlashSaleItemRepository flashSaleItemRepository;
-
+    private final ProductSkuRepository productSkuRepository;
 
      //  Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
-     private FlashSaleResponse toResponse(FlashSaleSlot slot, Map<Integer, Integer> qtyMap) {
+     private FlashSaleResponse toResponse(FlashSaleSlot slot,
+                                          Map<Integer, Integer> qtyMap,
+                                          Map<Integer, Integer> usedMap) {
           return FlashSaleResponse.builder()
                   .slotId(slot.getSlotId())
                   .name(slot.getName())
@@ -36,11 +46,54 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                   .endDate(slot.getEndDate())
                   .status(slot.getStatus())
                   .quantityFlashSaleSlot(qtyMap.getOrDefault(slot.getSlotId(), 0))
+                  .usedQuantity(usedMap.getOrDefault(slot.getSlotId(), 0))
                   .createdAt(slot.getCreatedAt())
                   .updatedAt(slot.getUpdatedAt())
+                  .bannerImageUrl(slot.getBannerImageUrl())
                   .build();
      }
+    // Map 1 slot sang FlashSaleResponse (kèm items, dùng cho chi tiết)
+    private FlashSaleResponse toResponseWithItems(FlashSaleSlot slot, List<FlashSaleItem> items) {
+        List<FlashSaleItemResponse> itemResponses = items.stream()
+                .map(this::toItemResponse)
+                .toList();
+        return FlashSaleResponse.builder()
+                .slotId(slot.getSlotId())
+                .name(slot.getName())
+                .startDate(slot.getStartDate())
+                .endDate(slot.getEndDate())
+                .status(slot.getStatus())
+                .quantityFlashSaleSlot(items.stream()
+                        .mapToInt(FlashSaleItem::getFlashSaleQuantity)
+                        .sum())
+                .usedQuantity(items.stream()
+                        .mapToInt(i -> i.getSoldQuantity() == null ? 0 : i.getSoldQuantity())
+                        .sum())
+                .createdAt(slot.getCreatedAt())
+                .updatedAt(slot.getUpdatedAt())
+                .bannerImageUrl(slot.getBannerImageUrl())
+                .items(itemResponses)
+                .build();
+    }
 
+    // Map 1 FlashSaleItem sang FlashSaleItemResponse
+    private FlashSaleItemResponse toItemResponse(FlashSaleItem item) {
+        ProductSku sku = item.getSku();
+        Integer remaining = item.getFlashSaleQuantity() - item.getSoldQuantity();
+        return FlashSaleItemResponse.builder()
+                .skuId(item.getId().getSkuId())
+                .productId(sku != null && sku.getProduct() != null ? sku.getProduct().getProductId() : null)
+                .productName(sku != null && sku.getProduct() != null ? sku.getProduct().getProductName() : null)
+                .skuCode(sku != null ? sku.getSkuCode() : null)
+                .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
+                .originalPrice(item.getOriginalPrice())
+                .flashSalePrice(item.getFlashSalePrice())
+                .flashSaleQuantity(item.getFlashSaleQuantity())
+                .soldQuantity(item.getSoldQuantity())
+                .remainingQuantity(remaining)
+                .createdAt(item.getCreatedAt())
+                .build();
+    }
      // chuẩn hóa keyword người dùng gửi
      private String normalizeKeyword(String keyword) {
           return (keyword == null || keyword.isBlank()) ? null : keyword.trim();
@@ -65,7 +118,15 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                                  row -> (Integer) row[0],
                                  row -> ((Number) row[1]).intValue()));
 
-         return page.map(slot -> toResponse(slot, qtyMap));
+         // Tổng sản phẩm đã sử dụng (soldQuantity) theo batch
+         Map<Integer, Integer> usedMap = slotIds.isEmpty()
+                 ? Map.of()
+                 : flashSaleItemRepository.sumSoldQuantityBySlotIds(slotIds).stream()
+                         .collect(Collectors.toMap(
+                                 row -> (Integer) row[0],
+                                 row -> ((Number) row[1]).intValue()));
+
+         return page.map(slot -> toResponse(slot, qtyMap, usedMap));
      }
     // lấy số lượng slot, số lượng slot đang chạy, số lượng slot sắp chạy, tổng số sản phẩm của toàn bộ slot
     @Override
@@ -100,7 +161,219 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                           row -> (Integer) row[0],
                           row -> ((Number) row[1]).intValue()));
 
-          return toResponse(slot, qtyMap);
-     }
+          // Tổng soldQuantity cho cột 'Đã sử dụng'
+          Map<Integer, Integer> usedMap = flashSaleItemRepository.sumSoldQuantityBySlotIds(List.of(slotId))
+                  .stream()
+                  .collect(Collectors.toMap(
+                          row -> (Integer) row[0],
+                          row -> ((Number) row[1]).intValue()));
 
+          return toResponse(slot, qtyMap, usedMap);
+     }
+    @Override
+    @Transactional
+    public FlashSaleResponse createFlashSale(FlashSaleSlotRequest request) {
+        // 1. Validate thời gian
+        LocalDateTime now = LocalDateTime.now();
+        if (request.getStartDate().isBefore(now)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Ngày bắt đầu không được ở trong quá khứ");
+        }
+        if (!request.getEndDate().isAfter(request.getStartDate())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Ngày kết thúc phải sau ngày bắt đầu");
+        }
+        // 2. Lấy & validate SKU trùng lặp trong request
+        List<FlashSaleItemRequest> itemRequests = request.getItems();
+        // set và hash set dùng để thêm xóa tìm kiếm loại bor các phần tử trùng lặp
+        Set<Integer> skuIdSet = new HashSet<>();
+        for (FlashSaleItemRequest ir : itemRequests) {
+            if (!skuIdSet.add(ir.getSkuId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "SKU id bị trùng trong request: " + ir.getSkuId());
+            }
+        }
+        // 3. Kiểm tra tất cả SKU có tồn tại không
+        List<Integer> skuIds = itemRequests.stream()
+                .map(FlashSaleItemRequest::getSkuId)
+                .toList();
+        List<ProductSku> skus = productSkuRepository.findBySkuIdIn(skuIds);
+
+        Map<Integer, ProductSku> skuMap = skus.stream()
+                .collect(Collectors.toMap(ProductSku::getSkuId, s -> s));
+
+        // 4. Chặn tạo 2 slot flash sale chạy cùng khung giờ
+        // Khoảng [start, end] của 2 slot được coi là overlap khi:
+        //   startA < endB  AND  startB < endA
+        // Dùng <> 0 thay vì status IN(2) vì slot vẫn ở status=1 (đã lên lịch)
+        // mà thời gian chưa tới cũng cần chặn luôn.
+        List<FlashSaleSlot> overlapping = flashSaleSlotRepository
+                .findOverlappingSlots(request.getStartDate(), request.getEndDate(), null);
+        if (!overlapping.isEmpty()) {
+            String detail = overlapping.stream()
+                    .map(s -> String.format("#%d '%s' (%s → %s)",
+                            s.getSlotId(),
+                            s.getName(),
+                            s.getStartDate(),
+                            s.getEndDate()))
+                    .collect(Collectors.joining(", "));
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Khung giờ đã bị trùng với các flash sale khác: " + detail);
+        }
+
+        // 5. Tạo slot
+        FlashSaleSlot slot = new FlashSaleSlot();
+        slot.setName(request.getName());
+        slot.setStartDate(request.getStartDate());
+        slot.setEndDate(request.getEndDate());
+        slot.setStatus(request.getStatus() != null ? request.getStatus() : 1);
+        slot.setBannerImageUrl(request.getBannerImageUrl());
+        FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
+        // 6. Tạo items
+        List<FlashSaleItem> itemsToSave = new ArrayList<>();
+        for (FlashSaleItemRequest ir : itemRequests) {
+            FlashSaleItemId itemId = new FlashSaleItemId();
+            itemId.setSlotId(savedSlot.getSlotId());
+            itemId.setSkuId(ir.getSkuId());
+            FlashSaleItem item = new FlashSaleItem();
+            item.setId(itemId);
+            item.setOriginalPrice(ir.getOriginalPrice());
+            item.setFlashSalePrice(ir.getFlashSalePrice());
+            item.setFlashSaleQuantity(ir.getFlashSaleQuantity());
+            // soldQuantity = 0 mặc định (entity set default)
+            itemsToSave.add(item);
+        }
+        List<FlashSaleItem> savedItems = flashSaleItemRepository.saveAll(itemsToSave);
+        // 6. Build response thủ công để có đầy đủ thông tin SKU (không cần load lại)
+        List<FlashSaleItemResponse> itemResponses = new ArrayList<>();
+        for (int i = 0; i < savedItems.size(); i++) {
+            FlashSaleItem saved = savedItems.get(i);
+            FlashSaleItemRequest ir = itemRequests.get(i);
+            ProductSku sku = skuMap.get(saved.getId().getSkuId());
+            itemResponses.add(FlashSaleItemResponse.builder()
+                    .skuId(saved.getId().getSkuId())
+                    .productId(sku.getProduct() != null ? sku.getProduct().getProductId() : null)
+                    .productName(sku.getProduct() != null ? sku.getProduct().getProductName() : null)
+                    .skuCode(sku.getSkuCode())
+                    .skuImageUrl(sku.getSkuImageUrl())
+                    .originalPrice(saved.getOriginalPrice())
+                    .flashSalePrice(saved.getFlashSalePrice())
+                    .flashSaleQuantity(saved.getFlashSaleQuantity())
+                    .soldQuantity(0)
+                    .remainingQuantity(saved.getFlashSaleQuantity())
+                    .createdAt(saved.getCreatedAt())
+                    .build());
+        }
+        return FlashSaleResponse.builder()
+                .slotId(savedSlot.getSlotId())
+                .name(savedSlot.getName())
+                .startDate(savedSlot.getStartDate())
+                .endDate(savedSlot.getEndDate())
+                .status(savedSlot.getStatus())
+                .quantityFlashSaleSlot(savedItems.stream()
+                        .mapToInt(FlashSaleItem::getFlashSaleQuantity).sum())
+                .usedQuantity(savedItems.stream()
+                        .mapToInt(i -> i.getSoldQuantity() == null ? 0 : i.getSoldQuantity())
+                        .sum())
+                .createdAt(savedSlot.getCreatedAt())
+                .updatedAt(savedSlot.getUpdatedAt())
+                .bannerImageUrl(savedSlot.getBannerImageUrl())
+                .items(itemResponses)
+                .build();
+    }
+
+    // Kiểm tra khoảng thời gian có đang đụng với slot khác không.
+    // FE gọi khi admin thay đổi startDate/endDate để hiện cảnh báo real-time.
+    @Override
+    @Transactional(readOnly = true)
+    public List<FlashSaleResponse> checkOverlappingSlots(
+            LocalDateTime startDate, LocalDateTime endDate, Integer excludeSlotId) {
+        if (startDate == null || endDate == null || !endDate.isAfter(startDate)) {
+            return List.of();
+        }
+        List<FlashSaleSlot> overlapping = flashSaleSlotRepository
+                .findOverlappingSlots(startDate, endDate, excludeSlotId);
+
+        // Gọi map usedMap (chi tiết) nhỏ để có thêm soldQuantity cho UI
+        List<Integer> slotIds = overlapping.stream()
+                .map(FlashSaleSlot::getSlotId)
+                .toList();
+        Map<Integer, Integer> qtyMap = slotIds.isEmpty()
+                ? Map.of()
+                : flashSaleItemRepository.sumFlashSaleQuantityBySlotIds(slotIds).stream()
+                        .collect(Collectors.toMap(
+                                row -> (Integer) row[0],
+                                row -> ((Number) row[1]).intValue()));
+        Map<Integer, Integer> usedMap = slotIds.isEmpty()
+                ? Map.of()
+                : flashSaleItemRepository.sumSoldQuantityBySlotIds(slotIds).stream()
+                        .collect(Collectors.toMap(
+                                row -> (Integer) row[0],
+                                row -> ((Number) row[1]).intValue()));
+        return overlapping.stream()
+                .map(s -> toResponse(s, qtyMap, usedMap))
+                .toList();
+    }
+
+    // ========================================================
+    // SCHEDULED: Tự động chuyển trạng thái flash sale theo thời gian
+    // Chạy mỗi 5 phút (cron: giây phút giờ ngày-tháng tháng thứ)
+    // ========================================================
+    @Override
+    @Scheduled(cron = "0 */5 * * * *")
+    @Transactional
+    public void autoUpdateFlashSaleStatuses() {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Chuyển slot 'Lên lịch' (1) mà đã đến giờ bắt đầu → 'Đang diễn ra' (2)
+        List<FlashSaleSlot> toActivate = flashSaleSlotRepository.findSlotsToActivate(now);
+        if (!toActivate.isEmpty()) {
+            toActivate.forEach(s -> s.setStatus((short) 2));
+            flashSaleSlotRepository.saveAll(toActivate);
+            log.info("[FlashSale] Đã kích hoạt {} slot: {}",
+                    toActivate.size(),
+                    toActivate.stream().map(FlashSaleSlot::getSlotId).toList());
+        }
+
+        // 2. Chuyển slot 'Đang diễn ra' (2) mà đã quá endDate → 'Đã kết thúc' (3)
+        //    Đồng thời khoá tổng SP: set flashSaleQuantity = soldQuantity
+        List<FlashSaleSlot> toExpire = flashSaleSlotRepository.findSlotsToExpire(now);
+        if (!toExpire.isEmpty()) {
+            toExpire.forEach(s -> s.setStatus((short) 3));
+            flashSaleSlotRepository.saveAll(toExpire);
+
+            // Khoá tổng sản phẩm: đặt flashSaleQuantity = soldQuantity (phần còn lại mất)
+            for (FlashSaleSlot slot : toExpire) {
+                List<FlashSaleItem> items = flashSaleItemRepository.findItemsBySlotIdWithSlot(slot.getSlotId());
+                items.forEach(item -> {
+                    if (item.getSoldQuantity() != null
+                            && item.getFlashSaleQuantity() != null
+                            && item.getFlashSaleQuantity() > item.getSoldQuantity()) {
+                        item.setFlashSaleQuantity(item.getSoldQuantity());
+                    }
+                });
+                if (!items.isEmpty()) {
+                    flashSaleItemRepository.saveAll(items);
+                }
+            }
+            log.info("[FlashSale] Đã kết thúc và khoá tổng SP của {} slot: {}",
+                    toExpire.size(),
+                    toExpire.stream().map(FlashSaleSlot::getSlotId).toList());
+        }
+
+        // 3. Slot 'Lên lịch' (1) mà đã quá endDate mà chưa kịp chạy → 'Đã kết thúc' (3)
+        List<FlashSaleSlot> overdue = flashSaleSlotRepository.findOverdueScheduledSlots(now);
+        if (!overdue.isEmpty()) {
+            overdue.forEach(s -> s.setStatus((short) 3));
+            flashSaleSlotRepository.saveAll(overdue);
+            log.info("[FlashSale] Đã đánh dấu kết thúc {} slot bị quên: {}",
+                    overdue.size(),
+                    overdue.stream().map(FlashSaleSlot::getSlotId).toList());
+        }
+    }
 }
+

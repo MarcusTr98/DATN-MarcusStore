@@ -19,6 +19,7 @@ public class FlashSaleResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Integer quantityFlashSaleSlot;
+    private Integer usedQuantity;
     private Short status;
 
     private LocalDateTime createdAt;

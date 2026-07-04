@@ -94,7 +94,7 @@
       <h2>Đang <span>cháy</span> hàng</h2>
       <router-link to="/khuyen-mai" class="see-all">Đi đến trang khuyến mãi</router-link>
     </div>
-    
+
     <section class="product-grid">
       <article
         v-for="(product, index) in flashSaleProducts"

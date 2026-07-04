@@ -17,6 +17,15 @@ public interface FlashSaleService {
     // Chi tiết
     FlashSaleResponse getFlashSaleSlotById(Integer slotId);
     // Tạo mới
-  //  FlashSaleResponse createFlashSale(FlashSaleSlotRequest request);
+   FlashSaleResponse createFlashSale(FlashSaleSlotRequest request);
 
+    // Scheduled: auto-update status theo thời gian + khoá tổng SP khi hết hạn
+    void autoUpdateFlashSaleStatuses();
+
+    // Kiểm tra 1 khoảng thời gian có đang đụng với slot khác không
+    // Trả về danh sách slot overlap để FE hiện cảnh báo trước khi submit
+    java.util.List<FlashSaleResponse> checkOverlappingSlots(
+            java.time.LocalDateTime startDate,
+            java.time.LocalDateTime endDate,
+            Integer excludeSlotId);
 }

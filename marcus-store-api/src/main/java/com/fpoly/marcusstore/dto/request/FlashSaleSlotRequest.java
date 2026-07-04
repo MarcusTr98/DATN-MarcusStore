@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.dto.request;
 
 
+import jakarta.validation.constraints.Future;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -22,6 +23,7 @@ public class FlashSaleSlotRequest {
     @NotBlank(message = "Tên flash sale không được để trống")
     private String name;
     @NotNull(message = "Ngày bắt đầu không được để trống")
+    @Future(message = "Ngày bắt đầu phải ở tương lai")
     private LocalDateTime startDate;
     @NotNull(message = "Ngày kết thúc không được để trống")
     private LocalDateTime endDate;

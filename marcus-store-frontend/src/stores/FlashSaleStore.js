@@ -12,7 +12,11 @@ function mapSlot(slot) {
     endDate: slot.endDate || null,
     status: Number(slot.status),
     quantityFlashSaleSlot: Number(slot.quantityFlashSaleSlot ?? 0),
-    imageUrl: slot.imageUrl || slot.bannerUrl || null,
+    usedQuantity: Number(slot.usedQuantity ?? 0),
+    bannerImageUrl: slot.bannerImageUrl || null,
+    items: Array.isArray(slot.items) ? slot.items : [],
+    createdAt: slot.createdAt || null,
+    updatedAt: slot.updatedAt || null,
   }
 }
 
@@ -305,6 +309,23 @@ export const useFlashSaleStore = defineStore('flashSale', {
         return []
       } finally {
         this.cascadeLoading = false
+      }
+    },
+
+    // Kiểm tra khung giờ mới nhập có đang đụng flash sale khác không.
+    // Trả về danh sách slot bị overlap (rỗng = OK để tạo).
+    // excludeSlotId để bỏ qua chính nó khi đang sửa.
+    async fetchOverlap({ startDate, endDate, excludeSlotId = null } = {}) {
+      try {
+        const res = await flashSaleApi.checkOverlap({
+          startDate,
+          endDate,
+          excludeSlotId,
+        })
+        return res.data || []
+      } catch (error) {
+        console.error('lỗi fetchOverlap:', error)
+        return []
       }
     },
   },
