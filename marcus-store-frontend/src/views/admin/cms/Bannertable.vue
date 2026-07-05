@@ -75,7 +75,7 @@
       <span class="pg-info">
         {{ banners.length === 0 ? 'Không có dữ liệu' : `Hiển thị ${from}–${to} / ${banners.length} banner` }}
       </span>
-      <div class="pg-btns" v-if="totalPages > 1">
+      <div class="pg-btns" v-if="banners.length > 0">
         <button class="pg-btn" :disabled="page === 1" @click="page--">
           <i class="bi bi-chevron-left"></i>
         </button>
@@ -123,8 +123,6 @@ function posLabel(positionId) {
   return found ? found.label : '—';
 }
 
-// Vị trí có cho phép nhiều banner chạy tuần tự (đọc từ allowsOrder do API trả về),
-// không còn hardcode so sánh positionCode === 'HOME_SLIDER' nữa
 function isSlider(positionId) {
   const found = props.positions.find(p => String(p.value) === String(positionId));
   return !!found?.allowsOrder;
