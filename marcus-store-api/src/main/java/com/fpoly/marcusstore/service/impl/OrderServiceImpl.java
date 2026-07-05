@@ -103,6 +103,7 @@ public class OrderServiceImpl implements OrderService {
 
     private String getHistoryTitle(String status) {
         return switch (status) {
+            case "CREATED" -> "Tạo đơn";
             case "PENDING" -> "Đơn hàng đã đặt";
             case "CONFIRMED" -> "Đơn hàng đã được xác nhận";
             case "PROCESSING" -> "Đơn hàng đang được chuẩn bị";
