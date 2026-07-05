@@ -94,10 +94,11 @@
             <tr>
               <th>ID</th>
               <th>Tên chiến dịch</th>
+              <th>Banner</th>
               <th>Thời gian</th>
               <th class="text-center">Số SP</th>
+              <th class="text-center">Đã sử dụng</th>
               <th>Trạng thái</th>
-              <th class="text-center">Kích hoạt</th>
               <th class="text-center">Thao tác</th>
             </tr>
             </thead>
@@ -105,6 +106,17 @@
             <tr v-for="(slot, index) in slotsWithStatus" :key="slot.slotId">
               <td><span class="id-text">#{{ currentPage * pageSize + index + 1 }}</span></td>
               <td><span class="slot-name">{{ slot.name }}</span></td>
+              <td>
+                <div
+                  v-if="slot.bannerImageUrl"
+                  class="banner-thumb"
+                  @click="openBannerPreview(slot.bannerImageUrl)"
+                  title="Bấm để xem ảnh lớn"
+                >
+                  <img :src="slot.bannerImageUrl" alt="banner" />
+                </div>
+                <span v-else class="text-muted small">—</span>
+              </td>
               <td>
                 <div class="time-line">
                   <div><span class="time-label">Từ</span><span>{{
@@ -118,20 +130,19 @@
               <td class="text-center">
                 <span class="item-count">{{ slot.quantityFlashSaleSlot ?? 0 }}</span>
               </td>
+              <td class="text-center">
+                <span
+                  class="item-count"
+                  :class="{ 'item-count-used': isSlotExhausted(slot) }"
+                  :title="getUsedTitle(slot)"
+                >
+                  {{ slot.usedQuantity ?? 0 }}
+                </span>
+              </td>
               <td>
                 <span class="status-badge" :class="statusBadgeClass(slot)">
                   {{ statusBadgeLabel(slot) }}
                 </span>
-              </td>
-              <td class="text-center">
-                <label class="fs-tog">
-                  <input
-                    type="checkbox"
-                    :checked="slot.status === 2"
-                    @change="toggleActive(slot, $event.target.checked)"
-                  />
-                  <span class="fs-tog-track"><span class="fs-tog-thumb"></span></span>
-                </label>
               </td>
               <td class="text-center">
                 <button class="icon-button" title="Sửa" @click="openEditModal(slot)">
@@ -266,6 +277,7 @@
                   type="datetime-local"
                   class="form-control"
                   :class="{ 'is-invalid': submitted && errors.startDate }"
+                  :min="minStartDate"
                 />
                 <div v-if="submitted && errors.startDate" class="invalid-feedback">
                   {{ errors.startDate }}
@@ -279,6 +291,7 @@
                   type="datetime-local"
                   class="form-control"
                   :class="{ 'is-invalid': submitted && errors.endDate }"
+                  :min="form.startDate || minStartDate"
                 />
                 <div v-if="submitted && errors.endDate" class="invalid-feedback">{{
                     errors.endDate
@@ -289,6 +302,19 @@
             <div v-if="submitted && errors.time" class="invalid-feedback mt-2">{{
                 errors.time
               }}
+            </div>
+            <div v-if="overlappingSlots.length > 0" class="fs-overlap-warn mt-2">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              <div>
+                <strong>Khung giờ bị trùng với {{ overlappingSlots.length }} flash sale khác:</strong>
+                <ul class="mb-0 mt-1">
+                  <li v-for="s in overlappingSlots" :key="s.slotId">
+                    #{{ s.slotId }} "{{ s.name }}" —
+                    {{ formatDateTime(s.startDate) }} → {{ formatDateTime(s.endDate) }}
+                  </li>
+                </ul>
+                <small>Vui lòng chọn khung giờ khác để tránh chồng chéo.</small>
+              </div>
             </div>
           </div>
 
@@ -373,8 +399,8 @@
                 <label class="form-label">Xem trước</label>
                 <div class="fs-banner-preview-box">
                   <img
-                    v-if="form.bannerUrl && !bannerImageError"
-                    :src="form.bannerUrl"
+                    v-if="getBannerPreviewSrc && !bannerImageError"
+                    :src="getBannerPreviewSrc"
                     alt="Banner preview"
                     class="fs-banner-preview-img"
                     @error="onBannerImageError"
@@ -607,12 +633,17 @@
                   <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
                     <input
-                      type="number"
+                      type="text"
+                      inputmode="numeric"
                       class="fs-input"
-                      :value="selItems[pid]?.flashSalePrice || 0"
+                      :class="{ 'is-invalid': submitted && errors[`item_${pid}_price`] }"
+                      :value="formatNumber(selItems[pid]?.flashSalePrice)"
                       @input="onPriceChange(pid, $event.target.value)"
-                      min="0"
+                      placeholder="Nhập giá"
                     />
+                    <div v-if="submitted && errors[`item_${pid}_price`]" class="invalid-feedback">
+                      {{ errors[`item_${pid}_price`] }}
+                    </div>
                   </td>
                   <td>
                     <input
@@ -628,12 +659,17 @@
                     <input
                       type="number"
                       class="fs-input"
-                      :class="{ 'is-invalid': qtyError[pid] }"
+                      :class="{ 'is-invalid': (submitted && errors[`item_${pid}_quantity`]) || qtyError[pid] }"
                       :value="selItems[pid]?.flashSaleQuantity || 0"
                       @input="onQtyChange(pid, $event.target.value)"
-                      min="0"
+                      min="1"
                     />
-                    <div v-if="qtyError[pid]" class="invalid-feedback">Quá tồn kho</div>
+                    <div v-if="qtyError[pid]" class="invalid-feedback">
+                      Vượt tồn kho (còn {{ getProductStock(pid) }})
+                    </div>
+                    <div v-else-if="submitted && errors[`item_${pid}_quantity`]" class="invalid-feedback">
+                      {{ errors[`item_${pid}_quantity`] }}
+                    </div>
                   </td>
                   <td>
                     <button class="fs-rm-btn" @click="removeProduct(pid)">
@@ -643,6 +679,11 @@
                 </tr>
                 </tbody>
               </table>
+            </div>
+
+            <!-- Lỗi items chung (khi chưa chọn sản phẩm nào) -->
+            <div v-if="submitted && errors.items" class="invalid-feedback d-block mt-2">
+              {{ errors.items }}
             </div>
           </div>
 
@@ -721,12 +762,17 @@
                   <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
                     <input
-                      type="number"
+                      type="text"
+                      inputmode="numeric"
                       class="fs-input"
-                      :value="selItems[pid]?.flashSalePrice || 0"
+                      :class="{ 'is-invalid': submitted && errors[`item_${pid}_price`] }"
+                      :value="formatNumber(selItems[pid]?.flashSalePrice)"
                       @input="onPriceChange(pid, $event.target.value)"
-                      min="0"
+                      placeholder="Nhập giá"
                     />
+                    <div v-if="submitted && errors[`item_${pid}_price`]" class="invalid-feedback">
+                      {{ errors[`item_${pid}_price`] }}
+                    </div>
                   </td>
                   <td>
                     <input
@@ -742,12 +788,17 @@
                     <input
                       type="number"
                       class="fs-input"
-                      :class="{ 'is-invalid': qtyError[pid] }"
+                      :class="{ 'is-invalid': (submitted && errors[`item_${pid}_quantity`]) || qtyError[pid] }"
                       :value="selItems[pid]?.flashSaleQuantity || 0"
                       @input="onQtyChange(pid, $event.target.value)"
-                      min="0"
+                      min="1"
                     />
-                    <div v-if="qtyError[pid]" class="invalid-feedback">Quá tồn kho</div>
+                    <div v-if="qtyError[pid]" class="invalid-feedback">
+                      Vượt tồn kho (còn {{ getProductStock(pid) }})
+                    </div>
+                    <div v-else-if="submitted && errors[`item_${pid}_quantity`]" class="invalid-feedback">
+                      {{ errors[`item_${pid}_quantity`] }}
+                    </div>
                   </td>
                   <td>
                     <button class="fs-rm-btn" @click="removeProduct(pid)">
@@ -758,6 +809,11 @@
                 </tbody>
               </table>
             </div>
+
+            <!-- Lỗi items chung -->
+            <div v-if="submitted && errors.items" class="invalid-feedback d-block mt-2">
+              {{ errors.items }}
+            </div>
           </div>
 
           <div class="form-actions">
@@ -765,10 +821,24 @@
               <i class="bi bi-arrow-counterclockwise"></i>Làm mới
             </button>
 
-            <button type="submit" class="btn btn-primary-action" :disabled="saving">
+            <button type="submit" class="btn btn-primary-action" :disabled="saving || bannerUploading">
               <i class="bi bi-check2-circle"></i>
-              {{ saving ? 'Đang lưu...' : 'Lưu chiến dịch' }}
+              {{ saving || bannerUploading ? 'Đang xử lý...' : 'Lưu chiến dịch' }}
             </button>
+          </div>
+
+          <!-- Lỗi trả về từ server (fieldErrors + error message) -->
+          <div v-if="submitted && (flashSaleStore.error || Object.keys(flashSaleStore.fieldErrors || {}).length > 0)"
+               class="fs-server-errors mt-3">
+            <div v-if="flashSaleStore.error" class="alert alert-danger mb-2">
+              <i class="bi bi-exclamation-triangle-fill me-2"></i>
+              {{ flashSaleStore.error }}
+            </div>
+            <ul v-if="Object.keys(flashSaleStore.fieldErrors || {}).length > 0" class="mb-0">
+              <li v-for="(msg, field) in flashSaleStore.fieldErrors" :key="field">
+                <strong>{{ field }}:</strong> {{ msg }}
+              </li>
+            </ul>
           </div>
         </form>
       </div>
@@ -812,12 +882,40 @@
         </div>
       </div>
     </div>
+
+    <!-- BANNER LIGHTBOX -->
+    <Transition name="fade">
+      <div
+        v-if="bannerLightboxUrl"
+        class="banner-lightbox"
+        @click.self="closeBannerPreview"
+        @keydown.esc="closeBannerPreview"
+        tabindex="0"
+        ref="lightboxEl"
+      >
+        <button
+          type="button"
+          class="banner-lightbox-close"
+          @click="closeBannerPreview"
+          title="Đóng (Esc)"
+        >
+          <i class="bi bi-x-lg"></i>
+        </button>
+        <img
+          :src="bannerLightboxUrl"
+          alt="banner preview"
+          class="banner-lightbox-img"
+          @click.stop
+        />
+      </div>
+    </Transition>
   </div>
 </template>
 <script setup>
 import {computed, reactive, ref, watch, onMounted, onUnmounted, nextTick} from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/flashSaleStore'
+import flashSaleApi from '@/api/FlashSaleApi'
 import '@/assets/css/FlashSale.css'
 
 const flashSaleStore = useFlashSaleStore()
@@ -889,9 +987,9 @@ function resolveStatus(slot) {
 }
 
 const statusPriority = {
-  ACTIVE: 1,
-  UPCOMING: 2,
-  SCHEDULED: 3,
+  SCHEDULED: 1,
+  ACTIVE: 2,
+  UPCOMING: 3,
   ENDED: 4,
   CANCELLED: 5,
   PENDING: 6,
@@ -904,7 +1002,13 @@ const slotsWithStatus = computed(() =>
       const pa = statusPriority[a.resolvedStatus] ?? 99
       const pb = statusPriority[b.resolvedStatus] ?? 99
       if (pa !== pb) return pa - pb
-      // cùng nhóm thì slot bắt đầu sớm hơn lên trước
+      // Cùng nhóm: ưu tiên flash sale mới tạo (createdAt mới nhất) lên đầu
+      // Nếu thiếu createdAt thì fallback theo startDate sớm nhất
+      const ca = a.createdAt ? new Date(a.createdAt).getTime() : null
+      const cb = b.createdAt ? new Date(b.createdAt).getTime() : null
+      if (ca != null && cb != null) return cb - ca
+      if (ca != null) return -1
+      if (cb != null) return 1
       return new Date(a.startDate) - new Date(b.startDate)
     })
 )
@@ -919,6 +1023,27 @@ function formatVND(value) {
     style: 'currency',
     currency: 'VND',
   }).format(Number(value))
+}
+
+/**
+ * Format số nguyên có dấu . phân cách hàng nghìn: 1234567 -> "1.234.567".
+ * Dùng cho ô nhập giá Flash Sale để admin nhìn cho dễ.
+ */
+function formatNumber(value) {
+  if (value === null || value === undefined || value === '') return ''
+  const digits = String(value).replace(/\D/g, '')
+  if (!digits) return ''
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Number(digits))
+}
+
+/**
+ * Parse chuỗi có dấu . về số: "1.234.567" -> 1234567.
+ * Trả về 0 nếu không parse được.
+ */
+function parseNumber(value) {
+  if (value === null || value === undefined) return 0
+  const digits = String(value).replace(/\D/g, '')
+  return digits ? Number(digits) : 0
 }
 
 function formatDateTime(value) {
@@ -957,26 +1082,47 @@ function statusBadgeClass(slot) {
   }[slot.resolvedStatus] || 'info'
 }
 
+// Cột 'Đã sử dụng': trả về true khi slot đã bán hết (used >= total)
+function isSlotExhausted(slot) {
+  const used = slot.usedQuantity ?? 0
+  const total = slot.quantityFlashSaleSlot ?? 0
+  return total > 0 && used >= total
+}
 
-function toggleActive(slot, checked) {
-  const idx = slots.value.findIndex(s => s.slotId === slot.slotId)
-  if (idx !== -1) {
-    slots.value[idx] = {
-      ...slots.value[idx],
-      status: checked ? 2 : 3
-    }
-    showToast({
-      type: 'success',
-      title: 'Thành công',
-      message: checked ? 'Đã kích hoạt chiến dịch.' : 'Đã tắt chiến dịch.'
-    })
-  }
+// Tooltip hiển thị thông tin sử dụng
+function getUsedTitle(slot) {
+  const used = slot.usedQuantity ?? 0
+  const total = slot.quantityFlashSaleSlot ?? 0
+  return `Đã sử dụng: ${used} / ${total}`
 }
 
 const isModalOpen = ref(false)
 const isEditing = ref(false)
 const activeTab = ref(0)
 const editSlotId = ref(null)
+const overlappingSlots = ref([])   // PHẢI khai báo trước watcher overlap
+
+// === Banner preview lightbox (xem ảnh lớn khi click thumbnail trong bảng) ===
+const bannerLightboxUrl = ref('')
+const lightboxEl = ref(null)
+
+function openBannerPreview(url) {
+  if (!url) return
+  bannerLightboxUrl.value = url
+  nextTick(() => {
+    lightboxEl.value?.focus()
+  })
+}
+
+function closeBannerPreview() {
+  bannerLightboxUrl.value = ''
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' && bannerPreviewUrl.value) {
+    closeBannerPreview()
+  }
+}
 
 const defaultForm = {
   name: '',
@@ -988,7 +1134,52 @@ const defaultForm = {
 
 const form = reactive({...defaultForm})
 
+// Debounced overlap check khi admin nhập startDate/endDate
+// PHẢI đặt sau `const form = reactive(...)` để tránh TDZ (Cannot access 'form' before initialization)
+let overlapTimer = null
+watch(
+  () => [form.startDate, form.endDate],
+  () => {
+    clearTimeout(overlapTimer)
+    overlapTimer = setTimeout(checkOverlap, 400)
+  }
+)
+
+async function checkOverlap() {
+  if (!form.startDate || !form.endDate) {
+    overlappingSlots.value = []
+    return
+  }
+  // Đảm bảo endDate > startDate trước khi gọi API
+  const start = new Date(form.startDate)
+  const end = new Date(form.endDate)
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+    overlappingSlots.value = []
+    return
+  }
+  const toIso = (d) => {
+    const pad = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`
+  }
+  try {
+    const list = await flashSaleStore.fetchOverlap({
+      startDate: toIso(start),
+      endDate: toIso(end),
+      excludeSlotId: isEditing.value ? editSlotId.value : null,
+    })
+    overlappingSlots.value = list
+  } catch (e) {
+    overlappingSlots.value = []
+  }
+}
+
 const nameLength = computed(() => (form.name || '').length)
+
+const minStartDate = computed(() => {
+  const d = new Date()
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+})
 
 /**
  * Sinh tên Flash Sale tự động theo format:
@@ -1018,6 +1209,8 @@ const errors = computed(() => {
   const result = {}
   if (!form.name.trim()) {
     result.name = 'Vui long nhap ten chien dich'
+  } else if (form.name.trim().length > 100) {
+    result.name = 'Tên chiến dịch tối đa 100 ký tự'
   }
   if (!form.startDate) {
     result.startDate = 'Vui long chon thoi gian bat dau'
@@ -1028,14 +1221,47 @@ const errors = computed(() => {
   if (form.startDate && form.endDate) {
     const s = new Date(form.startDate)
     const e = new Date(form.endDate)
-    if (e <= s) {
+    const now = new Date()
+    if (s < now) {
+      result.startDate = 'Thời gian bắt đầu không được ở trong quá khứ'
+    } else if (e <= s) {
       result.time = 'Thời gian kết thúc phải sau thời gian bắt đầu'
     }
   }
-  if (!form.bannerUrl.trim()) {
-    result.bannerUrl = 'Vui long nhap URL anh banner'
-  } else if (!isValidUrl(form.bannerUrl)) {
+  // Mode FILE: nếu đã chọn file thì OK, sẽ upload sau khi submit hợp lệ
+  const hasFile = bannerInputMode.value === 'file' && bannerFile.value
+  const hasUrl = bannerInputMode.value === 'url' && form.bannerUrl.trim()
+
+  if (!hasFile && !hasUrl) {
+    result.bannerUrl = 'Vui long upload anh hoac dan URL'
+  } else if (hasUrl && !isValidUrl(form.bannerUrl)) {
     result.bannerUrl = 'URL anh khong hop le'
+  }
+
+  // Validate items
+  const pids = selectedItemPids.value
+  if (pids.length === 0) {
+    result.items = 'Vui lòng chọn ít nhất 1 sản phẩm cho Flash Sale'
+  } else {
+    pids.forEach((skuId) => {
+      const it = selItems[skuId]
+      if (!it || it.flashSaleQuantity == null || it.flashSaleQuantity < 1) {
+        result[`item_${skuId}_quantity`] = 'Số lượng phải >= 1'
+      }
+      const orig = getProductPrice(skuId)
+      if (it && (it.flashSalePrice == null || it.flashSalePrice <= 0)) {
+        result[`item_${skuId}_price`] = 'Giá Flash Sale phải > 0'
+      } else if (it && orig > 0 && it.flashSalePrice >= orig) {
+        result[`item_${skuId}_price`] = 'Giá Flash Sale phải nhỏ hơn giá gốc'
+      }
+      if (it && (it.discountPercent == null || it.discountPercent < 0 || it.discountPercent > 100)) {
+        result[`item_${skuId}_discount`] = 'Chiết khấu phải từ 0–100%'
+      }
+      const stock = getProductStock(skuId)
+      if (it && stock > 0 && it.flashSaleQuantity > stock) {
+        result[`item_${skuId}_stock`] = `Vượt tồn kho (${stock})`
+      }
+    })
   }
   return result
 })
@@ -1050,9 +1276,17 @@ function isValidUrl(value) {
   }
 }
 
+const getBannerPreviewSrc = computed(() => {
+  if (bannerInputMode.value === 'file') return bannerPreviewUrl.value
+  return form.bannerUrl || ''
+})
+
 const bannerImageError = ref(false)
 const bannerInputMode = ref('file') // 'file' | 'url'
 const bannerFileName = ref('')
+const bannerFile = ref(null)         // File object chưa upload
+const bannerPreviewUrl = ref('')     // data URL để preview
+const bannerUploading = ref(false)   // disable nút Lưu khi đang upload
 
 const MAX_BANNER_SIZE = 2 * 1024 * 1024 // 2MB
 const ALLOWED_BANNER_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
@@ -1074,6 +1308,8 @@ function clearBanner() {
   form.bannerUrl = ''
   bannerImageError.value = false
   bannerFileName.value = ''
+  bannerFile.value = null
+  bannerPreviewUrl.value = ''
 }
 
 function switchBannerMode(mode) {
@@ -1081,6 +1317,8 @@ function switchBannerMode(mode) {
   // Reset trạng thái khi đổi mode
   bannerImageError.value = false
   bannerFileName.value = ''
+  bannerFile.value = null
+  bannerPreviewUrl.value = ''
   form.bannerUrl = ''
 }
 
@@ -1112,11 +1350,12 @@ function onBannerFileChange(event) {
 
   bannerFileName.value = file.name
   bannerImageError.value = false
+  bannerFile.value = file
 
-  // Đọc file thành data URL (base64) để set vào form.bannerUrl
+  // Preview bằng data URL (chỉ để xem trước, KHÔNG gán vào form.bannerUrl)
   const reader = new FileReader()
   reader.onload = (e) => {
-    form.bannerUrl = e.target.result
+    bannerPreviewUrl.value = e.target.result
   }
   reader.onerror = () => {
     showToast({
@@ -1125,6 +1364,8 @@ function onBannerFileChange(event) {
       message: 'Không thể đọc file ảnh.',
     })
     bannerFileName.value = ''
+    bannerFile.value = null
+    bannerPreviewUrl.value = ''
   }
   reader.readAsDataURL(file)
 }
@@ -1321,7 +1562,8 @@ function onDiscountChange(skuId, value) {
 }
 
 function onPriceChange(skuId, value) {
-  const fp = parseFloat(value) || 0
+  // value có thể là "1.234.567" -> parseNumber ra số nguyên 1234567
+  const fp = parseNumber(value)
   const orig = getProductPrice(skuId)
   const disc = orig > 0 ? parseFloat(((1 - fp / orig) * 100).toFixed(1)) : 0
   selItems[skuId] = {...selItems[skuId], flashSalePrice: fp, discountPercent: disc}
@@ -1344,22 +1586,53 @@ function openCreateModal() {
   flashSaleStore.fetchCascade({ includeOutOfStock: false })
 }
 
-function openEditModal(slot) {
+async function openEditModal(slot) {
   editSlotId.value = slot.slotId
   isEditing.value = true
   resetForm(false)
-  form.name = slot.name
-  form.startDate = toLocalDatetime(slot.startDate)
-  form.endDate = toLocalDatetime(slot.endDate)
-  form.status = slot.status
-  form.bannerUrl = slot.imageUrl || slot.bannerUrl || ''
-  bannerInputMode.value = 'url'
 
+  // Lấy chi tiết từ BE để có items đã chọn
+  let detail = null
+  try {
+    detail = await flashSaleStore.fetchOneSlot(slot.slotId)
+  } catch (e) {
+    detail = null
+  }
+  const data = detail || slot
+
+  form.name = data.name || ''
+  form.startDate = toLocalDatetime(data.startDate)
+  form.endDate = toLocalDatetime(data.endDate)
+  form.status = data.status ?? 1
+  form.bannerUrl = data.bannerImageUrl || ''
+  bannerInputMode.value = 'url'
+  bannerFile.value = null
+  bannerFileName.value = ''
+  bannerPreviewUrl.value = ''
+  bannerUploading.value = false
+
+  // Map items đã chọn sẵn vào selectedItemPids và selItems
   selectedItemPids.value = []
   Object.keys(selItems).forEach((k) => delete selItems[k])
+  if (Array.isArray(data.items) && data.items.length > 0) {
+    data.items.forEach((it) => {
+      if (!it || it.skuId == null) return
+      selectedItemPids.value.push(it.skuId)
+      const orig = Number(it.originalPrice ?? 0)
+      const fp = Number(it.flashSalePrice ?? 0)
+      const disc = orig > 0 ? parseFloat(((1 - fp / orig) * 100).toFixed(1)) : 0
+      selItems[it.skuId] = {
+        flashSalePrice: fp,
+        flashSaleQuantity: Number(it.flashSaleQuantity ?? 1),
+        discountPercent: it.discountPercent != null ? Number(it.discountPercent) : disc,
+      }
+    })
+  }
+
   isModalOpen.value = true
   activeTab.value = 0
-  flashSaleStore.fetchCascade({ includeOutOfStock: false })
+  // include hết hàng để hiển thị lại SKU cũ nếu stock đã về 0
+  flashSaleStore.fetchCascade({ includeOutOfStock: true })
 }
 
 function closeModal() {
@@ -1372,6 +1645,7 @@ function switchTab(i) {
 
 function resetForm(clearStatus = true) {
   submitted.value = false
+  overlappingSlots.value = []   // clear trạng thái overlap khi reset form
   Object.keys(form).forEach((k) => {
     if (k === 'status' && !clearStatus) return
     form[k] = defaultForm[k]
@@ -1388,6 +1662,9 @@ function resetForm(clearStatus = true) {
   bannerImageError.value = false
   bannerInputMode.value = 'file'
   bannerFileName.value = ''
+  bannerFile.value = null
+  bannerPreviewUrl.value = ''
+  bannerUploading.value = false
 }
 
 function toLocalDatetime(value) {
@@ -1398,75 +1675,131 @@ function toLocalDatetime(value) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
+/**
+ * Convert giá trị datetime-local ("YYYY-MM-DDTHH:mm") sang ISO 8601
+ * mà BE có thể parse bằng LocalDateTime.parse.
+ * Ví dụ: "2026-07-04T20:30" -> "2026-07-04T20:30:00"
+ */
+function toIsoString(localStr) {
+  if (!localStr) return null
+  if (localStr.length === 16) return localStr + ':00'
+  return localStr
+}
+
 async function saveSlot() {
   submitted.value = true
-  if (Object.keys(errors.value).length > 0) return
+  if (Object.keys(errors.value).length > 0) {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: 'Vui lòng kiểm tra lại các trường được đánh dấu đỏ.',
+    })
+    return
+  }
+
+  // Chặn submit nếu đang bị overlap (BE vẫn validate lại lần cuối)
+  if (overlappingSlots.value.length > 0) {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: 'Khung giờ bị trùng với flash sale khác, vui lòng chọn khung giờ khác.',
+    })
+    return
+  }
 
   const pids = selectedItemPids.value
   if (pids.length === 0) {
-    showToast({type: 'error', title: 'Loi', message: 'Vui long chon it nhat 1 san pham.'})
-    return
-  }
-  let hasQtyErr = false
-  pids.forEach((skuId) => {
-    const it = selItems[skuId]
-    if (!it || it.flashSaleQuantity <= 0) {
-      hasQtyErr = true
-    }
-    if ((it?.flashSaleQuantity ?? 0) > getProductStock(skuId)) {
-      qtyError[skuId] = true
-      hasQtyErr = true
-    }
-  })
-  if (hasQtyErr) {
-    showToast({type: 'error', title: 'Loi', message: 'Kiem tra lai so luong san pham.'})
+    showToast({type: 'error', title: 'Lỗi', message: 'Vui lòng chọn ít nhất 1 sản phẩm.'})
     return
   }
 
   saving.value = true
-
-  const items = pids.map((skuId) => {
-    const it = selItems[skuId]
-    const sku = getSku(skuId)
-    return {
-      skuId,
-      productName: sku?.productName || `SKU #${skuId}`,
-      originalPrice: sku?.originalPrice ?? it.flashSalePrice,
-      flashSalePrice: it.flashSalePrice,
-      flashSaleQuantity: it.flashSaleQuantity,
-      soldQuantity: 0,
+  try {
+    // Bước 1: Nếu user đang ở mode "file" và đã chọn file mới → upload lên Cloudinary
+    if (bannerInputMode.value === 'file' && bannerFile.value) {
+      bannerUploading.value = true
+      try {
+        const uploadRes = await flashSaleApi.uploadBanner(bannerFile.value)
+        const uploadedUrl = uploadRes?.data?.data?.imageUrl
+        if (!uploadedUrl) {
+          showToast({
+            type: 'error',
+            title: 'Lỗi',
+            message: 'Upload ảnh banner thất bại, vui lòng thử lại.',
+          })
+          return
+        }
+        form.bannerUrl = uploadedUrl
+      } catch (err) {
+        console.error('[FlashSale] Upload banner failed:', err)
+        showToast({
+          type: 'error',
+          title: 'Lỗi',
+          message:
+            err?.response?.data?.message ||
+            'Upload ảnh banner thất bại, vui lòng thử lại.',
+        })
+        return
+      } finally {
+        bannerUploading.value = false
+      }
     }
-  })
 
-  const payload = {
-    name: form.name.trim(),
-    startDate: form.startDate || null,
-    endDate: form.endDate || null,
-    status: Number(form.status),
-    bannerUrl: form.bannerUrl.trim(),
-    items,
+    // Bước 2: Build payload & submit slot
+    const items = pids.map((skuId) => {
+      const skuIdNum = Number(skuId)
+      // Guard: bỏ qua item có id không hợp lệ để tránh 400 toàn batch
+      if (!Number.isFinite(skuIdNum) || skuIdNum <= 0) {
+        console.warn('[FlashSale] Bỏ qua SKU không hợp lệ:', skuId)
+        return null
+      }
+      const it = selItems[skuId]
+      const sku = getSku(skuId)
+      // BE DTO FlashSaleItemRequest dùng field "skuId" viết thường (xem FlashSaleItemRequest.java)
+      return {
+        skuId: skuIdNum,
+        originalPrice: Number(sku?.originalPrice ?? 0),
+        flashSalePrice: Number(it?.flashSalePrice ?? 0),
+        flashSaleQuantity: Number(it?.flashSaleQuantity ?? 0),
+      }
+    }).filter(Boolean)
+
+    const payload = {
+      name: form.name.trim(),
+      startDate: toIsoString(form.startDate),
+      endDate: toIsoString(form.endDate),
+      status: Number(form.status) || 1,
+      // BE expect tên field "bannerImageUrl" (xem FlashSaleSlotRequest.java)
+      bannerImageUrl: form.bannerUrl.trim(),
+      items,
+    }
+
+    const ok = isEditing.value
+      ? await flashSaleStore.updateSlot(editSlotId.value, payload)
+      : await flashSaleStore.addSlot(payload)
+
+    if (!ok) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: flashSaleStore.error || 'Không thể lưu Flash Sale.',
+      })
+      return
+    }
+
+    // Reload lại danh sách từ BE để đảm bảo đồng bộ
+    await loadSlots()
+    showToast({
+      type: 'success',
+      title: 'Thành công',
+      message: isEditing.value
+        ? 'Cập nhật Flash Sale thành công!'
+        : 'Tạo Flash Sale thành công!',
+    })
+    closeModal()
+  } finally {
+    saving.value = false
   }
-
-
-  await new Promise(r => setTimeout(r, 300))
-
-  if (isEditing.value) {
-    const idx = slots.value.findIndex(s => s.slotId === editSlotId.value)
-    if (idx !== -1) {
-      slots.value[idx] = {...slots.value[idx], ...payload}
-    }
-    showToast({type: 'success', title: 'Thành công', message: 'Cập nhật Flash Sale thành công!'})
-  } else {
-    const newSlot = {
-      ...payload,
-      slotId: Math.max(...slots.value.map(s => s.slotId), 0) + 1,
-    }
-    slots.value.unshift(newSlot)
-    showToast({type: 'success', title: 'Thành công', message: 'Tạo Flash Sale thành công!'})
-  }
-
-  saving.value = false
-  closeModal()
 }
 
 
@@ -1486,10 +1819,18 @@ function closeDelModal() {
 
 async function confirmDel() {
   if (!delTarget.value) return
-  await new Promise(r => setTimeout(r, 200))
-  slots.value = slots.value.filter(s => s.slotId !== delTarget.value.slotId)
-  showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
-  closeDelModal()
+  const ok = await flashSaleStore.deleteSlotById(delTarget.value.slotId)
+  if (ok) {
+    showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
+    closeDelModal()
+  } else {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: flashSaleStore.error || 'Không thể xóa Flash Sale.',
+    })
+    closeDelModal()
+  }
 }
 
 
@@ -1526,6 +1867,7 @@ function handleDocKey(e) {
   if (e.key === 'Escape') {
     cascadeOpen.value = false
     catOpen.value = false
+    if (bannerLightboxUrl.value) closeBannerPreview()
   }
 }
 
@@ -1546,4 +1888,82 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* === Banner thumbnail trong bảng === */
+.banner-thumb {
+  width: 96px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: zoom-in;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.banner-thumb:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.banner-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* === Banner lightbox === */
+.banner-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  outline: none;
+  cursor: zoom-out;
+}
+.banner-lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  cursor: default;
+}
+.banner-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.banner-lightbox-close:hover {
+  background: #fff;
+  transform: rotate(90deg);
+}
+
+/* Fade transition cho lightbox */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>

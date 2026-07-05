@@ -1,6 +1,5 @@
 package com.fpoly.marcusstore.entity.promotion;
 
-import com.fpoly.marcusstore.dto.response.FlashSaleResponse;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -48,4 +47,6 @@ public class FlashSaleSlot {
     private List<FlashSaleItem> flashSaleItems = new ArrayList<>();
 
 
+    @Column(name = "banner_image_url", length = 500)
+    private String bannerImageUrl;
 }

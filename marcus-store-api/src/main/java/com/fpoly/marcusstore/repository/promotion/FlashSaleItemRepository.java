@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 
@@ -23,4 +24,39 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Fl
             GROUP BY fi.id.slotId
             """)
     List<Object[]> sumFlashSaleQuantityBySlotIds(@Param("slotIds") Collection<Integer> slotIds);
+
+    // Tổng soldQuantity theo slotId (dùng cho cột 'Đã sử dụng' trên bảng admin)
+    @Query("""
+            SELECT fi.id.slotId, COALESCE(SUM(fi.soldQuantity), 0)
+            FROM FlashSaleItem fi
+            WHERE fi.id.slotId IN :slotIds
+            GROUP BY fi.id.slotId
+            """)
+    List<Object[]> sumSoldQuantityBySlotIds(@Param("slotIds") Collection<Integer> slotIds);
+
+    // Tìm các SKU đang bị flash sale trùng khoảng thời gian
+    // Lấy tất cả item của 1 slot kèm slot (dùng cho scheduled khoá số lượng)
+    @Query("""
+            SELECT fi FROM FlashSaleItem fi
+            JOIN FETCH fi.slot s
+            WHERE s.slotId = :slotId
+            """)
+    List<FlashSaleItem> findItemsBySlotIdWithSlot(@Param("slotId") Integer slotId);
+
+    // Hook checkout: lấy item flash sale đang active cho 1 SKU
+    // (status=2 đang diễn ra, hoặc status=1 lên lịch mà đã đến giờ)
+    // Ưu tiên item đang cháy hàng (flashSaleQuantity > soldQuantity)
+    @Query("""
+            SELECT fi FROM FlashSaleItem fi
+            JOIN fi.slot s
+            WHERE fi.id.skuId = :skuId
+              AND s.status IN (1, 2)
+              AND s.startDate <= :now
+              AND s.endDate > :now
+              AND fi.flashSaleQuantity > fi.soldQuantity
+            ORDER BY s.startDate ASC
+            """)
+    List<FlashSaleItem> findActiveFlashSaleItemBySku(
+            @Param("skuId") Integer skuId,
+            @Param("now") LocalDateTime now);
 }

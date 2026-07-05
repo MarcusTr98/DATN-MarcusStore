@@ -111,6 +111,7 @@
         <span class="card-discount">-{{ product.discount }}%</span>
         <div class="thumb">
           <span class="product-emoji">{{ product.emoji }}</span>
+
         </div>
         <div class="card-name">{{ product.name }}</div>
         <div class="card-spec">{{ product.spec }}</div>

@@ -49,10 +49,25 @@ const flashSaleApi = {
     })
   },
 
-  /** Lấy cây của 1 brand cụ thể (ít dùng). */
-  getProductCascadeByBrand(brand, { includeOutOfStock = false } = {}) {
-    return api.get(`/admin/products/cascade/${encodeURIComponent(brand)}`, {
-      params: { includeOutOfStock },
+  // Kiểm tra khung giờ mới có đang đụng flash sale khác không.
+  // Trả về danh sách slot overlap (rỗng = OK).
+  // FE dùng khi admin nhập startDate/endDate để cảnh báo real-time,
+  // BE vẫn validate lại lúc tạo nên đây chỉ là UI helper.
+  checkOverlap({ startDate, endDate, excludeSlotId = null } = {}) {
+    return api.get('/admin/flashsale/check-overlap', {
+      params: { startDate, endDate, excludeSlotId },
+    })
+  },
+
+  /**
+   * Upload file ảnh banner từ thiết bị lên Cloudinary (qua BE).
+   * Trả về { imageUrl: "https://res.cloudinary.com/..." } để FE gán vào form.bannerUrl.
+   */
+  uploadBanner(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/admin/flashsale-banner', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
 }
