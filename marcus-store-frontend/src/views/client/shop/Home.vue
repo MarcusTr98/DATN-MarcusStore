@@ -54,6 +54,8 @@
               <div class="phone-shell">
                 <div class="phone-notch"></div>
                 <div class="phone-screen">
+                  <p class="phone-time">{{ currentTime }}</p>
+                  <p class="phone-date">{{ currentDate }}</p>
                   <transition name="fade" mode="out-in">
                     <div :key="activeHeroSlide" class="slide-content">
                       <p class="slide-kicker">{{ heroSlides[activeHeroSlide].kicker }}</p>
@@ -104,44 +106,8 @@
         </div>
       </section>
 
-      <!-- ============ SẢN PHẨM NỔI BẬT (TABS) ============ -->
-      <section class="featured py-5">
-        <div class="section-head text-center mb-4">
-          <span class="kicker">ĐƯỢC MUA NHIỀU NHẤT</span>
-          <h2 class="section-title">Sản phẩm nổi bật</h2>
-        </div>
-
-        <div class="tab-bar mb-4">
-          <button
-            v-for="tab in tabs"
-            :key="tab.key"
-            class="tab-btn"
-            :class="{ active: activeTab === tab.key }"
-            @click="activeTab = tab.key"
-          >
-            {{ tab.label }}
-          </button>
-        </div>
-
-        <div class="row g-4">
-          <div class="col-6 col-md-4 col-lg-3" v-for="p in filteredProducts" :key="p.id">
-            <div class="product-card static">
-              <div class="product-thumb" :style="{ background: p.color }">
-                <i :class="p.icon"></i>
-              </div>
-              <h6 class="product-name">{{ p.name }}</h6>
-              <div class="product-rating">
-                <i class="fas fa-star" v-for="n in 5" :key="n"></i>
-                <span>({{ p.sold }} đã bán)</span>
-              </div>
-              <div class="product-price">
-                <span class="price-now">{{ formatPrice(p.price) }}</span>
-                <span v-if="p.oldPrice" class="price-old">{{ formatPrice(p.oldPrice) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <!-- ============ SẢN PHẨM HOT (tách riêng để gọi API) ============ -->
+      <HomeHotProducts />
 
       <!-- ============ BANNER ĐÔI ============ -->
       <section class="promo-duo py-5">
@@ -182,6 +148,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import HeroBanner from '@/layouts/home/HomeBanner.vue'
 import FlashSaleSection from '@/layouts/home/HomeFlashSale.vue'
 import NewsAndInfoSection from '@/layouts/home/HomeNewAndInfo.vue'
+import HomeHotProducts from '@/layouts/home/HomeHotProducts.vue'
 import ProductCard from '@/components/client/ProductCard.vue'
 
 // Data mượn từ Landing Page
@@ -227,107 +194,33 @@ onUnmounted(() => {
   clearInterval(heroSliderTimer)
 })
 
-/* ---------- Sản phẩm nổi bật (tabs) ---------- */
-function formatPrice(v) {
-  return v.toLocaleString('vi-VN') + 'đ'
-}
+/* ---------- Đồng hồ hiện tại trên màn hình điện thoại ---------- */
+const now = ref(new Date())
+let clockTimer = null
 
-const allProducts = ref([
-  {
-    id: 11,
-    name: 'iPhone 17 Pro Max',
-    price: 32990000,
-    oldPrice: null,
-    sold: 245,
-    category: 'phone',
-    icon: 'fas fa-mobile-alt',
-    color: 'linear-gradient(135deg,#e1121c,#7a0d13)',
-  },
-  {
-    id: 12,
-    name: 'Samsung Galaxy S26 Ultra',
-    price: 26990000,
-    oldPrice: 29990000,
-    sold: 158,
-    category: 'phone',
-    icon: 'fas fa-mobile-alt',
-    color: 'linear-gradient(135deg,#14151a,#3a3c46)',
-  },
-  {
-    id: 13,
-    name: 'Xiaomi 17',
-    price: 15990000,
-    oldPrice: 17490000,
-    sold: 96,
-    category: 'phone',
-    icon: 'fas fa-mobile-alt',
-    color: 'linear-gradient(135deg,#ffb627,#c98600)',
-  },
-  {
-    id: 14,
-    name: 'iPad Pro M4 11-inch',
-    price: 26990000,
-    oldPrice: null,
-    sold: 74,
-    category: 'tablet',
-    icon: 'fas fa-tablet-alt',
-    color: 'linear-gradient(135deg,#e1121c,#7a0d13)',
-  },
-  {
-    id: 15,
-    name: 'iPad Air M3',
-    price: 16990000,
-    oldPrice: 18490000,
-    sold: 112,
-    category: 'tablet',
-    icon: 'fas fa-tablet-alt',
-    color: 'linear-gradient(135deg,#14151a,#3a3c46)',
-  },
-  {
-    id: 16,
-    name: 'Apple Watch Series 10',
-    price: 10990000,
-    oldPrice: null,
-    sold: 88,
-    category: 'accessory',
-    icon: 'far fa-clock',
-    color: 'linear-gradient(135deg,#ffb627,#c98600)',
-  },
-  {
-    id: 17,
-    name: 'AirPods Max',
-    price: 12990000,
-    oldPrice: 13990000,
-    sold: 41,
-    category: 'audio',
-    icon: 'fas fa-headphones',
-    color: 'linear-gradient(135deg,#e1121c,#7a0d13)',
-  },
-  {
-    id: 18,
-    name: 'Ốp lưng MagSafe chính hãng',
-    price: 690000,
-    oldPrice: null,
-    sold: 203,
-    category: 'accessory',
-    icon: 'fas fa-shield-alt',
-    color: 'linear-gradient(135deg,#14151a,#3a3c46)',
-  },
-])
-
-const tabs = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'phone', label: 'Điện thoại' },
-  { key: 'tablet', label: 'iPad / Tablet' },
-  { key: 'audio', label: 'Âm thanh' },
-  { key: 'accessory', label: 'Phụ kiện' },
-]
-const activeTab = ref('all')
-const filteredProducts = computed(() =>
-  activeTab.value === 'all'
-    ? allProducts.value
-    : allProducts.value.filter((p) => p.category === activeTab.value),
+const currentTime = computed(() =>
+  now.value.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }),
 )
+
+const weekdays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+
+const currentDate = computed(() => {
+  const d = now.value
+  const weekday = weekdays[d.getDay()]
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  return `${weekday}, ${day} tháng ${month}`
+})
+
+onMounted(() => {
+  clockTimer = setInterval(() => {
+    now.value = new Date()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  clearInterval(clockTimer)
+})
 
 /* ---------- Banner thương hiệu ---------- */
 const brandBanners = ref([
@@ -564,11 +457,26 @@ const brandBanners = ref([
 }
 
 .phone-screen {
-  margin-top: 90px;
+  margin-top: 46px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
+}
+
+.phone-time {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 2.6rem;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 0;
+  line-height: 1;
+}
+
+.phone-date {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 1.75rem;
 }
 
 .slide-kicker {
@@ -732,115 +640,6 @@ const brandBanners = ref([
 .brand-icon {
   font-size: 3.2rem;
   opacity: 0.25;
-}
-
-/* ============ SẢN PHẨM NỔI BẬT ============ */
-.section-head .kicker {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: var(--clr-red);
-  margin-bottom: 0.5rem;
-}
-
-.section-title {
-  font-weight: 700;
-}
-
-.tab-bar {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.tab-btn {
-  border: 1px solid #e5e2dd;
-  background: #fff;
-  color: var(--clr-muted);
-  padding: 0.5rem 1.2rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  transition: all 0.2s ease;
-}
-
-.tab-btn.active,
-.tab-btn:hover {
-  background: var(--clr-red);
-  border-color: var(--clr-red);
-  color: #fff;
-}
-
-.product-card {
-  position: relative;
-  background: #fff;
-  border-radius: 18px;
-  padding: 1.25rem;
-  transition: all 0.25s ease;
-}
-
-.product-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 14px 28px rgba(20, 21, 26, 0.08);
-}
-
-.product-card.static {
-  width: 100%;
-  background: var(--clr-surface-alt);
-}
-
-.product-thumb {
-  width: 100%;
-  height: 110px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 34px;
-  margin-bottom: 0.9rem;
-}
-
-.product-name {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--clr-ink);
-  margin-bottom: 0.5rem;
-  min-height: 2.4em;
-}
-
-.product-rating {
-  color: var(--clr-amber);
-  font-size: 0.72rem;
-  margin-bottom: 0.5rem;
-}
-
-.product-rating span {
-  color: var(--clr-muted);
-  margin-left: 4px;
-}
-
-.product-price {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 0.6rem;
-}
-
-.price-now {
-  font-weight: 700;
-  color: var(--clr-red);
-  font-size: 1rem;
-}
-
-.price-old {
-  font-size: 0.78rem;
-  color: var(--clr-muted);
-  text-decoration: line-through;
 }
 
 /* ============ BANNER ĐÔI ============ */

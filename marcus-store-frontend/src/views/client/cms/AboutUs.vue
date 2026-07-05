@@ -45,8 +45,8 @@
               <div class="phone-shell">
                 <div class="phone-notch"></div>
                 <div class="phone-screen">
-                  <p class="phone-time">21:04</p>
-                  <p class="phone-date">Thứ Bảy, 05 tháng 07</p>
+                  <p class="phone-time">{{ currentTime }}</p>
+                  <p class="phone-date">{{ currentDate }}</p>
 
                   <div class="notif-card notif-1">
                     <i class="fas fa-bolt"></i>
@@ -248,7 +248,35 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+
+// Đồng hồ hiển thị giờ/ngày hiện tại, tự cập nhật mỗi giây
+const now = ref(new Date())
+let clockTimer = null
+
+const currentTime = computed(() =>
+  now.value.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+)
+
+const weekdays = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+
+const currentDate = computed(() => {
+  const d = now.value
+  const weekday = weekdays[d.getDay()]
+  const day = String(d.getDate()).padStart(2, '0')
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  return `${weekday}, ${day} tháng ${month}`
+})
+
+onMounted(() => {
+  clockTimer = setInterval(() => {
+    now.value = new Date()
+  }, 1000)
+})
+
+onUnmounted(() => {
+  clearInterval(clockTimer)
+})
 
 // Danh mục sản phẩm chính đang kinh doanh
 const categories = ref([
