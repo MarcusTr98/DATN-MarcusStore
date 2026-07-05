@@ -46,8 +46,9 @@ const routes = [
         name: 'ProductDetail',
         component: () => import('@/views/client/shop/ProductDetail.vue'),
       },
-      { path: 'cart',
-        name: 'Cart', 
+      {
+        path: 'cart',
+        name: 'Cart',
         component: () => import('@/views/client/checkout/Cart.vue'),
         meta: { requiresAuth: true },
       },
@@ -55,7 +56,7 @@ const routes = [
         path: 'checkout',
         name: 'Checkout',
         component: () => import('@/views/client/checkout/Checkout.vue'),
-         meta: { requiresAuth: true },
+        meta: { requiresAuth: true },
       },
       {
         path: 'order-success',
@@ -126,6 +127,11 @@ const routes = [
         path: 'khuyen-mai',
         name: 'FlashSalePage',
         component: () => import('@/views/client/shop/FlashSalePage.vue'),
+      },
+      {
+        path: 'about-us',
+        name: 'AboutUs',
+        component: () => import('@/views/client/cms/AboutUs.vue'),
       },
     ],
   },
@@ -226,7 +232,7 @@ const routes = [
         path: 'employee',
         name: 'EmployeeManagement',
         component: () => import('@/views/admin/auth/EmployeeManagement.vue'),
-        meta: {roles: ['ROLE_ADMIN']},
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'customer',
@@ -238,7 +244,7 @@ const routes = [
         path: 'role',
         name: 'RoleManager',
         component: () => import('@/views/admin/auth/RoleManager.vue'),
-         meta: { roles: ['ROLE_ADMIN'] },
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'finance-reports',
@@ -246,12 +252,12 @@ const routes = [
         component: () => import('@/views/report/FinancialReport.vue'),
         meta: { permission: 'DONGTIEN_VIEW' },
       },
-            {
+      {
         path: 'inventoryManager',
         name: 'InventoryManager',
         component: () => import('@/views/admin/auth/InventoryManager.vue'),
       },
-                  {
+      {
         path: 'activity-log',
         name: 'ActivityLog',
         component: () => import('@/views/admin/auth/ActivityLog.vue'),
@@ -279,11 +285,7 @@ router.beforeEach((to) => {
   const isAdminOrStaff = isAdmin || roles.includes('ROLE_STAFF')
 
   // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào admin
-  if (
-    token &&
-    isAdminOrStaff &&
-    (to.path === '/' || to.path.startsWith('/auth/login'))
-  ) {
+  if (token && isAdminOrStaff && (to.path === '/' || to.path.startsWith('/auth/login'))) {
     return '/admin/dashboard'
   }
 
@@ -296,15 +298,15 @@ router.beforeEach((to) => {
   if (to.path.startsWith('/admin') && !isAdminOrStaff) {
     return '/'
   }
-// Route client yêu cầu đăng nhập
-if (to.meta.requiresAuth && !token) {
-  return {
-    path: '/auth/login',
-    query: {
-      redirect: to.fullPath,
-    },
+  // Route client yêu cầu đăng nhập
+  if (to.meta.requiresAuth && !token) {
+    return {
+      path: '/auth/login',
+      query: {
+        redirect: to.fullPath,
+      },
+    }
   }
-}
   // Kiểm tra theo role (chặn thô, vd chỉ ADMIN mới được vào trang)
   const requiredRoles = to.meta.roles
   if (requiredRoles) {

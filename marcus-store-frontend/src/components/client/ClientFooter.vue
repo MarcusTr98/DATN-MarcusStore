@@ -147,7 +147,6 @@
               <li><router-link to="/bao-mat">Bảo mật thông tin</router-link></li>
               <li><router-link to="/faq">Câu hỏi thường gặp</router-link></li>
               <li><router-link to="/lien-he">Liên hệ với chúng tôi</router-link></li>
-              <li><router-link to="/he-thong-cua-hang">Hệ thống cửa hàng</router-link></li>
             </ul>
           </div>
 
@@ -172,7 +171,6 @@
               <div class="payment-badge"><i class="fab fa-cc-visa"></i></div>
               <div class="payment-badge"><i class="fab fa-cc-mastercard"></i></div>
               <div class="payment-badge"><i class="fab fa-cc-jcb"></i></div>
-              <div class="payment-badge pay-text">MoMo</div>
               <div class="payment-badge pay-text">ZaloPay</div>
               <div class="payment-badge pay-text">COD</div>
             </div>
@@ -187,12 +185,12 @@
         <div class="footer-bottom-inner">
           <span>
             &copy; 2026
-            <router-link to="/" class="footer-bottom-brand">Marcus Store</router-link>
+            <router-link to="/about-us" class="footer-bottom-brand">Marcus Store</router-link>
             — Bản quyền thuộc về Marcus Store.
           </span>
           <span>
             Thiết kế bởi
-            <a href="#" class="footer-bottom-brand">Marcus Store Team</a>
+            <router-link to="/about-us" class="footer-bottom-brand">Marcus Store Team</router-link>
           </span>
         </div>
       </div>
@@ -207,6 +205,6 @@ import { useSettings } from '@/composables/useSettings'
 const { sysSettings, fetchSettings } = useSettings()
 
 onMounted(() => {
-  fetchSettings() // Đọi API. Header đã gọi rồi, footer chỉ lấy data từ Cache
+  fetchSettings()
 })
 </script>
