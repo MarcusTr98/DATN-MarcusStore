@@ -222,42 +222,85 @@ onUnmounted(() => {
     </div>
 
     <!-- Category Nav -->
-    <nav class="cat-nav">
+    <nav class="main-nav bg-white border-bottom shadow-sm">
       <div class="container">
-        <div class="cat-nav-inner">
-          <router-link to="/category/dien-thoai" class="cat-nav-item">
-            <i class="fas fa-mobile-alt"></i>
-            <span>Điện thoại</span>
-          </router-link>
-          <router-link to="/category/may-tinh-bang" class="cat-nav-item">
-            <i class="fas fa-tablet-alt"></i>
-            <span>Máy tính bảng</span>
-          </router-link>
-          <router-link to="/category/am-thanh" class="cat-nav-item">
-            <i class="fas fa-headphones-alt"></i>
-            <span>Âm thanh</span>
-          </router-link>
-          <router-link to="/category/dong-ho-thong-minh" class="cat-nav-item">
-            <i class="fas fa-clock"></i>
-            <span>Đồng hồ thông minh</span>
-          </router-link>
-          <router-link to="/category/sac-pin" class="cat-nav-item">
-            <i class="fas fa-battery-full"></i>
-            <span>Sạc & Pin</span>
-          </router-link>
-          <router-link to="/category/op-lung" class="cat-nav-item">
-            <i class="fas fa-shield-alt"></i>
-            <span>Ốp lưng & Bảo vệ</span>
-          </router-link>
-          <router-link to="/blog" class="cat-nav-item">
-            <i class="fas fa-newspaper"></i>
-            <span>Tin công nghệ</span>
-          </router-link>
-          <router-link to="/khuyen-mai" class="cat-nav-item cat-nav-sale">
-            <i class="fas fa-fire"></i>
-            <span>Khuyến mãi</span>
-          </router-link>
-        </div>
+        <ul
+          class="nav-list d-flex align-items-center justify-content-center list-unstyled mb-0 gap-1 gap-md-1 py-1"
+        >
+          <!-- 1. Trang chủ -->
+          <li class="nav-item">
+            <router-link to="/" class="nav-link fw-semibold text-dark px-1 py-1 rounded-pill">
+              <i class="fas fa-home me-1"></i> Trang chủ
+            </router-link>
+          </li>
+
+          <!-- 2. Danh mục (Dropdown Hover) -->
+          <li class="nav-item dropdown dropdown-hover">
+            <a
+              href="#"
+              class="nav-link fw-semibold text-dark px-1 py-2 rounded d-flex align-items-center"
+              @click.prevent
+            >
+              <i class="fas fa-bars me-2"></i> Danh mục
+              <i class="fas fa-chevron-down ms-2" style="font-size: 10px"></i>
+            </a>
+
+            <!-- Menu xổ xuống -->
+            <ul class="dropdown-menu border-0 shadow-lg mt-0 rounded-3 p-2">
+              <li>
+                <router-link to="/category/dien-thoai" class="dropdown-item rounded py-2">
+                  <i class="fas fa-mobile-alt fa-fw text-danger me-2"></i> Điện thoại
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/category/may-tinh-bang" class="dropdown-item rounded py-2">
+                  <i class="fas fa-tablet-alt fa-fw text-danger me-2"></i> Máy tính bảng
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/category/am-thanh" class="dropdown-item rounded py-2">
+                  <i class="fas fa-headphones-alt fa-fw text-danger me-2"></i> Âm thanh
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/category/dong-ho-thong-minh" class="dropdown-item rounded py-2">
+                  <i class="fas fa-clock fa-fw text-danger me-2"></i> Đồng hồ thông minh
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/category/sac-pin" class="dropdown-item rounded py-2">
+                  <i class="fas fa-battery-full fa-fw text-danger me-2"></i> Sạc & Pin
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/category/op-lung" class="dropdown-item rounded py-2">
+                  <i class="fas fa-shield-alt fa-fw text-danger me-2"></i> Ốp lưng & Bảo vệ
+                </router-link>
+              </li>
+            </ul>
+          </li>
+
+          <!-- 3. Flash Sale -->
+          <li class="nav-item">
+            <router-link to="/khuyen-mai" class="nav-link nav-sale fw-bold px-1 py-1 rounded">
+              <i class="fas fa-bolt text-warning me-1 flash-icon"></i> Flash Sale
+            </router-link>
+          </li>
+
+          <!-- 4. Giới thiệu -->
+          <li class="nav-item">
+            <router-link to="/about-us" class="nav-link fw-semibold text-dark px-1 py-1 rounded">
+              <i class="fas fa-users me-1"></i> Giới thiệu
+            </router-link>
+          </li>
+
+          <!-- 5. Tin công nghệ -->
+          <li class="nav-item">
+            <router-link to="/blog" class="nav-link fw-semibold text-dark px-1 py-1 rounded">
+              <i class="fas fa-newspaper me-1"></i> Tin công nghệ
+            </router-link>
+          </li>
+        </ul>
       </div>
     </nav>
   </header>
