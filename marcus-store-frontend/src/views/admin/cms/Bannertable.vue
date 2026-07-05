@@ -70,22 +70,29 @@
       </tbody>
     </table>
 
-    <!-- Phân trang -->
-    <div class="pagination-wrap">
-      <span class="pg-info">
-        {{ banners.length === 0 ? 'Không có dữ liệu' : `Hiển thị ${from}–${to} / ${banners.length} banner` }}
-      </span>
-      <div class="pg-btns" v-if="banners.length > 0">
-        <button class="pg-btn" :disabled="page === 1" @click="page--">
-          <i class="bi bi-chevron-left"></i>
+    <!-- Phân trang (đồng bộ style với Quản lý Voucher) -->
+    <div v-if="banners.length > 0" class="voucher-pagination">
+      <div class="pagination-summary">
+        Tổng <strong>{{ banners.length }}</strong> banner
+      </div>
+      <div class="pagination-controls">
+        <label class="page-size-control">
+          <span>Hiển thị</span>
+          <select v-model.number="pageSize" class="form-select form-select-sm">
+            <option :value="5">5</option>
+            <option :value="10">10</option>
+            <option :value="20">20</option>
+            <option :value="50">50</option>
+          </select>
+        </label>
+        <button type="button" class="pagination-button" :disabled="page === 1" @click="page--">
+          Trước
         </button>
-        <button
-          v-for="p in pageNumbers" :key="p"
-          class="pg-btn" :class="{ active: p === page }"
-          @click="page = p"
-        >{{ p }}</button>
-        <button class="pg-btn" :disabled="page === totalPages" @click="page++">
-          <i class="bi bi-chevron-right"></i>
+        <span class="page-indicator">
+          Trang <strong>{{ page }}</strong> / {{ totalPages }}
+        </span>
+        <button type="button" class="pagination-button" :disabled="page === totalPages" @click="page++">
+          Sau
         </button>
       </div>
     </div>
@@ -101,21 +108,15 @@ const props = defineProps({
 });
 defineEmits(['edit', 'toggle']);
 
-// ---- Phân trang ----
+// ---- Phân trang (đồng bộ style Voucher: dropdown chọn số dòng/trang) ----
 const page     = ref(1);
-const pageSize = 10;
+const pageSize = ref(10);
 
 watch(() => props.banners, () => { page.value = 1; });
+watch(pageSize, () => { page.value = 1; });
 
-const totalPages  = computed(() => Math.max(1, Math.ceil(props.banners.length / pageSize)));
-const from        = computed(() => props.banners.length === 0 ? 0 : (page.value - 1) * pageSize + 1);
-const to          = computed(() => Math.min(page.value * pageSize, props.banners.length));
-const paged       = computed(() => props.banners.slice((page.value - 1) * pageSize, page.value * pageSize));
-const pageNumbers = computed(() => {
-  const total = totalPages.value, cur = page.value, delta = 2, pages = [];
-  for (let i = Math.max(1, cur - delta); i <= Math.min(total, cur + delta); i++) pages.push(i);
-  return pages;
-});
+const totalPages = computed(() => Math.max(1, Math.ceil(props.banners.length / pageSize.value)));
+const paged       = computed(() => props.banners.slice((page.value - 1) * pageSize.value, page.value * pageSize.value));
 
 // ---- Helpers ----
 function posLabel(positionId) {
@@ -123,6 +124,8 @@ function posLabel(positionId) {
   return found ? found.label : '—';
 }
 
+// Vị trí có cho phép nhiều banner chạy tuần tự (đọc từ allowsOrder do API trả về),
+// không còn hardcode so sánh positionCode === 'HOME_SLIDER' nữa
 function isSlider(positionId) {
   const found = props.positions.find(p => String(p.value) === String(positionId));
   return !!found?.allowsOrder;
@@ -208,14 +211,99 @@ function statusOf(b) {
 .toggle-switch input:checked + .toggle-track { background:#f55d9b; }
 .toggle-switch input:checked + .toggle-track::before { transform:translateX(15px); }
 
-/* Phân trang */
-.pagination-wrap { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-top:1px solid #f3e8ee; }
-.pg-info { font-size:13px; color:#6b7280; }
-.pg-btns { display:flex; gap:4px; }
-.pg-btn { min-width:32px; height:32px; padding:0 8px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; color:#374151; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .15s; }
-.pg-btn:hover:not(:disabled):not(.active) { border-color:#f55d9b; color:#f55d9b; background:#fff0f7; }
-.pg-btn.active { background:#f55d9b; color:#fff; border-color:#f55d9b; font-weight:600; }
-.pg-btn:disabled { opacity:.35; cursor:not-allowed; }
+/* Phân trang — copy nguyên từ Voucher.css để đồng bộ style */
+.voucher-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-top: 1px solid #f3d6e3;
+  background: #fffafd;
+}
+
+.pagination-summary {
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.pagination-summary strong,
+.page-indicator strong {
+  color: #111827;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-size-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.page-size-control .form-select {
+  width: 78px;
+  min-height: 38px;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  font-weight: 700;
+}
+
+.pagination-button {
+  min-width: 72px;
+  min-height: 38px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #344054;
+  font-size: 0.9rem;
+  font-weight: 800;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.pagination-button:hover:not(:disabled),
+.pagination-button:focus:not(:disabled) {
+  border-color: #f55d9b;
+  background: #fff0f7;
+  color: #be3f75;
+}
+
+.pagination-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.page-indicator {
+  min-width: 96px;
+  color: #344054;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .voucher-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .pagination-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
 
 .empty-row { text-align:center; padding:48px 20px; color:#9ca3af; }
 .empty-icon { font-size:32px; display:block; margin:0 auto 8px; color:#e0b8cc; }

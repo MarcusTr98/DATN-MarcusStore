@@ -17,6 +17,29 @@
       </button>
     </div>
 
+    <!-- Khối tổng quan nhanh (đồng bộ style với Quản lý Voucher) -->
+    <section class="stats-grid">
+      <article class="stat-card">
+        <span>Tổng banner</span>
+        <strong>{{ stats.total }}</strong>
+      </article>
+
+      <article class="stat-card">
+        <span>Đang hiển thị</span>
+        <strong class="text-accent">{{ stats.active }}</strong>
+      </article>
+
+      <article class="stat-card">
+        <span>Hết hạn</span>
+        <strong>{{ stats.expired }}</strong>
+      </article>
+
+      <article class="stat-card">
+        <span>Tạm ẩn</span>
+        <strong>{{ stats.hidden }}</strong>
+      </article>
+    </section>
+
     <!-- Nội dung -->
     <div class="page-card">
 
@@ -100,6 +123,18 @@ function computeStatus(b) {
   if (s && now < s)  return 'scheduled';
   return 'active';
 }
+
+// Khối KPI tổng quan — tính trên toàn bộ banner, không phụ thuộc bộ lọc đang chọn
+const stats = computed(() => {
+  let active = 0, expired = 0, hidden = 0;
+  banners.value.forEach(b => {
+    const s = computeStatus(b);
+    if (s === 'active' || s === 'scheduled') active++;
+    else if (s === 'expired') expired++;
+    else if (s === 'hidden') hidden++;
+  });
+  return { total: banners.value.length, active, expired, hidden };
+});
 
 const filteredBanners = computed(() => {
   let list = [...banners.value];
@@ -276,6 +311,50 @@ async function handleToggle(banner) {
   border-radius: 12px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   overflow: hidden;
+}
+
+/* Khối KPI tổng quan — copy nguyên từ Voucher.css để đồng bộ style */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 992px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.stat-card {
+  border: 1px solid #f3d6e3;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+  padding: 20px 18px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100px;
+}
+
+.stat-card span {
+  display: block;
+  color: #6b7280;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.text-accent {
+  color: #f55d9b;
 }
 
 /* States */
