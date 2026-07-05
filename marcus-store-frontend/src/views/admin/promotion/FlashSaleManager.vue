@@ -633,12 +633,13 @@
                   <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
                     <input
-                      type="number"
+                      type="text"
+                      inputmode="numeric"
                       class="fs-input"
                       :class="{ 'is-invalid': submitted && errors[`item_${pid}_price`] }"
-                      :value="selItems[pid]?.flashSalePrice || 0"
+                      :value="formatNumber(selItems[pid]?.flashSalePrice)"
                       @input="onPriceChange(pid, $event.target.value)"
-                      min="0"
+                      placeholder="Nhập giá"
                     />
                     <div v-if="submitted && errors[`item_${pid}_price`]" class="invalid-feedback">
                       {{ errors[`item_${pid}_price`] }}
@@ -761,12 +762,13 @@
                   <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
                     <input
-                      type="number"
+                      type="text"
+                      inputmode="numeric"
                       class="fs-input"
                       :class="{ 'is-invalid': submitted && errors[`item_${pid}_price`] }"
-                      :value="selItems[pid]?.flashSalePrice || 0"
+                      :value="formatNumber(selItems[pid]?.flashSalePrice)"
                       @input="onPriceChange(pid, $event.target.value)"
-                      min="0"
+                      placeholder="Nhập giá"
                     />
                     <div v-if="submitted && errors[`item_${pid}_price`]" class="invalid-feedback">
                       {{ errors[`item_${pid}_price`] }}
@@ -1021,6 +1023,27 @@ function formatVND(value) {
     style: 'currency',
     currency: 'VND',
   }).format(Number(value))
+}
+
+/**
+ * Format số nguyên có dấu . phân cách hàng nghìn: 1234567 -> "1.234.567".
+ * Dùng cho ô nhập giá Flash Sale để admin nhìn cho dễ.
+ */
+function formatNumber(value) {
+  if (value === null || value === undefined || value === '') return ''
+  const digits = String(value).replace(/\D/g, '')
+  if (!digits) return ''
+  return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Number(digits))
+}
+
+/**
+ * Parse chuỗi có dấu . về số: "1.234.567" -> 1234567.
+ * Trả về 0 nếu không parse được.
+ */
+function parseNumber(value) {
+  if (value === null || value === undefined) return 0
+  const digits = String(value).replace(/\D/g, '')
+  return digits ? Number(digits) : 0
 }
 
 function formatDateTime(value) {
@@ -1539,7 +1562,8 @@ function onDiscountChange(skuId, value) {
 }
 
 function onPriceChange(skuId, value) {
-  const fp = parseFloat(value) || 0
+  // value có thể là "1.234.567" -> parseNumber ra số nguyên 1234567
+  const fp = parseNumber(value)
   const orig = getProductPrice(skuId)
   const disc = orig > 0 ? parseFloat(((1 - fp / orig) * 100).toFixed(1)) : 0
   selItems[skuId] = {...selItems[skuId], flashSalePrice: fp, discountPercent: disc}

@@ -98,6 +98,106 @@ public class FlashSaleServiceImpl implements FlashSaleService {
      private String normalizeKeyword(String keyword) {
           return (keyword == null || keyword.isBlank()) ? null : keyword.trim();
      }
+
+     /**
+      * Validate toàn bộ request trước khi tạo/cập nhật slot.
+      * - Thời gian hợp lệ (startDate không ở quá khứ, endDate > startDate)
+      * - Items không null/rỗng, không trùng SKU trong cùng request
+      * - Mọi SKU đều tồn tại trong DB
+      * - Giá hợp lệ (originalPrice > 0, 0 < flashSalePrice < originalPrice)
+      * - Số lượng hợp lệ (flashSaleQuantity >= 1, không vượt tồn kho SKU)
+      */
+     private void validateRequest(FlashSaleSlotRequest request,
+                                  Map<Integer, ProductSku> skuMap) {
+          // 1. Thời gian
+          if (request.getStartDate() == null || request.getEndDate() == null) {
+               throw new ResponseStatusException(
+                       HttpStatus.BAD_REQUEST,
+                       "Ngày bắt đầu và ngày kết thúc không được để trống");
+          }
+          LocalDateTime now = LocalDateTime.now();
+          if (request.getStartDate().isBefore(now)) {
+               throw new ResponseStatusException(
+                       HttpStatus.BAD_REQUEST,
+                       "Ngày bắt đầu không được ở trong quá khứ");
+          }
+          if (!request.getEndDate().isAfter(request.getStartDate())) {
+               throw new ResponseStatusException(
+                       HttpStatus.BAD_REQUEST,
+                       "Ngày kết thúc phải sau ngày bắt đầu");
+          }
+
+          // 2. Items phải có ít nhất 1 phần tử
+          List<FlashSaleItemRequest> itemRequests = request.getItems();
+          if (itemRequests == null || itemRequests.isEmpty()) {
+               throw new ResponseStatusException(
+                       HttpStatus.BAD_REQUEST,
+                       "Phải có ít nhất 1 sản phẩm trong Flash Sale");
+          }
+
+          // 3. Validate từng item: không trùng SKU + SKU tồn tại + giá/số lượng hợp lệ
+          Set<Integer> seenSkuIds = new HashSet<>();
+          for (FlashSaleItemRequest ir : itemRequests) {
+               // 3a. SKU không được null
+               if (ir.getSkuId() == null) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "SKU id không được để trống");
+               }
+               // 3b. Không trùng SKU trong cùng request
+               if (!seenSkuIds.add(ir.getSkuId())) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "SKU id bị trùng trong request: " + ir.getSkuId());
+               }
+               // 3c. SKU phải tồn tại trong DB
+               ProductSku sku = skuMap.get(ir.getSkuId());
+               if (sku == null) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Không tìm thấy SKU với id: " + ir.getSkuId());
+               }
+               // 3d. Validate giá gốc
+               if (ir.getOriginalPrice() == null
+                       || ir.getOriginalPrice().signum() <= 0) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Giá gốc của SKU " + ir.getSkuId() + " phải > 0");
+               }
+               // 3e. Validate giá Flash Sale
+               if (ir.getFlashSalePrice() == null
+                       || ir.getFlashSalePrice().signum() <= 0) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Giá Flash Sale của SKU " + ir.getSkuId() + " phải > 0");
+               }
+               // 3f. Giá Flash Sale phải nhỏ hơn giá gốc
+               if (ir.getFlashSalePrice().compareTo(ir.getOriginalPrice()) >= 0) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            String.format(
+                                    "Giá Flash Sale (%s) phải nhỏ hơn giá gốc (%s) của SKU %d",
+                                    ir.getFlashSalePrice().toPlainString(),
+                                    ir.getOriginalPrice().toPlainString(),
+                                    ir.getSkuId()));
+               }
+               // 3g. Validate số lượng
+               if (ir.getFlashSaleQuantity() == null || ir.getFlashSaleQuantity() < 1) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Số lượng Flash Sale của SKU " + ir.getSkuId() + " phải >= 1");
+               }
+               // 3h. Không vượt tồn kho SKU (nếu có thông tin tồn kho)
+               Integer stock = sku.getStockQuantity();
+               if (stock != null && ir.getFlashSaleQuantity() > stock) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            String.format(
+                                    "Số lượng Flash Sale của SKU %d vượt tồn kho (còn %d)",
+                                    ir.getSkuId(), stock));
+               }
+          }
+     }
      // phân trang
      @Override
      @Transactional(readOnly = true)
@@ -173,39 +273,20 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     @Override
     @Transactional
     public FlashSaleResponse createFlashSale(FlashSaleSlotRequest request) {
-        // 1. Validate thời gian
-        LocalDateTime now = LocalDateTime.now();
-        if (request.getStartDate().isBefore(now)) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Ngày bắt đầu không được ở trong quá khứ");
-        }
-        if (!request.getEndDate().isAfter(request.getStartDate())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Ngày kết thúc phải sau ngày bắt đầu");
-        }
-        // 2. Lấy & validate SKU trùng lặp trong request
+        // 1. Lấy danh sách SKU từ request + build skuMap (để validate tồn tại)
         List<FlashSaleItemRequest> itemRequests = request.getItems();
-        // set và hash set dùng để thêm xóa tìm kiếm loại bor các phần tử trùng lặp
-        Set<Integer> skuIdSet = new HashSet<>();
-        for (FlashSaleItemRequest ir : itemRequests) {
-            if (!skuIdSet.add(ir.getSkuId())) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "SKU id bị trùng trong request: " + ir.getSkuId());
-            }
-        }
-        // 3. Kiểm tra tất cả SKU có tồn tại không
         List<Integer> skuIds = itemRequests.stream()
                 .map(FlashSaleItemRequest::getSkuId)
                 .toList();
         List<ProductSku> skus = productSkuRepository.findBySkuIdIn(skuIds);
-
         Map<Integer, ProductSku> skuMap = skus.stream()
                 .collect(Collectors.toMap(ProductSku::getSkuId, s -> s));
 
-        // 4. Chặn tạo 2 slot flash sale chạy cùng khung giờ
+        // 2. Validate toàn bộ request (thời gian, SKU trùng, SKU tồn tại,
+        //    giá > 0, flashSalePrice < originalPrice, số lượng hợp lệ, không vượt tồn kho)
+        validateRequest(request, skuMap);
+
+        // 3. Chặn tạo 2 slot flash sale chạy cùng khung giờ
         // Khoảng [start, end] của 2 slot được coi là overlap khi:
         //   startA < endB  AND  startB < endA
         // Dùng <> 0 thay vì status IN(2) vì slot vẫn ở status=1 (đã lên lịch)
@@ -225,7 +306,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     "Khung giờ đã bị trùng với các flash sale khác: " + detail);
         }
 
-        // 5. Tạo slot
+        // 4. Tạo slot
         FlashSaleSlot slot = new FlashSaleSlot();
         slot.setName(request.getName());
         slot.setStartDate(request.getStartDate());
@@ -233,7 +314,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         slot.setStatus(request.getStatus() != null ? request.getStatus() : 1);
         slot.setBannerImageUrl(request.getBannerImageUrl());
         FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
-        // 6. Tạo items
+        // 5. Tạo items
         List<FlashSaleItem> itemsToSave = new ArrayList<>();
         for (FlashSaleItemRequest ir : itemRequests) {
             FlashSaleItemId itemId = new FlashSaleItemId();

@@ -1478,6 +1478,12 @@
   box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
 }
 
+.flashsale-hero .hero-title {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
 .flashsale-hero .hero-title h1 {
   color: #f55d9b;
   font-size: 1.45rem;
