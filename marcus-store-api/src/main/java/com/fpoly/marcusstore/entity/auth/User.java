@@ -27,7 +27,7 @@ public class User {
     @Column(name = "username", nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     @JsonIgnore // BẮT BUỘC: Không bao giờ trả password hash ra API
     private String passwordHash;
 
@@ -65,4 +65,7 @@ public class User {
 private Set<Permission> permissions = new HashSet<>();
     @Column(name = "email_verified")
     private Boolean emailVerified;
+    
+    @Column(name = "google_account_id")
+    private String googleAccountId;
 }

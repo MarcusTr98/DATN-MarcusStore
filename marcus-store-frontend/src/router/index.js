@@ -262,6 +262,11 @@ const routes = [
         name: 'ActivityLog',
         component: () => import('@/views/admin/auth/ActivityLog.vue'),
       },
+                        {
+  path: "/oauth-success",
+  name: 'OAuthSuccess',
+        component: () => import('@/views/admin/auth/OAuthSuccess.vue'),
+      },
     ],
   },
 
@@ -278,6 +283,9 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
+    if (to.path === "/oauth-success") {
+    return true
+  }
   const token = localStorage.getItem('ACCESS_TOKEN')
   const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
   const permissions = JSON.parse(localStorage.getItem('USER_PERMISSIONS') || '[]')

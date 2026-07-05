@@ -16,6 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import com.fpoly.marcusstore.security.OAuth2SuccessHandler;
 
 @Configuration
 @EnableMethodSecurity
@@ -26,6 +27,9 @@ public class SecurityConfig {
 
     @Autowired
     private AuthTokenFilter authTokenFilter;
+
+    @Autowired
+    private OAuth2SuccessHandler oAuth2SuccessHandler;
 
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
@@ -49,7 +53,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configure(http))
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, ex) -> {
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -73,10 +77,13 @@ public class SecurityConfig {
                                     }
                                     """);
                         }))
+                .oauth2Login(oauth -> oauth
+                        .successHandler(oAuth2SuccessHandler))
                 .authorizeHttpRequests(auth -> auth
                         // 1. Nhóm API mở tự do (Không cần Token)
                         .requestMatchers("/api/auth/**").permitAll() // Đăng nhập, Đăng ký, Quên MK
                         .requestMatchers("/api/ws-endpoint/**", "/ws-endpoint/**").permitAll() // Marcus làm websocket
+                        .requestMatchers("/oauth2/**","/login/oauth2/**").permitAll()
 
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/client/**").permitAll()

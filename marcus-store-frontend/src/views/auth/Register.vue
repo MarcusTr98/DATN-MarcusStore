@@ -48,7 +48,7 @@
 
         <div class="social-login">
           <button class="social-btn social-fb">Facebook</button>
-          <button class="social-btn social-gg">Google</button>
+          <button type="button" class="social-btn social-gg" @click="registerGoogle">Đăng ký bằng Google</button>
         </div>
 
         <div class="divider"><span>hoặc điền thông tin bên dưới</span></div>
@@ -146,6 +146,10 @@ const showRegisterPassword = ref(false)
 const showRegisterConfirm = ref(false)
 const loading = ref(false)
 
+const registerGoogle = () => {
+  window.location.href =
+    "http://localhost:8080/oauth2/authorization/google";
+}
 const registerForm = reactive({
   fullName: '',
   username: '',

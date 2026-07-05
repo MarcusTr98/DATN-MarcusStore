@@ -48,7 +48,7 @@
 
         <div class="social-login">
           <button class="social-btn social-fb">Facebook</button>
-          <button class="social-btn social-gg">Google</button>
+          <button class="social-btn social-gg" @click="loginGoogle">Google</button>
         </div>
 
         <div class="divider"><span>hoặc đăng nhập bằng tài khoản</span></div>
@@ -116,6 +116,11 @@ const router = useRouter()
 const showLoginPassword = ref(false)
 const errorMessage = ref('')
 const loading = ref(false)
+
+const loginGoogle = () => {
+  window.location.href =
+    "http://localhost:8080/oauth2/authorization/google";
+}
 
 const loginForm = reactive({
   username: '',
