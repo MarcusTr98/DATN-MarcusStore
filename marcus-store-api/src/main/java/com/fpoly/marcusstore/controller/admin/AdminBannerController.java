@@ -2,8 +2,8 @@ package com.fpoly.marcusstore.controller.admin;
 
 import com.fpoly.marcusstore.dto.request.BannerRequestDTO;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
+import com.fpoly.marcusstore.dto.response.BannerPositionResponseDTO;
 import com.fpoly.marcusstore.dto.response.BannerResponseDTO;
-import com.fpoly.marcusstore.entity.cms.BannerPosition;
 import com.fpoly.marcusstore.repository.cms.BannerPositionRepository;
 import com.fpoly.marcusstore.service.BannerService;
 import com.fpoly.marcusstore.service.CloudinaryService;
@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/banners")
@@ -42,10 +43,12 @@ public class AdminBannerController {
     }
 
     // Lấy tất cả vị trí banner — dùng để đổ vào dropdown khi thêm/sửa
-    // Trả về toàn bộ BannerPosition kể cả vị trí chưa có banner nào
     @GetMapping("/positions")
-    public ApiResponse<List<BannerPosition>> getPositions() {
-        return ApiResponse.success(positionRepository.findAll());
+    public ApiResponse<List<BannerPositionResponseDTO>> getPositions() {
+        List<BannerPositionResponseDTO> result = positionRepository.findAll().stream()
+                .map(BannerPositionResponseDTO::from)
+                .collect(Collectors.toList());
+        return ApiResponse.success(result);
     }
 
     // Thêm banner mới

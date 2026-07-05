@@ -25,24 +25,28 @@
         <div class="form-row-2">
           <div class="form-row no-mb">
             <label>Vị trí hiển thị <span class="req">*</span></label>
-            <select class="form-input" v-model="form.positionId">
+            <select class="form-input" v-model="form.positionId" @change="onPositionChange">
               <option value="">Chọn vị trí...</option>
               <option v-for="p in positions" :key="p.value" :value="p.value">
                 {{ p.label }}
               </option>
             </select>
           </div>
-          <div class="form-row no-mb">
-            <label>Thứ tự hiển thị</label>
+
+          <!-- Chỉ hiện thứ tự khi chọn Home Slider (nhiều ảnh chạy tuần tự) -->
+          <div class="form-row no-mb" v-if="isSliderSelected">
+            <label>Thứ tự trong slider</label>
             <div class="order-input">
-              <input
-                type="number"
-                v-model.number="form.displayOrder"
-                min="0"
-                class="order-field"
-              />
-              <span class="order-hint">≥ 0</span>
+              <button
+                v-for="n in sliderOrderOptions"
+                :key="n"
+                type="button"
+                class="order-btn"
+                :class="{ active: form.displayOrder === n }"
+                @click="form.displayOrder = n"
+              >{{ n }}</button>
             </div>
+            <span class="field-hint">Vị trí ảnh trong slider (1 = đầu tiên)</span>
           </div>
         </div>
 
@@ -208,7 +212,7 @@ watch(
   }
 );
 
-// ---- Upload ảnh qua bannerApi.uploadImage (dùng chung axios instance `api`) ----
+// ---- Upload ảnh qua bannerApi.uploadImage (dùng chung axios instance `api`, full baseURL) ----
 async function uploadToCloudinary(file) {
   if (!file) return;
 
@@ -227,7 +231,7 @@ async function uploadToCloudinary(file) {
 
   try {
     const url = await bannerApi.uploadImage(file, (e) => {
-      if (e.total) {
+      if (e.lengthComputable) {
         uploadPercent.value = Math.round((e.loaded / e.total) * 100);
       }
     });
@@ -235,8 +239,7 @@ async function uploadToCloudinary(file) {
     form.imageUrl = url;
     imgBroken.value = false;
   } catch (err) {
-    uploadError.value =
-      err?.response?.data?.message || 'Upload thất bại, thử lại hoặc nhập URL thủ công';
+    uploadError.value = err.message || 'Upload thất bại, thử lại hoặc nhập URL thủ công';
     console.error('Upload error:', err);
   } finally {
     uploading.value = false;
@@ -252,7 +255,7 @@ function onFileChange(e) {
 
 function onDrop(e) {
   const file = e.dataTransfer.files?.[0];
-  if (file) uploadToCloudinary(file);
+  if (file && file.type.startsWith('image/')) uploadToCloudinary(file);
 }
 
 // Validate ngày: end phải >= start
@@ -262,6 +265,27 @@ const dateInvalid = computed(() => {
   }
   return false;
 });
+
+// Vị trí có cho phép chọn thứ tự hay không — đọc từ API (allowsOrder), không hardcode positionCode nữa
+const isSliderSelected = computed(() => {
+  if (!form.positionId) return false;
+  const found = props.positions.find(p => String(p.value) === String(form.positionId));
+  return !!found?.allowsOrder;
+});
+
+// Danh sách nút chọn thứ tự sinh động theo maxSlots của từng vị trí (thay vì hardcode [1,2,3,4,5])
+const sliderOrderOptions = computed(() => {
+  const found = props.positions.find(p => String(p.value) === String(form.positionId));
+  const max = found?.maxSlots || 1;
+  return Array.from({ length: max }, (_, i) => i + 1);
+});
+
+function onPositionChange() {
+  // Khi chuyển sang vị trí không phải slider, reset thứ tự về 1
+  if (!isSliderSelected.value) {
+    form.displayOrder = 1;
+  }
+}
 
 // Validate bắt buộc: title, positionId, imageUrl (@NotBlank/@NotNull trong BannerRequestDTO)
 const canSave = computed(() => {
@@ -396,6 +420,20 @@ function handleSave() {
   align-items: center;
   gap: 6px;
 }
+/* Nút chọn thứ tự slider */
+.order-btn {
+  width: 36px; height: 36px;
+  border: 1px solid #f3d6e3;
+  border-radius: 8px;
+  background: #fff;
+  color: #b4557d;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.order-btn:hover { border-color: #f55d9b; background: #fff0f7; }
+.order-btn.active { background: #f55d9b; color: #fff; border-color: #f55d9b; }
 .order-field {
   width: 80px;
   padding: 7px 10px;
@@ -629,4 +667,5 @@ function handleSave() {
   font-size: 11px;
   color: #b4557d;
 }
+
 </style>

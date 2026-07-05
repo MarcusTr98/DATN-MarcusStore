@@ -1,5 +1,7 @@
 <template>
   <div class="bm-page">
+
+    <!-- Page Header (đồng nhất với Quản lý đơn hàng) -->
     <div class="page-header">
       <div class="page-header-left">
         <div class="page-icon">
@@ -42,13 +44,8 @@
           :banners="filteredBanners"
           :positions="positionOptions"
           @edit="openEditModal"
-          @delete="openDeleteConfirm"
+          @toggle="handleToggle"
         />
-
-        <!-- Pagination info -->
-        <div class="pagination-row">
-          <span class="pg-info">Hiển thị {{ filteredBanners.length }} / {{ banners.length }} banner</span>
-        </div>
       </template>
     </div>
 
@@ -61,30 +58,6 @@
       @close="modalVisible = false"
       @save="handleSave"
     />
-
-    <!-- Modal xác nhận xóa (thay thế confirm() xấu xí) -->
-    <Teleport to="body">
-      <div v-if="deleteTarget" class="confirm-overlay" @click.self="deleteTarget = null">
-        <div class="confirm-box">
-          <div class="confirm-icon">
-            <i class="bi bi-exclamation-triangle"></i>
-          </div>
-          <h3 class="confirm-title">Xác nhận xóa banner</h3>
-          <p class="confirm-msg">
-            Bạn có chắc muốn xóa banner
-            <strong>"{{ deleteTarget.title }}"</strong>?<br />
-            <span class="confirm-note">Banner sẽ bị ẩn khỏi website (có thể khôi phục sau).</span>
-          </p>
-          <div class="confirm-actions">
-            <button class="btn-cancel-confirm" @click="deleteTarget = null">Hủy bỏ</button>
-            <button class="btn-confirm-del" :disabled="deleting" @click="confirmDelete">
-              <i class="bi bi-trash"></i>
-              {{ deleting ? 'Đang xóa...' : 'Xác nhận xóa' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
 
   </div>
 </template>
@@ -103,14 +76,15 @@ const loading    = ref(true);
 const loadError  = ref('');
 const modalVisible  = ref(false);
 const editingBanner = ref(null);
-const deleteTarget  = ref(null);
-const deleting      = ref(false);
 
 // positionOptions: lấy từ API /banners/positions → đủ tất cả vị trí kể cả chưa có banner
 const positionOptions = computed(() =>
   rawPositions.value.map(p => ({
     value: p.positionId,
     label: p.description || p.positionCode,
+    code:  p.positionCode,     // giữ lại để hiển thị/debug, không dùng để so sánh logic nữa
+    allowsOrder: !!p.allowsOrder, // true = vị trí có nhiều banner chạy tuần tự (vd: Slider)
+    maxSlots: p.maxSlots || 1,    // số thứ tự tối đa cho phép chọn khi allowsOrder = true
   }))
 );
 
@@ -206,9 +180,6 @@ function openEditModal(banner) {
   editingBanner.value = banner;
   modalVisible.value = true;
 }
-function openDeleteConfirm(banner) {
-  deleteTarget.value = banner;
-}
 
 async function handleSave(formData) {
   try {
@@ -227,19 +198,20 @@ async function handleSave(formData) {
   }
 }
 
-async function confirmDelete() {
-  if (!deleteTarget.value) return;
-  deleting.value = true;
+// Toggle isActive trực tiếp không cần confirm
+async function handleToggle(banner) {
+  const idx = banners.value.findIndex(b => b.id === banner.id);
+  if (idx === -1) return;
+  const newActive = !banner.isActive;
+  // Optimistic update: cập nhật UI trước
+  banners.value[idx].isActive = newActive;
   try {
-    await bannerApi.remove(deleteTarget.value.id);
-    // Soft-delete: cập nhật isActive = false thay vì xóa khỏi mảng
-    const idx = banners.value.findIndex(b => b.id === deleteTarget.value.id);
-    if (idx > -1) banners.value[idx].isActive = false;
-    deleteTarget.value = null;
+    const payload = { ...mapToApi(banners.value[idx]), isActive: newActive };
+    await bannerApi.update(banner.id, payload);
   } catch (err) {
-    alert(err?.response?.data?.message || 'Xóa banner thất bại.');
-  } finally {
-    deleting.value = false;
+    // Rollback nếu lỗi
+    banners.value[idx].isActive = !newActive;
+    alert(err?.response?.data?.message || 'Cập nhật trạng thái thất bại.');
   }
 }
 </script>
@@ -331,90 +303,4 @@ async function confirmDelete() {
   cursor: pointer;
 }
 .btn-retry:hover { background: #ec4d8d; }
-
-/* Pagination row */
-.pagination-row {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding: 14px 24px;
-  border-top: 1px solid #f3e8ee;
-}
-.pg-info { font-size: 13px; color: #6b7280; }
-
-/* Modal xác nhận xóa */
-.confirm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15,23,42,0.46);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.confirm-box {
-  background: #fff;
-  border-radius: 16px;
-  padding: 32px 28px;
-  width: 420px;
-  max-width: 95vw;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(15,23,42,0.18);
-}
-.confirm-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: #fff5f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 16px;
-  font-size: 26px;
-  color: #dc2626;
-}
-.confirm-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 10px;
-}
-.confirm-msg {
-  font-size: 14px;
-  color: #4b5563;
-  margin: 0 0 24px;
-  line-height: 1.6;
-}
-.confirm-note {
-  font-size: 12px;
-  color: #9ca3af;
-}
-.confirm-actions { display: flex; gap: 10px; justify-content: center; }
-.btn-cancel-confirm {
-  padding: 9px 22px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  color: #6b7280;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.btn-cancel-confirm:hover { border-color: #d1d5db; background: #f9fafb; }
-.btn-confirm-del {
-  padding: 9px 22px;
-  border: none;
-  border-radius: 8px;
-  background: #dc2626;
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  transition: background 0.15s;
-}
-.btn-confirm-del:hover:not(:disabled) { background: #b91c1c; }
-.btn-confirm-del:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
