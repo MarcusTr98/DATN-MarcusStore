@@ -131,6 +131,9 @@
                 <div class="summary-row">
                   <span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong>
                 </div>
+                <div v-if="orderDetail.voucherCode" class="summary-row">
+                  <span>Mã giảm giá</span><strong>{{ orderDetail.voucherCode }}</strong>
+                </div>
                 <div class="summary-row">
                   <span>Giảm giá</span
                   ><strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
