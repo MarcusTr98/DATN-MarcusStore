@@ -156,8 +156,8 @@ onUnmounted(() => {
                 </router-link>
               </template>
               <template v-else>
-                <div class="dropdown">
-                  <a href="#" class="h-action-btn" data-bs-toggle="dropdown">
+                <div class="dropdown dropdown-hover">
+                  <a href="#" class="h-action-btn" @click.prevent>
                     <div class="h-action-icon active"><i class="far fa-user"></i></div>
                     <div class="h-action-text">
                       <span class="h-action-sub">Xin chào,</span>

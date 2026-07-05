@@ -349,6 +349,13 @@
   border-radius: 12px !important;
   padding: 6px 0;
   min-width: 210px;
+  z-index: 1030; /* Đè lên trên .main-nav (z-index 1020) để không bị chèn */
+}
+
+/* Nút Account cần position để dropdown con định vị đúng và ở trên nav */
+.header-actions .dropdown-hover {
+  position: relative;
+  z-index: 1030;
 }
 
 /* Desktop Dropdown Hover Logic */
@@ -375,6 +382,25 @@
     min-width: 240px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* Đổ bóng cho menu xổ xuống đẹp hơn */
   }
+}
+
+/* Header dropdown-toggle Account: bỏ mũi tên mặc định của Bootstrap trên nút bấm */
+.h-action-btn.dropdown-toggle::after {
+  display: none;
+}
+
+/* Dòng tên user ở đầu dropdown Account */
+.dropdown-user-header {
+  padding: 10px 16px 6px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+}
+
+.dropdown-user-header i {
+  color: #d70018;
 }
 
 /* Dropdown Items (Các mục con bên trong Danh mục) */
