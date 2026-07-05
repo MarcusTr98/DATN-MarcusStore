@@ -201,7 +201,7 @@
       </div>
     </section>
 
-    <!-- ============ ĐỘI NGŨ (giữ nguyên dữ liệu) ============ -->
+    <!-- ============ ĐỘI NGŨ ============ -->
     <section class="team-section py-5">
       <div class="container py-4">
         <div class="text-center mb-5">
@@ -301,12 +301,6 @@ const teamMembers = ref([
 </script>
 
 <style scoped>
-/* ============================================================
-   DESIGN TOKENS
-   Nền: đen than #0B0B10 | đỏ tín hiệu #E1121C | vàng hổ phách #FFB627
-   Trắng ấm #FAFAF8 | mực #14151A | xám trung tính #6B7280
-   Display: 'Space Grotesk' (tiêu đề, số liệu) — Body: 'Be Vietnam Pro'
-============================================================ */
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
 
 .about-page {
