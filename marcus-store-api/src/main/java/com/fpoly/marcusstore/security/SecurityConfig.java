@@ -76,9 +76,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 1. Nhóm API mở tự do (Không cần Token)
                         .requestMatchers("/api/auth/**").permitAll() // Đăng nhập, Đăng ký, Quên MK
+                        .requestMatchers("/ws-endpoint/**").permitAll() // Marcus thêm để làm websocket
                         .requestMatchers("/api/public/**").permitAll()
                         .requestMatchers("/api/client/**").permitAll()
-                         .requestMatchers("/api/home/**").permitAll()
+                        .requestMatchers("/api/home/**").permitAll()
                         .requestMatchers("/api/admin/user/verify-email").permitAll() // Khách hàng nhập OTP xác thực
                                                                                      // email
                         .requestMatchers("/api/vnpay/**").permitAll() // Marcus test môi trường Ngrok webhook Vnpay
@@ -86,8 +87,6 @@ public class SecurityConfig {
                         // FIX TẠI ĐÂY: Mở khóa toàn bộ nhánh GHN và mở endpoint báo lỗi của Spring Boot
                         .requestMatchers("/api/ghn/**").permitAll()
                         .requestMatchers("/error").permitAll()
-
-                        .requestMatchers("/ws-endpoint/**").permitAll() // Marcus thêm để làm websocket
 
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập
                         .requestMatchers("/api/user/**").authenticated() // Checkout, Giỏ hàng, Wishlist, Đgiá
