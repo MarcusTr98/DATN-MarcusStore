@@ -249,7 +249,7 @@ const routes = [
       {
         path: 'finance-reports',
         name: 'FinancialReport',
-        component: () => import('@/views/report/FinancialReport.vue'),
+        component: () => import('@/views/client/report/FinancialReport.vue'),
         meta: { permission: 'DONGTIEN_VIEW' },
       },
       {
