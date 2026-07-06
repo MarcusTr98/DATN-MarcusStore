@@ -269,6 +269,17 @@ tbody tr:hover {
   font-weight: 950;
 }
 
+/* Mã voucher: nổi bật hơn so với text xám của summary-row,
+   dùng tông hồng chủ đạo + nền hồng nhạt + bo tròn nhẹ. */
+.summary-row .voucher-code {
+  color: #ff4d94;
+  background: rgba(255, 77, 148, 0.12);
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+}
+
 .timeline {
   display: grid;
   gap: 16px;
@@ -943,6 +954,12 @@ tbody tr:hover {
     border-top: 1.5px solid #000 !important;
     border-bottom: 1.5px solid #000 !important;
     padding: 3px 0;
+  }
+
+  /* Mã voucher: giữ màu nổi bật khi in (mặc định sẽ bị override sang đen). */
+  .summary-row .voucher-code {
+    color: #c00 !important;
+    background: rgba(204, 0, 0, 0.08) !important;
   }
 
   /* Timeline */
