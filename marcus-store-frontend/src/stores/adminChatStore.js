@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-import { getActiveRooms, getChatHistory } from '@/api/adminChatApi'
+import { getActiveRooms, getChatHistory, claimRoomChat } from '@/api/adminChatApi'
 
 export const useAdminChatStore = defineStore('adminChat', {
   state: () => ({
@@ -36,9 +36,10 @@ export const useAdminChatStore = defineStore('adminChat', {
     connectSocket(token, username) {
       if (this.stompClient?.active) return
       this.currentAdmin = username
+      const socketUrl = 'http://localhost:8080/ws-endpoint'
 
       this.stompClient = new Client({
-        webSocketFactory: () => new SockJS('/ws-endpoint'),
+        webSocketFactory: () => new SockJS(socketUrl),
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 5000,
 
@@ -116,19 +117,21 @@ export const useAdminChatStore = defineStore('adminChat', {
     },
 
     // Admin bấm "Nhận hỗ trợ"
-    claimRoom(roomId) {
-      this.stompClient?.publish({
-        destination: '/app/chat.claim',
-        body: JSON.stringify({ roomId, adminUsername: this.currentAdmin }),
-      })
+    async claimRoom(roomId) {
+      try {
+        // Gọi REST API thay vì STOMP
+        await claimRoomChat(roomId)
 
-      const room = this.rooms.find((r) => r.roomId === roomId)
-      if (room) {
-        room.claimedBy = this.currentAdmin
-        room.unclaimed = false
+        // Cập nhật State nội bộ
+        const room = this.rooms.find((r) => r.roomId === roomId)
+        if (room) {
+          room.claimedBy = this.currentAdmin
+          room.unclaimed = false
+        }
+      } catch (error) {
+        console.error('Lỗi khi claim phòng:', error)
       }
     },
-
     // Admin gửi tin nhắn trả lời khách
     sendMessage(content) {
       if (!this.activeRoomId || !content.trim()) return

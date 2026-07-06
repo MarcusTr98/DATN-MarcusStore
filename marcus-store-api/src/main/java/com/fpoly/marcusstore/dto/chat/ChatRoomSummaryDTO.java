@@ -7,10 +7,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * Tóm tắt 1 phòng chat để hiển thị trong danh sách Inbox bên Admin.
- * Dùng cho API GET /admin/chat/active-rooms.
- */
 @Data
 @Builder
 @NoArgsConstructor

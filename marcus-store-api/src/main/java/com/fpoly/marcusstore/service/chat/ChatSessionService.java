@@ -67,8 +67,8 @@ public class ChatSessionService {
         messagingTemplate.convertAndSend("/topic/chat.room." + roomId, systemMsg);
     }
 
-    // Danh sách toàn bộ phòng chat đang có dữ liệu (dùng khi Admin vừa đăng nhập,
-    // để không bỏ lỡ các phòng đã có tin nhắn trước khi Admin online)
+    // list toàn bộ phòng chat đang có dữ liệu (dùng khi Admin vừa đăng nhập,
+    // để k bỏ lỡ các phòng đã có tin nhắn trước khi Admin online)
     public List<ChatRoomSummaryDTO> getActiveRooms() {
         List<ChatRoomSummaryDTO> result = new ArrayList<>();
 
@@ -80,16 +80,26 @@ public class ChatSessionService {
             result.add(ChatRoomSummaryDTO.builder()
                     .roomId(roomId)
                     .lastMessage(lastMsg.getContent())
-                    .lastTimestamp(lastMsg.getTimestamp())
+                    .lastTimestamp(lastMsg.getTimestamp()) // Có thể null
                     .claimedBy(claimedRooms.get(roomId))
                     .unclaimed(!claimedRooms.containsKey(roomId))
                     .build());
         });
 
-        // Phòng chưa ai nhận hiển thị lên đầu, sau đó theo tin nhắn mới nhất
-        result.sort(Comparator
-                .comparing(ChatRoomSummaryDTO::isUnclaimed, Comparator.reverseOrder())
-                .thenComparing(ChatRoomSummaryDTO::getLastTimestamp, Comparator.reverseOrder()));
+        // TẠM THỜI TẮT HÀM SORT CŨ GÂY LỖI 500 VÀ DÙNG HÀM NÀY
+        result.sort((r1, r2) -> {
+            // Ưu tiên phòng chưa ai nhận lên đầu
+            if (r1.isUnclaimed() && !r2.isUnclaimed())
+                return -1;
+            if (!r1.isUnclaimed() && r2.isUnclaimed())
+                return 1;
+            // Nếu cùng trạng thái, cái nào mới hơn xếp trên
+            if (r1.getLastTimestamp() == null)
+                return 1;
+            if (r2.getLastTimestamp() == null)
+                return -1;
+            return r2.getLastTimestamp().compareTo(r1.getLastTimestamp());
+        });
 
         return result;
     }

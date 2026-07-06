@@ -52,11 +52,4 @@ public class ChatRestController {
         chatSessionService.endSession(roomId);
         return ResponseEntity.ok(ApiResponse.success("Phiên chat đã kết thúc"));
     }
-
-    @GetMapping("/admin/chat/active-rooms")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_STAFF')")
-    public ApiResponse<List<ChatRoomSummaryDTO>> getActiveRooms() {
-
-        return ApiResponse.success(chatSessionService.getActiveRooms());
-    }
 }
