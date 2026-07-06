@@ -14,7 +14,7 @@
 
     <!-- Offcanvas FAQ Sidebar -->
     <div
-      class="offcanvas offcanvas-end"
+      class="offcanvas offcanvas-end custom-offcanvas-zindex"
       tabindex="-1"
       id="faqOffcanvas"
       aria-labelledby="faqOffcanvasLabel"
@@ -120,21 +120,26 @@
           </p>
         </div>
 
-        <!-- Nút liên hệ thêm -->
+        <!-- Nút liên hệ thêm (Đã nâng cấp) -->
         <div class="mt-4 pt-3 border-top text-center">
-          <p class="small text-muted mb-3">Không tìm thấy câu trả lời bạn cần?</p>
+          <p class="small text-muted mb-3">Vẫn chưa giải quyết được vấn đề?</p>
           <div class="d-flex gap-2 justify-content-center">
-            <a href="tel:19001234" class="btn btn-danger btn-sm rounded-pill px-3">
+            <!-- Nút Hotline giữ nguyên vì tính cấp bách -->
+            <a
+              href="tel:19001234"
+              class="btn btn-outline-dark btn-sm rounded-pill px-3 border-2 fw-semibold"
+            >
               <i class="fas fa-phone-alt me-1"></i> Gọi Hotline
             </a>
-            <a
-              href="https://zalo.me/"
-              target="_blank"
-              rel="noopener"
-              class="btn btn-outline-danger btn-sm rounded-pill px-3"
+
+            <!-- Đổi nút Zalo thành nút gọi Chat Live hệ thống -->
+            <button
+              type="button"
+              class="btn btn-danger btn-sm rounded-pill px-3 fw-semibold shadow-sm"
+              @click="triggerLiveChat"
             >
-              <i class="fas fa-comment-dots me-1"></i> Chat Zalo
-            </a>
+              <i class="fas fa-comments me-1"></i> Chat với CSKH
+            </button>
           </div>
         </div>
       </div>
@@ -236,6 +241,23 @@ const filteredFaqs = computed(() => {
     return matchesCategory && matchesQuery
   })
 })
+
+// Hàm Mới: Xử lý kích hoạt Chat Live
+const triggerLiveChat = () => {
+  // 1. Tự động đóng Offcanvas FAQ
+  const closeBtn = document.querySelector('#faqOffcanvas .btn-close')
+  if (closeBtn) closeBtn.click()
+
+  // 2. Kích hoạt nút Chat Live của hệ thống (delay nhẹ để chờ Offcanvas đóng xong)
+  setTimeout(() => {
+    const chatBtn = document.querySelector('.chat-trigger-btn')
+    if (chatBtn) {
+      chatBtn.click()
+    } else {
+      console.warn('Chưa tìm thấy Widget Chat. CSKH có thể đang Offline.')
+    }
+  }, 350)
+}
 </script>
 
 <style scoped>
@@ -274,6 +296,11 @@ const filteredFaqs = computed(() => {
   letter-spacing: 1px;
   margin-top: 8px;
   text-transform: uppercase;
+}
+
+/* Ép z-index của bản thân Offcanvas cao hơn mọi Widget khác (1050 của Chat) */
+.custom-offcanvas-zindex {
+  z-index: 1060 !important;
 }
 
 /* Ô tìm kiếm */
@@ -403,5 +430,12 @@ const filteredFaqs = computed(() => {
 .offcanvas {
   border-left: none;
   box-shadow: -10px 0 30px rgba(0, 0, 0, 0.1);
+}
+</style>
+
+<!-- Tác động Global để lớp nền (backdrop) đen của Bootstrap cũng đè lên Chat Widget -->
+<style>
+.offcanvas-backdrop {
+  z-index: 1055 !important;
 }
 </style>
