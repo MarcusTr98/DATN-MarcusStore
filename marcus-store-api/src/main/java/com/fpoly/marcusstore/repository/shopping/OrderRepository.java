@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -35,6 +36,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
           OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
         AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
         AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+        AND (:fromDate IS NULL OR CAST(o.createdAt AS LocalDate) >= :fromDate)
+        AND (:toDate   IS NULL OR CAST(o.createdAt AS LocalDate) <= :toDate)
       ORDER BY
         CASE WHEN o.orderStatus = 'PENDING' THEN 0 ELSE 1 END,
         o.createdAt DESC,
@@ -44,6 +47,8 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
       @Param("keyword") String keyword,
       @Param("paymentMethod") String paymentMethod,
       @Param("orderStatus") String orderStatus,
+      @Param("fromDate") LocalDate fromDate,
+      @Param("toDate") LocalDate toDate,
       Pageable pageable);
 
   @Query("""
@@ -154,13 +159,15 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Query(value = """
       SELECT status_code
       FROM (VALUES
-          ('PENDING', 1),
-          ('PROCESSING', 2),
-          ('CONFIRMED', 3),
-          ('SHIPPING', 4),
-          ('COMPLETED', 5),
-          ('CANCELLED', 6),
-          ('FAILED', 7)
+          ('PENDING',    1),
+          ('CONFIRMED',  2),
+          ('PROCESSING', 3),
+          ('PACKED',     4),
+          ('SHIPPING',   5),
+          ('DELIVERED',  6),
+          ('COMPLETED',  7),
+          ('FAILED',     8),
+          ('CANCELLED',  9)
       ) AS statuses(status_code, sort_order)
       ORDER BY sort_order
       """, nativeQuery = true)

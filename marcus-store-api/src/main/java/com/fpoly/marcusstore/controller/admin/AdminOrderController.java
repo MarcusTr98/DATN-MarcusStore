@@ -11,7 +11,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
@@ -26,9 +28,13 @@ public class AdminOrderController {
                                            @RequestParam(defaultValue = "10") int size,
                                            @RequestParam(required = false) String keyword,
                                            @RequestParam(required = false) String paymentMethod,
-                                           @RequestParam(required = false) String orderStatus) {
+                                           @RequestParam(required = false) String orderStatus,
+                                           @RequestParam(required = false)
+                                           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+                                           @RequestParam(required = false)
+                                           @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1));
-        return orderService.getOrdersPage(keyword, paymentMethod, orderStatus, pageable);
+        return orderService.getOrdersPage(keyword, paymentMethod, orderStatus, fromDate, toDate, pageable);
     }
     @GetMapping("/orders/stats")
     public OrderStatsResponse getOrderStats(@RequestParam(required = false) String keyword,

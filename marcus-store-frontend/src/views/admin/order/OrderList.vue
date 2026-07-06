@@ -37,7 +37,7 @@
 
       <section class="toolbar-panel">
         <div class="row g-3 align-items-end">
-          <div class="col-12 col-md-6 col-lg-5">
+          <div class="col-12 col-md-6 col-lg-4">
             <label class="form-label">Tìm kiếm</label>
             <div class="input-group">
               <span class="input-group-text">
@@ -70,6 +70,26 @@
                 {{ orderStatusMap[item]?.label || item }}
               </option>
             </select>
+          </div>
+
+          <div class="col-6 col-md-3 col-lg">
+            <label class="form-label">Từ ngày</label>
+            <input
+              v-model="fromDate"
+              type="date"
+              class="form-control"
+              :max="toDate || undefined"
+            />
+          </div>
+
+          <div class="col-6 col-md-3 col-lg">
+            <label class="form-label">Đến ngày</label>
+            <input
+              v-model="toDate"
+              type="date"
+              class="form-control"
+              :min="fromDate || undefined"
+            />
           </div>
 
           <div class="col-12 col-md-6 col-lg-auto">
@@ -199,6 +219,8 @@ const router = useRouter()
 const keyword = ref('')
 const paymentMethod = ref('all')
 const orderStatus = ref('all')
+const fromDate = ref('')
+const toDate = ref('')
 
 const orders = ref([])
 const currentPage = ref(0)
@@ -227,6 +249,8 @@ async function fetchGetAllOrder(){
       keyword: keyword.value || undefined,
       paymentMethod: paymentMethod.value === 'all' ? undefined : paymentMethod.value,
       orderStatus: orderStatus.value === 'all' ? undefined : orderStatus.value,
+      fromDate: fromDate.value || undefined,
+      toDate: toDate.value || undefined,
     })
     orders.value = response.data.content || []
     totalPages.value = response.data.totalPages
@@ -248,7 +272,7 @@ onMounted(()=> {
   fetchOrderStats()
   getFilterOption()
 })
-watch([keyword, paymentMethod, orderStatus], () => {
+watch([keyword, paymentMethod, orderStatus, fromDate, toDate], () => {
   currentPage.value = 0
   fetchGetAllOrder()
 })
@@ -283,13 +307,15 @@ const formatTime1 = (value) => {
   return String(value).split(' ')[1] || ''
 }
 const orderStatusMap = {
-  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
-  PROCESSING: { label: 'Đang xử lý', className: 'confirmed' },
-  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
-  SHIPPING: { label: 'Đang giao', className: 'shipping' },
-  COMPLETED: { label: 'Hoàn thành', className: 'completed' },
-  CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
-  FAILED: { label: 'Giao thất bại', className: 'failed' },
+  PENDING:   { label: 'Chờ xác nhận',    className: 'pending' },
+  CONFIRMED: { label: 'Đã xác nhận',     className: 'confirmed' },
+  PROCESSING:{ label: 'Đang chuẩn bị',   className: 'processing' },
+  PACKED:    { label: 'Đã đóng gói',     className: 'processing' },
+  SHIPPING:  { label: 'Đang giao',       className: 'shipping' },
+  DELIVERED: { label: 'Giao thành công', className: 'shipping' },
+  COMPLETED: { label: 'Hoàn thành',      className: 'completed' },
+  CANCELLED: { label: 'Đã hủy',         className: 'cancelled' },
+  FAILED:    { label: 'Giao thất bại',   className: 'failed' },
 }
 
 const paymentStatusMap = {
@@ -332,6 +358,8 @@ const resetFilters = () => {
   keyword.value = ''
   paymentMethod.value = 'all'
   orderStatus.value = 'all'
+  fromDate.value = ''
+  toDate.value = ''
   showToast('Đã làm mới bộ lọc.')
 }
 </script>

@@ -67,7 +67,7 @@
                   <span class="meta-label"
                     ><i class="fa-solid fa-calendar-check"></i>Thời gian TT</span
                   >
-                  <strong class="meta-value">{{ selectedOrder.paymentDate || '---' }}</strong>
+                  <strong class="meta-value">{{ displayPaymentDate || '---' }}</strong>
                 </div>
               </div>
 
@@ -89,7 +89,7 @@
                     <div class="step-icon">
                       <i class="fa-solid" :class="step.icon"></i>
                     </div>
-                    <div class="step-code">{{ step.status }}</div>
+
                     <div class="step-title">{{ step.title }}</div>
                     <div class="step-time">
                       {{ step.isCurrent ? 'Hiện tại' : formatDateTime(step.createdAt) }}
@@ -250,9 +250,18 @@
                     </div>
 
                     <div class="detail-actions">
-                      <button class="btn-dark" type="button">
-                        <i class="fa-solid fa-phone"></i>
-                        Liên hệ shop
+                      <button
+                        type="button"
+                        class="btn-dark btn-cancel-order"
+                        :disabled="cancelling || !canCancelOrder"
+                        @click="handleCancelOrder"
+                      >
+                        <i
+                          v-if="cancelling"
+                          class="fa-solid fa-spinner fa-spin"
+                        ></i>
+                        <i v-else class="fa-solid fa-ban"></i>
+                        {{ cancelling ? 'Đang hủy đơn...' : 'Hủy đơn hàng' }}
                       </button>
                     </div>
                   </div>
@@ -260,6 +269,84 @@
               </div>
             </div>
           </section>
+        </div>
+      </div>
+
+      <div
+        v-if="cancelModal.open"
+        class="modal-backdrop"
+        @click.self="closeCancelModal"
+      >
+        <div class="modal-card" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <h4 class="modal-title">
+              <i class="fa-solid fa-ban"></i>
+              Hủy đơn hàng
+            </h4>
+            <button
+              type="button"
+              class="modal-close"
+              :disabled="cancelling"
+              @click="closeCancelModal"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div class="modal-body">
+            <p class="modal-text">
+              Vui lòng cho Marcus Store biết lý do bạn muốn hủy đơn
+              <strong>{{ cancelModal.orderCode }}</strong>.
+            </p>
+            <textarea
+              v-model="cancelModal.reason"
+              class="modal-input"
+              rows="3"
+              maxlength="500"
+              placeholder="Ví dụ: Đặt nhầm size, đổi ý không muốn mua nữa..."
+              :disabled="cancelling"
+            ></textarea>
+            <div class="modal-counter">
+              {{ cancelModal.reason.length }}/500
+            </div>
+
+            <div
+              v-if="cancelModal.feedback.message"
+              class="modal-feedback"
+              :class="`modal-feedback-${cancelModal.feedback.type}`"
+              role="alert"
+            >
+              <i
+                class="fa-solid"
+                :class="cancelModal.feedback.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'"
+              ></i>
+              <span>{{ cancelModal.feedback.message }}</span>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn-ghost"
+              :disabled="cancelling"
+              @click="closeCancelModal"
+            >
+              Quay lại
+            </button>
+            <button
+              type="button"
+              class="btn-danger"
+              :disabled="cancelling || !cancelModal.reason.trim()"
+              @click="confirmCancelOrder"
+            >
+              <i
+                v-if="cancelling"
+                class="fa-solid fa-spinner fa-spin"
+              ></i>
+              <i v-else class="fa-solid fa-check"></i>
+              {{ cancelling ? 'Đang xử lý...' : 'Xác nhận hủy' }}
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -299,23 +386,97 @@ async function fetchOrderDetail() {
 
 onMounted(fetchOrderDetail)
 
+const USER_CANCELLABLE_STATUSES = ['PENDING', 'PROCESSING', 'PACKED']
+
+const canCancelOrder = computed(() => {
+  const order = selectedOrder.value
+  if (!order) return false
+  if ((order.paymentMethod || '').toUpperCase() !== 'COD') return false
+  const status = (order.orderStatus || '').toUpperCase()
+  return USER_CANCELLABLE_STATUSES.includes(status)
+})
+
+const cancelling = ref(false)
+
+const cancelModal = ref({
+  open: false,
+  orderCode: '',
+  reason: '',
+  feedback: { type: '', message: '' },
+})
+
+function openCancelModal() {
+  const order = selectedOrder.value
+  if (!order || !canCancelOrder.value || cancelling.value) return
+  cancelModal.value = {
+    open: true,
+    orderCode: order.orderCode,
+    reason: '',
+    feedback: { type: '', message: '' },
+  }
+}
+
+function closeCancelModal() {
+  if (cancelling.value) return
+  cancelModal.value = {
+    open: false,
+    orderCode: '',
+    reason: '',
+    feedback: { type: '', message: '' },
+  }
+}
+
+async function handleCancelOrder() {
+  if (!canCancelOrder.value || cancelling.value) return
+  openCancelModal()
+}
+
+async function confirmCancelOrder() {
+  const modal = cancelModal.value
+  if (!modal.open || cancelling.value) return
+
+  const reason = modal.reason.trim()
+  if (!reason) return
+
+  cancelling.value = true
+  modal.feedback = { type: '', message: '' }
+  try {
+    const response = await UserOrderApi.cancelOrder(modal.orderCode, { note: reason })
+    if (response?.data) {
+      selectedOrder.value = response.data
+    } else {
+      await fetchOrderDetail()
+    }
+    cancelling.value = false
+    closeCancelModal()
+  } catch (e) {
+    modal.feedback = {
+      type: 'error',
+      message: e?.response?.data?.message || e?.message || 'Hủy đơn thất bại, vui lòng thử lại.',
+    }
+    cancelling.value = false
+  }
+}
+
 const statusConfig = {
-  CREATED: { label: 'Tạo đơn', className: 'pending', icon: 'fa-file-circle-plus' },
-  PENDING: { label: 'Chờ xác nhận', className: 'pending', icon: 'fa-clock' },
-  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed', icon: 'fa-circle-check' },
-  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing', icon: 'fa-boxes-packing' },
-  SHIPPING: { label: 'Đang giao', className: 'shipping', icon: 'fa-truck-fast' },
-  COMPLETED: { label: 'Hoàn thành', className: 'completed', icon: 'fa-house-circle-check' },
-  CANCELLED: { label: 'Đã hủy', className: 'cancelled', icon: 'fa-ban' },
-  FAILED: { label: 'Giao thất bại', className: 'failed', icon: 'fa-triangle-exclamation' },
+  CREATED:   { label: 'Tạo đơn',               className: 'pending',    icon: 'fa-file-circle-plus' },
+  PENDING:   { label: 'Chờ xác nhận',          className: 'pending',    icon: 'fa-clock' },
+  CONFIRMED: { label: 'Đã xác nhận',           className: 'confirmed',  icon: 'fa-circle-check' },
+  PROCESSING:{ label: 'Đang chuẩn bị',          className: 'processing', icon: 'fa-boxes-packing' },
+  PACKED:    { label: 'Đã đóng gói',            className: 'processing', icon: 'fa-box' },
+  SHIPPING:  { label: 'Đang giao',              className: 'shipping',   icon: 'fa-truck-fast' },
+  DELIVERED: { label: 'Giao thành công',        className: 'delivered',  icon: 'fa-circle-check' },
+  CANCELLED: { label: 'Đã hủy',                className: 'cancelled',  icon: 'fa-ban' },
+  FAILED:    { label: 'Giao thất bại',          className: 'failed',     icon: 'fa-triangle-exclamation' },
 }
 
 const defaultTimelineSteps = [
   { status: 'PENDING' },
   { status: 'CONFIRMED' },
   { status: 'PROCESSING' },
+  { status: 'PACKED' },
   { status: 'SHIPPING' },
-  { status: 'COMPLETED' },
+  { status: 'DELIVERED' },
 ]
 
 const visibleTimelineSteps = computed(() => {
@@ -329,6 +490,7 @@ const visibleTimelineSteps = computed(() => {
   // Xác định các bước flow đã đi qua dựa trên currentStatus
   const currentIndex = defaultTimelineSteps.findIndex((step) => step.status === currentStatus)
   const isTerminalStatus = currentStatus === 'CANCELLED' || currentStatus === 'FAILED'
+  const isCompletedStatus = currentStatus === 'COMPLETED'
 
   let flowStatuses
   if (isTerminalStatus) {
@@ -338,8 +500,9 @@ const visibleTimelineSteps = computed(() => {
       .filter((step) => historyByStatus.has(step.status))
       .map((step) => step.status)
     flowStatuses.push(currentStatus)
-  } else if (currentIndex >= 0) {
-    flowStatuses = defaultTimelineSteps.slice(0, currentIndex + 1).map((step) => step.status)
+  } else if (currentIndex >= 0 || isCompletedStatus) {
+    // COMPLETED: hiển thị đầy đủ flow như DELIVERED (không hiện COMPLETED trên timeline)
+    flowStatuses = [...defaultTimelineSteps.map((step) => step.status)]
   } else {
     flowStatuses = ['PENDING', currentStatus]
   }
@@ -355,7 +518,8 @@ const visibleTimelineSteps = computed(() => {
       status === 'CREATED' ? selectedOrder.value.createdAt : historyItem?.createdAt,
       historyItem?.note,
     )
-    timelineStep.isCurrent = currentStatus === status
+    timelineStep.isCurrent = (currentStatus === status) ||
+      (currentStatus === 'COMPLETED' && status === 'DELIVERED')
     return timelineStep
   })
 })
@@ -363,7 +527,9 @@ const visibleTimelineSteps = computed(() => {
 const displayHistory = computed(() => {
   if (!selectedOrder.value) return []
 
-  const history = selectedOrder.value.history || []
+  // Lọc bỏ COMPLETED cho UI client (vẫn giữ ở admin)
+  const history = (selectedOrder.value.history || [])
+    .filter((item) => item.status !== 'COMPLETED')
   const hasCreated = history.some((item) => item.status === 'CREATED')
 
   if (hasCreated) return history
@@ -376,6 +542,30 @@ const displayHistory = computed(() => {
   }
 
   return [createdItem, ...history]
+})
+
+const displayPaymentDate = computed(() => {
+  if (!selectedOrder.value) return ''
+
+  const order = selectedOrder.value
+  const isCOD = order.paymentMethod === 'COD'
+  const hasPaymentDate = order.paymentDate
+
+  // Nếu đã có paymentDate thì hiển thị paymentDate
+  if (hasPaymentDate) {
+    return formatDateTime(hasPaymentDate)
+  }
+
+  // Nếu là COD và chưa có paymentDate, lấy thời gian DELIVERED từ history
+  if (isCOD) {
+    const history = order.history || []
+    const deliveredItem = history.find((item) => item.status === 'DELIVERED')
+    if (deliveredItem?.createdAt) {
+      return formatDateTime(deliveredItem.createdAt)
+    }
+  }
+
+  return '---'
 })
 
 const timelineProgress = computed(() => {
