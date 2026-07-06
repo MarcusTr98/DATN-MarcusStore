@@ -135,15 +135,9 @@
                   <span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong>
                 </div>
                 <div v-if="orderDetail.voucherCode" class="summary-row">
-                  <span
-                    >Mã giảm giá:
-                    <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span
-                  >
+
+                  <span>Mã giảm giá: <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span>
                   <strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
-                </div>
-                <div class="summary-row">
-                  <span>Phí vận chuyển</span>
-                  <strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong>
                 </div>
                 <div
                   v-if="orderDetail.shippingSubsidy > 0"
@@ -152,6 +146,10 @@
                 >
                   <span>Trợ giá vận chuyển </span>
                   <strong>- {{ formatCurrency(orderDetail.shippingSubsidy) }}</strong>
+                </div>
+                <div v-if="subTotal >= 5000000" class="summary-row">
+                  <span>Giảm giá vận chuyển </span>
+                  <strong>---</strong>
                 </div>
                 <div class="summary-row total">
                   <span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong>
