@@ -1,7 +1,7 @@
 <script setup>
 import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
-import { injectFallbackScript } from '@/utils/chatFallback'
+import { injectFallbackScript, removeFallbackScript } from '@/utils/chatFallback'
 import ChatWidget from './ChatWidget.vue'
 
 const chatStore = useChatStore()
@@ -17,7 +17,7 @@ onMounted(async () => {
   // Hỏi trạng thái Admin
   await chatStore.checkPresence()
 
-  // Nếu là User => Kết nối STOMP để hóng Admin
+  // Chỉ Kết nối STOMP khi đã đăng nhập (Guest không cần socket)
   if (isLoggedIn.value) {
     chatStore.connectSocket(token, username)
   }
@@ -25,10 +25,10 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   chatStore.disconnectSocket()
+  removeFallbackScript()
 })
 </script>
 
 <template>
-  <!-- Render Khung chat xịn kế bên Zalo nếu có Admin online -->
-  <ChatWidget v-if="isLoggedIn && chatStore.isAdminOnline" />
+  <ChatWidget v-if="chatStore.isAdminOnline" :is-logged-in="isLoggedIn" />
 </template>
