@@ -780,11 +780,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
 .fin-page {
   min-height: 100%;
   padding: 28px;
   background: #eef3fb;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Be Vietnam Pro', sans-serif;
 }
 .fin-shell {
   max-width: 1280px;

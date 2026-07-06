@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
     width: calc(100vw - 32px);
     right: -8px;
   }
-  .room-list {
+  p .room-list {
     width: 160px;
     min-width: 160px;
   }

@@ -29,7 +29,7 @@ export const useChatStore = defineStore('chat', {
       if (this.isConnected) return
 
       this.roomId = username // Dùng chính username làm roomId cho cá nhân
-      const socketUrl = 'http://localhost:8080/api/ws-endpoint'
+      const socketUrl = 'http://localhost:8080/ws-endpoint'
 
       this.stompClient = new Client({
         webSocketFactory: () => new SockJS(socketUrl),
