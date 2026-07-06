@@ -28,16 +28,17 @@ public class CustomUserDetailsService implements UserDetailsService {
         return CustomUserDetails.build(user);
     }
 
-    @Transactional
-    public UserDetails loadUserByEmail(String email) {
+@Transactional(readOnly = true)
+public UserDetails loadUserByEmail(String email) {
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy user: " + email));
+    User user = userRepository.findByEmailWithRole(email)
+            .orElseThrow(() ->
+                    new UsernameNotFoundException("Không tìm thấy user: " + email));
 
-        if (!user.getIsActive()) {
-            throw new RuntimeException("Tài khoản đã bị khóa!");
-        }
-
-        return CustomUserDetails.build(user);
+    if (!Boolean.TRUE.equals(user.getIsActive())) {
+        throw new RuntimeException("Tài khoản đã bị khóa!");
     }
+
+    return CustomUserDetails.build(user);
+}
 }

@@ -9,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -19,10 +20,12 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.UUID;
 
 @Component
 public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
-
+    @Value("${frontend.url}")
+    private String frontendUrl;
     @Autowired
     private UserRepository userRepository;
 
@@ -37,8 +40,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
-                                        HttpServletResponse response,
-                                        Authentication authentication)
+            HttpServletResponse response,
+            Authentication authentication)
             throws IOException, ServletException {
 
         OAuth2User oauthUser = (OAuth2User) authentication.getPrincipal();
@@ -56,8 +59,8 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         // Nếu chưa liên kết thì tìm theo Email
         if (user == null) {
-           user = userRepository.findByEmailWithRole(email)
-        .orElse(null);
+            user = userRepository.findByEmailWithRole(email)
+                    .orElse(null);
         }
         // Chưa có tài khoản -> tạo CUSTOMER
         if (user == null) {
@@ -71,7 +74,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             user.setFullName(fullName);
 
             // Nếu cột password_hash đang NOT NULL thì đổi thành ""
-            user.setPasswordHash("");
+            user.setPasswordHash(null);
 
             user.setGoogleAccountId(googleId);
 
@@ -82,6 +85,9 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             user.setEmailVerified(true);
 
             user = userRepository.save(user);
+            user = userRepository
+                    .findByUsernameWithAuthorities(user.getUsername())
+                    .orElseThrow();
         }
         // Đã có tài khoản
         else {
@@ -109,19 +115,21 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
                 user.setGoogleAccountId(googleId);
 
-                userRepository.save(user);
+                user = userRepository.save(user);
+
+                user = userRepository
+                        .findByUsernameWithAuthorities(user.getUsername())
+                        .orElseThrow();
             }
         }
 
         // Sinh JWT
-        UserDetails userDetails =
-                customUserDetailsService.loadUserByUsername(user.getUsername());
+        CustomUserDetails userDetails = CustomUserDetails.build(user);
 
-        Authentication auth =
-                new UsernamePasswordAuthenticationToken(
-                        userDetails,
-                        null,
-                        userDetails.getAuthorities());
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities());
 
         String jwt = jwtUtils.generateJwtToken(auth);
 
@@ -139,20 +147,17 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 .reduce((a, b) -> a + "," + b)
                 .orElse("");
 
-
         // Redirect về Vue
         response.sendRedirect(
-                "http://localhost:5173/oauth-success"
+        frontendUrl + "/oauth-success"
                         + "?token=" + URLEncoder.encode(jwt, StandardCharsets.UTF_8)
                         + "&username=" + URLEncoder.encode(user.getUsername(), StandardCharsets.UTF_8)
                         + "&email=" + URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8)
                         + "&roles=" + URLEncoder.encode(roles, StandardCharsets.UTF_8)
-                        + "&permissions=" + URLEncoder.encode(permissions, StandardCharsets.UTF_8)
-        );
+                        + "&permissions=" + URLEncoder.encode(permissions, StandardCharsets.UTF_8));
     }
 
-    
-     //Sinh username không trùng
+    // Sinh username không trùng
     private String generateUniqueUsername(String email) {
 
         String username = email.split("@")[0]
@@ -162,14 +167,11 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             username = "user";
         }
 
-        String original = username;
-        int index = 1;
-
-        while (userRepository.existsByUsername(username)) {
-            username = original + index++;
-        }
-
-        return username;
+        return username + "_"
+                + UUID.randomUUID()
+                        .toString()
+                        .replace("-", "")
+                        .substring(0, 6);
     }
 
 }

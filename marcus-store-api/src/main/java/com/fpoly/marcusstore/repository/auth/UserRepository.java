@@ -81,4 +81,15 @@ LEFT JOIN FETCH u.permissions
 WHERE u.googleAccountId = :googleAccountId
 """)
 Optional<User> findByGoogleAccountId(@Param("googleAccountId") String googleAccountId);
+@Query("""
+SELECT DISTINCT u
+FROM User u
+JOIN FETCH u.role r
+LEFT JOIN FETCH r.permissions
+LEFT JOIN FETCH u.permissions
+WHERE u.username = :username
+""")
+Optional<User> findByUsernameWithAuthorities(
+        @Param("username") String username
+);
 }
