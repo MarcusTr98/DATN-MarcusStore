@@ -9,7 +9,7 @@ export const getActiveRooms = () => {
 
 // Lấy lịch sử tin nhắn của 1 phòng cụ thể (dùng chung endpoint với Client)
 export const getChatHistory = (roomId) => {
-  return api.get(`/client/chat/rooms/${roomId}/history`)
+  return api.get(`/public/chat/rooms/${roomId}/history`)
 }
 
 export const claimRoomChat = (roomId) => {

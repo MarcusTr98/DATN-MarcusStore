@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
+
 import { getActiveRooms, getChatHistory, claimRoomChat } from '@/api/adminChatApi'
 
 export const useAdminChatStore = defineStore('adminChat', {
@@ -16,6 +17,7 @@ export const useAdminChatStore = defineStore('adminChat', {
     messages: [], // tin nhắn của activeRoomId
 
     currentAdmin: null,
+    currentRoomSubscription: null,
   }),
 
   getters: {
@@ -36,7 +38,11 @@ export const useAdminChatStore = defineStore('adminChat', {
     connectSocket(token, username) {
       if (this.stompClient?.active) return
       this.currentAdmin = username
-      const socketUrl = 'http://localhost:8080/ws-endpoint'
+
+      // FIX: VITE_WS_URL trong .env đã chứa sẵn "/ws-endpoint",
+      // dùng thẳng biến env, KHÔNG nối thêm "/ws-endpoint" nữa
+      // (nối thêm sẽ tạo ra URL sai: .../ws-endpoint/ws-endpoint => SockJS gọi /info bị 404)
+      const socketUrl = import.meta.env.VITE_WS_URL
 
       this.stompClient = new Client({
         webSocketFactory: () => new SockJS(socketUrl),
@@ -79,16 +85,19 @@ export const useAdminChatStore = defineStore('adminChat', {
     // Cập nhật preview tin nhắn mới nhất trong danh sách Inbox
     upsertRoomSummary(msg) {
       const existing = this.rooms.find((r) => r.roomId === msg.roomId)
+
       if (existing) {
         existing.lastMessage = msg.content
         existing.lastTimestamp = msg.timestamp
+        // Nếu phòng này đang được claim (claimedBy != null), thì không cộng vào unclaimedCount nữa
       } else {
+        // Đây là phòng mới hoàn toàn
         this.rooms.unshift({
           roomId: msg.roomId,
           lastMessage: msg.content,
           lastTimestamp: msg.timestamp,
           claimedBy: null,
-          unclaimed: true,
+          unclaimed: true, // Đánh dấu là chưa ai nhận
         })
       }
 
@@ -103,6 +112,12 @@ export const useAdminChatStore = defineStore('adminChat', {
       this.activeRoomId = roomId
       this.messages = []
 
+      // 1. NGẮT LẮNG NGHE PHÒNG CŨ (Chống nhân bản tin nhắn)
+      if (this.currentRoomSubscription) {
+        this.currentRoomSubscription.unsubscribe()
+      }
+
+      // 2. TẢI LỊCH SỬ TỪ BE
       try {
         const res = await getChatHistory(roomId)
         this.messages = res.data.data ?? []
@@ -110,19 +125,20 @@ export const useAdminChatStore = defineStore('adminChat', {
         console.error('Không tải được lịch sử chat:', err)
       }
 
-      // Subscribe riêng vào topic của phòng này để nhận tin nhắn realtime
-      this.stompClient?.subscribe(`/topic/chat.room.${roomId}`, (msg) => {
-        this.messages.push(JSON.parse(msg.body))
-      })
+      // 3. ĐĂNG KÝ LẮNG NGHE PHÒNG MỚI
+      this.currentRoomSubscription = this.stompClient?.subscribe(
+        `/topic/chat.room.${roomId}`,
+        (msg) => {
+          this.messages.push(JSON.parse(msg.body))
+        },
+      )
     },
 
     // Admin bấm "Nhận hỗ trợ"
     async claimRoom(roomId) {
       try {
-        // Gọi REST API thay vì STOMP
         await claimRoomChat(roomId)
 
-        // Cập nhật State nội bộ
         const room = this.rooms.find((r) => r.roomId === roomId)
         if (room) {
           room.claimedBy = this.currentAdmin
@@ -132,6 +148,7 @@ export const useAdminChatStore = defineStore('adminChat', {
         console.error('Lỗi khi claim phòng:', error)
       }
     },
+
     // Admin gửi tin nhắn trả lời khách
     sendMessage(content) {
       if (!this.activeRoomId || !content.trim()) return
@@ -147,9 +164,6 @@ export const useAdminChatStore = defineStore('adminChat', {
         destination: '/app/chat.send',
         body: JSON.stringify(message),
       })
-
-      // Optimistic UI
-      this.messages.push(message)
     },
   },
 })
