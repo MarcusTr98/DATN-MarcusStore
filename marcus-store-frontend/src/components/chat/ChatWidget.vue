@@ -1,14 +1,27 @@
 <template>
   <div class="chat-widget-container">
     <!-- Nút mở khung chat -->
-    <button class="chat-trigger-btn shadow-lg" @click="toggleChat" :class="{ 'is-hidden': isOpen }">
+    <button
+      class="chat-trigger-btn shadow-lg"
+      @click="chatStore.toggleChat"
+      :class="{ 'is-hidden': chatStore.isOpen }"
+    >
       <i class="fas fa-headset"></i>
       <span class="pulse-ring"></span>
+
+      <!-- CHẤM ĐỎ BÁO TIN NHẮN CHƯA ĐỌC -->
+      <span
+        v-if="chatStore.unreadCount > 0"
+        class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+        style="font-size: 12px; border: 2px solid #fff"
+      >
+        {{ chatStore.unreadCount }}
+      </span>
     </button>
 
     <!-- Khung Chat Chính -->
     <transition name="chat-slide">
-      <div v-show="isOpen" class="chat-window shadow-lg">
+      <div v-show="chatStore.isOpen" class="chat-window shadow-lg">
         <!-- Header -->
         <div class="chat-header">
           <div class="d-flex align-items-center gap-2">
@@ -21,7 +34,7 @@
               <span class="status-text">Đang trực tuyến</span>
             </div>
           </div>
-          <button class="close-btn" @click="toggleChat">
+          <button class="close-btn" @click="chatStore.toggleChat">
             <i class="fas fa-times"></i>
           </button>
         </div>
@@ -70,33 +83,15 @@ import { ref, watch, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 
 const chatStore = useChatStore()
-const isOpen = ref(false)
 const inputMsg = ref('')
 const chatBody = ref(null)
 
-const toggleChat = () => {
-  isOpen.value = !isOpen.value
-  if (isOpen.value) {
-    scrollToBottom()
-  }
-}
-
 const handleSend = () => {
   if (!inputMsg.value.trim()) return
-
-  // Gọi hàm trong store để bắn qua STOMP
   chatStore.sendMessage(inputMsg.value.trim())
-
-  // Tạm thời push thẳng vào giao diện để thấy ngay lập tức (Lạc quan UI)
-  chatStore.messages.push({
-    senderRole: 'CUSTOMER',
-    content: inputMsg.value.trim(),
-  })
-
-  inputMsg.value = ''
+  inputMsg.value = '' // Tự động xóa input sau khi ấn gửi
 }
 
-// Tự động cuộn xuống dưới cùng khi có tin nhắn mới
 const scrollToBottom = async () => {
   await nextTick()
   if (chatBody.value) {
@@ -107,9 +102,14 @@ const scrollToBottom = async () => {
 watch(
   () => chatStore.messages.length,
   () => {
-    if (isOpen.value) {
-      scrollToBottom()
-    }
+    if (chatStore.isOpen) scrollToBottom()
+  },
+)
+
+watch(
+  () => chatStore.isOpen,
+  (newVal) => {
+    if (newVal) scrollToBottom()
   },
 )
 </script>

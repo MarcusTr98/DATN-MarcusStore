@@ -3,7 +3,7 @@ const FALLBACK_ID = 'marcus-zalo-personal-btn'
 export function injectFallbackScript() {
   if (document.getElementById(FALLBACK_ID)) return
 
-  const ZALO_PHONE = '035xxxxxxx' // Sửa số của bạn
+  const ZALO_PHONE = '0907640098'
 
   const zaloBtn = document.createElement('a')
   zaloBtn.id = FALLBACK_ID

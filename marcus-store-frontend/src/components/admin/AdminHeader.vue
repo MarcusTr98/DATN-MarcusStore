@@ -96,7 +96,9 @@ const displayNotifications = computed(() => {
   return notifications.value.filter((item) => !item.isRead).slice(0, 5)
 })
 
-const WS_BASE_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080'
+// FIX: VITE_WS_URL trong .env đã chứa sẵn "/ws-endpoint" (http://localhost:8080/ws-endpoint),
+// nên biến này giờ là URL đầy đủ luôn, KHÔNG nối thêm "/ws-endpoint" nữa ở connectWebSocket()
+const WS_ENDPOINT_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws-endpoint'
 
 const loadUser = () => {
   username.value = localStorage.getItem('USERNAME') || 'Admin'
@@ -127,7 +129,7 @@ const connectWebSocket = () => {
   const token = localStorage.getItem('ACCESS_TOKEN')
 
   stompClient = new Client({
-    webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws-endpoint`),
+    webSocketFactory: () => new SockJS(WS_ENDPOINT_URL),
     reconnectDelay: 5000,
     connectHeaders: {
       Authorization: token ? `Bearer ${token}` : '',
