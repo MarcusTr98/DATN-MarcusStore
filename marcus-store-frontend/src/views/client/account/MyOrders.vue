@@ -106,13 +106,15 @@ async function fetchUserOrders() {
 onMounted(fetchUserOrders)
 
 const statusConfig = {
-  PENDING: { label: 'Chờ xác nhận', className: 'pending', icon: 'fa-clock' },
-  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed', icon: 'fa-circle-check' },
-  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing', icon: 'fa-boxes-packing' },
-  SHIPPING: { label: 'Đang giao', className: 'shipping', icon: 'fa-truck-fast' },
-  COMPLETED: { label: 'Hoàn thành', className: 'completed', icon: 'fa-house-circle-check' },
-  CANCELLED: { label: 'Đã hủy', className: 'cancelled', icon: 'fa-ban' },
-  FAILED: { label: 'Giao thất bại', className: 'failed', icon: 'fa-triangle-exclamation' },
+  PENDING:   { label: 'Chờ xác nhận', className: 'pending',    icon: 'fa-clock' },
+  CONFIRMED: { label: 'Đã xác nhận',  className: 'confirmed',  icon: 'fa-circle-check' },
+  PROCESSING:{ label: 'Đang xử lý',    className: 'processing', icon: 'fa-boxes-packing' },
+  PACKED:    { label: 'Đang xử lý',    className: 'processing', icon: 'fa-box' },
+  SHIPPING:  { label: 'Đang giao',      className: 'shipping',   icon: 'fa-truck-fast' },
+  DELIVERED: { label: 'Đang giao',      className: 'shipping',   icon: 'fa-box-anchor' },
+  COMPLETED: { label: 'Hoàn thành',     className: 'completed',  icon: 'fa-house-circle-check' },
+  CANCELLED: { label: 'Đã hủy',        className: 'cancelled',  icon: 'fa-ban' },
+  FAILED:    { label: 'Giao thất bại', className: 'failed',     icon: 'fa-triangle-exclamation' },
 }
 
 const statusOptions = computed(() => Object.keys(statusConfig))

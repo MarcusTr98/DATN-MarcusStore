@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <section class="order-detail-page">
     <div class="page-heading">
       <div>
@@ -356,13 +356,15 @@ watch(
 )
 
 const orderStatusMap = {
-  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
-  PROCESSING: { label: 'Đang chuẩn bị hàng', className: 'processing' },
-  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
-  SHIPPING: { label: 'Đang giao', className: 'shipping' },
-  COMPLETED: { label: 'Hoàn thành', className: 'completed' },
-  CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
-  FAILED: { label: 'Giao thất bại', className: 'failed' },
+  PENDING:   { label: 'Chờ xác nhận',    className: 'pending' },
+  CONFIRMED: { label: 'Đã xác nhận',     className: 'confirmed' },
+  PROCESSING:{ label: 'Đang chuẩn bị',    className: 'processing' },
+  PACKED:    { label: 'Đã đóng gói',      className: 'processing' },
+  SHIPPING:  { label: 'Đang giao',        className: 'shipping' },
+  DELIVERED: { label: 'Giao thành công',  className: 'shipping' },
+  COMPLETED: { label: 'Hoàn thành',       className: 'completed' },
+  CANCELLED: { label: 'Đã hủy',           className: 'cancelled' },
+  FAILED:    { label: 'Giao thất bại',    className: 'failed' },
 }
 
 const paymentStatusMap = {
@@ -386,16 +388,23 @@ const allowedTransitions = {
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],
   CONFIRMED: [
-    { value: 'PROCESSING', label: 'Đang chuẩn bị hàng' },
+    { value: 'PROCESSING', label: 'Bắt đầu chuẩn bị hàng' },
     { value: 'CANCELLED', label: 'Hủy đơn & Hoàn tiền' },
   ],
   PROCESSING: [
-    { value: 'SHIPPING', label: 'Đang giao hàng' },
+    { value: 'PACKED', label: 'Đã đóng gói' },
+    { value: 'CANCELLED', label: 'Hủy đơn' },
+  ],
+  PACKED: [
+    { value: 'SHIPPING', label: 'Bắt đầu giao hàng' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],
   SHIPPING: [
-    { value: 'COMPLETED', label: 'Giao thành công' },
+    { value: 'DELIVERED', label: 'Giao thành công' },
     { value: 'FAILED', label: 'Giao thất bại' },
+  ],
+  DELIVERED: [
+    { value: 'COMPLETED', label: 'Đối soát hoàn tất' },
   ],
   COMPLETED: [],
   CANCELLED: [],

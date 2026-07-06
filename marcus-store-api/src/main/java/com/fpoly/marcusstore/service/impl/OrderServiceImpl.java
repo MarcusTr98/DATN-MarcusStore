@@ -28,9 +28,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,6 +47,8 @@ public class OrderServiceImpl implements OrderService {
     private final UserVoucherRepository userVoucherRepository;
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
+
+    private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED");
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -90,8 +94,10 @@ public class OrderServiceImpl implements OrderService {
         return switch (currentStatus) {
             case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
             case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
-            case "PROCESSING" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
-            case "SHIPPING" -> newStatus.equals("COMPLETED") || newStatus.equals("FAILED");
+            case "PROCESSING" -> newStatus.equals("PACKED") || newStatus.equals("CANCELLED");
+            case "PACKED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
+            case "SHIPPING" -> newStatus.equals("DELIVERED") || newStatus.equals("FAILED");
+            case "DELIVERED" -> newStatus.equals("COMPLETED");
             case "FAILED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             default -> false;
         };
@@ -107,8 +113,10 @@ public class OrderServiceImpl implements OrderService {
             case "PENDING" -> "Đơn hàng đã đặt";
             case "CONFIRMED" -> "Đơn hàng đã được xác nhận";
             case "PROCESSING" -> "Đơn hàng đang được chuẩn bị";
+            case "PACKED" -> "Đơn hàng đã đóng gói";
             case "SHIPPING" -> "Đơn hàng đang được giao";
-            case "COMPLETED" -> "Giao hàng thành công";
+            case "DELIVERED" -> "Giao hàng thành công";
+            case "COMPLETED" -> "Đơn hàng hoàn thành";
             case "FAILED" -> "Giao hàng không thành công";
             case "CANCELLED" -> "Đơn hàng đã hủy";
             default -> "Cập nhật trạng thái";
@@ -217,9 +225,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus,
-            Pageable pageable) {
+            LocalDate fromDate, LocalDate toDate, Pageable pageable) {
         return orderRepository.searchOrders(
                 normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
+                fromDate, toDate,
                 pageable)
                 .map(this::toResponse);
     }
@@ -340,5 +349,29 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Không có quyền xem");
         }
         return response;
+    }
+
+    @Override
+    @Transactional
+    public OrderDetailResponse cancelUserOrder(String orderCode, String reason) {
+        Integer userId = SecurityUtils.getCurrentUserId();
+
+        Order order = orderRepository.findByOrderCodeAndUserUserId(orderCode, userId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        if (!"COD".equalsIgnoreCase(order.getPaymentMethod())) {
+            throw new RuntimeException("Chỉ hỗ trợ hủy đơn COD");
+        }
+
+        String currentStatus = normalizeStatusValue(order.getOrderStatus());
+        if (!USER_CANCELLABLE_STATUSES.contains(currentStatus)) {
+            throw new RuntimeException("Không thể hủy đơn ở trạng thái " + currentStatus);
+        }
+
+        UpdateOrderStatusRequest request = UpdateOrderStatusRequest.builder()
+                .status("CANCELLED")
+                .note((reason == null || reason.isBlank()) ? "Khách hàng tự hủy" : reason)
+                .build();
+        return updateStatusOrder(orderCode, request);
     }
 }

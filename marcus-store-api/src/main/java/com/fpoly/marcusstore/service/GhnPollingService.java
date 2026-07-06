@@ -26,7 +26,7 @@ public class GhnPollingService {
             "picking", "SHIPPING",
             "picked", "SHIPPING",
             "delivering", "SHIPPING",
-            "delivered", "COMPLETED",
+            "delivered", "DELIVERED",
             "delivery_fail", "FAILED",
             "return", "FAILED",
             "cancel", "CANCELLED");
@@ -83,7 +83,8 @@ public class GhnPollingService {
     private String getTitle(String status) {
         return switch (status) {
             case "SHIPPING" -> "Đơn hàng đang được giao";
-            case "COMPLETED" -> "Giao hàng thành công";
+            case "DELIVERED" -> "Giao hàng thành công";
+            case "COMPLETED" -> "Đơn hàng hoàn thành";
             case "FAILED" -> "Giao hàng không thành công";
             case "CANCELLED" -> "Đơn hàng đã hủy";
             default -> "Cập nhật trạng thái";

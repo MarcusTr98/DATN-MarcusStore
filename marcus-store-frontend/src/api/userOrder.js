@@ -8,6 +8,10 @@ const UserOrderApi = {
   userOrderDetail(orderCode) {
     return api.get(`/orders/${orderCode}`)
   },
+
+  cancelOrder(orderCode, payload = {}) {
+    return api.post(`/orders/${orderCode}/cancel`, payload)
+  },
 }
 
 export default UserOrderApi
