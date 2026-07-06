@@ -287,10 +287,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         validateRequest(request, skuMap);
 
         // 3. Chặn tạo 2 slot flash sale chạy cùng khung giờ
-        // Khoảng [start, end] của 2 slot được coi là overlap khi:
-        //   startA < endB  AND  startB < endA
-        // Dùng <> 0 thay vì status IN(2) vì slot vẫn ở status=1 (đã lên lịch)
-        // mà thời gian chưa tới cũng cần chặn luôn.
+
         List<FlashSaleSlot> overlapping = flashSaleSlotRepository
                 .findOverlappingSlots(request.getStartDate(), request.getEndDate(), null);
         if (!overlapping.isEmpty()) {
@@ -421,27 +418,16 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         }
 
         // 2. Chuyển slot 'Đang diễn ra' (2) mà đã quá endDate → 'Đã kết thúc' (3)
-        //    Đồng thời khoá tổng SP: set flashSaleQuantity = soldQuantity
+        //    Việc chặn mua sau khi kết thúc được đảm bảo qua slot.status = 3
+        //    (repository query findActiveFlashSaleItemBySku đã filter theo status).
+        //    Không ghi đè flashSaleQuantity để giữ nguyên tổng ban đầu cho báo cáo
+        //    và tránh vi phạm CHECK constraint flash_sale_quantity > 0.
         List<FlashSaleSlot> toExpire = flashSaleSlotRepository.findSlotsToExpire(now);
         if (!toExpire.isEmpty()) {
             toExpire.forEach(s -> s.setStatus((short) 3));
             flashSaleSlotRepository.saveAll(toExpire);
 
-            // Khoá tổng sản phẩm: đặt flashSaleQuantity = soldQuantity (phần còn lại mất)
-            for (FlashSaleSlot slot : toExpire) {
-                List<FlashSaleItem> items = flashSaleItemRepository.findItemsBySlotIdWithSlot(slot.getSlotId());
-                items.forEach(item -> {
-                    if (item.getSoldQuantity() != null
-                            && item.getFlashSaleQuantity() != null
-                            && item.getFlashSaleQuantity() > item.getSoldQuantity()) {
-                        item.setFlashSaleQuantity(item.getSoldQuantity());
-                    }
-                });
-                if (!items.isEmpty()) {
-                    flashSaleItemRepository.saveAll(items);
-                }
-            }
-            log.info("[FlashSale] Đã kết thúc và khoá tổng SP của {} slot: {}",
+            log.info("[FlashSale] Đã kết thúc {} slot: {}",
                     toExpire.size(),
                     toExpire.stream().map(FlashSaleSlot::getSlotId).toList());
         }

@@ -226,6 +226,13 @@ public class CheckoutService {
         createdHistory.setCreatedBy(user);
         orderStatusHistoryRepository.save(createdHistory);
 
+        OrderStatusHistory pendingHistory = new OrderStatusHistory();
+        pendingHistory.setOrder(savedOrder);
+        pendingHistory.setStatus("PENDING");
+        pendingHistory.setTitle("Đơn hàng đã đặt");
+        pendingHistory.setCreatedBy(user);
+        orderStatusHistoryRepository.save(pendingHistory);
+
         cartItemRepository.deleteAll(cartItems);
 
         try {

@@ -43,9 +43,9 @@
           </div>
 
           <div class="cart-item-list">
-            <div v-for="item in cartItems" :key="item.id" class="cart-item">
+            <div v-for="item in cartItems" :key="item.id" class="cart-item" @click="toggleItem(item)">
               <div class="item-check">
-                <input v-model="item.checked" type="checkbox" />
+                <input v-model="item.checked" type="checkbox" @click.stop />
               </div>
               <div class="item-info">
                 <div class="item-img">
@@ -71,7 +71,7 @@
                 <s>{{ formatPrice(item.originalPrice) }}</s>
                 {{ formatPrice(item.price) }}
               </div>
-              <div class="qty-control">
+              <div class="qty-control" @click.stop>
                 <button
                   class="qty-btn"
                   type="button"
@@ -89,6 +89,7 @@
                   type="number"
                   :disabled="isLoadingCart"
                   @change="normalizeQty(item)"
+                  @click.stop
                 />
 
                 <button
@@ -105,7 +106,7 @@
                 class="item-remove"
                 type="button"
                 aria-label="Xóa sản phẩm"
-                @click="removeItem(item.skuId)"
+                @click.stop="removeItem(item.skuId)"
               >
                 <i class="ti ti-trash" aria-hidden="true"></i>
               </button>
@@ -880,6 +881,10 @@ const allSelected = computed({
     })
   },
 })
+
+function toggleItem(item) {
+  item.checked = !item.checked
+}
 
 async function removeItem(skuId) {
   const success = await cartStore.removeItemFromCart(skuId)

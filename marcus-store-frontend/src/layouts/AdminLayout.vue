@@ -8,12 +8,14 @@
         <router-view></router-view>
       </div>
     </main>
+    <AdminChatInbox />
   </div>
 </template>
 
 <script setup>
 import AdminHeader from '@/components/admin/AdminHeader.vue'
 import AdminSidebar from '@/components/admin/AdminSidebar.vue'
+import AdminChatInbox from '@/components/chat/AdminChatInbox.vue'
 </script>
 
 <style scoped>

@@ -312,8 +312,8 @@ const statusConfig = {
 
 const defaultTimelineSteps = [
   { status: 'PENDING' },
-  { status: 'PROCESSING' },
   { status: 'CONFIRMED' },
+  { status: 'PROCESSING' },
   { status: 'SHIPPING' },
   { status: 'COMPLETED' },
 ]
@@ -325,11 +325,26 @@ const visibleTimelineSteps = computed(() => {
   const historyByStatus = new Map(
     (selectedOrder.value.history || []).map((item) => [item.status, item]),
   )
+
+  // Xác định các bước flow đã đi qua dựa trên currentStatus
   const currentIndex = defaultTimelineSteps.findIndex((step) => step.status === currentStatus)
-  const flowStatuses =
-    currentIndex >= 0
-      ? defaultTimelineSteps.slice(0, currentIndex + 1).map((step) => step.status)
-      : ['PENDING', currentStatus]
+  const isTerminalStatus = currentStatus === 'CANCELLED' || currentStatus === 'FAILED'
+
+  let flowStatuses
+  if (isTerminalStatus) {
+    // Trạng thái kết thúc: hiển thị tất cả các bước đã đi qua
+    // từ PENDING đến bước hiện tại trước khi cancel/fail, lấy từ history
+    flowStatuses = defaultTimelineSteps
+      .filter((step) => historyByStatus.has(step.status))
+      .map((step) => step.status)
+    flowStatuses.push(currentStatus)
+  } else if (currentIndex >= 0) {
+    flowStatuses = defaultTimelineSteps.slice(0, currentIndex + 1).map((step) => step.status)
+  } else {
+    flowStatuses = ['PENDING', currentStatus]
+  }
+
+  // Luôn bắt đầu timeline bằng CREATED
   const statuses = ['CREATED', ...new Set(flowStatuses)]
 
   return statuses.map((status, index) => {
