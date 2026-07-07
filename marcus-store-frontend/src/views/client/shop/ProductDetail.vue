@@ -53,7 +53,7 @@
             :min-price="product.minPrice"
             :max-price="product.maxPrice"
             :min-original-price="product.minOriginalPrice"
-            :is-wished="product.isWished"
+            :is-wished="isWished"
             :current-sku="currentSku"
             @toggle-wishlist="toggleWishlist"
           />
@@ -121,6 +121,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '@/utils/api'
 import { useCartStore } from '@/stores/cartStore'
+import wishlist, { state as wishlistState } from '@/composables/useWishlistShared'
 import BaseModal from '@/components/BaseModal.vue'
 
 import ProductGallery from '@/layouts/product-detail/ProductGallery.vue'
@@ -183,9 +184,19 @@ async function fetchProduct() {
   product.value = null
   selectedVariant.value = {}
 
+  // Đảm bảo share state đã có wishlist ids (nếu user đã đăng nhập) trước khi bind UI
+  if (localStorage.getItem('ACCESS_TOKEN')) {
+    await wishlist.fetchIds()
+  }
+
   try {
     const res = await api.get(`/client/products/${slug}`)
     product.value = res.data?.data ?? null
+
+    // Đồng bộ isWished từ BE vào share state
+    if (product.value?.productId != null && product.value.isWished === true) {
+      wishlistState.productIds.add(product.value.productId)
+    }
   } catch (err) {
     console.error('Lỗi tải chi tiết sản phẩm:', err)
     error.value =
@@ -203,19 +214,26 @@ function onVariantChange({ attributeId, valueId }) {
 }
 
 // ===== Wishlist =====
+const isWished = computed(() =>
+  product.value?.productId != null ? wishlist.isWished(product.value.productId) : false,
+)
+
 async function toggleWishlist() {
-  if (!product.value) return
+  if (!product.value?.productId) return
   const token = localStorage.getItem('ACCESS_TOKEN')
   if (!token) {
     showNotify('info', 'Yêu cầu đăng nhập', 'Vui lòng đăng nhập để sử dụng tính năng yêu thích.')
     return
   }
-  // TODO: tích hợp wishlistApi khi BE ready
-  product.value.isWished = !product.value.isWished
+  const result = await wishlist.toggle(product.value.productId)
+  if (!result.success) {
+    showNotify('error', 'Thao tác thất bại', result.message || 'Không thể cập nhật yêu thích.')
+    return
+  }
   showNotify(
     'success',
-    product.value.isWished ? 'Đã thêm vào yêu thích' : 'Đã bỏ yêu thích',
-    product.value.isWished
+    isWished.value ? 'Đã thêm vào yêu thích' : 'Đã bỏ yêu thích',
+    isWished.value
       ? `Sản phẩm "${product.value.productName}" đã được thêm vào danh sách yêu thích.`
       : `Sản phẩm "${product.value.productName}" đã được bỏ khỏi yêu thích.`,
   )
