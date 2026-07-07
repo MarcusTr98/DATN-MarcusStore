@@ -47,7 +47,7 @@
         </div>
 
         <div class="social-login">
-          <button class="social-btn social-fb">Facebook</button>
+          <button class="social-btn social-fb" @click="loginFacebook">Facebook</button>
           <button class="social-btn social-gg" @click="loginGoogle">Google</button>
         </div>
 
@@ -58,11 +58,7 @@
         <form @submit.prevent="handleLogin">
           <div class="form-group">
             <label>TÊN ĐĂNG NHẬP HOẶC EMAIL</label>
-            <input
-              type="text"
-              v-model="loginForm.username"
-              placeholder="Nhập tên đăng nhập của bạn"
-            />
+            <input type="text" v-model="loginForm.username" placeholder="Nhập tên đăng nhập của bạn" />
           </div>
 
           <div class="form-group">
@@ -71,14 +67,11 @@
               <router-link to="/auth/forgot-password">QUÊN MẬT KHẨU?</router-link>
             </div>
             <div class="password-input">
-              <input
-                :type="showLoginPassword ? 'text' : 'password'"
-                v-model="loginForm.password"
-                placeholder="Nhập mật khẩu của bạn"
-              />
+              <input :type="showLoginPassword ? 'text' : 'password'" v-model="loginForm.password"
+                placeholder="Nhập mật khẩu của bạn" />
               <span class="eye" @click="showLoginPassword = !showLoginPassword">{{
                 showLoginPassword ? '🙈' : '👁'
-              }}</span>
+                }}</span>
             </div>
           </div>
 
@@ -96,17 +89,12 @@
       </div>
     </div>
   </div>
-  <BaseModal
-    :visible="modal.visible"
-    :type="modal.type"
-    :title="modal.title"
-    :message="modal.message"
-    @close="modal.visible = false"
-  />
+  <BaseModal :visible="modal.visible" :type="modal.type" :title="modal.title" :message="modal.message"
+    @close="modal.visible = false" />
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginApi } from '@/api/authApi'
 import BaseModal from '@/components/BaseModal.vue'
@@ -120,6 +108,11 @@ const loading = ref(false)
 const loginGoogle = () => {
   window.location.href =
     "http://localhost:8080/oauth2/authorization/google";
+}
+
+const loginFacebook = () => {
+  window.location.href =
+    "http://localhost:8080/oauth2/authorization/facebook";
 }
 
 const loginForm = reactive({
@@ -139,6 +132,30 @@ const showModal = (type, title, message) => {
   modal.message = message
   modal.visible = true
 }
+
+// Map mã lỗi backend trả về (OAuth2SuccessHandler) sang thông điệp tiếng Việt
+const OAUTH_ERROR_MESSAGES = {
+  unsupported_provider: 'Nhà cung cấp đăng nhập không được hỗ trợ.',
+  no_email: 'Tài khoản mạng xã hội của bạn không cung cấp email. Vui lòng dùng phương thức khác.',
+  social_not_allowed: 'Tài khoản này không được phép đăng nhập bằng mạng xã hội.',
+  account_disabled: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ hỗ trợ.',
+}
+
+// Xử lý lỗi OAuth redirect về /auth/login?error=...
+onMounted(() => {
+  const params = new URLSearchParams(window.location.search)
+  const error = params.get('error')
+
+  if (error) {
+    const message = OAUTH_ERROR_MESSAGES[error] || 'Đăng nhập bằng mạng xã hội thất bại. Vui lòng thử lại.'
+    showModal('error', 'Đăng nhập thất bại', message)
+
+    // Xóa query param khỏi URL để F5 không hiện lại lỗi
+    const url = new URL(window.location.href)
+    url.searchParams.delete('error')
+    window.history.replaceState({}, '', url.toString())
+  }
+})
 
 const handleLogin = async () => {
   errorMessage.value = ''
@@ -160,8 +177,6 @@ const handleLogin = async () => {
       username: loginForm.username,
       password: loginForm.password,
     })
-
-    console.log('Response:', response)
 
     const userData = response.data.data
 
@@ -204,6 +219,7 @@ const handleLogin = async () => {
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 .error-box {
   margin-bottom: 16px;
   padding: 10px 16px;
@@ -214,6 +230,7 @@ const handleLogin = async () => {
   text-align: center;
   font-size: 14px;
 }
+
 .auth-page {
   display: flex;
   min-height: 100vh;

@@ -45,9 +45,8 @@
           <h2>Tạo tài khoản mới</h2>
           <p>Tham gia MarcusStore - Mua sắm thả ga!</p>
         </div>
-
         <div class="social-login">
-          <button class="social-btn social-fb">Facebook</button>
+          <button type="button" class="social-btn social-fb" @click="registerFacebook">Facebook</button>
           <button type="button" class="social-btn social-gg" @click="registerGoogle">Đăng ký bằng Google</button>
         </div>
 
@@ -57,19 +56,19 @@
           <div class="grid-form">
             <div class="form-group">
               <label>HỌ VÀ TÊN</label>
-              <input type="text" v-model="registerForm.fullName" placeholder="Nguyễn Văn A"  />
+              <input type="text" v-model="registerForm.fullName" placeholder="Nguyễn Văn A" />
             </div>
             <div class="form-group">
               <label>TÊN ĐĂNG NHẬP</label>
-              <input type="text" v-model="registerForm.username" placeholder="nguyenvana123"  />
+              <input type="text" v-model="registerForm.username" placeholder="nguyenvana123" />
             </div>
             <div class="form-group">
               <label>EMAIL</label>
-              <input type="email" v-model="registerForm.email" placeholder="email@example.com"  />
+              <input type="email" v-model="registerForm.email" placeholder="email@example.com" />
             </div>
             <div class="form-group">
               <label>SỐ ĐIỆN THOẠI</label>
-              <input type="text" v-model="registerForm.phone" placeholder="0901234567"  />
+              <input type="text" v-model="registerForm.phone" placeholder="0901234567" />
             </div>
             <div class="form-group">
               <label>MẬT KHẨU</label>
@@ -78,33 +77,33 @@
                   placeholder="Tối thiểu 6 ký tự" />
                 <span class="eye" @click="showRegisterPassword = !showRegisterPassword">{{
                   showRegisterPassword ? '🙈' : '👁'
-                  }}</span>
+                }}</span>
               </div>
             </div>
             <div class="form-group">
               <label>XÁC NHẬN MẬT KHẨU</label>
               <div class="password-input">
                 <input :type="showRegisterConfirm ? 'text' : 'password'" v-model="registerForm.confirmPassword"
-                  placeholder="Nhập lại mật khẩu"  />
+                  placeholder="Nhập lại mật khẩu" />
                 <span class="eye" @click="showRegisterConfirm = !showRegisterConfirm">{{
                   showRegisterConfirm ? '🙈' : '👁'
-                  }}</span>
+                }}</span>
               </div>
             </div>
           </div>
 
           <div class="agree">
-            <input type="checkbox" v-model="registerForm.agree"  />
-            <span>Tôi đồng ý với   <a href="#" @click.prevent="showTermsModal = true">
-    Điều khoản dịch vụ
-  </a>
+            <input type="checkbox" v-model="registerForm.agree" />
+            <span>Tôi đồng ý với <a href="#" @click.prevent="showTermsModal = true">
+                Điều khoản dịch vụ
+              </a>
 
-  và
+              và
 
-  <a href="#" @click.prevent="showPrivacyModal = true">
-    Chính sách bảo mật
-  </a>
-</span>
+              <a href="#" @click.prevent="showPrivacyModal = true">
+                Chính sách bảo mật
+              </a>
+            </span>
           </div>
 
           <button class="main-btn" type="submit" :disabled="loading">
@@ -118,18 +117,11 @@
       </div>
     </div>
   </div>
-  <BaseModal 
-  :visible="modal.visible" 
-  :type="modal.type" :title="modal.title" 
-  :message="modal.message"
-  @close="modal.visible = false" />
-  <TermsOfServiceModal 
-  :show="showTermsModal" 
-  @close="showTermsModal = false" />
+  <BaseModal :visible="modal.visible" :type="modal.type" :title="modal.title" :message="modal.message"
+    @close="modal.visible = false" />
+  <TermsOfServiceModal :show="showTermsModal" @close="showTermsModal = false" />
 
-  <PrivacyPolicyModal 
-  :show="showPrivacyModal" 
-  @close="showPrivacyModal = false" />
+  <PrivacyPolicyModal :show="showPrivacyModal" @close="showPrivacyModal = false" />
 </template>
 
 <script setup>
@@ -149,6 +141,11 @@ const loading = ref(false)
 const registerGoogle = () => {
   window.location.href =
     "http://localhost:8080/oauth2/authorization/google";
+}
+
+const registerFacebook = () => {
+  window.location.href =
+    "http://localhost:8080/oauth2/authorization/facebook";
 }
 const registerForm = reactive({
   fullName: '',
@@ -198,7 +195,7 @@ const handleRegister = async () => {
       showModal('error', 'Thiếu thông tin', 'Vui lòng nhập mật khẩu.')
       return
     }
-        if (!registerForm.agree) {
+    if (!registerForm.agree) {
       showModal('error', 'Chưa đồng ý', 'Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.')
       return
     }
