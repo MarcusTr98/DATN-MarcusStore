@@ -23,29 +23,38 @@ public class ChatSessionService {
     public ChatMessageDTO saveAndBroadcastMessage(ChatMessageDTO message) {
         if (message.getTimestamp() == null)
             message.setTimestamp(LocalDateTime.now());
+        if (message.getId() == null)
+            message.setId((int) (Math.random() * 1000000));
 
         roomMessages.computeIfAbsent(message.getRoomId(), k -> new ArrayList<>()).add(message);
+
+        // 1. Gửi vào phòng chat chi tiết
         messagingTemplate.convertAndSend("/topic/chat.room." + message.getRoomId(), message);
-        if ("CUSTOMER".equals(message.getSenderRole())) {
-            messagingTemplate.convertAndSend("/topic/chat.incoming", message);
-        }
+
+        // 2. LUÔN gửi ra danh sách Inbox bên ngoài để cập nhật Text Preview mới nhất
+        messagingTemplate.convertAndSend("/topic/chat.incoming", message);
+
         return message;
     }
 
     public void claimRoom(String roomId, String adminUsername) {
         claimedRooms.put(roomId, adminUsername);
 
-        // Thông báo cho các Admin khác biết phòng này đã có người nhận (để bỏ trạng
-        // thái "chưa nhận")
+        // 1. Cập nhật Sidebar cho các Admin khác
         messagingTemplate.convertAndSend("/topic/chat.incoming.claimed",
                 Map.of("roomId", roomId, "claimedBy", adminUsername));
+
+        // 2. Gửi một tin nhắn "Đã tham gia" dưới danh nghĩa ADMIN (Nằm góc phải, màu
+        // xanh)
         ChatMessageDTO joinMsg = ChatMessageDTO.builder()
+                .id((int) (Math.random() * 1000000))
                 .roomId(roomId)
                 .sender(adminUsername)
                 .senderRole("ADMIN")
-                .content(adminUsername + " đã tham gia hỗ trợ bạn")
+                .content("Chào bạn, " + adminUsername + " đã tham gia hỗ trợ.")
                 .timestamp(LocalDateTime.now())
                 .build();
+
         saveAndBroadcastMessage(joinMsg);
     }
 
@@ -65,8 +74,14 @@ public class ChatSessionService {
         });
 
         result.sort((r1, r2) -> {
-            if (r1.isUnclaimed() != r2.isUnclaimed())
-                return r1.isUnclaimed() ? -1 : 1;
+            if (r1.isUnclaimed() && !r2.isUnclaimed())
+                return -1;
+            if (!r1.isUnclaimed() && r2.isUnclaimed())
+                return 1;
+            if (r1.getLastTimestamp() == null)
+                return 1;
+            if (r2.getLastTimestamp() == null)
+                return -1;
             return r2.getLastTimestamp().compareTo(r1.getLastTimestamp());
         });
         return result;

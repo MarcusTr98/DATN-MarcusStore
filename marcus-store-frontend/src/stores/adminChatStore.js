@@ -11,27 +11,32 @@ export const useAdminChatStore = defineStore('adminChat', {
     messages: [],
     currentAdmin: null,
     currentRoomSubscription: null,
-    isOpen: false,
+    isOpen: false, // Biến duy nhất quản lý trạng thái Đóng/Mở Panel
   }),
 
   getters: {
-    unclaimedCount: (state) => state.rooms.filter((r) => r.unclaimed).length,
-
-    // Tổng số phòng cần Admin chú ý: chưa claim HOẶC đã claim nhưng có tin nhắn mới chưa đọc
     notificationCount: (state) => state.rooms.filter((r) => r.unclaimed || r.hasNewMessage).length,
   },
 
   actions: {
+    // Hàm mới: Đóng mở panel và reset thông báo
+    toggleChatPanel() {
+      this.isOpen = !this.isOpen
+      if (this.isOpen && this.activeRoomId) {
+        const room = this.rooms.find((r) => r.roomId === this.activeRoomId)
+        if (room) room.hasNewMessage = false
+      }
+    },
+
     async initInbox() {
       try {
         const res = await getActiveRooms()
-        // Khởi tạo thêm cờ hasNewMessage = false cho mỗi phòng khi mới tải danh sách
         this.rooms = (res.data.data ?? []).map((room) => ({
           ...room,
           hasNewMessage: false,
         }))
       } catch (err) {
-        console.error('Lỗi tải danh sách phòng:', err)
+        console.error('Không tải được danh sách phòng:', err)
       }
     },
 
@@ -45,9 +50,10 @@ export const useAdminChatStore = defineStore('adminChat', {
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 5000,
         onConnect: () => {
-          this.stompClient.subscribe('/topic/chat.incoming', (msg) =>
-            this.upsertRoomSummary(JSON.parse(msg.body)),
-          )
+          this.stompClient.subscribe('/topic/chat.incoming', (msg) => {
+            this.upsertRoomSummary(JSON.parse(msg.body))
+          })
+
           this.stompClient.subscribe('/topic/chat.incoming.claimed', (msg) => {
             const { roomId, claimedBy } = JSON.parse(msg.body)
             const room = this.rooms.find((r) => r.roomId === roomId)
@@ -63,17 +69,13 @@ export const useAdminChatStore = defineStore('adminChat', {
 
     upsertRoomSummary(msg) {
       const room = this.rooms.find((r) => r.roomId === msg.roomId)
-
-      // Admin có đang xem đúng phòng này không (panel mở + đúng roomId đang active)
       const isViewingThisRoom = this.isOpen && this.activeRoomId === msg.roomId
+      const isFromCustomer = msg.senderRole === 'CUSTOMER'
 
       if (room) {
         room.lastMessage = msg.content
         room.lastTimestamp = msg.timestamp
-
-        // FIX: chỉ bật chấm đỏ "tin nhắn mới" khi Admin KHÔNG đang xem đúng phòng này,
-        // không phụ thuộc việc phòng đã được claim hay chưa
-        if (msg.senderRole === 'CUSTOMER' && !isViewingThisRoom) {
+        if (isFromCustomer && !isViewingThisRoom) {
           room.hasNewMessage = true
         }
       } else {
@@ -83,11 +85,15 @@ export const useAdminChatStore = defineStore('adminChat', {
           lastTimestamp: msg.timestamp,
           claimedBy: null,
           unclaimed: true,
-          hasNewMessage: msg.senderRole === 'CUSTOMER',
+          hasNewMessage: isFromCustomer && !isViewingThisRoom,
         })
       }
 
-      if (this.activeRoomId === msg.roomId) this.messages.push(msg)
+      if (this.activeRoomId === msg.roomId) {
+        if (!this.messages.some((m) => m.id === msg.id && m.id != null)) {
+          this.messages.push(msg)
+        }
+      }
     },
 
     async openRoom(roomId) {
@@ -95,16 +101,18 @@ export const useAdminChatStore = defineStore('adminChat', {
       this.messages = []
       this.isOpen = true
 
-      // Đã mở phòng để xem -> tắt chấm đỏ "tin nhắn mới" của phòng này
       const room = this.rooms.find((r) => r.roomId === roomId)
       if (room) room.hasNewMessage = false
 
-      this.currentRoomSubscription?.unsubscribe()
+      if (this.currentRoomSubscription) {
+        this.currentRoomSubscription.unsubscribe()
+      }
+
       this.currentRoomSubscription = this.stompClient?.subscribe(
         `/topic/chat.room.${roomId}`,
         (msg) => {
           const receivedMsg = JSON.parse(msg.body)
-          if (!this.messages.some((m) => m.id === receivedMsg.id && m.id)) {
+          if (!this.messages.some((m) => m.id === receivedMsg.id && m.id != null)) {
             this.messages.push(receivedMsg)
           }
         },
@@ -126,19 +134,21 @@ export const useAdminChatStore = defineStore('adminChat', {
           room.claimedBy = this.currentAdmin
           room.unclaimed = false
         }
-      } catch (e) {
-        console.error(e)
+      } catch (error) {
+        console.error('Lỗi khi claim phòng:', error)
       }
     },
 
     sendMessage(content) {
+      if (!this.activeRoomId || !content.trim()) return
+
       this.stompClient?.publish({
         destination: '/app/chat.send',
         body: JSON.stringify({
           roomId: this.activeRoomId,
           sender: this.currentAdmin,
           senderRole: 'ADMIN',
-          content,
+          content: content.trim(),
         }),
       })
     },
