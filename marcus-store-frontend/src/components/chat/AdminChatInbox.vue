@@ -3,22 +3,22 @@
     <!-- Nút thả nổi -->
     <button
       class="chat-trigger-btn shadow-lg"
-      @click="togglePanel"
-      :class="{ 'is-hidden': isOpen }"
+      @click="chatStore.toggleChatPanel"
+      :class="{ 'is-hidden': chatStore.isOpen }"
     >
       <i class="fas fa-headset"></i>
-      <span v-if="chatStore.unclaimedCount > 0" class="unclaimed-dot">{{
-        chatStore.unclaimedCount
-      }}</span>
+      <span v-if="chatStore.notificationCount > 0" class="unclaimed-dot">
+        {{ chatStore.notificationCount }}
+      </span>
     </button>
 
     <!-- Panel nổi -->
     <transition name="panel-slide">
-      <div v-show="isOpen" class="chat-panel shadow-lg">
+      <div v-show="chatStore.isOpen" class="chat-panel shadow-lg">
         <!-- Header panel -->
         <div class="panel-header">
           <h6 class="mb-0 fw-bold">Hỗ trợ khách hàng</h6>
-          <button class="close-btn" @click="togglePanel">
+          <button class="close-btn" @click="chatStore.toggleChatPanel">
             <i class="fas fa-times"></i>
           </button>
         </div>
@@ -43,7 +43,7 @@
             >
               <div class="room-avatar">
                 {{ room.roomId.charAt(0).toUpperCase() }}
-                <span v-if="room.unclaimed" class="ping-dot"></span>
+                <span v-if="room.unclaimed || room.hasNewMessage" class="ping-dot"></span>
               </div>
 
               <div class="room-info">
@@ -98,15 +98,23 @@
                 </div>
               </div>
 
+              <!-- Trong phần conv-footer -->
               <div class="conv-footer">
                 <input
                   v-model="inputMsg"
                   type="text"
-                  placeholder="Nhập phản hồi cho khách..."
+                  :placeholder="
+                    activeRoomClaimedBy ? 'Nhập phản hồi...' : 'Bạn cần nhận hỗ trợ để nhắn tin...'
+                  "
+                  :disabled="!activeRoomClaimedBy"
                   class="conv-input"
                   @keyup.enter="handleSend"
                 />
-                <button class="conv-send-btn" :disabled="!inputMsg.trim()" @click="handleSend">
+                <button
+                  class="conv-send-btn"
+                  :disabled="!inputMsg.trim() || !activeRoomClaimedBy"
+                  @click="handleSend"
+                >
                   <i class="fas fa-paper-plane"></i>
                 </button>
               </div>
@@ -128,13 +136,8 @@ import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useAdminChatStore } from '@/stores/adminChatStore'
 
 const chatStore = useAdminChatStore()
-const isOpen = ref(false)
 const inputMsg = ref('')
 const convBody = ref(null)
-
-const togglePanel = () => {
-  isOpen.value = !isOpen.value
-}
 
 // Lấy thông tin ai đang phụ trách phòng đang mở
 const activeRoomClaimedBy = computed(() => {
@@ -165,8 +168,6 @@ onMounted(async () => {
   const token = localStorage.getItem('ACCESS_TOKEN')
   const username = localStorage.getItem('USERNAME')
 
-  // Load danh sách phòng + connect socket ngay khi Admin vào trang,
-  // không cần đợi Admin bấm mở panel mới bắt đầu lắng nghe
   await chatStore.initInbox()
   chatStore.connectSocket(token, username)
 })
@@ -177,6 +178,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+/* CSS GIỮ NGUYÊN BẢN CŨ CỦA BẠN - KHÔNG CẦN CHỈNH SỬA GÌ Ở PHẦN NÀY */
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
 
 .admin-chat-widget {
@@ -187,7 +189,6 @@ onBeforeUnmount(() => {
   z-index: 1050;
 }
 
-/* ===== Nút thả nổi ===== */
 .chat-trigger-btn {
   width: 60px;
   height: 60px;
@@ -242,7 +243,6 @@ onBeforeUnmount(() => {
   }
 }
 
-/* ===== Panel nổi ===== */
 .chat-panel {
   position: absolute;
   bottom: 74px;
@@ -294,7 +294,6 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
-/* ===== Cột trái: danh sách phòng ===== */
 .room-list {
   width: 220px;
   min-width: 220px;
@@ -330,11 +329,9 @@ onBeforeUnmount(() => {
 .room-item:hover {
   background: #eaf2ff;
 }
-
 .room-item.is-active {
   background: #dbeafe;
 }
-
 .room-item.is-unclaimed {
   background: #f0f7ff;
 }
@@ -401,7 +398,6 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 
-/* ===== Cột phải: hội thoại ===== */
 .conversation-panel {
   flex: 1;
   display: flex;
@@ -541,7 +537,6 @@ onBeforeUnmount(() => {
   opacity: 0.4;
 }
 
-/* Responsive: panel co lại trên màn hình nhỏ */
 @media (max-width: 700px) {
   .chat-panel {
     width: calc(100vw - 32px);

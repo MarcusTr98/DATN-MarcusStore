@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChatMessageDTO {
+    private Integer id;
     private String roomId; // Tên phòng (Ví dụ: username của khách)
     private String sender; // Người gửi (username)
     private String senderRole; // CUSTOMER hoặc ADMIN
