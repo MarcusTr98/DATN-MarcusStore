@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.repository.core;
 
 import com.fpoly.marcusstore.entity.core.Product;
+import com.fpoly.marcusstore.entity.core.ProductSku;
 
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
