@@ -53,6 +53,14 @@ public class AdminFlashSaleController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // Cập nhật flash sale (admin)
+    @PutMapping("/flashsale/{slotId}")
+    public FlashSaleResponse updateFlashSale(
+            @PathVariable("slotId") Integer slotId,
+            @RequestBody @Valid FlashSaleSlotRequest request) {
+        return flashSaleService.updateFlashSale(slotId, request);
+    }
+
     // FE gọi khi admin nhập startDate/endDate để cảnh báo sớm.
     // Trả về danh sách slot overlap (rỗng = OK).
     @GetMapping("/flashsale/check-overlap")

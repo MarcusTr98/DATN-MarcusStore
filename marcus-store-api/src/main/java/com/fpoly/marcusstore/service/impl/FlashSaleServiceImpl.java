@@ -52,152 +52,110 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                   .bannerImageUrl(slot.getBannerImageUrl())
                   .build();
      }
-    // Map 1 slot sang FlashSaleResponse (kèm items, dùng cho chi tiết)
-    private FlashSaleResponse toResponseWithItems(FlashSaleSlot slot, List<FlashSaleItem> items) {
-        List<FlashSaleItemResponse> itemResponses = items.stream()
-                .map(this::toItemResponse)
-                .toList();
-        return FlashSaleResponse.builder()
-                .slotId(slot.getSlotId())
-                .name(slot.getName())
-                .startDate(slot.getStartDate())
-                .endDate(slot.getEndDate())
-                .status(slot.getStatus())
-                .quantityFlashSaleSlot(items.stream()
-                        .mapToInt(FlashSaleItem::getFlashSaleQuantity)
-                        .sum())
-                .usedQuantity(items.stream()
-                        .mapToInt(i -> i.getSoldQuantity() == null ? 0 : i.getSoldQuantity())
-                        .sum())
-                .createdAt(slot.getCreatedAt())
-                .updatedAt(slot.getUpdatedAt())
-                .bannerImageUrl(slot.getBannerImageUrl())
-                .items(itemResponses)
-                .build();
+// chuẩn hóa keyword người dùng gửi
+    private String normalizeKeyword(String keyword) {
+        return (keyword == null || keyword.isBlank()) ? null : keyword.trim();
     }
 
-    // Map 1 FlashSaleItem sang FlashSaleItemResponse
-    private FlashSaleItemResponse toItemResponse(FlashSaleItem item) {
-        ProductSku sku = item.getSku();
-        Integer remaining = item.getFlashSaleQuantity() - item.getSoldQuantity();
-        return FlashSaleItemResponse.builder()
-                .skuId(item.getId().getSkuId())
-                .productId(sku != null && sku.getProduct() != null ? sku.getProduct().getProductId() : null)
-                .productName(sku != null && sku.getProduct() != null ? sku.getProduct().getProductName() : null)
-                .skuCode(sku != null ? sku.getSkuCode() : null)
-                .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
-                .originalPrice(item.getOriginalPrice())
-                .flashSalePrice(item.getFlashSalePrice())
-                .flashSaleQuantity(item.getFlashSaleQuantity())
-                .soldQuantity(item.getSoldQuantity())
-                .remainingQuantity(remaining)
-                .createdAt(item.getCreatedAt())
-                .build();
+/**
+     * Validate toàn bộ request trước khi tạo slot.
+     * - Thời gian hợp lệ (startDate không ở quá khứ, endDate > startDate)
+     * - Items không null/rỗng, không trùng SKU trong cùng request
+     * - Mọi SKU đều tồn tại trong DB
+     * - Giá hợp lệ (originalPrice > 0, 0 < flashSalePrice < originalPrice)
+     * - Số lượng hợp lệ (flashSaleQuantity >= 1, không vượt tồn kho SKU)
+     */
+    private void validateRequest(FlashSaleSlotRequest request,
+                                 Map<Integer, ProductSku> skuMap) {
+         // 1. Thời gian
+         if (request.getStartDate() == null || request.getEndDate() == null) {
+              throw new ResponseStatusException(
+                      HttpStatus.BAD_REQUEST,
+                      "Ngày bắt đầu và ngày kết thúc không được để trống");
+         }
+         LocalDateTime now = LocalDateTime.now();
+         if (request.getStartDate().isBefore(now)) {
+              throw new ResponseStatusException(
+                      HttpStatus.BAD_REQUEST,
+                      "Ngày bắt đầu không được ở trong quá khứ");
+         }
+         if (!request.getEndDate().isAfter(request.getStartDate())) {
+              throw new ResponseStatusException(
+                      HttpStatus.BAD_REQUEST,
+                      "Ngày kết thúc phải sau ngày bắt đầu");
+         }
+
+         // 2. Items phải có ít nhất 1 phần tử
+         List<FlashSaleItemRequest> itemRequests = request.getItems();
+         if (itemRequests == null || itemRequests.isEmpty()) {
+              throw new ResponseStatusException(
+                      HttpStatus.BAD_REQUEST,
+                      "Phải có ít nhất 1 sản phẩm trong Flash Sale");
+         }
+
+         // 3. Validate từng item: không trùng SKU + SKU tồn tại + giá/số lượng hợp lệ
+         Set<Integer> seenSkuIds = new HashSet<>();
+         for (FlashSaleItemRequest ir : itemRequests) {
+              // 3a. SKU không được null
+              if (ir.getSkuId() == null) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           "SKU id không được để trống");
+              }
+              // 3b. Không trùng SKU trong cùng request
+              if (!seenSkuIds.add(ir.getSkuId())) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           "SKU id bị trùng trong request: " + ir.getSkuId());
+              }
+              // 3c. SKU phải tồn tại trong DB
+              ProductSku sku = skuMap.get(ir.getSkuId());
+              if (sku == null) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           "Không tìm thấy SKU với id: " + ir.getSkuId());
+              }
+              // 3d. Validate giá gốc
+              if (ir.getOriginalPrice() == null
+                      || ir.getOriginalPrice().signum() <= 0) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           "Giá gốc của SKU " + ir.getSkuId() + " phải > 0");
+              }
+              // 3e. Validate giá Flash Sale
+              if (ir.getFlashSalePrice() == null
+                      || ir.getFlashSalePrice().signum() <= 0) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           "Giá Flash Sale của SKU " + ir.getSkuId() + " phải > 0");
+              }
+              // 3f. Giá Flash Sale phải nhỏ hơn giá gốc
+              if (ir.getFlashSalePrice().compareTo(ir.getOriginalPrice()) >= 0) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           String.format(
+                                   "Giá Flash Sale (%s) phải nhỏ hơn giá gốc (%s) của SKU %d",
+                                   ir.getFlashSalePrice().toPlainString(),
+                                   ir.getOriginalPrice().toPlainString(),
+                                   ir.getSkuId()));
+              }
+              // 3g. Validate số lượng
+              if (ir.getFlashSaleQuantity() == null || ir.getFlashSaleQuantity() < 1) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           "Số lượng Flash Sale của SKU " + ir.getSkuId() + " phải >= 1");
+              }
+              // 3h. Không vượt tồn kho SKU (nếu có thông tin tồn kho)
+              Integer stock = sku.getStockQuantity();
+              if (stock != null && ir.getFlashSaleQuantity() > stock) {
+                   throw new ResponseStatusException(
+                           HttpStatus.BAD_REQUEST,
+                           String.format(
+                                   "Số lượng Flash Sale của SKU %d vượt tồn kho (còn %d)",
+                                   ir.getSkuId(), stock));
+              }
+         }
     }
-     // chuẩn hóa keyword người dùng gửi
-     private String normalizeKeyword(String keyword) {
-          return (keyword == null || keyword.isBlank()) ? null : keyword.trim();
-     }
-
-     /**
-      * Validate toàn bộ request trước khi tạo/cập nhật slot.
-      * - Thời gian hợp lệ (startDate không ở quá khứ, endDate > startDate)
-      * - Items không null/rỗng, không trùng SKU trong cùng request
-      * - Mọi SKU đều tồn tại trong DB
-      * - Giá hợp lệ (originalPrice > 0, 0 < flashSalePrice < originalPrice)
-      * - Số lượng hợp lệ (flashSaleQuantity >= 1, không vượt tồn kho SKU)
-      */
-     private void validateRequest(FlashSaleSlotRequest request,
-                                  Map<Integer, ProductSku> skuMap) {
-          // 1. Thời gian
-          if (request.getStartDate() == null || request.getEndDate() == null) {
-               throw new ResponseStatusException(
-                       HttpStatus.BAD_REQUEST,
-                       "Ngày bắt đầu và ngày kết thúc không được để trống");
-          }
-          LocalDateTime now = LocalDateTime.now();
-          if (request.getStartDate().isBefore(now)) {
-               throw new ResponseStatusException(
-                       HttpStatus.BAD_REQUEST,
-                       "Ngày bắt đầu không được ở trong quá khứ");
-          }
-          if (!request.getEndDate().isAfter(request.getStartDate())) {
-               throw new ResponseStatusException(
-                       HttpStatus.BAD_REQUEST,
-                       "Ngày kết thúc phải sau ngày bắt đầu");
-          }
-
-          // 2. Items phải có ít nhất 1 phần tử
-          List<FlashSaleItemRequest> itemRequests = request.getItems();
-          if (itemRequests == null || itemRequests.isEmpty()) {
-               throw new ResponseStatusException(
-                       HttpStatus.BAD_REQUEST,
-                       "Phải có ít nhất 1 sản phẩm trong Flash Sale");
-          }
-
-          // 3. Validate từng item: không trùng SKU + SKU tồn tại + giá/số lượng hợp lệ
-          Set<Integer> seenSkuIds = new HashSet<>();
-          for (FlashSaleItemRequest ir : itemRequests) {
-               // 3a. SKU không được null
-               if (ir.getSkuId() == null) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "SKU id không được để trống");
-               }
-               // 3b. Không trùng SKU trong cùng request
-               if (!seenSkuIds.add(ir.getSkuId())) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "SKU id bị trùng trong request: " + ir.getSkuId());
-               }
-               // 3c. SKU phải tồn tại trong DB
-               ProductSku sku = skuMap.get(ir.getSkuId());
-               if (sku == null) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "Không tìm thấy SKU với id: " + ir.getSkuId());
-               }
-               // 3d. Validate giá gốc
-               if (ir.getOriginalPrice() == null
-                       || ir.getOriginalPrice().signum() <= 0) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "Giá gốc của SKU " + ir.getSkuId() + " phải > 0");
-               }
-               // 3e. Validate giá Flash Sale
-               if (ir.getFlashSalePrice() == null
-                       || ir.getFlashSalePrice().signum() <= 0) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "Giá Flash Sale của SKU " + ir.getSkuId() + " phải > 0");
-               }
-               // 3f. Giá Flash Sale phải nhỏ hơn giá gốc
-               if (ir.getFlashSalePrice().compareTo(ir.getOriginalPrice()) >= 0) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            String.format(
-                                    "Giá Flash Sale (%s) phải nhỏ hơn giá gốc (%s) của SKU %d",
-                                    ir.getFlashSalePrice().toPlainString(),
-                                    ir.getOriginalPrice().toPlainString(),
-                                    ir.getSkuId()));
-               }
-               // 3g. Validate số lượng
-               if (ir.getFlashSaleQuantity() == null || ir.getFlashSaleQuantity() < 1) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "Số lượng Flash Sale của SKU " + ir.getSkuId() + " phải >= 1");
-               }
-               // 3h. Không vượt tồn kho SKU (nếu có thông tin tồn kho)
-               Integer stock = sku.getStockQuantity();
-               if (stock != null && ir.getFlashSaleQuantity() > stock) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            String.format(
-                                    "Số lượng Flash Sale của SKU %d vượt tồn kho (còn %d)",
-                                    ir.getSkuId(), stock));
-               }
-          }
-     }
      // phân trang
      @Override
      @Transactional(readOnly = true)
@@ -246,29 +204,55 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                         .sumFlashSaleQuantityInActiveSlots(now))
                 .build();
     }
-     @Override
-     @Transactional(readOnly = true)
-     public FlashSaleResponse getFlashSaleSlotById(Integer slotId) {
-          FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
-                  .orElseThrow(() -> new ResponseStatusException(
-                          HttpStatus.NOT_FOUND,
-                          "Không tìm thấy flash sale với id: " + slotId));
+@Override
+    @Transactional(readOnly = true)
+    public FlashSaleResponse getFlashSaleSlotById(Integer slotId) {
+         FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
+                 .orElseThrow(() -> new ResponseStatusException(
+                         HttpStatus.NOT_FOUND,
+                         "Không tìm thấy flash sale với id: " + slotId));
 
-          // Vẫn dùng batch API, truyền 1 id
-          Map<Integer, Integer> qtyMap = flashSaleItemRepository.sumFlashSaleQuantityBySlotIds(List.of(slotId))
-                  .stream()
-                  .collect(Collectors.toMap(
-                          row -> (Integer) row[0],
-                          row -> ((Number) row[1]).intValue()));
+         // Load items kèm SKU để build response có items[] (FE cần để render form chỉnh sửa)
+         List<FlashSaleItem> items = flashSaleItemRepository.findBySlotSlotId(slotId);
 
-          // Tổng soldQuantity cho cột 'Đã sử dụng'
-          Map<Integer, Integer> usedMap = flashSaleItemRepository.sumSoldQuantityBySlotIds(List.of(slotId))
-                  .stream()
-                  .collect(Collectors.toMap(
-                          row -> (Integer) row[0],
-                          row -> ((Number) row[1]).intValue()));
+         // Build response inline để có đầy đủ items[] + quantity/used
+         List<FlashSaleItemResponse> itemResponses = new ArrayList<>();
+         for (FlashSaleItem item : items) {
+              ProductSku sku = item.getSku();
+              itemResponses.add(FlashSaleItemResponse.builder()
+                      .skuId(item.getId().getSkuId())
+                      .productId(sku != null && sku.getProduct() != null
+                              ? sku.getProduct().getProductId() : null)
+                      .productName(sku != null && sku.getProduct() != null
+                              ? sku.getProduct().getProductName() : null)
+                      .skuCode(sku != null ? sku.getSkuCode() : null)
+                      .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
+                      .originalPrice(item.getOriginalPrice())
+                      .flashSalePrice(item.getFlashSalePrice())
+                      .flashSaleQuantity(item.getFlashSaleQuantity())
+                      .soldQuantity(item.getSoldQuantity())
+                      .remainingQuantity(item.getFlashSaleQuantity()
+                              - (item.getSoldQuantity() == null ? 0 : item.getSoldQuantity()))
+                      .createdAt(item.getCreatedAt())
+                      .build());
+         }
 
-          return toResponse(slot, qtyMap, usedMap);
+         return FlashSaleResponse.builder()
+                 .slotId(slot.getSlotId())
+                 .name(slot.getName())
+                 .startDate(slot.getStartDate())
+                 .endDate(slot.getEndDate())
+                 .status(slot.getStatus())
+                 .quantityFlashSaleSlot(items.stream()
+                         .mapToInt(FlashSaleItem::getFlashSaleQuantity).sum())
+                 .usedQuantity(items.stream()
+                         .mapToInt(i -> i.getSoldQuantity() == null ? 0 : i.getSoldQuantity())
+                         .sum())
+                 .createdAt(slot.getCreatedAt())
+                 .updatedAt(slot.getUpdatedAt())
+                 .bannerImageUrl(slot.getBannerImageUrl())
+                 .items(itemResponses)
+                 .build();
      }
     @Override
     @Transactional
@@ -357,6 +341,184 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                 .usedQuantity(savedItems.stream()
                         .mapToInt(i -> i.getSoldQuantity() == null ? 0 : i.getSoldQuantity())
                         .sum())
+                .createdAt(savedSlot.getCreatedAt())
+                .updatedAt(savedSlot.getUpdatedAt())
+                .bannerImageUrl(savedSlot.getBannerImageUrl())
+                .items(itemResponses)
+                .build();
+    }
+
+    // ============================================================
+    // UPDATE FLASH SALE
+    // ============================================================
+
+    @Override
+    @Transactional
+    public FlashSaleResponse updateFlashSale(Integer slotId, FlashSaleSlotRequest request) {
+        // 1. Tìm slot, 404 nếu không có
+        FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy flash sale với id: " + slotId));
+
+        // 2. Validate thời gian + items (tái sử dụng validateRequest của create)
+        //    Lưu ý: slot cũ có thể đã chạy nên KHÔNG chặn startDate ở quá khứ.
+        if (request.getStartDate() == null || request.getEndDate() == null
+                || !request.getEndDate().isAfter(request.getStartDate())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Ngày kết thúc phải sau ngày bắt đầu");
+        }
+        if (request.getItems() == null || request.getItems().isEmpty()) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Phải có ít nhất 1 sản phẩm trong Flash Sale");
+        }
+
+        // 3. Load SKU map từ request
+        List<FlashSaleItemRequest> itemRequests = request.getItems();
+        List<Integer> skuIds = itemRequests.stream()
+                .map(FlashSaleItemRequest::getSkuId)
+                .toList();
+        List<ProductSku> skus = productSkuRepository.findBySkuIdIn(skuIds);
+        Map<Integer, ProductSku> skuMap = skus.stream()
+                .collect(Collectors.toMap(ProductSku::getSkuId, s -> s));
+
+        // 4. Validate SKU tồn tại + giá/số lượng hợp lệ (tái sử dụng helper trong validateRequest)
+        //    Lấy tay vì startDate có thể ở quá khứ nhưng phần còn lại giống create.
+        Set<Integer> seenSkuIds = new HashSet<>();
+        for (FlashSaleItemRequest ir : itemRequests) {
+            if (ir.getSkuId() == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "SKU id không được để trống");
+            }
+            if (!seenSkuIds.add(ir.getSkuId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "SKU id bị trùng trong request: " + ir.getSkuId());
+            }
+            ProductSku sku = skuMap.get(ir.getSkuId());
+            if (sku == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy SKU với id: " + ir.getSkuId());
+            }
+            if (ir.getOriginalPrice() == null || ir.getOriginalPrice().signum() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Giá gốc của SKU " + ir.getSkuId() + " phải > 0");
+            }
+            if (ir.getFlashSalePrice() == null || ir.getFlashSalePrice().signum() <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Giá Flash Sale của SKU " + ir.getSkuId() + " phải > 0");
+            }
+            if (ir.getFlashSalePrice().compareTo(ir.getOriginalPrice()) >= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(
+                        "Giá Flash Sale (%s) phải nhỏ hơn giá gốc (%s) của SKU %d",
+                        ir.getFlashSalePrice().toPlainString(),
+                        ir.getOriginalPrice().toPlainString(), ir.getSkuId()));
+            }
+            if (ir.getFlashSaleQuantity() == null || ir.getFlashSaleQuantity() < 1) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Số lượng Flash Sale của SKU " + ir.getSkuId() + " phải >= 1");
+            }
+            Integer stock = sku.getStockQuantity();
+            if (stock != null && ir.getFlashSaleQuantity() > stock) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(
+                        "Số lượng Flash Sale của SKU %d vượt tồn kho (còn %d)",
+                        ir.getSkuId(), stock));
+            }
+        }
+
+        // 5. Build map items cũ theo skuId để check soldQuantity
+        //    (tránh vi phạm CHECK constraint flash_sale_quantity >= soldQuantity)
+        List<FlashSaleItem> oldItems = flashSaleItemRepository.findBySlotSlotId(slotId);
+        Map<Integer, Integer> oldSoldQtyBySku = oldItems.stream()
+                .collect(Collectors.toMap(
+                        it -> it.getId().getSkuId(),
+                        it -> it.getSoldQuantity() == null ? 0 : it.getSoldQuantity()));
+        for (FlashSaleItemRequest ir : itemRequests) {
+            Integer soldBefore = oldSoldQtyBySku.getOrDefault(ir.getSkuId(), 0);
+            if (soldBefore > 0 && ir.getFlashSaleQuantity() < soldBefore) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, String.format(
+                        "SKU %d đã có %d sản phẩm được bán, không thể giảm số lượng Flash Sale xuống %d",
+                        ir.getSkuId(), soldBefore, ir.getFlashSaleQuantity()));
+            }
+        }
+
+        // 6. Validate overlap với slot khác (status 1/2), trừ chính mình
+        List<FlashSaleSlot> overlapping = flashSaleSlotRepository
+                .findOverlappingSlots(request.getStartDate(), request.getEndDate(), slotId);
+        if (!overlapping.isEmpty()) {
+            String detail = overlapping.stream()
+                    .map(s -> String.format("#%d '%s' (%s → %s)",
+                            s.getSlotId(), s.getName(),
+                            s.getStartDate(), s.getEndDate()))
+                    .collect(Collectors.joining(", "));
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Khung giờ đã bị trùng với các flash sale khác: " + detail);
+        }
+
+        // 7. Update field trên entity
+        slot.setName(request.getName());
+        slot.setStartDate(request.getStartDate());
+        slot.setEndDate(request.getEndDate());
+        if (request.getStatus() != null) {
+            slot.setStatus(request.getStatus());
+        }
+        slot.setBannerImageUrl(request.getBannerImageUrl());
+
+        // 8. Replace items: clear collection (orphanRemoval sẽ xoá cũ) + add mới
+        slot.getFlashSaleItems().clear();
+        for (FlashSaleItemRequest ir : itemRequests) {
+            FlashSaleItemId itemId = new FlashSaleItemId();
+            itemId.setSlotId(slotId);
+            itemId.setSkuId(ir.getSkuId());
+            FlashSaleItem newItem = new FlashSaleItem();
+            newItem.setId(itemId);
+            newItem.setSlot(slot);
+            newItem.setOriginalPrice(ir.getOriginalPrice());
+            newItem.setFlashSalePrice(ir.getFlashSalePrice());
+            newItem.setFlashSaleQuantity(ir.getFlashSaleQuantity());
+            // Giữ soldQuantity cũ cho SKU đã có (bảo toàn lịch sử bán)
+            Integer keepSold = oldSoldQtyBySku.get(ir.getSkuId());
+            if (keepSold != null) {
+                newItem.setSoldQuantity(keepSold);
+            }
+            slot.getFlashSaleItems().add(newItem);
+        }
+
+        FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
+
+        // 9. Build response giống createFlashSale để có items[] (form chỉnh sửa render lại đúng)
+        Map<Integer, ProductSku> skuMapForResponse = skuMap; // đã load ở bước 3
+        List<FlashSaleItemResponse> itemResponses = new ArrayList<>();
+        for (FlashSaleItem savedItem : savedSlot.getFlashSaleItems()) {
+             ProductSku sku = skuMapForResponse.get(savedItem.getId().getSkuId());
+             itemResponses.add(FlashSaleItemResponse.builder()
+                     .skuId(savedItem.getId().getSkuId())
+                     .productId(sku != null && sku.getProduct() != null
+                             ? sku.getProduct().getProductId() : null)
+                     .productName(sku != null && sku.getProduct() != null
+                             ? sku.getProduct().getProductName() : null)
+                     .skuCode(sku != null ? sku.getSkuCode() : null)
+                     .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
+                     .originalPrice(savedItem.getOriginalPrice())
+                     .flashSalePrice(savedItem.getFlashSalePrice())
+                     .flashSaleQuantity(savedItem.getFlashSaleQuantity())
+                     .soldQuantity(savedItem.getSoldQuantity() == null ? 0 : savedItem.getSoldQuantity())
+                     .remainingQuantity(savedItem.getFlashSaleQuantity()
+                             - (savedItem.getSoldQuantity() == null ? 0 : savedItem.getSoldQuantity()))
+                     .createdAt(savedItem.getCreatedAt())
+                     .build());
+        }
+        return FlashSaleResponse.builder()
+                .slotId(savedSlot.getSlotId())
+                .name(savedSlot.getName())
+                .startDate(savedSlot.getStartDate())
+                .endDate(savedSlot.getEndDate())
+                .status(savedSlot.getStatus())
+                .quantityFlashSaleSlot(savedSlot.getFlashSaleItems().stream()
+                        .mapToInt(FlashSaleItem::getFlashSaleQuantity).sum())
+                .usedQuantity(savedSlot.getFlashSaleItems().stream()
+                        .mapToInt(i -> i.getSoldQuantity() == null ? 0 : i.getSoldQuantity()).sum())
                 .createdAt(savedSlot.getCreatedAt())
                 .updatedAt(savedSlot.getUpdatedAt())
                 .bannerImageUrl(savedSlot.getBannerImageUrl())

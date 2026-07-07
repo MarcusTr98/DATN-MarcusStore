@@ -19,6 +19,9 @@ public interface FlashSaleService {
     // Tạo mới
    FlashSaleResponse createFlashSale(FlashSaleSlotRequest request);
 
+    // Cập nhật
+    FlashSaleResponse updateFlashSale(Integer slotId, FlashSaleSlotRequest request);
+
     // Scheduled: auto-update status theo thời gian + khoá tổng SP khi hết hạn
     void autoUpdateFlashSaleStatuses();
 
