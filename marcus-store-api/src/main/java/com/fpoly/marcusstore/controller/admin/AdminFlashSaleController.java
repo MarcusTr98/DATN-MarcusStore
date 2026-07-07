@@ -61,7 +61,6 @@ public class AdminFlashSaleController {
             @RequestBody @Valid FlashSaleSlotRequest request) {
         return flashSaleService.updateFlashSale(slotId, request);
     }
-
     // Đổi trạng thái nhanh cho slot
     @PatchMapping("/flashsale/{slotId}/status")
     public FlashSaleResponse updateFlashSaleStatus(
