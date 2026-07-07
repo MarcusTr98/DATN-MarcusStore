@@ -68,4 +68,7 @@ private Set<Permission> permissions = new HashSet<>();
     
     @Column(name = "google_account_id")
     private String googleAccountId;
+
+    @Column(name = "facebook_account_id")
+    private String facebookAccountId;
 }

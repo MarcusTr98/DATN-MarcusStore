@@ -73,24 +73,47 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             return;
         }
 
-        User user = null;
-
-        // Tìm theo Social ID (đã JOIN FETCH role + permissions)
-        if (socialId != null) {
-            user = userRepository.findByGoogleAccountId(socialId).orElse(null);
+        // Fallback nếu provider không trả về tên
+        if (fullName == null || fullName.isBlank()) {
+            fullName = email.split("@")[0];
         }
 
-        // Nếu chưa liên kết thì tìm theo email (đã JOIN FETCH role + permissions)
+        // Chỉ Google mới cần check email_verified
+        // (Facebook đã đảm bảo email trả về là verified theo chính sách của họ)
+        if ("google".equals(provider)) {
+            Object emailVerifiedAttr = oauthUser.getAttribute("email_verified");
+            boolean emailVerified = Boolean.TRUE.equals(emailVerifiedAttr)
+                    || "true".equalsIgnoreCase(String.valueOf(emailVerifiedAttr));
+
+            if (!emailVerified) {
+                response.sendRedirect(frontendUrl + "/auth/login?error=email_not_verified");
+                return;
+            }
+        }
+
+        User user = null;
+        boolean isNewlyLinkedToExistingAccount = false;
+
+        // Tìm theo Social ID tương ứng provider (đã JOIN FETCH role + permissions)
+        if ("google".equals(provider)) {
+            user = userRepository.findByGoogleAccountId(socialId).orElse(null);
+        } else if ("facebook".equals(provider)) {
+            user = userRepository.findByFacebookAccountId(socialId).orElse(null);
+        }
+
+        // Nếu chưa liên kết thì tìm theo email
         if (user == null) {
             user = userRepository.findByEmailWithRole(email).orElse(null);
+            if (user != null) {
+                isNewlyLinkedToExistingAccount = true;
+            }
         }
 
         // ======================
-        // Chưa có tài khoản
+        // Chưa có tài khoản -> tạo mới
         // ======================
         if (user == null) {
 
-            // Fetch kèm permissions luôn để tránh lazy-load sau này
             Role customerRole = roleRepository.findByRoleNameWithPermissions("CUSTOMER")
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy role CUSTOMER"));
 
@@ -98,46 +121,45 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             newUser.setEmail(email);
             newUser.setFullName(fullName);
             newUser.setPasswordHash(null);
-            newUser.setGoogleAccountId(socialId);
             newUser.setRole(customerRole);
             newUser.setIsActive(true);
             newUser.setEmailVerified(true);
 
-            user = saveWithUniqueUsername(newUser, email);
-            // Không cần requery: role + permissions đã có sẵn trong memory (fetch ở trên)
+            if ("google".equals(provider)) {
+                newUser.setGoogleAccountId(socialId);
+            } else {
+                newUser.setFacebookAccountId(socialId);
+            }
+
+            User savedUser = saveOrRecoverFromRaceCondition(newUser, email);
+
+            // Nếu do race condition mà kết quả trả về không phải chính newUser
+            // (một request khác đã tạo user với cùng email trước đó)
+            // -> cần liên kết social id vào user thật sự đó
+            if (savedUser != newUser) {
+                isNewlyLinkedToExistingAccount = true;
+                user = linkSocialIdIfMissing(savedUser, provider, socialId);
+            } else {
+                user = savedUser;
+            }
         }
 
         // ======================
-        // Đã có tài khoản
+        // Đã có tài khoản (tìm theo social id hoặc theo email)
         // ======================
         else {
 
-            // Chỉ CUSTOMER được đăng nhập Social
             if (!"CUSTOMER".equalsIgnoreCase(user.getRole().getRoleName())) {
-
-                response.sendRedirect(
-                        frontendUrl + "/auth/login?error=social_not_allowed");
-
+                response.sendRedirect(frontendUrl + "/auth/login?error=social_not_allowed");
                 return;
             }
 
-            // Tài khoản bị khóa
             if (!Boolean.TRUE.equals(user.getIsActive())) {
-
-                response.sendRedirect(
-                        frontendUrl + "/auth/login?error=account_disabled");
-
+                response.sendRedirect(frontendUrl + "/auth/login?error=account_disabled");
                 return;
             }
 
-            // Chưa liên kết Social
-            if (user.getGoogleAccountId() == null) {
-
-                user.setGoogleAccountId(socialId);
-                user = userRepository.save(user);
-                // Không cần requery: user gốc đã JOIN FETCH role/permissions,
-                // save() chỉ update, association trong memory vẫn còn nguyên
-            }
+            user = linkSocialIdIfMissing(user, provider, socialId);
         }
 
         // ======================
@@ -167,20 +189,49 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
                 .reduce((a, b) -> a + "," + b)
                 .orElse("");
 
-        response.sendRedirect(
-                frontendUrl + "/oauth-success"
-                        + "?token=" + URLEncoder.encode(jwt, StandardCharsets.UTF_8)
-                        + "&username=" + URLEncoder.encode(user.getUsername(), StandardCharsets.UTF_8)
-                        + "&email=" + URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8)
-                        + "&roles=" + URLEncoder.encode(roles, StandardCharsets.UTF_8)
-                        + "&permissions=" + URLEncoder.encode(permissions, StandardCharsets.UTF_8));
+        String redirectUrl = frontendUrl + "/oauth-success"
+                + "?token=" + URLEncoder.encode(jwt, StandardCharsets.UTF_8)
+                + "&username=" + URLEncoder.encode(user.getUsername(), StandardCharsets.UTF_8)
+                + "&email=" + URLEncoder.encode(user.getEmail(), StandardCharsets.UTF_8)
+                + "&roles=" + URLEncoder.encode(roles, StandardCharsets.UTF_8)
+                + "&permissions=" + URLEncoder.encode(permissions, StandardCharsets.UTF_8);
+
+        if (isNewlyLinkedToExistingAccount) {
+            redirectUrl += "&notice=account_linked";
+        }
+
+        response.sendRedirect(redirectUrl);
+    }
+
+    /**
+     * Gán social id vào user nếu chưa có, theo đúng field từng provider.
+     */
+    private User linkSocialIdIfMissing(User user, String provider, String socialId) {
+
+        boolean needsSave = false;
+
+        if ("google".equals(provider) && user.getGoogleAccountId() == null) {
+            user.setGoogleAccountId(socialId);
+            needsSave = true;
+        } else if ("facebook".equals(provider) && user.getFacebookAccountId() == null) {
+            user.setFacebookAccountId(socialId);
+            needsSave = true;
+        }
+
+        if (needsSave) {
+            return userRepository.save(user);
+        }
+
+        return user;
     }
 
     /**
      * Lưu user mới với username random, tự retry nếu đụng unique constraint.
-     * Không query trước để check tồn tại — chỉ retry khi INSERT thật sự conflict.
+     * Nếu conflict là do race condition trên email (2 request cùng lúc tạo
+     * user mới với cùng email), tự động phát hiện và trả về user đã được
+     * request kia tạo trước đó, thay vì thất bại oan.
      */
-    private User saveWithUniqueUsername(User newUser, String email) {
+    private User saveOrRecoverFromRaceCondition(User newUser, String email) {
 
         int attempts = 0;
 
@@ -190,20 +241,21 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             try {
                 return userRepository.save(newUser);
             } catch (DataIntegrityViolationException e) {
+
+                User existing = userRepository.findByEmailWithRole(email).orElse(null);
+                if (existing != null) {
+                    return existing;
+                }
+
                 attempts++;
                 if (attempts >= MAX_USERNAME_RETRY) {
                     throw new RuntimeException(
-                            "Không thể tạo username duy nhất sau " + MAX_USERNAME_RETRY + " lần thử", e);
+                            "Không thể tạo tài khoản sau " + MAX_USERNAME_RETRY + " lần thử", e);
                 }
-                // random lại username, thử insert tiếp
             }
         }
     }
 
-    /**
-     * Sinh username ngẫu nhiên, KHÔNG query DB để check trùng trước.
-     * Xác suất trùng gần như bằng 0 với 6 ký tự hex random.
-     */
     private String generateRandomUsername(String email) {
 
         String prefix = email.split("@")[0]
