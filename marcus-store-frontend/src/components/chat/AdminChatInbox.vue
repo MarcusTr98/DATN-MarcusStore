@@ -7,8 +7,8 @@
       :class="{ 'is-hidden': isOpen }"
     >
       <i class="fas fa-headset"></i>
-      <span v-if="chatStore.unclaimedCount > 0" class="unclaimed-dot">{{
-        chatStore.unclaimedCount
+      <span v-if="chatStore.notificationCount > 0" class="unclaimed-dot">{{
+        chatStore.notificationCount
       }}</span>
     </button>
 
@@ -43,7 +43,7 @@
             >
               <div class="room-avatar">
                 {{ room.roomId.charAt(0).toUpperCase() }}
-                <span v-if="room.unclaimed" class="ping-dot"></span>
+                <span v-if="room.unclaimed || room.hasNewMessage" class="ping-dot"></span>
               </div>
 
               <div class="room-info">
@@ -98,15 +98,23 @@
                 </div>
               </div>
 
+              <!-- Trong phần conv-footer -->
               <div class="conv-footer">
                 <input
                   v-model="inputMsg"
                   type="text"
-                  placeholder="Nhập phản hồi cho khách..."
+                  :placeholder="
+                    activeRoomClaimedBy ? 'Nhập phản hồi...' : 'Bạn cần nhận hỗ trợ để nhắn tin...'
+                  "
+                  :disabled="!activeRoomClaimedBy"
                   class="conv-input"
                   @keyup.enter="handleSend"
                 />
-                <button class="conv-send-btn" :disabled="!inputMsg.trim()" @click="handleSend">
+                <button
+                  class="conv-send-btn"
+                  :disabled="!inputMsg.trim() || !activeRoomClaimedBy"
+                  @click="handleSend"
+                >
                   <i class="fas fa-paper-plane"></i>
                 </button>
               </div>
