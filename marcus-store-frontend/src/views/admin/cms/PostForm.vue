@@ -1,32 +1,5 @@
 <template>
   <div class="pf-wrap">
-
-    <div class="page-header">
-      <div class="page-header-left">
-        <div class="page-icon">
-          <i class="bi bi-file-earmark-text"></i>
-        </div>
-        <div>
-          <div class="crumbs">
-            <span class="crumb-link" @click="attemptCancel">Bài viết</span>
-            <i class="bi bi-chevron-right"></i>
-            <span class="current">{{ isEdit ? 'Chỉnh sửa' : 'Tạo mới' }}</span>
-          </div>
-          <h2 class="page-title">{{ isEdit ? 'Chỉnh sửa bài viết' : 'Tạo mới bài viết' }}</h2>
-        </div>
-      </div>
-      <div class="header-actions">
-        <span class="status-pill" :class="form.isPublished ? 'live' : 'draft'">
-          {{ form.isPublished ? 'Sẽ xuất bản' : 'Lưu nháp' }}
-        </span>
-        <button class="btn-cancel" @click="attemptCancel">Hủy bỏ</button>
-        <button class="btn-save" :disabled="saving" @click="onSave">
-          <i class="bi bi-check-lg"></i>
-          {{ saving ? 'Đang lưu…' : 'Lưu bài viết' }}
-        </button>
-      </div>
-    </div>
-
     <div class="layout">
       <div class="main-col">
         <div class="page-card pad">
@@ -75,24 +48,9 @@
 
         <div class="page-card pad">
           <p class="section-title">Nội dung bài viết <span class="req">*</span></p>
-          <p class="section-sub">Bản chính thức nên tích hợp Rich Text Editor như TipTap hoặc CKEditor.</p>
+          <p class="section-sub">Gõ trực tiếp, xuống dòng bình thường — không cần tự viết thẻ HTML.</p>
 
-          <div class="rte-toolbar">
-            <button type="button" class="rte-btn" title="In đậm" @click="insertTag('<strong>', '</strong>')"><b>B</b></button>
-            <button type="button" class="rte-btn" title="In nghiêng" @click="insertTag('<em>', '</em>')"><i>I</i></button>
-            <button type="button" class="rte-btn" title="Danh sách" @click="insertList(false)">•≡</button>
-            <button type="button" class="rte-btn" title="Danh sách số" @click="insertList(true)">1≡</button>
-            <button type="button" class="rte-btn" title="Liên kết" @click="insertTag(&quot;<a href='#'>&quot;, '</a>')">🔗</button>
-          </div>
-          <textarea
-            ref="contentArea"
-            class="content-area"
-            :class="{ error: errors.content }"
-            v-model="form.content"
-            rows="10"
-            placeholder="Nhập nội dung chi tiết bài viết tại đây..."
-            @blur="validateField('content')"
-          ></textarea>
+          <PostEditor v-model="form.content" @blur="validateField('content')" />
           <span v-if="errors.content" class="error-msg">{{ errors.content }}</span>
         </div>
 
@@ -179,6 +137,18 @@
       </div>
     </div>
 
+    <!-- Thanh Lưu/Hủy ở cuối form — đỡ phải kéo lên đầu trang -->
+    <div class="bottom-bar">
+      <span class="status-pill" :class="form.isPublished ? 'live' : 'draft'">
+        {{ form.isPublished ? 'Sẽ xuất bản' : 'Lưu nháp' }}
+      </span>
+      <button class="btn-cancel" @click="attemptCancel">Hủy bỏ</button>
+      <button class="btn-save" :disabled="saving" @click="onSave">
+        <i class="bi bi-check-lg"></i>
+        {{ saving ? 'Đang lưu…' : 'Lưu bài viết' }}
+      </button>
+    </div>
+
     <Teleport to="body">
       <div v-if="showLeaveConfirm" class="bn-modal-overlay" @click.self="cancelLeaveNav">
         <div class="banner-modal-box confirm-box" role="dialog" aria-modal="true" aria-labelledby="leaveModalTitle">
@@ -215,9 +185,12 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { reactive, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { postApi } from '@/api/PostApi';
+import PostEditor from './Posteditor.vue';
 
+// Không dùng route nữa — nhận post (null = tạo mới, object = đang sửa) và
+// categories (đã có sẵn ở PostManager) qua props, báo kết quả qua emit.
 const props = defineProps({
   post: { type: Object, default: null },
   categories: { type: Array, default: () => [] },
@@ -226,6 +199,8 @@ const emit = defineEmits(['saved', 'cancel']);
 
 const isEdit = computed(() => !!props.post);
 
+// author_id ẩn khỏi UI — tạo mới lấy USERNAME từ localStorage (api.js đã lưu khi login),
+// sửa thì lấy authorName thật từ post đang chỉnh.
 const authorName = computed(() => props.post?.authorName || localStorage.getItem('USERNAME') || 'Admin');
 const authorInitial = computed(() => authorName.value?.trim()?.slice(-1)?.toUpperCase() || 'A');
 
@@ -244,7 +219,6 @@ const initialSnapshot = ref('');
 const slugCheckDone = ref(false);
 const slugDuplicate = ref(false);
 
-const contentArea = ref(null);
 const imgBroken = ref(false);
 const uploading = ref(false);
 const uploadPercent = ref(0);
@@ -332,29 +306,6 @@ function validateAll() {
   return Object.keys(errors).length === 0;
 }
 
-function insertTag(tagStart, tagEnd) {
-  const ta = contentArea.value;
-  const start = ta.selectionStart, end = ta.selectionEnd;
-  const val = form.content;
-  const selected = val.slice(start, end) || 'văn bản';
-  form.content = val.slice(0, start) + tagStart + selected + tagEnd + val.slice(end);
-  nextTick(() => {
-    ta.focus();
-    ta.selectionStart = start + tagStart.length;
-    ta.selectionEnd = start + tagStart.length + selected.length;
-  });
-}
-function insertList(ordered) {
-  const ta = contentArea.value;
-  const start = ta.selectionStart;
-  const val = form.content;
-  const tag = ordered
-    ? '<ol>\n  <li>Mục 1</li>\n  <li>Mục 2</li>\n</ol>\n'
-    : '<ul>\n  <li>Mục 1</li>\n  <li>Mục 2</li>\n</ul>\n';
-  form.content = val.slice(0, start) + tag + val.slice(start);
-  nextTick(() => ta.focus());
-}
-
 async function uploadFile(file) {
   if (!file) return;
   if (file.size > 5 * 1024 * 1024) { uploadError.value = 'Ảnh quá lớn, tối đa 5MB'; return; }
@@ -369,7 +320,7 @@ async function uploadFile(file) {
     form.thumbnailUrl = url;
     imgBroken.value = false;
   } catch (err) {
-    uploadError.value = err.message || 'Upload thất bại, thử lại hoặc nhập URL thủ công';
+    uploadError.value = err?.response?.data?.message || err.message || 'Upload thất bại, thử lại hoặc nhập URL thủ công';
   } finally {
     uploading.value = false;
   }
@@ -480,6 +431,21 @@ function cancelLeaveNav() {
 
 <style scoped>
 .pf-wrap { }
+
+.bottom-bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #f3d6e3;
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-top: 4px;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+}
 
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 16px; }
 .page-header-left { display: flex; align-items: center; gap: 16px; }

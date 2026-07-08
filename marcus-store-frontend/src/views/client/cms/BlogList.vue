@@ -4,7 +4,7 @@
       <i class="far fa-newspaper me-2 text-danger"></i>Tin tức công nghệ
     </h2>
 
-    <div v-if="loading && posts.length === 0" class="text-center text-muted py-5">
+    <div v-if="loading" class="text-center text-muted py-5">
       <i class="fas fa-spinner fa-spin me-2"></i>Đang tải bài viết...
     </div>
 
@@ -40,44 +40,58 @@
         </div>
       </div>
 
-      <div v-if="hasMore" class="text-center mt-5">
-        <button type="button" class="btn btn-outline-danger px-4" :disabled="loading" @click="loadMore">
-          <i class="fas fa-spinner fa-spin me-2" v-if="loading"></i>
-          {{ loading ? 'Đang tải...' : 'Xem thêm bài viết' }}
-        </button>
-      </div>
+      <!-- Phân trang thật (trang 1/2/3...) thay vì nút "Xem thêm" tải chồng vô hạn -->
+      <nav v-if="totalPages > 1" class="mt-5 d-flex justify-content-center">
+        <ul class="pagination">
+          <li class="page-item" :class="{ disabled: page === 0 }">
+            <button type="button" class="page-link" @click="goToPage(page - 1)">‹ Trước</button>
+          </li>
+          <li v-for="p in pageNumbers" :key="p" class="page-item" :class="{ active: p - 1 === page }">
+            <button type="button" class="page-link" @click="goToPage(p - 1)">{{ p }}</button>
+          </li>
+          <li class="page-item" :class="{ disabled: page >= totalPages - 1 }">
+            <button type="button" class="page-link" @click="goToPage(page + 1)">Sau ›</button>
+          </li>
+        </ul>
+      </nav>
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { postPublicApi } from '@/api/PostApi'
 
 const posts = ref([])
 const loading = ref(true)
-const page = ref(0)
-const hasMore = ref(true)
+const page = ref(0) // 0-indexed, khớp với Spring Data Pageable
+const totalPages = ref(1)
+const pageSize = 6
 
-async function loadPage() {
+const pageNumbers = computed(() => Array.from({ length: totalPages.value }, (_, i) => i + 1))
+
+async function loadPage(targetPage) {
   loading.value = true
   try {
-    const res = await postPublicApi.getPage({ page: page.value })
-    posts.value = posts.value.concat(res.content || [])
-    hasMore.value = !res.last
+    const res = await postPublicApi.getPage({ page: targetPage, size: pageSize })
+    posts.value = res.content || []
+    totalPages.value = res.totalPages || 1
+    page.value = res.number ?? targetPage
   } catch (err) {
-    hasMore.value = false
+    posts.value = []
+    totalPages.value = 1
   } finally {
     loading.value = false
   }
 }
 
-function loadMore() {
-  page.value += 1
-  loadPage()
+function goToPage(p) {
+  if (p < 0 || p > totalPages.value - 1 || p === page.value) return
+  loadPage(p)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-onMounted(loadPage)
+onMounted(() => loadPage(0))
 </script>
 
 <style scoped>
@@ -92,11 +106,6 @@ onMounted(loadPage)
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-.post-thumb {
-  height: 180px;
-  width: 100%;
-  object-fit: cover;
 }
 .post-thumb-wrap {
   position: relative;
@@ -119,5 +128,17 @@ onMounted(loadPage)
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+.pagination .page-link {
+  color: #e1121c;
+  border-color: #f1d6d6;
+}
+.pagination .page-item.active .page-link {
+  background: #e1121c;
+  border-color: #e1121c;
+  color: #fff;
+}
+.pagination .page-item.disabled .page-link {
+  color: #adb5bd;
 }
 </style>
