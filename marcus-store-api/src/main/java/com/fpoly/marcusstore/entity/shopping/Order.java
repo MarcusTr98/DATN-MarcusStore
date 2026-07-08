@@ -75,6 +75,9 @@ public class Order {
     @Column(name = "shipping_fee", precision = 18, scale = 2)
     private BigDecimal shippingFee;
 
+    @Column(name = "shipping_subsidy", precision = 18, scale = 2)
+    private BigDecimal shippingSubsidy = BigDecimal.ZERO;
+
     @Column(name = "tracking_code", length = 100)
     private String trackingCode;
 

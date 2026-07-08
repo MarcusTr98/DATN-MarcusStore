@@ -148,32 +148,36 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
+        String newStatus = normalizeStatusValue(request.getStatus());
 
-        String newStatus = request.getStatus();
         if (newStatus == null || newStatus.isBlank()) {
             throw new RuntimeException("Trạng thái mới không hợp lệ");
         }
-        newStatus = normalizeStatusValue(newStatus);
-
-        boolean isJustConfirmed = "PENDING".equals(currentStatus) && "CONFIRMED".equals(newStatus);
 
         if (!canChangeStatus(currentStatus, newStatus)) {
             throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
         }
 
-        String note = request.getNote();
+        // NÂNG CẤP
+        boolean isPackingNow = "PACKED".equals(newStatus) && !"PACKED".equals(currentStatus);
 
+        if (isPackingNow) {
+            try {
+                orderShippingService.processCreateGhnOrder(order);
+            } catch (Exception e) {
+                throw new RuntimeException("Lỗi tạo mã vận đơn GHN: " + e.getMessage());
+            }
+        }
+
+        String note = request.getNote();
         if (requiresNote(newStatus) && (note == null || note.isBlank())) {
             throw new RuntimeException("Vui lòng nhập lý do cho trạng thái này");
         }
 
         boolean wasCancelled = "CANCELLED".equals(newStatus);
-
         if (wasCancelled) {
             List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
-            List<Integer> skuIds = orderItems.stream()
-                    .map(item -> item.getSku().getSkuId())
-                    .toList();
+            List<Integer> skuIds = orderItems.stream().map(item -> item.getSku().getSkuId()).toList();
             List<ProductSku> lockedSkus = productSkuRepository.findByIdsForUpdate(skuIds);
             Map<Integer, ProductSku> skuMap = lockedSkus.stream()
                     .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
@@ -188,17 +192,13 @@ public class OrderServiceImpl implements OrderService {
             if (order.getVoucher() != null) {
                 Voucher voucher = order.getVoucher();
                 LocalDateTime now = LocalDateTime.now();
-
-                // Chỉ hoàn quota nếu voucher còn hiệu lực (chưa hết hạn)
                 if (voucher.getEndDate() == null || voucher.getEndDate().isAfter(now)) {
                     voucher.setQuantity(voucher.getQuantity() + 1);
                     voucherRepository.save(voucher);
                 }
 
-                // Reset UserVoucher.isUsed = false
                 Integer userId = order.getUser().getUserId();
-                userVoucherRepository
-                        .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
+                userVoucherRepository.findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
                         .ifPresent(userVoucher -> {
                             if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
                                 userVoucher.setIsUsed(false);
@@ -216,10 +216,6 @@ public class OrderServiceImpl implements OrderService {
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
 
-        if (isJustConfirmed) {
-            orderShippingService.processCreateGhnOrder(order);
-        }
-
         return getOrderDetailResponse(orderCode);
     }
 
@@ -228,8 +224,7 @@ public class OrderServiceImpl implements OrderService {
             LocalDate fromDate, LocalDate toDate, Pageable pageable) {
         return orderRepository.searchOrders(
                 normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
-                fromDate, toDate,
-                pageable)
+                fromDate, toDate, pageable)
                 .map(this::toResponse);
     }
 
@@ -289,6 +284,7 @@ public class OrderServiceImpl implements OrderService {
                 .totalAmount(order.getTotalAmount())
                 .discountAmount(order.getDiscountAmount())
                 .shippingFee(order.getShippingFee())
+                .shippingSubsidy(order.getShippingSubsidy())
                 .finalAmount(order.getFinalAmount())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentStatus(order.getPaymentStatus())
@@ -312,21 +308,15 @@ public class OrderServiceImpl implements OrderService {
                                     .skuCode(sku.getSkuCode())
                                     .productId(product.getProductId())
                                     .productName(product.getProductName())
-                                    .productImage(
-                                            sku.getSkuImageUrl() != null
-                                                    ? sku.getSkuImageUrl()
-                                                    : product.getThumbnailUrl())
+                                    .productImage(sku.getSkuImageUrl() != null ? sku.getSkuImageUrl()
+                                            : product.getThumbnailUrl())
                                     .quantity(orderItem.getQuantity())
                                     .priceAtPurchase(orderItem.getPriceAtPurchase())
-                                    .lineTotal(
-                                            orderItem.getPriceAtPurchase()
-                                                    .multiply(BigDecimal.valueOf(orderItem.getQuantity())))
-                                    .imeis(
-                                            orderItem.getProductItems().stream()
-                                                    .map(item -> ImeiResponse.builder()
-                                                            .imeiCode(item.getImeiCode())
-                                                            .build())
-                                                    .toList())
+                                    .lineTotal(orderItem.getPriceAtPurchase()
+                                            .multiply(BigDecimal.valueOf(orderItem.getQuantity())))
+                                    .imeis(orderItem.getProductItems().stream()
+                                            .map(item -> ImeiResponse.builder().imeiCode(item.getImeiCode()).build())
+                                            .toList())
                                     .build();
                         }).toList())
                 .history(historyResponses)

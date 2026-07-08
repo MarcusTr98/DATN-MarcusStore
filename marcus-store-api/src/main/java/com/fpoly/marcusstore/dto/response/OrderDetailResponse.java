@@ -39,4 +39,6 @@ public class OrderDetailResponse {
     private BigDecimal voucherMaxDiscount;
     private List<OrderItemDetailResponse> items;
     private List<OrderStatusHistoryResponse> history;
+    // marcus thêm
+    private BigDecimal shippingSubsidy;
 }

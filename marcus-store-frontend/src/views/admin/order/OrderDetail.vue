@@ -24,7 +24,9 @@
     <div class="print-only-header">
       <h1>Marcus Store</h1>
       <p>Hóa đơn bán hàng</p>
-      <p v-if="orderDetail">Mã đơn: <strong>{{ orderDetail.orderCode }}</strong></p>
+      <p v-if="orderDetail">
+        Mã đơn: <strong>{{ orderDetail.orderCode }}</strong>
+      </p>
     </div>
 
     <template v-if="orderDetail">
@@ -127,21 +129,29 @@
                 </table>
               </div>
 
+              <!-- NÂNG CẤP: Bảng tổng hợp dòng tiền chuẩn xác -->
               <div class="table-summary">
                 <div class="summary-row">
                   <span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong>
                 </div>
                 <div v-if="orderDetail.voucherCode" class="summary-row">
-                  <span>Mã giảm giá: <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span>
+                  <span
+                    >Mã giảm giá:
+                    <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span
+                  >
                   <strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
                 </div>
                 <div class="summary-row">
-                  <span>Phí vận chuyển</span
-                  ><strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong>
+                  <span>Phí vận chuyển</span>
+                  <strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong>
                 </div>
-                <div v-if="subTotal >= 5000000" class="summary-row">
-                  <span>Giảm giá vận chuyển </span>
-                  <strong>---</strong>
+                <div
+                  v-if="orderDetail.shippingSubsidy > 0"
+                  class="summary-row"
+                  style="color: #10b981"
+                >
+                  <span>Trợ giá vận chuyển </span>
+                  <strong>- {{ formatCurrency(orderDetail.shippingSubsidy) }}</strong>
                 </div>
                 <div class="summary-row total">
                   <span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong>
@@ -168,7 +178,6 @@
                   <div class="timeline-content">
                     <p class="timeline-title">
                       {{ item.title || getOrderStatusLabel(item.status) }}
-
                       <span class="badge" :class="getOrderStatusClass(item.status)">
                         {{ getOrderStatusLabel(item.status) }}
                       </span>
@@ -259,8 +268,14 @@
                   ><span class="mini-value">{{ orderDetail.trackingCode || '---' }}</span>
                 </div>
                 <div class="mini-row">
-                  <span class="mini-label">Phí ship</span
-                  ><span class="mini-value">{{ formatCurrency(orderDetail.shippingFee) }}</span>
+                  <span class="mini-label">Phí ship gốc</span>
+                  <span class="mini-value">{{ formatCurrency(orderDetail.shippingFee) }}</span>
+                </div>
+                <div class="mini-row" v-if="orderDetail.shippingSubsidy > 0">
+                  <span class="mini-label">Trợ giá ship</span>
+                  <span class="mini-value" style="color: #10b981"
+                    >-{{ formatCurrency(orderDetail.shippingSubsidy) }}</span
+                  >
                 </div>
                 <div class="mini-row">
                   <span class="mini-label">Ghi chú</span><span class="mini-value">{{ '---' }}</span>
@@ -357,15 +372,15 @@ watch(
 )
 
 const orderStatusMap = {
-  PENDING:   { label: 'Chờ xác nhận',    className: 'pending' },
-  CONFIRMED: { label: 'Đã xác nhận',     className: 'confirmed' },
-  PROCESSING:{ label: 'Đang chuẩn bị',    className: 'processing' },
-  PACKED:    { label: 'Đã đóng gói',      className: 'processing' },
-  SHIPPING:  { label: 'Đang giao',        className: 'shipping' },
-  DELIVERED: { label: 'Giao thành công',  className: 'shipping' },
-  COMPLETED: { label: 'Hoàn thành',       className: 'completed' },
-  CANCELLED: { label: 'Đã hủy',           className: 'cancelled' },
-  FAILED:    { label: 'Giao thất bại',    className: 'failed' },
+  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
+  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
+  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing' },
+  PACKED: { label: 'Đã đóng gói', className: 'processing' },
+  SHIPPING: { label: 'Đang giao', className: 'shipping' },
+  DELIVERED: { label: 'Giao thành công', className: 'shipping' },
+  COMPLETED: { label: 'Hoàn thành', className: 'completed' },
+  CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
+  FAILED: { label: 'Giao thất bại', className: 'failed' },
 }
 
 const paymentStatusMap = {
@@ -404,9 +419,7 @@ const allowedTransitions = {
     { value: 'DELIVERED', label: 'Giao thành công' },
     { value: 'FAILED', label: 'Giao thất bại' },
   ],
-  DELIVERED: [
-    { value: 'COMPLETED', label: 'Đối soát hoàn tất' },
-  ],
+  DELIVERED: [{ value: 'COMPLETED', label: 'Đối soát hoàn tất' }],
   COMPLETED: [],
   CANCELLED: [],
   FAILED: [
@@ -533,7 +546,9 @@ const resetPrintScale = () => {
     page.style.width = ''
     page.style.maxWidth = ''
   }
-  const tableWrap = document.querySelector('.order-detail-page .table-wrap, .order-detail-page table')
+  const tableWrap = document.querySelector(
+    '.order-detail-page .table-wrap, .order-detail-page table',
+  )
   if (tableWrap) {
     tableWrap.style.transform = ''
     tableWrap.style.transformOrigin = ''
@@ -545,7 +560,6 @@ const getPrintableWidthPx = () => {
   const A4_MM = 210
   const MARGIN_MM = 12
   const printableMm = A4_MM - 2 * MARGIN_MM
-  // CSS pixel = mm * 96/25.4 (96dpi chuẩn CSS)
   return printableMm * (96 / 25.4)
 }
 
@@ -562,8 +576,6 @@ const applyPrintScale = () => {
     const scale = printableWidth / contentWidth
     page.style.transformOrigin = 'top left'
     page.style.transform = `scale(${scale})`
-    // width mới = width cũ * scale để giữ chỗ cho layout,
-    // tránh phần content cao hơn bị đẩy lệch.
     page.style.width = `${contentWidth * scale}px`
     page.style.maxWidth = `${contentWidth * scale}px`
   }
@@ -571,7 +583,6 @@ const applyPrintScale = () => {
 
 const printPage = async () => {
   await nextTick()
-  // Tạm ẩn widget chat nổi (Messenger/Zalo + nút headset admin) và Vue DevTools để không xuất hiện trong bản in
   const chatElements = [
     document.getElementById('marcus-floating-actions'),
     document.getElementById('marcus-floating-actions-style'),
@@ -580,22 +591,17 @@ const printPage = async () => {
     ...document.querySelectorAll('#vue-devtools-container, [id^="vue-devtools"]'),
   ].filter(Boolean)
 
-  // Lưu parent để restore sau khi in
   const restoreData = chatElements.map((el) => ({
     el,
     parent: el.parentNode,
     nextSibling: el.nextSibling,
   }))
-  // Tạm thời tách khỏi DOM để chắc chắn không hiển thị
   restoreData.forEach(({ el }) => el.remove())
 
-  // Đợi 1 frame để DOM ổn định trước khi đo
   requestAnimationFrame(() => {
     applyPrintScale()
-    // Đợi browser paint xong rồi mới gọi print()
     requestAnimationFrame(() => {
       window.print()
-      // Khôi phục lại các element sau khi in xong
       setTimeout(() => {
         restoreData.forEach(({ el, parent, nextSibling }) => {
           if (parent) {
@@ -611,7 +617,6 @@ const printPage = async () => {
   })
 }
 
-// Bắt cả trường hợp user dùng Ctrl+P (không qua nút)
 const onBeforePrint = () => {
   applyPrintScale()
 }
