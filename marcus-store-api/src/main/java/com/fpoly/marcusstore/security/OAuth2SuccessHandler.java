@@ -57,8 +57,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         if ("google".equals(provider)) {
             socialId = oauthUser.getAttribute("sub");
-        } else if ("facebook".equals(provider)) {
-            socialId = oauthUser.getAttribute("id");
         } else {
             response.sendRedirect(frontendUrl + "/auth/login?error=unsupported_provider");
             return;
@@ -67,7 +65,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
         String email = oauthUser.getAttribute("email");
         String fullName = oauthUser.getAttribute("name");
 
-        // Facebook có thể không trả email
         if (email == null || email.isBlank()) {
             response.sendRedirect(frontendUrl + "/auth/login?error=no_email");
             return;
@@ -78,28 +75,20 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             fullName = email.split("@")[0];
         }
 
-        // Chỉ Google mới cần check email_verified
-        // (Facebook đã đảm bảo email trả về là verified theo chính sách của họ)
-        if ("google".equals(provider)) {
-            Object emailVerifiedAttr = oauthUser.getAttribute("email_verified");
-            boolean emailVerified = Boolean.TRUE.equals(emailVerifiedAttr)
-                    || "true".equalsIgnoreCase(String.valueOf(emailVerifiedAttr));
+        Object emailVerifiedAttr = oauthUser.getAttribute("email_verified");
+        boolean emailVerified = Boolean.TRUE.equals(emailVerifiedAttr)
+                || "true".equalsIgnoreCase(String.valueOf(emailVerifiedAttr));
 
-            if (!emailVerified) {
-                response.sendRedirect(frontendUrl + "/auth/login?error=email_not_verified");
-                return;
-            }
+        if (!emailVerified) {
+            response.sendRedirect(frontendUrl + "/auth/login?error=email_not_verified");
+            return;
         }
 
         User user = null;
         boolean isNewlyLinkedToExistingAccount = false;
 
-        // Tìm theo Social ID tương ứng provider (đã JOIN FETCH role + permissions)
-        if ("google".equals(provider)) {
-            user = userRepository.findByGoogleAccountId(socialId).orElse(null);
-        } else if ("facebook".equals(provider)) {
-            user = userRepository.findByFacebookAccountId(socialId).orElse(null);
-        }
+        // Tìm theo Google Account ID (đã JOIN FETCH role + permissions)
+        user = userRepository.findByGoogleAccountId(socialId).orElse(null);
 
         // Nếu chưa liên kết thì tìm theo email
         if (user == null) {
@@ -124,12 +113,7 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
             newUser.setRole(customerRole);
             newUser.setIsActive(true);
             newUser.setEmailVerified(true);
-
-            if ("google".equals(provider)) {
-                newUser.setGoogleAccountId(socialId);
-            } else {
-                newUser.setFacebookAccountId(socialId);
-            }
+            newUser.setGoogleAccountId(socialId);
 
             User savedUser = saveOrRecoverFromRaceCondition(newUser, email);
 
@@ -212,9 +196,6 @@ public class OAuth2SuccessHandler implements AuthenticationSuccessHandler {
 
         if ("google".equals(provider) && user.getGoogleAccountId() == null) {
             user.setGoogleAccountId(socialId);
-            needsSave = true;
-        } else if ("facebook".equals(provider) && user.getFacebookAccountId() == null) {
-            user.setFacebookAccountId(socialId);
             needsSave = true;
         }
 
