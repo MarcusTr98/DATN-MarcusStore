@@ -28,6 +28,19 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+
+                    // ==========================
+    // Bỏ qua các URL OAuth2
+    // ==========================
+    String path = request.getServletPath();
+
+    if (path.startsWith("/oauth2/")
+            || path.startsWith("/login/oauth2/")) {
+
+        filterChain.doFilter(request, response);
+        return;
+    }
+
         try {
             String jwt = parseJwt(request);
             if (jwt != null && jwtUtils.validateJwtToken(jwt)) {

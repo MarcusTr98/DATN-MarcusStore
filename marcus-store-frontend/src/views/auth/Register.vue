@@ -1,6 +1,8 @@
 <template>
   <div class="auth-page">
-    <div class="left-panel">
+    <div class="left-panel" @mousemove="handleParallax" @mouseleave="resetParallax">
+      <div class="deco-circle circle-1" ref="circle1"></div>
+      <div class="deco-circle circle-2" ref="circle2"></div>
       <div class="content">
         <div class="brand">
           <div class="menu-icon">☰</div>
@@ -11,23 +13,47 @@
         </div>
         <div class="features">
           <div class="feature-item">
-            <div class="icon">🛡</div>
+            <div class="icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2 4 5v6c0 5.25 3.5 9.74 8 11 4.5-1.26 8-5.75 8-11V5l-8-3z"/>
+              </svg>
+            </div>
             <span>Bảo mật tuyệt đối - Tin cậy mọi giao dịch</span>
           </div>
           <div class="feature-item">
-            <div class="icon">🕒</div>
+            <div class="icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="9"/>
+                <path d="M12 7v5l3 3"/>
+              </svg>
+            </div>
             <span>Giao hàng siêu tốc - Toàn quốc trong 24h</span>
           </div>
           <div class="feature-item">
-            <div class="icon">♡</div>
+            <div class="icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="none">
+                <path d="M12 21s-7.5-4.6-10-9.2C.4 8.8 2 5 6 5c2 0 3.5 1.2 4.5 2.8C11.5 6.2 13 5 15 5c4 0 5.6 3.8 4 6.8-2.5 4.6-10 9.2-10 9.2z"/>
+              </svg>
+            </div>
             <span>Nơi khách hàng gửi trọn niềm tin</span>
           </div>
           <div class="feature-item">
-            <div class="icon">📞</div>
+            <div class="icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 2.9a2 2 0 0 1-.4 2.1L8.1 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.4 1.9.6 2.9.7a2 2 0 0 1 1.6 2z"/>
+              </svg>
+            </div>
             <span>Hỗ trợ 24/7 - Luôn sẵn sàng phục vụ</span>
           </div>
           <div class="feature-item">
-            <div class="icon">🔁</div>
+            <div class="icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 2 21 6l-4 4"/>
+                <path d="M3 12v-2a4 4 0 0 1 4-4h14"/>
+                <path d="M7 22 3 18l4-4"/>
+                <path d="M21 12v2a4 4 0 0 1-4 4H3"/>
+              </svg>
+            </div>
             <span>Đổi trả dễ dàng - Cam kết hài lòng</span>
           </div>
         </div>
@@ -35,20 +61,39 @@
     </div>
 
     <div class="right-panel">
-      <div class="auth-card">
-        <div class="tabs">
-          <router-link to="/auth/login" class="tab-link">Đăng nhập</router-link>
-          <button class="active">Đăng ký</button>
+      <div class="auth-card" :class="{ shake: isShaking }">
+        <div class="tabs" ref="tabsRef">
+          <div class="tab-indicator" :style="indicatorStyle"></div>
+          <router-link
+            to="/auth/login"
+            class="tab-link"
+            @mouseenter="moveIndicator"
+            @mouseleave="resetIndicator"
+          >Đăng nhập</router-link>
+          <button
+            class="active"
+            ref="tabActive"
+            @mouseenter="moveIndicator"
+            @mouseleave="resetIndicator"
+          >Đăng ký</button>
         </div>
 
         <div class="title">
           <h2>Tạo tài khoản mới</h2>
           <p>Tham gia MarcusStore - Mua sắm thả ga!</p>
         </div>
-
         <div class="social-login">
-          <button class="social-btn social-fb">Facebook</button>
-          <button class="social-btn social-gg">Google</button>
+          <button type="button" class="social-btn social-gg" @click="registerGoogle">
+            <span class="social-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.85A10.98 10.98 0 0 0 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.85z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.05l3.66 2.85C6.71 7.3 9.14 5.38 12 5.38z"/>
+              </svg>
+            </span>
+            Đăng ký bằng Google
+          </button>
         </div>
 
         <div class="divider"><span>hoặc điền thông tin bên dưới</span></div>
@@ -57,19 +102,19 @@
           <div class="grid-form">
             <div class="form-group">
               <label>HỌ VÀ TÊN</label>
-              <input type="text" v-model="registerForm.fullName" placeholder="Nguyễn Văn A"  />
+              <input type="text" v-model="registerForm.fullName" placeholder="Nguyễn Văn A" />
             </div>
             <div class="form-group">
               <label>TÊN ĐĂNG NHẬP</label>
-              <input type="text" v-model="registerForm.username" placeholder="nguyenvana123"  />
+              <input type="text" v-model="registerForm.username" placeholder="nguyenvana123" />
             </div>
             <div class="form-group">
               <label>EMAIL</label>
-              <input type="email" v-model="registerForm.email" placeholder="email@example.com"  />
+              <input type="email" v-model="registerForm.email" placeholder="email@example.com" />
             </div>
             <div class="form-group">
               <label>SỐ ĐIỆN THOẠI</label>
-              <input type="text" v-model="registerForm.phone" placeholder="0901234567"  />
+              <input type="text" v-model="registerForm.phone" placeholder="0901234567" />
             </div>
             <div class="form-group">
               <label>MẬT KHẨU</label>
@@ -78,36 +123,36 @@
                   placeholder="Tối thiểu 6 ký tự" />
                 <span class="eye" @click="showRegisterPassword = !showRegisterPassword">{{
                   showRegisterPassword ? '🙈' : '👁'
-                  }}</span>
+                }}</span>
               </div>
             </div>
             <div class="form-group">
               <label>XÁC NHẬN MẬT KHẨU</label>
               <div class="password-input">
                 <input :type="showRegisterConfirm ? 'text' : 'password'" v-model="registerForm.confirmPassword"
-                  placeholder="Nhập lại mật khẩu"  />
+                  placeholder="Nhập lại mật khẩu" />
                 <span class="eye" @click="showRegisterConfirm = !showRegisterConfirm">{{
                   showRegisterConfirm ? '🙈' : '👁'
-                  }}</span>
+                }}</span>
               </div>
             </div>
           </div>
 
           <div class="agree">
-            <input type="checkbox" v-model="registerForm.agree"  />
-            <span>Tôi đồng ý với   <a href="#" @click.prevent="showTermsModal = true">
-    Điều khoản dịch vụ
-  </a>
+            <input type="checkbox" v-model="registerForm.agree" />
+            <span>Tôi đồng ý với <a href="#" @click.prevent="showTermsModal = true">
+                Điều khoản dịch vụ
+              </a>
 
-  và
+              và
 
-  <a href="#" @click.prevent="showPrivacyModal = true">
-    Chính sách bảo mật
-  </a>
-</span>
+              <a href="#" @click.prevent="showPrivacyModal = true">
+                Chính sách bảo mật
+              </a>
+            </span>
           </div>
 
-          <button class="main-btn" type="submit" :disabled="loading">
+          <button class="main-btn" type="submit" :disabled="loading" @click="createRipple">
             {{ loading ? 'Đang xử lý...' : 'Đăng ký ngay' }}
           </button>
         </form>
@@ -118,33 +163,32 @@
       </div>
     </div>
   </div>
-  <BaseModal 
-  :visible="modal.visible" 
-  :type="modal.type" :title="modal.title" 
-  :message="modal.message"
-  @close="modal.visible = false" />
-  <TermsOfServiceModal 
-  :show="showTermsModal" 
-  @close="showTermsModal = false" />
+  <BaseModal :visible="modal.visible" :type="modal.type" :title="modal.title" :message="modal.message"
+    @close="modal.visible = false" />
+  <TermsOfServiceModal :show="showTermsModal" @close="showTermsModal = false" />
 
-  <PrivacyPolicyModal 
-  :show="showPrivacyModal" 
-  @close="showPrivacyModal = false" />
+  <PrivacyPolicyModal :show="showPrivacyModal" @close="showPrivacyModal = false" />
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal.vue'
 import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
+import '@/assets/css/Register.css'
 const showTermsModal = ref(false)
 const showPrivacyModal = ref(false)
 const router = useRouter()
 const showRegisterPassword = ref(false)
 const showRegisterConfirm = ref(false)
 const loading = ref(false)
+
+const registerGoogle = () => {
+  window.location.href =
+    "http://localhost:8080/oauth2/authorization/google";
+}
 
 const registerForm = reactive({
   fullName: '',
@@ -168,33 +212,112 @@ const showModal = (type, title, message) => {
   modal.message = message
   modal.visible = true
 }
+
+// ---- Parallax ----
+const circle1 = ref(null)
+const circle2 = ref(null)
+
+const handleParallax = (e) => {
+  const { innerWidth, innerHeight } = window
+  const x = (e.clientX / innerWidth - 0.5) * 20
+  const y = (e.clientY / innerHeight - 0.5) * 20
+  if (circle1.value) circle1.value.style.transform = `translate(${x}px, ${y}px)`
+  if (circle2.value) circle2.value.style.transform = `translate(${-x}px, ${-y}px)`
+}
+
+const resetParallax = () => {
+  if (circle1.value) circle1.value.style.transform = 'translate(0, 0)'
+  if (circle2.value) circle2.value.style.transform = 'translate(0, 0)'
+}
+
+// ---- Tab indicator ----
+const tabsRef = ref(null)
+const tabActive = ref(null)
+const indicatorStyle = ref({ left: '4px', width: 'calc(50% - 4px)' })
+
+const setIndicatorToActive = () => {
+  if (!tabActive.value) return
+  indicatorStyle.value = {
+    left: tabActive.value.offsetLeft + 'px',
+    width: tabActive.value.offsetWidth + 'px',
+  }
+}
+
+const moveIndicator = (e) => {
+  const el = e.currentTarget
+  indicatorStyle.value = {
+    left: el.offsetLeft + 'px',
+    width: el.offsetWidth + 'px',
+  }
+}
+
+const resetIndicator = () => {
+  setIndicatorToActive()
+}
+
+// ---- Ripple ----
+const createRipple = (e) => {
+  const button = e.currentTarget
+  const circle = document.createElement('span')
+  const diameter = Math.max(button.clientWidth, button.clientHeight)
+  const rect = button.getBoundingClientRect()
+
+  circle.style.width = circle.style.height = `${diameter}px`
+  circle.style.left = `${e.clientX - rect.left - diameter / 2}px`
+  circle.style.top = `${e.clientY - rect.top - diameter / 2}px`
+  circle.classList.add('ripple')
+
+  const oldRipple = button.querySelector('.ripple')
+  if (oldRipple) oldRipple.remove()
+
+  button.appendChild(circle)
+  setTimeout(() => circle.remove(), 600)
+}
+
+// ---- Shake khi lỗi ----
+const isShaking = ref(false)
+const triggerShake = () => {
+  isShaking.value = true
+  setTimeout(() => (isShaking.value = false), 450)
+}
+
+onMounted(() => {
+  nextTick(() => setIndicatorToActive())
+})
+
 const handleRegister = async () => {
   try {
     if (!registerForm.fullName.trim()) {
+      triggerShake()
       showModal('error', 'Thiếu thông tin', 'Vui lòng nhập họ và tên.')
       return
     }
 
     if (!registerForm.username.trim()) {
+      triggerShake()
       showModal('error', 'Thiếu thông tin', 'Vui lòng nhập tên đăng nhập.')
       return
     }
 
     if (!registerForm.email.trim()) {
+      triggerShake()
       showModal('error', 'Thiếu thông tin', 'Vui lòng nhập email.')
       return
     }
 
     if (!registerForm.phone.trim()) {
+      triggerShake()
       showModal('error', 'Thiếu thông tin', 'Vui lòng nhập số điện thoại.')
       return
     }
 
     if (!registerForm.password.trim()) {
+      triggerShake()
       showModal('error', 'Thiếu thông tin', 'Vui lòng nhập mật khẩu.')
       return
     }
-        if (!registerForm.agree) {
+    if (!registerForm.agree) {
+      triggerShake()
       showModal('error', 'Chưa đồng ý', 'Vui lòng đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.')
       return
     }
@@ -212,6 +335,7 @@ const handleRegister = async () => {
     const response = await api.post('/auth/register/request', payload)
 
     if (response?.data?.success === false) {
+      triggerShake()
       showModal(
         'error',
         'Đăng ký thất bại',
@@ -235,6 +359,7 @@ const handleRegister = async () => {
       })
     }, 1500)
   } catch (error) {
+    triggerShake()
     const status = error?.response?.status
     const message = error?.response?.data?.message
 
@@ -270,366 +395,5 @@ const handleRegister = async () => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-.auth-page {
-  display: flex;
-  min-height: 100vh;
-  width: 100%;
-  /* BẮT BUỘC: Ép component giãn hết chiều ngang hệ thống */
-  background: #fff7fa;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Inter', sans-serif;
-}
-
-.auth-page {
-  display: flex;
-  min-height: 100vh;
-  background: #fff7fa;
-}
-
-.left-panel {
-  width: 35%;
-  background: linear-gradient(135deg, #ff9ec2, #ff5d99);
-  padding: 50px;
-  display: flex;
-  align-items: center;
-  color: white;
-  position: relative;
-  overflow: hidden;
-}
-
-.left-panel::before {
-  content: '';
-  position: absolute;
-  width: 450px;
-  height: 450px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 50%;
-  top: -150px;
-  left: -120px;
-}
-
-.left-panel::after {
-  content: '';
-  position: absolute;
-  width: 350px;
-  height: 350px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 50%;
-  bottom: -120px;
-  right: -100px;
-}
-
-.content {
-  position: relative;
-  z-index: 2;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 70px;
-}
-
-.menu-icon {
-  font-size: 28px;
-}
-
-.brand h1 {
-  font-size: 28px;
-  margin-bottom: 8px;
-}
-
-.brand p {
-  opacity: 0.9;
-}
-
-.features {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.feature-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.icon {
-  width: 54px;
-  height: 54px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.right-panel {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 30px;
-}
-
-.auth-card {
-  width: 100%;
-  max-width: 700px;
-  background: white;
-  border-radius: 24px;
-  padding: 32px;
-  box-shadow: 0 10px 35px rgba(255, 105, 160, 0.12);
-}
-
-.tabs {
-  display: flex;
-  background: #fff0f6;
-  border-radius: 14px;
-  padding: 4px;
-  margin-bottom: 28px;
-}
-
-.tabs button,
-.tab-link {
-  flex: 1;
-  border: none;
-  background: transparent;
-  padding: 14px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 600;
-  color: #777;
-  transition: 0.3s;
-  text-align: center;
-  text-decoration: none;
-}
-
-.tabs .active {
-  background: white;
-  color: #ff4d94;
-  box-shadow: 0 4px 12px rgba(255, 105, 160, 0.15);
-}
-
-.title h2 {
-  font-size: 32px;
-  margin-bottom: 8px;
-}
-
-.title p {
-  color: #777;
-  margin-bottom: 24px;
-}
-
-.social-login {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.social-btn {
-  flex: 1;
-  height: 48px;
-  border: 1px solid #ffd4e4;
-  background: white;
-  border-radius: 12px;
-  cursor: pointer;
-  color: #273044;
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1;
-  transition: 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.social-btn:hover {
-  background: #fff3f8;
-  color: #111827;
-}
-
-.social-icon {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 24px;
-}
-
-.social-icon svg {
-  width: 24px;
-  height: 24px;
-  display: block;
-}
-
-.divider {
-  position: relative;
-  text-align: center;
-  margin-bottom: 28px;
-  color: #ff6ca7;
-  font-size: 13px;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  position: absolute;
-  width: 32%;
-  height: 1px;
-  background: #f2d8e3;
-  top: 50%;
-}
-
-.divider::before {
-  left: 0;
-}
-
-.divider::after {
-  right: 0;
-}
-
-.grid-form {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
-}
-
-.form-group {
-  margin-bottom: 18px;
-}
-
-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #555;
-}
-
-input[type='text'],
-input[type='email'],
-input[type='password'] {
-  width: 100%;
-  height: 48px;
-  border: 1px solid #f2d8e3;
-  border-radius: 12px;
-  padding: 0 16px;
-  outline: none;
-  transition: 0.3s;
-}
-
-input:focus {
-  border-color: #ff6ca7;
-  box-shadow: 0 0 0 4px rgba(255, 105, 160, 0.12);
-}
-
-.password-input {
-  position: relative;
-}
-
-.eye {
-  position: absolute;
-  right: 16px;
-  top: 13px;
-  opacity: 0.5;
-  cursor: pointer;
-  user-select: none;
-}
-
-.agree {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 22px;
-  font-size: 14px;
-  color: #666;
-}
-
-.agree a {
-  color: #ff4d94;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.main-btn {
-  width: 100%;
-  height: 52px;
-  border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #ff76ae, #ff4d94);
-  color: white;
-  font-size: 16px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.3s;
-  box-shadow: 0 8px 20px rgba(255, 105, 160, 0.2);
-}
-
-.main-btn:hover {
-  transform: translateY(-2px);
-}
-
-.bottom-link {
-  text-align: center;
-  margin-top: 24px;
-  color: #777;
-}
-
-.bottom-link a {
-  color: #ff4d94;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-@media (max-width: 992px) {
-  .auth-page {
-    flex-direction: column;
-  }
-
-  .left-panel {
-    width: 100%;
-  }
-
-  .grid-form {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 600px) {
-  .social-login {
-    flex-direction: column;
-  }
-
-  .auth-card {
-    padding: 24px;
-  }
-
-  .title h2 {
-    font-size: 26px;
-  }
-}
-
-@keyframes popupShow {
-  from {
-    opacity: 0;
-    transform: scale(0.85);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 </style>

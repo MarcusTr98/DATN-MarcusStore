@@ -62,4 +62,23 @@ public interface UserRepository extends JpaRepository<User, Integer> {
         List<User> findByRoleRoleIdAndKeyword(
                         @Param("roleId") Integer roleId,
                         @Param("keyword") String keyword);
+
+        @Query("""
+SELECT DISTINCT u
+FROM User u
+JOIN FETCH u.role r
+LEFT JOIN FETCH r.permissions
+LEFT JOIN FETCH u.permissions
+WHERE u.email = :email
+""")
+Optional<User> findByEmailWithRole(@Param("email") String email);
+@Query("""
+SELECT u
+FROM User u
+JOIN FETCH u.role r
+LEFT JOIN FETCH r.permissions
+LEFT JOIN FETCH u.permissions
+WHERE u.googleAccountId = :googleAccountId
+""")
+Optional<User> findByGoogleAccountId(@Param("googleAccountId") String googleAccountId);
 }

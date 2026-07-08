@@ -68,3 +68,8 @@ ghn.store.ward-code=20310
 # token verify webhook từ GHN Dashboard
 # Nếu chưa có thì để trống, webhook sẽ không verify (dùng khi test Ngrok)
 ghn.webhook.token=
+# cấu hình đăng nhập đăng ký GG
+google.oauth2.client-id=YOUR_GOOGLE_CLIENT_ID
+google.oauth2.client-secret=YOUR_GOOGLE_CLIENT_SECRET
+spring.security.oauth2.client.registration.google.scope=email,profile
+frontend.url=http://localhost:5173
