@@ -3,7 +3,6 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.request.ApplyVoucherRequest;
 import com.fpoly.marcusstore.dto.request.CalculateFeeRequestDTO;
 import com.fpoly.marcusstore.dto.request.CheckoutRequestDTO;
-import com.fpoly.marcusstore.dto.response.ShippingCalculationResponse;
 import com.fpoly.marcusstore.dto.response.VoucherApplyResult;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.ProductSku;
@@ -57,8 +56,7 @@ public class CheckoutService {
 
     @Autowired
     private GhnService ghnService;
-    @Autowired
-    private ShippingService shippingService;
+  
     @Autowired
     private AdminNotificationService notificationService;
 
@@ -163,17 +161,7 @@ public class CheckoutService {
                 req.getToWardCode(),
                 totalWeightGram,
                 totalAmount.intValue());
-
-        BigDecimal ghnStandardFee = BigDecimal.valueOf(shippingFee);
-
-        // Gọi ShippingService để tính phí ship sau khi áp dụng subsidy 60k
-        ShippingCalculationResponse shippingCalc = shippingService.calculateFinalShipping(
-                totalAmount,
-                ghnStandardFee);
-
-        // Dùng phí đã giảm (discountedShippingFee) thay vì phí gốc
-        BigDecimal shippingFeeDecimal = shippingCalc.getDiscountedShippingFee();
-
+        BigDecimal shippingFeeDecimal = BigDecimal.valueOf(shippingFee);
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal freeshipAmount = BigDecimal.ZERO;
         Voucher voucher = null;
