@@ -155,7 +155,7 @@
       </button>
     </div>
 
-    <!-- Cột phải: Tin tức sản phẩm (data tĩnh, click -> blog detail) -->
+    <!-- Cột phải: Tin tức sản phẩm (bài viết thật từ API public, click -> blog detail) -->
     <div class="col-lg-4">
       <div class="news-block">
         <div class="news-header d-flex align-items-center justify-content-between mb-3">
@@ -163,15 +163,27 @@
           <router-link to="/blog" class="news-view-all">Xem tất cả →</router-link>
         </div>
 
-        <div class="news-list">
+        <div v-if="newsLoading" class="text-muted small py-2">
+          <i class="fas fa-spinner fa-spin me-2"></i>Đang tải...
+        </div>
+
+        <div v-else-if="newsPosts.length === 0" class="text-muted small py-2">
+          Chưa có bài viết nào.
+        </div>
+
+        <div v-else class="news-list">
           <router-link
             v-for="post in newsPosts"
-            :key="post.title"
-            to="/blog/detail-slug"
+            :key="post.id"
+            :to="{ name: 'BlogDetail', params: { slug: post.slug } }"
             class="news-item d-flex gap-2 mb-3"
           >
-            <div class="news-thumb" :style="{ background: post.bg }">
-              <span class="news-thumb-emoji">{{ post.emoji }}</span>
+            <div v-if="post.thumbnailUrl" class="news-thumb news-thumb-img">
+              <img :src="post.thumbnailUrl" aria-hidden="true" class="news-thumb-bg" />
+              <img :src="post.thumbnailUrl" :alt="post.title" class="news-thumb-fg" />
+            </div>
+            <div v-else class="news-thumb" :style="{ background: fallbackBg(post.id) }">
+              <span class="news-thumb-emoji">📰</span>
             </div>
             <p class="news-item-title mb-0">{{ post.title }}</p>
           </router-link>
@@ -182,7 +194,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { postPublicApi } from '@/api/PostApi'
 
 // ---- INFO SECTION: Điện thoại thông minh (data tĩnh, hiện full ngay tại Home) ----
 const phoneTabs = ref(['iPhone 17', 'iPhone 17 256gb', 'iPhone 17 Pro', 'iPhone 17 Pro Max', 'iPhone Air'])
@@ -203,34 +216,30 @@ const tocItems = ref([
   { text: '5. Mua điện thoại giá tốt, chính hãng tại Marcus Store', anchor: 'muc5' },
 ])
 
-// ---- NEWS SECTION: Tin tức sản phẩm (data tĩnh, click -> /blog/detail-slug) ----
-const newsPosts = ref([
-  {
-    title: 'Danh sách smartphone được lên đời Android 17: Bạn có thấy thiết bị của mình?',
-    emoji: '🤖',
-    bg: 'linear-gradient(135deg, #1a1a2e, #16213e)',
-  },
-  {
-    title: 'OPPO Find N7 Wide sẽ có cụm camera sau ngang, màn hình không nếp gấp',
-    emoji: '📷',
-    bg: 'linear-gradient(135deg, #2d1b3d, #4a2c5e)',
-  },
-  {
-    title: 'Xiaomi 18 có thể nâng cấp mạnh trải nghiệm màn hình phụ ở mặt sau với HyperOS 4',
-    emoji: '📱',
-    bg: 'linear-gradient(135deg, #0f3d2e, #1a5c45)',
-  },
-  {
-    title: 'Cập nhật Xiaomi HyperOS 4: Chi tiết danh sách thiết bị hỗ trợ, ngày ra mắt và loạt tính năng',
-    emoji: '4️⃣',
-    bg: 'linear-gradient(135deg, #1a2a4a, #2c4a7a)',
-  },
-  {
-    title: 'Samsung mở rộng thử nghiệm One UI 9 cho Galaxy Z Fold7, S24, S23 và A56',
-    emoji: '🔄',
-    bg: 'linear-gradient(135deg, #3d1a1a, #5e2c2c)',
-  },
-])
+// ---- NEWS SECTION: Tin tức sản phẩm — lấy bài viết thật đã xuất bản từ API public ----
+const newsPosts = ref([])
+const newsLoading = ref(true)
+
+const fallbackGradients = [
+  'linear-gradient(135deg, #1a1a2e, #16213e)',
+  'linear-gradient(135deg, #2d1b3d, #4a2c5e)',
+  'linear-gradient(135deg, #0f3d2e, #1a5c45)',
+  'linear-gradient(135deg, #1a2a4a, #2c4a7a)',
+  'linear-gradient(135deg, #3d1a1a, #5e2c2c)',
+]
+function fallbackBg(id) {
+  return fallbackGradients[id % fallbackGradients.length]
+}
+
+onMounted(async () => {
+  try {
+    newsPosts.value = await postPublicApi.getAll({ size: 5 })
+  } catch (err) {
+    newsPosts.value = []
+  } finally {
+    newsLoading.value = false
+  }
+})
 </script>
 
 <style scoped>
@@ -394,6 +403,30 @@ const newsPosts = ref([
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+.news-thumb-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.news-thumb-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(12px) brightness(0.85);
+  transform: scale(1.3);
+}
+.news-thumb-fg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.news-thumb-img {
+  position: relative;
 }
 .news-thumb-emoji {
   font-size: 1.6rem;

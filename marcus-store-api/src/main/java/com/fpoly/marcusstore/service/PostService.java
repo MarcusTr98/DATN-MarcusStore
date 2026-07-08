@@ -29,7 +29,6 @@ public class PostService {
     @Autowired
     private UserRepository userRepository;
 
-    // Khởi tạo Slugify 1 lần dùng chung
     private final Slugify slugify = Slugify.builder().build();
 
     private PostResponseDTO toResponse(Post post) {
@@ -45,14 +44,12 @@ public class PostService {
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt());
 
-        // Gắn thông tin danh mục nếu có
         if (post.getPostCategory() != null) {
             builder.postCategoryId(post.getPostCategory().getPostCategoryId())
                    .postCategoryName(post.getPostCategory().getName())
                    .postCategorySlug(post.getPostCategory().getSlug());
         }
 
-        // Gắn thông tin tác giả nếu có
         if (post.getAuthor() != null) {
             builder.authorId(post.getAuthor().getUserId())
                    .authorName(post.getAuthor().getFullName());
@@ -61,35 +58,36 @@ public class PostService {
         return builder.build();
     }
 
-    // Lấy tất cả post — có phân trang
     @Transactional(readOnly = true)
     public Page<PostResponseDTO> getAll(Pageable pageable) {
         return postRepository.findAll(pageable).map(this::toResponse);
     }
 
-    // Lấy chi tiết 1 post theo ID
     @Transactional(readOnly = true)
     public PostResponseDTO getOne(Integer id) {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy post với id: " + id));
         return toResponse(post);
     }
-
-    // Thêm post mới
+    
+    @Transactional(readOnly = true)
+    public boolean checkSlugExists(String slug, Integer excludeId) {
+        if (slug == null || slug.isBlank()) return false;
+        return (excludeId != null)
+                ? postRepository.existsBySlugAndPostIdNot(slug, excludeId)
+                : postRepository.existsBySlug(slug);
+    }
+    @Transactional
     public PostResponseDTO add(PostRequestDTO req) {
-        // Sinh slug tự động từ title
         String slug = slugify.slugify(req.getTitle());
 
-        // Kiểm tra slug đã tồn tại chưa
         if (postRepository.existsBySlug(slug)) {
             throw new RuntimeException("Slug '" + slug + "' đã tồn tại, vui lòng đổi tiêu đề");
         }
 
-        // Kiểm tra category tồn tại
         PostCategory category = postCategoryRepository.findById(req.getPostCategoryId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục với id: " + req.getPostCategoryId()));
 
-        // Lấy author từ user đang login — không cho Frontend truyền authorId
         Integer currentUserId = SecurityUtils.getCurrentUserId();
         User author = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy tác giả với id: " + currentUserId));
@@ -104,29 +102,24 @@ public class PostService {
         post.setPostCategory(category);
         post.setAuthor(author);
 
-        // Nếu publish thì ghi lại thời gian publish
         if (Boolean.TRUE.equals(req.getIsPublished())) {
-            post.setPublishedAt(LocalDateTime.now());
+            post.setPublishedAt(req.getPublishedAt() != null ? req.getPublishedAt() : LocalDateTime.now());
         }
 
         return toResponse(postRepository.save(post));
     }
 
-    // Sửa post theo ID
+    @Transactional
     public PostResponseDTO update(Integer id, PostRequestDTO req) {
-        // Kiểm tra post tồn tại
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy post với id: " + id));
 
-        // Sinh slug tự động từ title mới
         String slug = slugify.slugify(req.getTitle());
 
-        // Kiểm tra slug trùng với post khác
         if (postRepository.existsBySlugAndPostIdNot(slug, id)) {
             throw new RuntimeException("Slug '" + slug + "' đã tồn tại, vui lòng đổi tiêu đề");
         }
 
-        // Kiểm tra category tồn tại
         PostCategory category = postCategoryRepository.findById(req.getPostCategoryId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục với id: " + req.getPostCategoryId()));
 
@@ -137,20 +130,33 @@ public class PostService {
         post.setContent(req.getContent());
         post.setPostCategory(category);
 
-        // Nếu chuyển sang publish lần đầu thì ghi lại thời gian
-        if (Boolean.TRUE.equals(req.getIsPublished()) && !Boolean.TRUE.equals(post.getIsPublished())) {
-            post.setPublishedAt(LocalDateTime.now());
+        if (Boolean.TRUE.equals(req.getIsPublished())) {
+            if (req.getPublishedAt() != null) {
+                post.setPublishedAt(req.getPublishedAt());
+            } else if (!Boolean.TRUE.equals(post.getIsPublished())) {
+                post.setPublishedAt(LocalDateTime.now());
+            }
         }
         post.setIsPublished(req.getIsPublished());
 
         return toResponse(postRepository.save(post));
     }
-
-    // Xóa mềm
+    @Transactional
     public void remove(Integer id) {
         Post post = postRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy post với id: " + id));
         post.setIsPublished(false);
         postRepository.save(post);
     }
+    @Transactional(readOnly = true)
+public Page<PostResponseDTO> getPublished(Pageable pageable) {
+    return postRepository.findByIsPublishedTrue(pageable).map(this::toResponse);
+}
+
+@Transactional(readOnly = true)
+public PostResponseDTO getPublishedBySlug(String slug) {
+    Post post = postRepository.findBySlugAndIsPublishedTrue(slug)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy bài viết"));
+    return toResponse(post);
+}
 }

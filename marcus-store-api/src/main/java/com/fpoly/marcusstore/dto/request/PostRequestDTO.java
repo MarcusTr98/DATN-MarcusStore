@@ -1,13 +1,9 @@
 package com.fpoly.marcusstore.dto.request;
-
 import jakarta.validation.constraints.*;
 import lombok.Data;
+import java.time.LocalDateTime;
 
-/**
- * DTO nhận dữ liệu từ client khi thêm / sửa post
- * Không có authorId — lấy từ token người đang login
- * Không có slug — tự sinh từ title
- */
+
 @Data
 public class PostRequestDTO {
 
@@ -28,4 +24,6 @@ public class PostRequestDTO {
 
     @NotNull(message = "Danh mục không được để trống")
     private Integer postCategoryId;
+    //cho người dúng chọn thời gian đăng bài trong tương lai
+    private LocalDateTime publishedAt;
 }
