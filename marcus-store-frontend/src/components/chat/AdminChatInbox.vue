@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-chat-widget">
+  <div class="admin-chat-widget no-print">
     <!-- Nút thả nổi -->
     <button
       class="chat-trigger-btn shadow-lg"

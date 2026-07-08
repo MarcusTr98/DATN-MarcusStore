@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.request.ApplyVoucherRequest;
 import com.fpoly.marcusstore.dto.request.CalculateFeeRequestDTO;
 import com.fpoly.marcusstore.dto.request.CheckoutRequestDTO;
+import com.fpoly.marcusstore.dto.response.ShippingCalculationResponse;
 import com.fpoly.marcusstore.dto.response.VoucherApplyResult;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.ProductSku;
@@ -20,10 +21,10 @@ import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -57,14 +58,9 @@ public class CheckoutService {
     @Autowired
     private GhnService ghnService;
     @Autowired
-    private AdminNotificationService notificationService;
-
+    private ShippingService shippingService;
     @Autowired
-    private PlatformTransactionManager transactionManager;
-
-    private TransactionTemplate getTransactionTemplate() {
-        return new TransactionTemplate(transactionManager);
-    }
+    private AdminNotificationService notificationService;
 
     // Hàm tính phí ship cho Frontend gọi real-time
     @Transactional(readOnly = true)
@@ -168,7 +164,15 @@ public class CheckoutService {
                 totalWeightGram,
                 totalAmount.intValue());
 
-        BigDecimal shippingFeeDecimal = BigDecimal.valueOf(shippingFee);
+        BigDecimal ghnStandardFee = BigDecimal.valueOf(shippingFee);
+
+        // Gọi ShippingService để tính phí ship sau khi áp dụng subsidy 60k
+        ShippingCalculationResponse shippingCalc = shippingService.calculateFinalShipping(
+                totalAmount,
+                ghnStandardFee);
+
+        // Dùng phí đã giảm (discountedShippingFee) thay vì phí gốc
+        BigDecimal shippingFeeDecimal = shippingCalc.getDiscountedShippingFee();
 
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal freeshipAmount = BigDecimal.ZERO;
@@ -185,7 +189,14 @@ public class CheckoutService {
             VoucherApplyResult result = voucherService.applyVoucher(applyReq, currentUserId);
 
             if (!result.isApplied()) {
-                throw new RuntimeException(result.getMessage());
+                // Throw ResponseStatusException kèm errorCode để FE phân biệt loại lỗi
+                // (mở lại modal chọn voucher khi voucher bị khóa / hết hạn / hết lượt)
+                String reason = result.getMessage();
+                String code = result.getErrorCode();
+                String fullReason = (code != null && !code.isBlank())
+                        ? reason + "|" + code
+                        : reason;
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fullReason);
             }
 
             discountAmount = result.getDiscountAmount() != null ? result.getDiscountAmount() : BigDecimal.ZERO;
@@ -208,15 +219,12 @@ public class CheckoutService {
 
         Order savedOrder = orderRepository.save(order);
 
+        // Re-validate voucher lần cuối trước khi trừ quota:
+        // - Voucher có thể đã bị admin khóa giữa lúc user apply và lúc thanh toán
+        // - Có thể vừa hết lượt do race condition với user khác
+        // - Nếu throw, @Transactional ở method cha sẽ rollback toàn bộ Order
         if (appliedVoucherId != null) {
-            final Integer finalVoucherId = appliedVoucherId;
-            try {
-                getTransactionTemplate().executeWithoutResult(status -> {
-                    voucherService.confirmVoucherUsage(finalVoucherId, currentUserId);
-                });
-            } catch (Exception e) {
-                log.error("[Cảnh báo] Lỗi khi confirm voucher, voucher vẫn được áp dụng: " + e.getMessage());
-            }
+            voucherService.confirmVoucherUsage(appliedVoucherId, currentUserId);
         }
 
         OrderStatusHistory createdHistory = new OrderStatusHistory();

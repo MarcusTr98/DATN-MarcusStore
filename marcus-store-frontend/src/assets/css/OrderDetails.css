@@ -699,7 +699,9 @@ tbody tr:hover {
   .admin-layout .header,
   .admin-layout .admin-header,
   .admin-layout .admin-sidebar,
-  .order-detail-toast {
+  .order-detail-toast,
+  #marcus-floating-actions,
+  #marcus-floating-actions-style {
     display: none !important;
   }
 

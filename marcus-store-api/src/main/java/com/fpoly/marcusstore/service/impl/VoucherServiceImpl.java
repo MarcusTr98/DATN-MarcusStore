@@ -465,6 +465,7 @@ public class VoucherServiceImpl implements VoucherService {
             return VoucherApplyResult.builder()
                     .applied(false)
                     .message("Mã giảm giá không tồn tại.")
+                    .errorCode("VOUCHER_NOT_FOUND")
                     .build();
         }
 
@@ -476,6 +477,7 @@ public class VoucherServiceImpl implements VoucherService {
             return VoucherApplyResult.builder()
                     .applied(false)
                     .message("Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.")
+                    .errorCode("VOUCHER_INACTIVE")
                     .build();
         }
 
@@ -485,12 +487,14 @@ public class VoucherServiceImpl implements VoucherService {
             return VoucherApplyResult.builder()
                     .applied(false)
                     .message("Mã giảm giá chưa có hiệu lực.")
+                    .errorCode("VOUCHER_NOT_STARTED")
                     .build();
         }
         if (voucher.getEndDate() != null && now.isAfter(voucher.getEndDate())) {
             return VoucherApplyResult.builder()
                     .applied(false)
                     .message("Voucher đã hết hạn, vui lòng chọn voucher khác.")
+                    .errorCode("VOUCHER_EXPIRED")
                     .build();
         }
 
@@ -500,6 +504,7 @@ public class VoucherServiceImpl implements VoucherService {
             return VoucherApplyResult.builder()
                     .applied(false)
                     .message("Đơn hàng chưa đạt giá trị tối thiểu để sử dụng mã này.")
+                    .errorCode("VOUCHER_MIN_ORDER")
                     .build();
         }
 
@@ -512,6 +517,7 @@ public class VoucherServiceImpl implements VoucherService {
                 return VoucherApplyResult.builder()
                         .applied(false)
                         .message("Bạn không được phép sử dụng mã giảm giá này.")
+                        .errorCode("VOUCHER_NOT_ALLOWED")
                         .build();
             }
         }
@@ -525,6 +531,7 @@ public class VoucherServiceImpl implements VoucherService {
                 return VoucherApplyResult.builder()
                         .applied(false)
                         .message("Bạn đã sử dụng mã giảm giá này rồi.")
+                        .errorCode("VOUCHER_ALREADY_USED")
                         .build();
             }
             // Đã được gán nhưng chưa dùng -> đánh dấu để confirm sau
@@ -548,6 +555,7 @@ public class VoucherServiceImpl implements VoucherService {
             return VoucherApplyResult.builder()
                     .applied(false)
                     .message("Voucher đã hết lượt sử dụng, vui lòng chọn voucher khác.")
+                    .errorCode("VOUCHER_QUOTA_EXHAUSTED")
                     .build();
         }
         // KHÔNG trừ quantity ở đây - confirmVoucherUsage sẽ trừ atomic với UserVoucher
@@ -597,25 +605,34 @@ public class VoucherServiceImpl implements VoucherService {
 
         // 1. Tìm voucher
         Voucher voucher = voucherRepository.findById(voucherId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy voucher."));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Không tìm thấy voucher.|VOUCHER_NOT_FOUND"));
 
         // 2. Nếu voucher đã bị deactivate trước đó → throw lỗi thân thiện
+        //    (admin có thể đã khóa voucher giữa lúc user apply và lúc thanh toán)
         if (Boolean.FALSE.equals(voucher.getIsActive())) {
-            throw new RuntimeException("Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Voucher đã ngừng hoạt động. Vui lòng chọn voucher khác.|VOUCHER_INACTIVE");
         }
 
         // 3. Nếu endDate đã qua → auto deactivate + throw lỗi
         if (voucher.getEndDate() != null && voucher.getEndDate().isBefore(now)) {
             voucher.setIsActive(false);
             voucherRepository.save(voucher);
-            throw new RuntimeException("Voucher đã hết hạn, vui lòng chọn voucher khác.");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Voucher đã hết hạn. Vui lòng chọn voucher khác.|VOUCHER_EXPIRED");
         }
 
         // 4. Nếu hết quantity → auto deactivate + throw lỗi (race condition guard)
         if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
             voucher.setIsActive(false);
             voucherRepository.save(voucher);
-            throw new RuntimeException("Voucher đã hết lượt sử dụng, vui lòng chọn voucher khác.");
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Voucher đã hết lượt sử dụng. Vui lòng chọn voucher khác.|VOUCHER_QUOTA_EXHAUSTED");
         }
 
         // 5. Trừ quantity

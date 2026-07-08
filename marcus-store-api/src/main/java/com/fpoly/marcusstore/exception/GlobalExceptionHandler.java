@@ -8,6 +8,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.server.ResponseStatusException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,14 +31,41 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
-    // 2. Bắt các lỗi văng ra từ logic nghiệp vụ (Custom Exception)
+    // 2. Xử lý ResponseStatusException - tách errorCode nhúng trong reason theo pattern "MESSAGE|CODE"
+    //    VD: "Voucher đã ngừng hoạt động.|VOUCHER_INACTIVE" -> message="Voucher đã ngừng hoạt động.", data="VOUCHER_INACTIVE"
+    //    Lý do: cho phép service throw kèm mã lỗi để FE phân biệt loại lỗi mà không cần tạo class Exception mới.
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException ex) {
+        String reason = ex.getReason() != null ? ex.getReason() : "Đã xảy ra lỗi";
+        String message = reason;
+        String errorCode = null;
+
+        int pipeIdx = reason.lastIndexOf('|');
+        if (pipeIdx > 0 && pipeIdx < reason.length() - 1) {
+            String candidate = reason.substring(pipeIdx + 1).trim();
+            // Chỉ coi là errorCode nếu khớp pattern VOUCHER_XXX (chữ in hoa + số/_)
+            if (candidate.matches("^[A-Z_][A-Z0-9_]*$")) {
+                message = reason.substring(0, pipeIdx).trim();
+                errorCode = candidate;
+            }
+        }
+
+        ApiResponse<Object> response = new ApiResponse<>(
+                ex.getStatusCode().value(),
+                message,
+                errorCode // null nếu không phải lỗi có code nhúng
+        );
+        return new ResponseEntity<>(response, ex.getStatusCode());
+    }
+
+    // 3. Bắt các lỗi văng ra từ logic nghiệp vụ (Custom Exception)
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Object>> handleRuntimeExceptions(RuntimeException ex) {
         ApiResponse<Object> response = new ApiResponse<>(400, ex.getMessage(), null);
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
-    // 3. (Optional) Bắt các lỗi hệ thống không xác định
+    // 4. (Optional) Bắt các lỗi hệ thống không xác định
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGlobalExceptions(Exception ex) {
         ApiResponse<Object> response = new ApiResponse<>(500, "Đã xảy ra lỗi hệ thống: " + ex.getMessage(), null);
