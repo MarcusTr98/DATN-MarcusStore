@@ -1,100 +1,47 @@
 <template>
   <div class="checkout-page pt-4">
     <BaseModal
-      :show="modal.show"
+      :visible="modal.show"
       :title="modal.title"
       :message="modal.message"
       @close="handleModalConfirm"
     />
 
-    <!-- Modal thông báo voucher hết hạn / hết lượt -->
-    <a-modal
-      v-model:open="showVoucherExpiredModal"
-      title="Thông báo"
-      :footer="null"
-      centered
-      :mask-closable="true"
-      @cancel="closeVoucherExpiredModal"
-    >
-      <p>{{ voucherExpiredMessage }}</p>
-    </a-modal>
+    <!-- Modal thông báo voucher không khả dụng -->
+    <BaseModal
+      :visible="isVoucherInvalidModalOpen"
+      type="error"
+      title="Voucher không khả dụng"
+      :message="voucherInvalidMessage"
+      @close="closeVoucherInvalidModal"
+      @confirm="handleVoucherInvalidConfirm"
+    />
 
-    <!-- Modal thông báo áp dụng voucher thành công -->
-    <div
-      class="v-overlay"
-      :class="{ active: isVoucherSuccessModalOpen }"
-      @click.self="closeVoucherSuccessModal"
-    >
-      <div
-        class="v-card alert-card voucher-success-modal"
-        :class="`voucher-success-modal--${voucherSuccessType.toLowerCase()}`"
-      >
-        <div class="alert-icon voucher-success-modal__icon">
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 48 48"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="24" cy="24" r="20" stroke="#16A34A" stroke-width="2.5" fill="none" />
-            <path
-              d="M15 24L21 30L33 18"
-              stroke="#16A34A"
-              stroke-width="3"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              fill="none"
-            />
-          </svg>
-        </div>
-        <div class="alert-body">
-          <h3 class="alert-title">Áp dụng voucher thành công</h3>
-          <p class="alert-message">{{ voucherSuccessMessage }}</p>
+    <!-- Modal chọn lại voucher (từ Cart) -->
+    <VoucherModal
+      :visible="isReSelectVoucherModalOpen"
+      :vouchers="availableVouchers"
+      :cart-total="cartData.totalAmount"
+      :is-loading="isAvailableVouchersLoading"
+      :pre-selected-id="null"
+      :title="reSelectVoucherMessage ? 'Voucher không khả dụng' : 'Chọn 1 Voucher Áp Dụng'"
+      :subtitle="reSelectVoucherMessage || 'Hệ thống tự động chọn mã có giá trị giảm cao nhất cho bạn'"
+      @close="closeReSelectVoucherModal"
+      @confirm="handleVoucherModalConfirm"
+    />
 
-          <div class="voucher-success-modal__highlight" v-if="voucherSuccessType === 'FREESHIP'">
-            <i class="fas fa-truck"></i>
-            <span
-              >Tiền được trừ:
-              <strong>−{{ formatCurrency(voucherSuccessDiscountAmount) }}</strong></span
-            >
-          </div>
-
-          <div
-            class="voucher-success-modal__highlight"
-            v-else-if="voucherSuccessType === 'PERCENT'"
-          >
-            <i class="fas fa-percent"></i>
-            <span
-              >Tiền được trừ:
-              <strong>−{{ formatCurrency(voucherSuccessDiscountAmount) }}</strong></span
-            >
-          </div>
-
-          <div class="voucher-success-modal__highlight" v-else-if="voucherSuccessType === 'AMOUNT'">
-            <i class="fas fa-tag"></i>
-            <span
-              >Tiền được trừ:
-              <strong>−{{ formatCurrency(voucherSuccessDiscountAmount) }}</strong></span
-            >
-          </div>
-
-          <p class="voucher-success-modal__note">
-            <i class="fas fa-info-circle"></i>
-            {{ voucherSuccessNote }}
-          </p>
-        </div>
-        <div class="alert-footer">
-          <button
-            class="alert-confirm-btn voucher-success-modal__btn"
-            type="button"
-            @click="closeVoucherSuccessModal"
-          >
-            Đồng ý
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- Modal chọn voucher từ checkout -->
+    <VoucherModal
+      :visible="isCheckoutVoucherModalOpen"
+      :vouchers="availableVouchers"
+      :cart-total="cartData.totalAmount"
+      :is-loading="isAvailableVouchersLoading"
+      :pre-selected-id="v2SelectedId"
+      title="Chọn Voucher"
+      subtitle="Chọn voucher để giảm giá đơn hàng"
+      @close="closeCheckoutVoucherModal"
+      @confirm="handleCheckoutVoucherConfirm"
+    />
 
     <div class="checkout-header">
       <div class="checkout-header__inner">
@@ -509,6 +456,40 @@
               <span>{{ cartData.totalAmount?.toLocaleString('vi-VN') }}₫</span>
             </div>
 
+            <!-- Voucher đã chọn -->
+            <div class="order-totals__row order-totals__row--voucher" v-if="appliedVoucherCode">
+              <div class="voucher-selected">
+                <div class="voucher-selected__left">
+                  <i class="fas fa-ticket-alt text-danger me-1"></i>
+                  <span class="voucher-selected__code">{{ appliedVoucherCode }}</span>
+                </div>
+                <button
+                  type="button"
+                  class="voucher-selected__change"
+                  @click="openVoucherModal"
+                  title="Đổi voucher"
+                >
+                  Đổi mã
+                  <i class="fas fa-chevron-right"></i>
+                </button>
+              </div>
+              <span v-if="voucherError" class="voucher-error-text">{{ voucherError }}</span>
+              <span v-else-if="isVoucherLoading" class="voucher-loading-text">
+                <i class="fas fa-spinner fa-spin"></i>
+              </span>
+            </div>
+
+            <!-- Nút chọn voucher -->
+            <div class="order-totals__row" v-else>
+              <button
+                type="button"
+                class="btn-voucher-select"
+                @click="openVoucherModal"
+              >
+                <i class="fas fa-ticket-alt me-1"></i> Chọn Voucher
+              </button>
+            </div>
+
             <div class="order-totals__row order-totals__row--discount" v-if="discountAmount > 0">
               <span><i class="fas fa-tag me-1"></i>Giảm giá Voucher</span>
               <span>-{{ discountAmount.toLocaleString('vi-VN') }}₫</span>
@@ -610,6 +591,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
+import VoucherModal from '@/components/VoucherModal.vue'
 
 import { useCartStore } from '@/stores/cartStore'
 const cartStore = useCartStore()
@@ -620,6 +602,7 @@ import cartApi from '@/api/cartApi'
 import ghnApi from '@/api/ghnApi'
 import api from '@/utils/api'
 import '@/assets/css/CheckOut.css'
+import '@/assets/css/cart.css'
 
 const router = useRouter()
 const isProcessing = ref(false)
@@ -681,66 +664,224 @@ const hasFreeshipVoucher = ref(false)
 const voucherError = ref('')
 const isVoucherLoading = ref(false)
 
-const showVoucherExpiredModal = ref(false)
-const voucherExpiredMessage = ref('')
+// ─── Modal chọn lại voucher (sau khi backend re-validate fail)
+//      Hiển thị danh sách voucher khả dụng để user chọn cái khác thay thế.
+const isReSelectVoucherModalOpen = ref(false)
 
-const openVoucherExpiredModal = (message) => {
-  voucherExpiredMessage.value =
-    message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.'
-  showVoucherExpiredModal.value = true
+const reSelectVoucherMessage = ref('')
+const availableVouchers = ref([])
+const isAvailableVouchersLoading = ref(false)
+const v2SelectedId = ref(null)
+
+// ─── Computed v2 voucher list (giống Cart.vue)
+const v2Vouchers = computed(() => {
+  const cartTotal = Number(cartData.value?.totalAmount ?? 0)
+  return availableVouchers.value.map((v) => {
+    const discountType = (v.discountType || '').toUpperCase()
+    const isAmount = discountType === 'AMOUNT'
+    const isPercent = discountType === 'PERCENT'
+    const isFreeship = discountType === 'FREESHIP'
+
+    let title = ''
+    let discountPercent = 0
+    if (isAmount) title = `Giảm ${formatCurrency(v.discountValue)} toàn sàn`
+    else if (isPercent) { title = `Giảm ${v.discountValue}% toàn sàn`; discountPercent = v.discountValue }
+    else if (isFreeship) title = `Miễn phí vận chuyển ${formatCurrency(v.discountValue)}`
+    else title = `Giảm ${formatCurrency(v.discountValue)} toàn sàn`
+
+    const active = v.isActive && !v.isUsed && cartTotal >= (v.minOrderValue || 0)
+
+    let disabledReason = ''
+    if (!v.isActive) disabledReason = 'Voucher không còn hoạt động'
+    else if (v.isUsed) disabledReason = 'Voucher đã được sử dụng'
+    else if (cartTotal < (v.minOrderValue || 0)) {
+      disabledReason = `Chưa đủ điều kiện: Mua thêm ${formatCurrency((v.minOrderValue || 0) - cartTotal)}`
+    }
+
+    return {
+      id: v.voucherId,
+      voucherCode: v.voucherCode,
+      title,
+      discountType,
+      minOrder: v.minOrderValue,
+      discountValue: v.discountValue,
+      discountPercent,
+      maxDiscountAmount: v.maxDiscountAmount || 0,
+      expiryLabel: `Hạn dùng đến: ${new Date(v.endDate).toLocaleDateString('vi-VN')}`,
+      icon: isFreeship ? 'fas fa-truck' : 'fas fa-tag',
+      iconClass: isFreeship ? 'v2-icon-box--freeship' : isPercent ? 'v2-icon-box--percent' : 'v2-icon-box--amount',
+      active,
+      disabledReason,
+    }
+  })
+})
+
+function estimatedDiscountValue(voucher, totalAmount) {
+  if (!voucher.active) return 0
+  if (voucher.discountType === 'AMOUNT') return Math.min(voucher.discountValue, totalAmount)
+  if (voucher.discountType === 'PERCENT') {
+    const raw = (voucher.discountPercent / 100) * totalAmount
+    return Math.min(raw, voucher.maxDiscountAmount > 0 ? voucher.maxDiscountAmount : raw)
+  }
+  if (voucher.discountType === 'FREESHIP') return voucher.discountValue
+  return 0
 }
 
-const closeVoucherExpiredModal = () => {
-  showVoucherExpiredModal.value = false
-  voucherExpiredMessage.value = ''
+const v2ActiveVouchers = computed(() => {
+  const total = Number(cartData.value?.totalAmount ?? 0)
+  const list = v2Vouchers.value
+    .filter((v) => v.active)
+    .map((v) => ({ ...v, _discount: estimatedDiscountValue(v, total) }))
+    .sort((a, b) => b._discount - a._discount)
+  if (list.length > 0) list[0].isBest = true
+  return list.map(({ _discount, ...rest }) => rest)
+})
+
+const v2DisabledVouchers = computed(() => v2Vouchers.value.filter((v) => !v.active))
+
+function selectVoucherFromModal2(id) {
+  v2SelectedId.value = v2SelectedId.value === id ? null : id
 }
+
+async function applySelectedVoucherFromModal() {
+  const picked = v2Vouchers.value.find((v) => v.id === v2SelectedId.value)
+  if (picked) {
+    clearAppliedVoucher()
+    appliedVoucherCode.value = picked.voucherCode
+    localStorage.setItem('selectedVoucher', JSON.stringify({
+      code: picked.voucherCode,
+      type: picked.discountType,
+    }))
+  } else {
+    clearAppliedVoucher()
+  }
+  isReSelectVoucherModalOpen.value = false
+  v2SelectedId.value = null
+}
+
+// ─── Modal thông báo voucher không khả dụng (Modal 1 - bước 1)
+//      Hiện khi backend re-validate fail khi user bấm Đặt hàng.
+//      Bấm "Đồng ý" mới mở Modal 2 (chọn lại voucher).
+const isVoucherInvalidModalOpen = ref(false)
+const voucherInvalidMessage = ref('')
+
+const openVoucherInvalidModal = (message) => {
+  voucherInvalidMessage.value =
+    message ||
+    'Voucher hiện không còn khả dụng. Vui lòng chọn voucher khác để tiếp tục thanh toán.'
+  isVoucherInvalidModalOpen.value = true
+}
+
+const closeVoucherInvalidModal = () => {
+  isVoucherInvalidModalOpen.value = false
+  voucherInvalidMessage.value = ''
+}
+
+const handleVoucherInvalidConfirm = () => {
+  const message = voucherInvalidMessage.value
+  isVoucherInvalidModalOpen.value = false
+  voucherInvalidMessage.value = ''
+  openReSelectVoucherModal(message)
+}
+
+const VOUCHER_RE_SELECT_CODES = new Set([
+  'VOUCHER_INACTIVE',
+  'VOUCHER_EXPIRED',
+  'VOUCHER_QUOTA_EXHAUSTED',
+  'VOUCHER_NOT_FOUND',
+])
+
+const isVoucherReSelectCode = (code) => code && VOUCHER_RE_SELECT_CODES.has(code)
 
 // Modal thông báo áp dụng voucher thành công
-const isVoucherSuccessModalOpen = ref(false)
-const voucherSuccessMessage = ref('')
-const voucherSuccessType = ref('AMOUNT')
-const voucherSuccessAmount = ref(0)
-const voucherSuccessPercent = ref(0)
-const voucherSuccessMaxDiscount = ref(0)
-const voucherSuccessDiscountAmount = ref(0)
-const voucherSuccessNote = ref(
-  'Số tiền giảm thực tế sẽ được hệ thống tính toán lại tại bước thanh toán.',
-)
-const lastShownSuccessCode = ref('')
-
-const openVoucherSuccessModal = (voucherInfo) => {
-  if (!voucherInfo) return
-  const code = voucherInfo.voucherCode || appliedVoucherCode.value
-  if (lastShownSuccessCode.value === code) return
-  lastShownSuccessCode.value = code
-
-  voucherSuccessType.value = (voucherInfo.discountType || 'AMOUNT').toUpperCase()
-  voucherSuccessAmount.value = Number(voucherInfo.discountValue) || 0
-  voucherSuccessPercent.value = Number(voucherInfo.discountPercent) || 0
-  voucherSuccessMaxDiscount.value = Number(voucherInfo.maxDiscountAmount) || 0
-  voucherSuccessDiscountAmount.value =
-    Number(voucherInfo.actualDiscountAmount ?? voucherInfo.discountAmount) || 0
-  voucherSuccessMessage.value = `Voucher ${code} đã được áp dụng thành công.`
-
-  if (voucherSuccessType.value === 'FREESHIP') {
-    voucherSuccessNote.value =
-      'Số tiền freeship thực tế sẽ được tính dựa trên phí vận chuyển GHN tại bước thanh toán.'
-  } else {
-    voucherSuccessNote.value =
-      'Vui lòng kiểm tra lại thông tin voucher trước khi tiến hành đặt hàng.'
+// ─── Re-select voucher modal (mở khi backend re-validate fail) ───
+const fetchAvailableVouchers = async () => {
+  isAvailableVouchersLoading.value = true
+  try {
+    const res = await api.get('/client/vouchers/available')
+    availableVouchers.value = res.data?.data ?? res.data ?? []
+  } catch (e) {
+    console.error('Lỗi tải danh sách voucher khả dụng:', e)
+    availableVouchers.value = []
+  } finally {
+    isAvailableVouchersLoading.value = false
   }
-
-  isVoucherSuccessModalOpen.value = true
 }
 
-const closeVoucherSuccessModal = () => {
-  isVoucherSuccessModalOpen.value = false
-  voucherSuccessMessage.value = ''
-  voucherSuccessAmount.value = 0
-  voucherSuccessPercent.value = 0
-  voucherSuccessMaxDiscount.value = 0
-  voucherSuccessDiscountAmount.value = 0
-  voucherSuccessType.value = 'AMOUNT'
+const openReSelectVoucherModal = (message) => {
+  reSelectVoucherMessage.value =
+    message || 'Voucher bạn chọn không còn khả dụng. Vui lòng chọn voucher khác.'
+  v2SelectedId.value = null
+  isReSelectVoucherModalOpen.value = true
+  fetchAvailableVouchers()
+}
+
+const closeReSelectVoucherModal = () => {
+  isReSelectVoucherModalOpen.value = false
+  reSelectVoucherMessage.value = ''
+  v2SelectedId.value = null
+}
+
+const clearAppliedVoucher = () => {
+  appliedVoucherCode.value = ''
+  discountAmount.value = 0
+  hasFreeshipVoucher.value = false
+  voucherError.value = ''
+  localStorage.removeItem('selectedVoucher')
+}
+
+// ─── Modal chọn voucher từ checkout
+const isCheckoutVoucherModalOpen = ref(false)
+
+const openVoucherModal = async () => {
+  await fetchAvailableVouchers()
+  // Pre-select current voucher nếu có
+  if (appliedVoucherCode.value) {
+    const current = availableVouchers.value.find(
+      (v) => v.voucherCode?.toUpperCase() === appliedVoucherCode.value.toUpperCase()
+    )
+    if (current) {
+      v2SelectedId.value = current.voucherId
+    }
+  }
+  isCheckoutVoucherModalOpen.value = true
+}
+
+const closeCheckoutVoucherModal = () => {
+  isCheckoutVoucherModalOpen.value = false
+  v2SelectedId.value = null
+}
+
+// Handle voucher confirmation từ VoucherModal (re-select)
+const handleVoucherModalConfirm = (picked) => {
+  if (picked) {
+    clearAppliedVoucher()
+    appliedVoucherCode.value = picked.voucherCode
+    localStorage.setItem('selectedVoucher', JSON.stringify({
+      code: picked.voucherCode,
+      type: picked.discountType,
+    }))
+  } else {
+    clearAppliedVoucher()
+  }
+  closeReSelectVoucherModal()
+}
+
+// Handle voucher confirmation từ VoucherModal (checkout)
+const handleCheckoutVoucherConfirm = (picked) => {
+  if (picked) {
+    clearAppliedVoucher()
+    appliedVoucherCode.value = picked.voucherCode
+    localStorage.setItem('selectedVoucher', JSON.stringify({
+      code: picked.voucherCode,
+      type: picked.discountType,
+    }))
+    // Preview voucher immediately
+    previewVoucher()
+  } else {
+    clearAppliedVoucher()
+  }
+  closeCheckoutVoucherModal()
 }
 
 const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')}₫`
@@ -801,6 +942,8 @@ const validateEmail = (email) => {
 }
 
 // ─── Voucher preview
+// Chỉ dùng để hiển thị số tiền giảm trong checkout summary.
+// KHÔNG clear voucher code khi fail — voucher chỉ bị reject khi backend validate lúc "Đặt hàng".
 const previewVoucher = async () => {
   const code = appliedVoucherCode.value
   if (!code) {
@@ -825,32 +968,15 @@ const previewVoucher = async () => {
       discountAmount.value = Number(result.discountAmount) || 0
       hasFreeshipVoucher.value = result.discountType === 'FREESHIP'
       voucherError.value = ''
-      openVoucherSuccessModal({
-        voucherCode: code,
-        discountType: result.discountType,
-        discountValue: result.discountValue,
-        discountPercent: result.discountPercent,
-        maxDiscountAmount: result.maxDiscountAmount,
-        actualDiscountAmount: result.discountAmount,
-      })
     } else {
       discountAmount.value = 0
       hasFreeshipVoucher.value = false
-      voucherError.value = result?.message || 'Mã giảm giá không hợp lệ'
-      localStorage.removeItem('selectedVoucher')
-      appliedVoucherCode.value = ''
-      openVoucherExpiredModal(
-        result?.message || 'Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.',
-      )
+      voucherError.value = result?.message || ''
     }
   } catch (e) {
     discountAmount.value = 0
     hasFreeshipVoucher.value = false
-    const errorMsg = e.response?.data?.message || 'Không thể áp dụng mã giảm giá'
-    voucherError.value = errorMsg
-    localStorage.removeItem('selectedVoucher')
-    appliedVoucherCode.value = ''
-    openVoucherExpiredModal(errorMsg)
+    voucherError.value = e.response?.data?.message || 'Không thể xác minh voucher'
   } finally {
     isVoucherLoading.value = false
   }
@@ -1145,222 +1271,43 @@ const handleCheckout = async () => {
     const savedOrderCode = data?.data?.orderCode || data?.orderCode || 'Không xác định'
     router.push({ path: '/order-success', query: { orderCode: savedOrderCode } })
   } catch (error) {
-    showModal(
-      'Lỗi đặt hàng',
-      error.response?.data?.message ?? 'Hệ thống gián đoạn. Vui lòng thử lại.',
-    )
+    const responseData = error.response?.data
+    const errorCode = responseData?.data // ResponseStatusException -> data = errorCode string
+    const errorMessage = responseData?.message ?? 'Hệ thống gián đoạn. Vui lòng thử lại.'
+
+    // Nếu backend báo voucher không khả dụng -> clear state + mở Modal 1 (thông báo)
+    // User bấm "Đồng ý" ở Modal 1 mới mở Modal 2 (chọn voucher khác).
+    if (isVoucherReSelectCode(errorCode) && appliedVoucherCode.value) {
+      clearAppliedVoucher()
+      openVoucherInvalidModal(errorMessage)
+      return
+    }
+
+    showModal('Lỗi đặt hàng', errorMessage)
   } finally {
     isProcessing.value = false
   }
 }
 
+const isModalMounted = ref(false)
+
 onMounted(async () => {
   await prefillUserEmail()
   await Promise.allSettled([fetchGhnProvinces(), fetchCart(), fetchMyAddresses()])
-  await previewVoucher()
+  // Preview voucher nếu có voucher được chọn từ cart
+  if (appliedVoucherCode.value) {
+    await previewVoucher()
+  }
 })
 
-watch(
-  () => cartData.value.totalAmount,
-  () => {
-    if (appliedVoucherCode.value) {
-      previewVoucher()
-    }
-  },
-)
-</script>
-
-<style scoped>
-/* ── Voucher Success Modal (style tương thích với check-out.css) ── */
-.v-overlay {
-  position: fixed;
-  z-index: 1100;
-  top: 0;
-  left: 0;
-  display: flex;
-  visibility: hidden;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(4px);
-  opacity: 0;
-  transition:
-    opacity 0.2s ease,
-    visibility 0.2s ease;
-}
-
-.v-overlay.active {
-  visibility: visible;
-  opacity: 1;
-}
-
-.v-card {
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-  transform: scale(0.92);
-  opacity: 0;
-  transition:
-    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 0.2s;
-}
-
-.v-overlay.active .v-card {
-  transform: scale(1);
-  opacity: 1;
-}
-
-.alert-card {
-  width: 420px;
-  max-width: 92vw;
-  border-radius: 20px;
-  padding: 36px 32px 28px;
-  text-align: center;
-  align-items: center;
-}
-
-.alert-icon {
-  margin-bottom: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: #f0fdf4;
-}
-
-.alert-body {
-  width: 100%;
-  margin-bottom: 24px;
-}
-
-.alert-title {
-  margin: 0 0 10px;
-  color: #16a34a;
-  font-size: 19px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.alert-message {
-  margin: 0;
-  color: #475569;
-  font-size: 14.5px;
-  line-height: 1.6;
-}
-
-.alert-footer {
-  width: 100%;
-}
-
-.alert-confirm-btn {
-  width: 100%;
-  height: 44px;
-  border: none;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-  color: #fff;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  transition: background 0.15s ease;
-}
-
-.alert-confirm-btn:hover {
-  background: linear-gradient(135deg, #15803d 0%, #166534 100%);
-}
-
-.voucher-success-modal .alert-title {
-  color: #16a34a;
-}
-
-.voucher-success-modal__highlight {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin: 14px auto 12px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-  border: 1px solid #a7f3d0;
-  border-radius: 10px;
-  color: #065f46;
-  font-size: 14px;
-  flex-wrap: wrap;
-  text-align: center;
-}
-
-.voucher-success-modal__highlight i {
-  font-size: 18px;
-  color: #16a34a;
-  flex-shrink: 0;
-}
-
-.voucher-success-modal__highlight strong {
-  color: #047857;
-  font-size: 15.5px;
-  font-weight: 800;
-}
-
-.voucher-success-modal__note {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  background: #f8fafc;
-  border-radius: 8px;
-  color: #64748b;
-  font-size: 12.5px;
-  line-height: 1.5;
-  text-align: left;
-}
-
-.voucher-success-modal__note i {
-  font-size: 14px;
-  color: #94a3b8;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.voucher-success-modal--percent .voucher-success-modal__highlight {
-  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
-  border-color: #fde68a;
-  color: #92400e;
-}
-
-.voucher-success-modal--percent .voucher-success-modal__highlight i {
-  color: #b45309;
-}
-
-.voucher-success-modal--percent .voucher-success-modal__highlight strong {
-  color: #b45309;
-}
-
-.voucher-success-modal--amount .voucher-success-modal__highlight {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-color: #bfdbfe;
-  color: #1e40af;
-}
-
-.voucher-success-modal--amount .voucher-success-modal__highlight i {
-  color: #1d4ed8;
-}
-
-.voucher-success-modal--amount .voucher-success-modal__highlight strong {
-  color: #1d4ed8;
-}
-
-@media (max-width: 480px) {
-  .alert-card {
-    width: 94vw;
-    padding: 28px 22px 22px;
+// Watch appliedVoucherCode để tự động preview khi thay đổi
+watch(appliedVoucherCode, async (newCode) => {
+  if (newCode) {
+    await previewVoucher()
+  } else {
+    discountAmount.value = 0
+    hasFreeshipVoucher.value = false
+    voucherError.value = ''
   }
-}
-</style>
+})
+</script>

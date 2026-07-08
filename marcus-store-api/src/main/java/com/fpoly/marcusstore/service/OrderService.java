@@ -7,12 +7,12 @@ import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.List;
-import java.util.Optional;
 
 public interface OrderService {
-    // Lấy dữ liệu theo keyword, phương thức thanh toán và trạng thái đơn hàng
-    Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus, Pageable pageable);
+    // Lấy dữ liệu theo keyword, phương thức thanh toán, trạng thái đơn hàng và khoảng thời gian tạo đơn
+    Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus, LocalDate fromDate, LocalDate toDate, Pageable pageable);
     OrderStatsResponse getOrderStats(String keyword, String paymentMethod, String orderStatus);
     List<String> getPaymentMethods();
 
@@ -21,5 +21,6 @@ public interface OrderService {
     OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request);
      List<OrderResponse> getUserOrder();
      OrderDetailResponse getUserOrderDetail(String orderCode);
+    OrderDetailResponse cancelUserOrder(String orderCode, String reason);
 
 }

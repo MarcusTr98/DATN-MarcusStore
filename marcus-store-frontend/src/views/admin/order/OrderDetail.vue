@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <section class="order-detail-page">
     <div class="page-heading">
       <div>
@@ -108,7 +108,7 @@
                     <tr v-for="item in orderDetail.items" :key="item.skuId">
                       <td>
                         <div class="product-cell">
-                          <span class="product-thumb">📦</span>
+                          <span class="product-thumb no-print">📦</span>
                           <span>
                             <span class="main-line">{{ item.productName }}</span>
                           </span>
@@ -132,15 +132,16 @@
                   <span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong>
                 </div>
                 <div v-if="orderDetail.voucherCode" class="summary-row">
-                  <span>Mã giảm giá</span><strong>{{ orderDetail.voucherCode }}</strong>
-                </div>
-                <div class="summary-row">
-                  <span>Giảm giá</span
-                  ><strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
+                  <span>Mã giảm giá: <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span>
+                  <strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
                 </div>
                 <div class="summary-row">
                   <span>Phí vận chuyển</span
                   ><strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong>
+                </div>
+                <div v-if="subTotal >= 5000000" class="summary-row">
+                  <span>Giảm giá vận chuyển </span>
+                  <strong>---</strong>
                 </div>
                 <div class="summary-row total">
                   <span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong>
@@ -149,7 +150,7 @@
             </div>
           </section>
 
-          <section class="card section-card">
+          <section class="card section-card no-print">
             <div class="section-header">
               <div>
                 <h4>Mốc xử lý & lịch sử thao tác</h4>
@@ -356,13 +357,15 @@ watch(
 )
 
 const orderStatusMap = {
-  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
-  PROCESSING: { label: 'Đang chuẩn bị hàng', className: 'processing' },
-  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
-  SHIPPING: { label: 'Đang giao', className: 'shipping' },
-  COMPLETED: { label: 'Hoàn thành', className: 'completed' },
-  CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
-  FAILED: { label: 'Giao thất bại', className: 'failed' },
+  PENDING:   { label: 'Chờ xác nhận',    className: 'pending' },
+  CONFIRMED: { label: 'Đã xác nhận',     className: 'confirmed' },
+  PROCESSING:{ label: 'Đang chuẩn bị',    className: 'processing' },
+  PACKED:    { label: 'Đã đóng gói',      className: 'processing' },
+  SHIPPING:  { label: 'Đang giao',        className: 'shipping' },
+  DELIVERED: { label: 'Giao thành công',  className: 'shipping' },
+  COMPLETED: { label: 'Hoàn thành',       className: 'completed' },
+  CANCELLED: { label: 'Đã hủy',           className: 'cancelled' },
+  FAILED:    { label: 'Giao thất bại',    className: 'failed' },
 }
 
 const paymentStatusMap = {
@@ -386,16 +389,23 @@ const allowedTransitions = {
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],
   CONFIRMED: [
-    { value: 'PROCESSING', label: 'Đang chuẩn bị hàng' },
+    { value: 'PROCESSING', label: 'Bắt đầu chuẩn bị hàng' },
     { value: 'CANCELLED', label: 'Hủy đơn & Hoàn tiền' },
   ],
   PROCESSING: [
-    { value: 'SHIPPING', label: 'Đang giao hàng' },
+    { value: 'PACKED', label: 'Đã đóng gói' },
+    { value: 'CANCELLED', label: 'Hủy đơn' },
+  ],
+  PACKED: [
+    { value: 'SHIPPING', label: 'Bắt đầu giao hàng' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],
   SHIPPING: [
-    { value: 'COMPLETED', label: 'Giao thành công' },
+    { value: 'DELIVERED', label: 'Giao thành công' },
     { value: 'FAILED', label: 'Giao thất bại' },
+  ],
+  DELIVERED: [
+    { value: 'COMPLETED', label: 'Đối soát hoàn tất' },
   ],
   COMPLETED: [],
   CANCELLED: [],
@@ -515,9 +525,6 @@ const saveStatusUpdate = async () => {
   }
 }
 
-/**
- * Reset mọi transform/scale được set từ lần in trước.
- */
 const resetPrintScale = () => {
   const page = document.querySelector('.order-detail-page')
   if (page) {
@@ -534,15 +541,6 @@ const resetPrintScale = () => {
   }
 }
 
-/**
- * In nội dung vừa vùng in của Chrome.
- * Cách xử lý:
- *  - Đo width của `.order-detail-page` (chưa scale).
- *  - Đo width vùng in = A4 (210mm) - 2 lề.
- *    Vì JS không đọc được lề user đã chọn trong print dialog,
- *    ta giả định "worst-case" = 12mm mỗi bên (Chrome Default).
- *  - Nếu content > printable: scale toàn page để vừa khít.
- */
 const getPrintableWidthPx = () => {
   const A4_MM = 210
   const MARGIN_MM = 12
@@ -573,12 +571,42 @@ const applyPrintScale = () => {
 
 const printPage = async () => {
   await nextTick()
+  // Tạm ẩn widget chat nổi (Messenger/Zalo + nút headset admin) và Vue DevTools để không xuất hiện trong bản in
+  const chatElements = [
+    document.getElementById('marcus-floating-actions'),
+    document.getElementById('marcus-floating-actions-style'),
+    ...document.querySelectorAll('.chat-trigger-btn'),
+    document.querySelector('.admin-chat-widget'),
+    ...document.querySelectorAll('#vue-devtools-container, [id^="vue-devtools"]'),
+  ].filter(Boolean)
+
+  // Lưu parent để restore sau khi in
+  const restoreData = chatElements.map((el) => ({
+    el,
+    parent: el.parentNode,
+    nextSibling: el.nextSibling,
+  }))
+  // Tạm thời tách khỏi DOM để chắc chắn không hiển thị
+  restoreData.forEach(({ el }) => el.remove())
+
   // Đợi 1 frame để DOM ổn định trước khi đo
   requestAnimationFrame(() => {
     applyPrintScale()
     // Đợi browser paint xong rồi mới gọi print()
     requestAnimationFrame(() => {
       window.print()
+      // Khôi phục lại các element sau khi in xong
+      setTimeout(() => {
+        restoreData.forEach(({ el, parent, nextSibling }) => {
+          if (parent) {
+            if (nextSibling) {
+              parent.insertBefore(el, nextSibling)
+            } else {
+              parent.appendChild(el)
+            }
+          }
+        })
+      }, 500)
     })
   })
 }

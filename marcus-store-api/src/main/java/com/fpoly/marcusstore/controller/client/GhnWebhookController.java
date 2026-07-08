@@ -29,7 +29,7 @@ public class GhnWebhookController {
             "picking", "SHIPPING",
             "picked", "SHIPPING",
             "delivering", "SHIPPING",
-            "delivered", "COMPLETED",
+            "delivered", "DELIVERED",
             "delivery_fail", "FAILED",
             "return", "FAILED",
             "cancel", "CANCELLED");
