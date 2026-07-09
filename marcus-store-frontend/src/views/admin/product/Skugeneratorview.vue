@@ -28,6 +28,7 @@
       </div>
     </div>
 
+    <!-- BƯỚC 1: CHỌN SẢN PHẨM -->
     <div class="card step-card" :class="{ collapsed: currentStep > 1 }">
       <div class="card-header-row" @click="currentStep > 1 && (currentStep = 1)">
         <div class="card-title-group">
@@ -140,6 +141,76 @@
       </div>
     </div>
 
+    <!-- TÍNH NĂNG MỚI: BẢNG SKU ĐÃ TỒN TẠI TRONG CSDL -->
+    <div class="card step-card" v-if="selectedProductId && existingSkus.length > 0">
+      <div class="card-header-row no-pointer">
+        <div class="card-title-group">
+          <span class="step-badge" style="background: #ecfdf5; color: #10b981">
+            <i class="fa-solid fa-check-double"></i>
+          </span>
+          <div>
+            <h3 class="card-title">SKU Đang Hoạt Động ({{ existingSkus.length }})</h3>
+            <p class="card-subtitle">
+              Các biến thể đã tồn tại trong hệ thống. Hãy đối chiếu để tránh tạo trùng!
+            </p>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="sku-table-wrapper">
+          <table class="sku-table">
+            <thead>
+              <tr>
+                <th class="th-variant">Tổ hợp biến thể</th>
+                <th class="th-sku">Mã SKU</th>
+                <th class="th-price">Giá bán (₫)</th>
+                <th class="th-stock">Tồn kho</th>
+                <th class="th-del">Hành động</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(sku, idx) in existingSkus" :key="sku.skuId" class="sku-row">
+                <td>
+                  <div class="variant-name-cell">
+                    <span class="variant-label">
+                      {{
+                        sku.attributeValues
+                          ? sku.attributeValues.map((v) => v.valueString).join(' / ')
+                          : '---'
+                      }}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <code style="color: #db2777; font-weight: bold">{{ sku.skuCode }}</code>
+                </td>
+                <td>{{ formatMoney(sku.price) }}</td>
+                <td>{{ sku.stockQuantity }}</td>
+                <td>
+                  <button
+                    class="btn-row-del"
+                    @click="deleteExistingSku(sku.skuId, idx)"
+                    title="Xóa SKU này khỏi CSDL"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                      <path
+                        d="M2 3.5h9M5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M4 3.5l.667 7h3.666L9 3.5H4z"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- BƯỚC 2: CHỌN THUỘC TÍNH -->
     <div class="card step-card" :class="{ collapsed: currentStep !== 2, locked: currentStep < 2 }">
       <div class="card-header-row" @click="currentStep > 2 && (currentStep = 2)">
         <div class="card-title-group">
@@ -232,6 +303,7 @@
       </div>
     </div>
 
+    <!-- BƯỚC 3: MA TRẬN SKU MỚI -->
     <div class="card step-card" :class="{ locked: currentStep < 3 }">
       <div class="card-header-row">
         <div class="card-title-group">
@@ -289,7 +361,13 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(sku, index) in generatedSkus" :key="index" class="sku-row">
+              <!-- NÂNG CẤP: Gắn class bôi đỏ (is-duplicate-row) nếu biến thể đã tồn tại -->
+              <tr
+                v-for="(sku, index) in generatedSkus"
+                :key="index"
+                class="sku-row"
+                :class="{ 'is-duplicate-row': isComboExists(sku.comboValues) }"
+              >
                 <td>
                   <div class="variant-name-cell">
                     <div class="variant-dots">
@@ -302,6 +380,10 @@
                       ></span>
                     </div>
                     <span class="variant-label">{{ sku.variantName }}</span>
+                    <!-- Nhãn cảnh báo đỏ -->
+                    <span v-if="isComboExists(sku.comboValues)" class="badge-duplicate"
+                      >Đã có trong DB</span
+                    >
                   </div>
                 </td>
 
@@ -317,7 +399,7 @@
                     placeholder="IP16-BLK-256"
                   />
                   <div class="error-text" v-if="isDuplicateSku(sku.skuCode, index)">
-                    Mã SKU bị trùng lặp trong bảng!
+                    Mã SKU bị trùng lặp!
                   </div>
                   <div class="error-text" v-else-if="fieldErrors[`skus[${index}].skuCode`]">
                     {{ fieldErrors[`skus[${index}].skuCode`] }}
@@ -376,6 +458,13 @@
           </table>
         </div>
 
+        <!-- Cảnh báo nếu có trùng lặp -->
+        <div v-if="hasAnyDuplicate" class="duplicate-warning-box">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          Phát hiện các biến thể hoặc Mã SKU bị trùng lặp. Vui lòng xóa các dòng bị bôi đỏ hoặc đổi
+          Mã SKU trước khi lưu!
+        </div>
+
         <div class="card-footer-row">
           <button class="btn-cancel" @click="currentStep = 2">← Quay lại</button>
           <button
@@ -390,6 +479,7 @@
       </div>
     </div>
 
+    <!-- Modal Thông báo -->
     <Transition name="modal">
       <div class="modal-backdrop" v-if="alertModal.show" @click.self="alertModal.show = false">
         <div class="modal-box alert-modal-box">
@@ -413,7 +503,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import api from '@/utils/api'
 import '@/assets/css/sku.css'
 
@@ -443,7 +533,52 @@ const bulkPrice = ref('')
 const bulkStock = ref('')
 const alertModal = ref({ show: false, message: '', type: 'success' })
 
-// ── HÀM BÁO LỖI / TRÙNG LẶP TRỰC TIẾP ──
+// STATE MỚI: Quản lý SKU đang hoạt động
+const existingSkus = ref([])
+
+// FORMAT TIỀN TỆ
+const formatMoney = (value) => {
+  return new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
+}
+
+// Lắng nghe sự kiện chọn sản phẩm để lấy SKU cũ[cite: 41, 48]
+watch(selectedProductId, async (newVal) => {
+  if (!newVal) {
+    existingSkus.value = []
+    return
+  }
+  try {
+    const res = await api.get(`/admin/skus/product/${newVal}`)
+    existingSkus.value = res.data?.data || []
+  } catch (error) {
+    console.error('Lỗi khi tải danh sách SKU hiện có:', error)
+  }
+})
+
+// Xóa SKU cũ trực tiếp từ CSDL[cite: 40, 48]
+const deleteExistingSku = async (skuId, index) => {
+  if (!confirm('Bạn chắc chắn muốn vô hiệu hóa SKU này khỏi hệ thống?')) return
+  try {
+    await api.delete(`/admin/skus/${skuId}`)
+    existingSkus.value.splice(index, 1)
+    showAlert('Đã xóa SKU thành công!', 'success')
+  } catch (e) {
+    showAlert('Lỗi khi xóa: ' + (e.response?.data?.message || e.message), 'error')
+  }
+}
+
+// KIỂM TRA TRÙNG LẶP COMBO (Ví dụ: Đỏ - 256GB đã có trong DB chưa)
+const isComboExists = (comboValues) => {
+  return existingSkus.value.some((sku) => {
+    if (!sku.attributeValues) return false
+    const existingCombo = sku.attributeValues.map((v) => v.valueString)
+    if (existingCombo.length !== comboValues.length) return false
+    // Kiểm tra xem tất cả các thuộc tính của combo mới có nằm trong combo cũ không
+    return comboValues.every((val) => existingCombo.includes(val))
+  })
+}
+
+// KIỂM TRA TRÙNG MÃ SKU GÕ TAY[cite: 48]
 const clearFieldError = (index, fieldName) => {
   const key = `skus[${index}].${fieldName}`
   if (fieldErrors.value[key]) {
@@ -453,14 +588,20 @@ const clearFieldError = (index, fieldName) => {
 
 const isDuplicateSku = (code, currentIndex) => {
   if (!code) return false
-  return (
+  // Trùng trong bảng mới đang tạo
+  const inNew =
     generatedSkus.value.findIndex((s, idx) => idx !== currentIndex && s.skuCode === code) !== -1
-  )
+  // Trùng mã với SKU dưới DB
+  const inDb = existingSkus.value.some((s) => s.skuCode === code)
+  return inNew || inDb
 }
 
+// KHÓA NÚT LƯU KHI PHÁT HIỆN LỖI (Trùng Mã SKU HOẶC Trùng Combo)
 const hasAnyDuplicate = computed(() => {
   const codes = generatedSkus.value.map((s) => s.skuCode).filter((c) => c)
-  return new Set(codes).size !== codes.length
+  const hasDuplicateCode = new Set(codes).size !== codes.length
+  const hasExistingCombo = generatedSkus.value.some((s) => isComboExists(s.comboValues))
+  return hasDuplicateCode || hasExistingCombo
 })
 
 // ── API CALLS ──
@@ -592,25 +733,20 @@ const getInitials = (str) => {
     .join('')
 }
 
-// FIX: Xử lý triệt để thuật toán sinh mã Đỏ và Đen
 const generateValueCode = (val) => {
   const clean = val
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[đĐ]/g, 'D') // Đảm bảo viết hoa
+    .replace(/[đĐ]/g, 'D')
     .replace(/[^a-zA-Z0-9 ]/g, '')
     .toUpperCase()
 
   const words = clean.split(' ').filter((w) => w.length > 0)
   if (words.length === 0) return ''
 
-  // 1. Nếu có số (512GB) -> Cắt 5 ký tự đầu
   if (words.length === 1 && /\d/.test(words[0])) return words[0].substring(0, 5)
-
-  // 2. Nếu chỉ có 1 chữ (Đỏ, Đen) -> Cắt 3 ký tự (DO, DEN)
   if (words.length === 1) return words[0].substring(0, 3)
 
-  // 3. Nếu có nhiều chữ (Titan Đen) -> Từ đầu lấy 1 chữ, từ cuối lấy 2 chữ (TDE)
   let code = ''
   for (let i = 0; i < words.length - 1; i++) {
     code += words[i][0]
@@ -657,7 +793,7 @@ const applyBulkSettings = () => {
 const saveAllSkus = async () => {
   if (!selectedProductId.value || generatedSkus.value.length === 0) return
   isSaving.value = true
-  fieldErrors.value = {} // Đặt lại bộ đếm lỗi
+  fieldErrors.value = {}
 
   try {
     const payload = {
@@ -671,18 +807,21 @@ const saveAllSkus = async () => {
     }
     await api.post('/admin/skus/batch', payload)
     showAlert(`Đã lưu ${generatedSkus.value.length} SKU thành công!`, 'success')
+
+    // Tự động load lại bảng SKU cũ để hiển thị cái vừa thêm
+    const res = await api.get(`/admin/skus/product/${selectedProductId.value}`)
+    existingSkus.value = res.data?.data || []
+
     generatedSkus.value = []
     selectedValueIds.value = new Set()
     selectedAttributeIds.value = new Set()
     selectedValueObjects.value = []
     currentStep.value = 1
   } catch (error) {
-    // Nếu là lỗi Validation 400 (Trống giá, số âm)
     if (error.response?.status === 400 && error.response?.data?.data) {
       fieldErrors.value = error.response.data.data
       showAlert('Vui lòng kiểm tra lại các trường báo đỏ trong bảng!', 'error')
     } else {
-      // Báo lỗi trùng từ Database hoặc Lỗi khác
       showAlert(error.response?.data?.message || 'Có lỗi khi lưu SKU vào CSDL', 'error')
     }
   } finally {
@@ -727,7 +866,6 @@ const getColorStyle = (valueStr) => {
 </script>
 
 <style scoped>
-/* CSS hiển thị các trạng thái báo lỗi */
 .table-input.is-invalid {
   border-color: #ef4444 !important;
   background-color: #fef2f2 !important;
@@ -738,5 +876,35 @@ const getColorStyle = (valueStr) => {
   font-weight: 600;
   margin-top: 4px;
   text-align: left;
+}
+
+/* CSS CHO PHẦN BÔI ĐỎ TRÙNG LẶP */
+.is-duplicate-row {
+  background-color: #fef2f2 !important;
+  opacity: 0.8;
+}
+
+.badge-duplicate {
+  font-size: 10px;
+  background: #ef4444;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+  font-weight: bold;
+}
+
+.duplicate-warning-box {
+  margin-top: 15px;
+  padding: 12px;
+  background-color: #fee2e2;
+  border: 1px solid #ef4444;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 </style>
