@@ -285,6 +285,7 @@ public class OrderServiceImpl implements OrderService {
                 .discountAmount(order.getDiscountAmount())
                 .shippingFee(order.getShippingFee())
                 .shippingSubsidy(order.getShippingSubsidy())
+                .deliveryNote(order.getDeliveryNote())
                 .finalAmount(order.getFinalAmount())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentStatus(order.getPaymentStatus())

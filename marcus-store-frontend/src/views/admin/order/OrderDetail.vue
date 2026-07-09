@@ -277,8 +277,11 @@
                     >-{{ formatCurrency(orderDetail.shippingSubsidy) }}</span
                   >
                 </div>
-                <div class="mini-row">
-                  <span class="mini-label">Ghi chú</span><span class="mini-value">{{ '---' }}</span>
+                <div class="mini-row align-items-start">
+                  <span class="mini-label mt-1">Ghi chú</span>
+                  <span class="mini-value" :class="{ 'text-muted': !orderDetail.deliveryNote }">
+                    {{ orderDetail.deliveryNote || 'Không có ghi chú' }}
+                  </span>
                 </div>
               </div>
             </div>

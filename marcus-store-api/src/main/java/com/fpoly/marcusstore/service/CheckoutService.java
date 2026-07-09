@@ -121,6 +121,7 @@ public class CheckoutService {
         order.setPaymentMethod(req.getPaymentMethod());
         order.setPaymentStatus("COD".equalsIgnoreCase(req.getPaymentMethod()) ? "UNPAID" : "PENDING");
         order.setOrderStatus("PENDING");
+        order.setDeliveryNote(req.getNote());
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         int totalWeightGram = 0;

@@ -218,6 +218,15 @@
                         </div>
                       </div>
                     </div>
+                    <div class="info-line" v-if="selectedOrder.deliveryNote">
+                      <i class="fa-solid fa-clipboard-user"></i>
+                      <div>
+                        <div class="info-label">Ghi chú của bạn</div>
+                        <div class="info-value" style="font-style: italic">
+                          "{{ selectedOrder.deliveryNote }}"
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </section>
 

@@ -41,4 +41,5 @@ public class OrderDetailResponse {
     private List<OrderStatusHistoryResponse> history;
     // marcus thêm
     private BigDecimal shippingSubsidy;
+    private String deliveryNote;
 }

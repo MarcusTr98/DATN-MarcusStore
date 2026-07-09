@@ -92,6 +92,9 @@ public class Order {
     @Column(name = "to_ward_code", length = 20)
     private String toWardCode;
 
+    @Column(name = "delivery_note", length = 500)
+    private String deliveryNote;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore
