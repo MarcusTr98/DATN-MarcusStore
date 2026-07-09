@@ -15,7 +15,7 @@
     <template v-else>
       <div class="row g-4">
         <div class="col-md-4" v-for="post in posts" :key="post.id">
-          <div class="card border-0 shadow-sm h-100 rounded-3 overflow-hidden bg-white">
+          <div class="card border-0 shadow-sm h-100 rounded-3 overflow-hidden bg-white position-relative">
             <div v-if="post.thumbnailUrl" class="post-thumb-wrap">
               <img :src="post.thumbnailUrl" aria-hidden="true" class="post-thumb-bg" />
               <img :src="post.thumbnailUrl" :alt="post.title" class="post-thumb-fg" />
@@ -31,7 +31,7 @@
               <p class="text-muted small line-clamp-3 mb-3">{{ post.excerpt }}</p>
               <router-link
                 :to="{ name: 'BlogDetail', params: { slug: post.slug } }"
-                class="btn btn-light btn-sm text-danger w-100 fw-bold border mt-auto"
+                class="btn btn-light btn-sm text-danger w-100 fw-bold border mt-auto stretched-link"
               >
                 Đọc chi tiết bài viết
               </router-link>
@@ -128,6 +128,14 @@ onMounted(() => loadPage(0))
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+.card.position-relative {
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.card.position-relative:hover {
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1) !important;
+  transform: translateY(-2px);
 }
 .pagination .page-link {
   color: #e1121c;
