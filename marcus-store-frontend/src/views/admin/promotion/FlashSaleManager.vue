@@ -145,10 +145,30 @@
                 </span>
               </td>
               <td class="text-center">
-                <button class="icon-button" title="Sửa" @click="openEditModal(slot)">
-                  <i class="bi bi-pencil-square"></i>
+                <button
+                  class="icon-button"
+                  :class="{ 'icon-button-locked': isSlotLocked(slot) }"
+                  :title="isSlotLocked(slot) ? 'Xem chi tiết (không thể chỉnh sửa)' : 'Sửa'"
+                  @click="openEditModal(slot)"
+                >
+                  <i :class="isSlotLocked(slot) ? 'bi bi-eye-fill' : 'bi bi-pencil-square'"></i>
                 </button>
-                <button class="icon-button danger ms-1" title="Xóa" @click="openDelModal(slot)">
+                <!-- Slot đã ACTIVE/ENDED/CANCELLED/PENDING: đổi nút Xóa thành Xem chi tiết thống kê -->
+                <button
+                  v-if="isSlotLocked(slot)"
+                  class="icon-button icon-button-detail ms-1"
+                  title="Xem chi tiết thống kê"
+                  @click="openDetailModal(slot)"
+                >
+                  <i class="bi bi-bar-chart-line-fill"></i>
+                </button>
+                <!-- Slot SCHEDULED/UPCOMING: giữ nút Xóa -->
+                <button
+                  v-else
+                  class="icon-button danger ms-1"
+                  title="Xóa"
+                  @click="openDelModal(slot)"
+                >
                   <i class="bi bi-trash3"></i>
                 </button>
               </td>
@@ -226,7 +246,21 @@
           </button>
         </div>
 
-        <form class="voucher-form" novalidate @submit.prevent="saveSlot">
+        <!-- Banner cảnh báo khi slot bị khóa (chỉ hiện khi edit slot đã ACTIVE/ENDED/CANCELLED/PENDING) -->
+        <div v-if="formLocked" class="fs-locked-banner">
+          <i class="bi bi-eye-fill"></i>
+          <div>
+            <strong>Chế độ chỉ xem</strong>
+            <span>{{ lockReason(editSlot) }}. Bạn có thể xem chi tiết nhưng không thể thay đổi bất kỳ trường nào.</span>
+          </div>
+        </div>
+
+        <form
+          class="voucher-form"
+          :class="{ 'form-locked-view': formLocked }"
+          novalidate
+          @submit.prevent="saveSlot"
+        >
           <!-- BASIC INFO -->
           <div class="form-section">
             <div class="section-title">
@@ -245,10 +279,16 @@
                   type="text"
                   class="form-control voucher-code-input"
                   :class="{ 'is-invalid': submitted && errors.name }"
+                  :readonly="formLocked"
                   placeholder="VD: Flash Sale Thứ 6 - iPhone Series"
                   maxlength="100"
                 />
-                <button type="button" class="generate-code-btn" @click="generateSlotName">
+                <button
+                  type="button"
+                  class="generate-code-btn"
+                  :disabled="formLocked"
+                  @click="generateSlotName"
+                >
                   <i class="bi bi-stars"></i>
                   Tạo tự động
                 </button>
@@ -277,6 +317,7 @@
                   type="datetime-local"
                   class="form-control"
                   :class="{ 'is-invalid': submitted && errors.startDate }"
+                  :readonly="formLocked"
                   :min="minStartDate"
                 />
                 <div v-if="submitted && errors.startDate" class="invalid-feedback">
@@ -291,6 +332,7 @@
                   type="datetime-local"
                   class="form-control"
                   :class="{ 'is-invalid': submitted && errors.endDate }"
+                  :readonly="formLocked"
                   :min="form.startDate || minStartDate"
                 />
                 <div v-if="submitted && errors.endDate" class="invalid-feedback">{{
@@ -338,6 +380,7 @@
                     type="button"
                     class="fs-banner-mode-btn"
                     :class="{ active: bannerInputMode === 'file' }"
+                    :disabled="formLocked"
                     @click="switchBannerMode('file')"
                   >
                     <i class="bi bi-upload"></i> Tải ảnh lên
@@ -346,6 +389,7 @@
                     type="button"
                     class="fs-banner-mode-btn"
                     :class="{ active: bannerInputMode === 'url' }"
+                    :disabled="formLocked"
                     @click="switchBannerMode('url')"
                   >
                     <i class="bi bi-link-45deg"></i> Dán URL
@@ -354,7 +398,7 @@
 
                 <!-- MODE: FILE UPLOAD -->
                 <div v-show="bannerInputMode === 'file'" class="fs-banner-file-zone">
-                  <label class="fs-banner-file-label">
+                  <label class="fs-banner-file-label" :class="{ 'fs-banner-file-locked': formLocked }">
                     <i class="bi bi-cloud-arrow-up"></i>
                     <span v-if="!bannerFileName">Chọn ảnh từ thiết bị</span>
                     <span v-else class="fs-banner-file-name">{{ bannerFileName }}</span>
@@ -363,6 +407,7 @@
                       type="file"
                       accept="image/png,image/jpeg,image/jpg,image/webp"
                       hidden
+                      :disabled="formLocked"
                       @change="onBannerFileChange"
                     />
                   </label>
@@ -380,6 +425,7 @@
                       type="text"
                       class="form-control"
                       :class="{ 'is-invalid': submitted && errors.bannerUrl }"
+                      :readonly="formLocked"
                       placeholder="https://example.com/banner-flashsale.png"
                       @input="onBannerUrlChange"
                     />
@@ -415,6 +461,7 @@
                   v-if="form.bannerUrl"
                   type="button"
                   class="fs-banner-clear-btn mt-2"
+                  :disabled="formLocked"
                   @click="clearBanner"
                 >
                   <i class="bi bi-x-circle"></i> Xóa ảnh
@@ -429,6 +476,7 @@
             <button
               class="fs-tab-btn"
               :class="{ active: activeTab === 0 }"
+              :disabled="formLocked"
               @click="switchTab(0)"
             >
               <i class="bi bi-box-seam"></i> Chọn sản phẩm
@@ -436,6 +484,7 @@
             <button
               class="fs-tab-btn"
               :class="{ active: activeTab === 1 }"
+              :disabled="formLocked"
               @click="switchTab(1)"
             >
               <i class="bi bi-grid-3x3-gap"></i> Theo danh mục
@@ -449,7 +498,8 @@
               <button
                 type="button"
                 class="fs-cascade-trigger"
-                :class="{ active: cascadeOpen, has: selectedItemPids.length > 0 }"
+                :class="{ active: cascadeOpen, has: selectedItemPids.length > 0, locked: formLocked }"
+                :disabled="formLocked"
                 @click.stop="cascadeOpen = !cascadeOpen"
               >
                 <i class="bi bi-diagram-3"></i>
@@ -637,6 +687,7 @@
                       inputmode="numeric"
                       class="fs-input"
                       :class="{ 'is-invalid': submitted && errors[`item_${pid}_price`] }"
+                      :readonly="formLocked"
                       :value="formatNumber(selItems[pid]?.flashSalePrice)"
                       @input="onPriceChange(pid, $event.target.value)"
                       placeholder="Nhập giá"
@@ -649,6 +700,7 @@
                     <input
                       type="number"
                       class="fs-input"
+                      :readonly="formLocked"
                       :value="selItems[pid]?.discountPercent || 0"
                       @input="onDiscountChange(pid, $event.target.value)"
                       min="0"
@@ -660,6 +712,7 @@
                       type="number"
                       class="fs-input"
                       :class="{ 'is-invalid': (submitted && errors[`item_${pid}_quantity`]) || qtyError[pid] }"
+                      :readonly="formLocked"
                       :value="selItems[pid]?.flashSaleQuantity || 0"
                       @input="onQtyChange(pid, $event.target.value)"
                       min="1"
@@ -672,7 +725,11 @@
                     </div>
                   </td>
                   <td>
-                    <button class="fs-rm-btn" @click="removeProduct(pid)">
+                    <button
+                      class="fs-rm-btn"
+                      :disabled="formLocked"
+                      @click="removeProduct(pid)"
+                    >
                       <i class="bi bi-x"></i>
                     </button>
                   </td>
@@ -694,7 +751,8 @@
                 <button
                   type="button"
                   class="fs-cat-trigger"
-                  :class="{ active: catOpen, has: activeCategoryId !== null }"
+                  :class="{ active: catOpen, has: activeCategoryId !== null, locked: formLocked }"
+                  :disabled="formLocked"
                   @click.stop="catOpen = !catOpen"
                 >
                   <i class="bi bi-grid-3x3-gap"></i>
@@ -733,6 +791,7 @@
                 v-if="selectedItemPids.length > 0"
                 type="button"
                 class="fs-link-btn"
+                :disabled="formLocked"
                 @click="removeAllSelected"
               >
                 <i class="bi bi-x-circle"></i> Xóa chọn
@@ -766,6 +825,7 @@
                       inputmode="numeric"
                       class="fs-input"
                       :class="{ 'is-invalid': submitted && errors[`item_${pid}_price`] }"
+                      :readonly="formLocked"
                       :value="formatNumber(selItems[pid]?.flashSalePrice)"
                       @input="onPriceChange(pid, $event.target.value)"
                       placeholder="Nhập giá"
@@ -778,6 +838,7 @@
                     <input
                       type="number"
                       class="fs-input"
+                      :readonly="formLocked"
                       :value="selItems[pid]?.discountPercent || 0"
                       @input="onDiscountChange(pid, $event.target.value)"
                       min="0"
@@ -789,6 +850,7 @@
                       type="number"
                       class="fs-input"
                       :class="{ 'is-invalid': (submitted && errors[`item_${pid}_quantity`]) || qtyError[pid] }"
+                      :readonly="formLocked"
                       :value="selItems[pid]?.flashSaleQuantity || 0"
                       @input="onQtyChange(pid, $event.target.value)"
                       min="1"
@@ -801,7 +863,11 @@
                     </div>
                   </td>
                   <td>
-                    <button class="fs-rm-btn" @click="removeProduct(pid)">
+                    <button
+                      class="fs-rm-btn"
+                      :disabled="formLocked"
+                      @click="removeProduct(pid)"
+                    >
                       <i class="bi bi-x"></i>
                     </button>
                   </td>
@@ -817,13 +883,32 @@
           </div>
 
           <div class="form-actions">
-            <button type="button" class="btn btn-soft" @click="resetForm">
+            <button
+              type="button"
+              class="btn btn-soft"
+              :disabled="formLocked"
+              @click="resetForm"
+            >
               <i class="bi bi-arrow-counterclockwise"></i>Làm mới
             </button>
 
-            <button type="submit" class="btn btn-primary-action" :disabled="saving || bannerUploading">
+            <!-- Ẩn hoàn toàn nút Lưu khi slot bị khóa; chỉ hiện nút Đóng -->
+            <button
+              v-if="!formLocked"
+              type="submit"
+              class="btn btn-primary-action"
+              :disabled="saving || bannerUploading"
+            >
               <i class="bi bi-check2-circle"></i>
               {{ saving || bannerUploading ? 'Đang xử lý...' : 'Lưu chiến dịch' }}
+            </button>
+            <button
+              v-else
+              type="button"
+              class="btn btn-primary-action"
+              @click="closeModal"
+            >
+              <i class="bi bi-x-circle"></i> Đóng
             </button>
           </div>
 
@@ -909,6 +994,13 @@
         />
       </div>
     </Transition>
+
+    <!-- Modal Xem chi tiết thống kê Flash Sale (cho slot đã ACTIVE/ENDED/CANCELLED/PENDING) -->
+    <FlashSaleDetailModal
+      :visible="detailVisible"
+      :slot-id="detailSlotId"
+      @close="closeDetailModal"
+    />
   </div>
 </template>
 <script setup>
@@ -916,6 +1008,7 @@ import {computed, reactive, ref, watch, onMounted, onUnmounted, nextTick} from '
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/flashSaleStore'
 import flashSaleApi from '@/api/FlashSaleApi'
+import FlashSaleDetailModal from '@/views/admin/promotion/FlashSaleDetailModal.vue'
 import '@/assets/css/FlashSale.css'
 
 const flashSaleStore = useFlashSaleStore()
@@ -1082,6 +1175,38 @@ function statusBadgeClass(slot) {
   }[slot.resolvedStatus] || 'info'
 }
 
+/**
+ * Phương án B: chỉ cho phép chỉnh sửa khi slot ở SCHEDULED hoặc UPCOMING
+ * (tức là chưa bắt đầu). Khi đã ACTIVE / ENDED / CANCELLED / PENDING
+ * thì khóa hoàn toàn.
+ *
+ * Tại sao khóa cả PENDING? Vì trạng thái này là fallback khi không xác định
+ * được thời gian, an toàn nhất là không cho sửa.
+ */
+function isSlotLocked(slot) {
+  if (!slot) return true
+  // Ưu tiên backend status (chính xác nhất). Nếu status = 1 → cho sửa.
+  if (slot.status != null) {
+    return slot.status !== 1
+  }
+  // Fallback dựa trên resolvedStatus (FE tự tính)
+  const editable = ['SCHEDULED', 'UPCOMING']
+  return !editable.includes(slot.resolvedStatus)
+}
+
+/**
+ * Lý do khóa — dùng hiển thị trong tooltip nút Sửa + toast thông báo.
+ */
+function lockReason(slot) {
+  const map = {
+    ACTIVE: 'Flash Sale đang diễn ra, không thể chỉnh sửa',
+    ENDED: 'Flash Sale đã kết thúc, không thể chỉnh sửa',
+    CANCELLED: 'Flash Sale đã bị hủy, không thể chỉnh sửa',
+    PENDING: 'Flash Sale chưa sẵn sàng, không thể chỉnh sửa',
+  }
+  return map[slot?.resolvedStatus] || 'Flash Sale đã bị khóa, không thể chỉnh sửa'
+}
+
 // Cột 'Đã sử dụng': trả về true khi slot đã bán hết (used >= total)
 function isSlotExhausted(slot) {
   const used = slot.usedQuantity ?? 0
@@ -1100,6 +1225,12 @@ const isModalOpen = ref(false)
 const isEditing = ref(false)
 const activeTab = ref(0)
 const editSlotId = ref(null)
+const editSlot = ref(null) // Lưu slot đang edit để check locked trong form
+const formLocked = ref(false) // true khi mở edit slot đã ACTIVE/ENDED/CANCELLED
+
+// === Modal Xem chi tiết thống kê (chỉ hiện cho slot đã locked) ===
+const detailVisible = ref(false)
+const detailSlotId = ref(null)
 const overlappingSlots = ref([])   // PHẢI khai báo trước watcher overlap
 
 // === Banner preview lightbox (xem ảnh lớn khi click thumbnail trong bảng) ===
@@ -1579,6 +1710,8 @@ function onQtyChange(skuId, value) {
 
 function openCreateModal() {
   editSlotId.value = null
+  editSlot.value = null
+  formLocked.value = false
   isEditing.value = false
   resetForm()
   isModalOpen.value = true
@@ -1586,9 +1719,43 @@ function openCreateModal() {
   flashSaleStore.fetchCascade({ includeOutOfStock: false })
 }
 
+/**
+ * Khi admin click nút Sửa trên slot đã khóa → mở form view-only (không toast).
+ * Helper này hiện không được gọi trực tiếp nhưng giữ lại để dùng cho test/debug.
+ */
+// eslint-disable-next-line no-unused-vars
+function onLockedEditClick(slot) {
+  showToast({
+    type: 'warning',
+    title: 'Không thể chỉnh sửa',
+    message: lockReason(slot),
+  })
+}
+
+/**
+ * Mở modal Xem chi tiết thống kê cho slot đã ACTIVE/ENDED/CANCELLED/PENDING.
+ * Component con (FlashSaleDetailModal) tự gọi API lấy items + soldQuantity.
+ */
+function openDetailModal(slot) {
+  detailSlotId.value = slot.slotId
+  detailVisible.value = true
+}
+
+function closeDetailModal() {
+  detailVisible.value = false
+  // Reset slotId sau khi đóng để lần mở sau luôn fetch mới
+  setTimeout(() => {
+    detailSlotId.value = null
+  }, 200)
+}
+
 async function openEditModal(slot) {
+  // Hướng view-only: vẫn cho mở form để admin xem chi tiết
+  // Khi slot đã ACTIVE/ENDED/CANCELLED/PENDING → formLocked=true → input readonly + mờ
   editSlotId.value = slot.slotId
+  editSlot.value = slot
   isEditing.value = true
+  formLocked.value = isSlotLocked(slot)
   resetForm(false)
 
   // Lấy chi tiết từ BE để có items đã chọn
@@ -1637,6 +1804,10 @@ async function openEditModal(slot) {
 
 function closeModal() {
   isModalOpen.value = false
+  formLocked.value = false
+  editSlot.value = null
+  editSlotId.value = null
+  isEditing.value = false
 }
 
 function switchTab(i) {
@@ -1687,6 +1858,16 @@ function toIsoString(localStr) {
 }
 
 async function saveSlot() {
+  // Defense in depth: chặn gọi update API ngay cả khi ai đó bypass UI
+  if (isEditing.value && formLocked.value) {
+    showToast({
+      type: 'warning',
+      title: 'Không thể chỉnh sửa',
+      message: lockReason(editSlot.value),
+    })
+    return
+  }
+
   submitted.value = true
   if (Object.keys(errors.value).length > 0) {
     showToast({
@@ -1911,6 +2092,154 @@ onUnmounted(() => {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* === Icon button khi bị khóa (slot ACTIVE/ENDED/CANCELLED/PENDING) — LÀM ĐẬM === */
+/* Mục đích: nút 👁️ vẫn phải nổi bật, dễ click, dễ thấy */
+.icon-button-locked {
+  opacity: 1 !important;          /* KHÔNG mờ icon */
+  cursor: pointer !important;     /* vẫn click được mở form */
+  color: #2563eb;                 /* xanh dương đậm thay vì xám */
+  font-weight: 700;
+  transform: scale(1.08);         /* phóng to nhẹ để nổi bật */
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.icon-button-locked:hover {
+  color: #1d4ed8;
+  transform: scale(1.15);
+  background: rgba(37, 99, 235, 0.08);
+}
+.icon-button-locked i {
+  font-size: 1.1em;               /* icon to hơn */
+  font-weight: 700;
+}
+.icon-button.danger {
+  color: #dc2626;
+  font-weight: 700;
+}
+.icon-button.danger:hover {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.08);
+}
+.icon-button.danger i {
+  font-size: 1.1em;
+}
+
+/* === Icon button Xem chi tiết thống kê (slot đã ACTIVE/ENDED/CANCELLED/PENDING) === */
+/* Màu teal/cyan đậm để phân biệt với nút Sửa (xanh) và Xóa (đỏ) */
+.icon-button-detail {
+  color: #0891b2;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.icon-button-detail:hover {
+  color: #0e7490;
+  background: rgba(8, 145, 178, 0.10);
+  transform: scale(1.08);
+}
+.icon-button-detail:active {
+  transform: scale(0.96);
+}
+.icon-button-detail i {
+  font-size: 1.1em;
+}
+
+/* === Banner cảnh báo trong modal khi slot bị khóa === */
+.fs-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 24px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  color: #7a5d00;
+}
+.fs-locked-banner i {
+  font-size: 24px;
+  color: #b8860b;
+  flex-shrink: 0;
+}
+.fs-locked-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fs-locked-banner strong {
+  font-size: 14px;
+  color: #5c4400;
+}
+.fs-locked-banner span {
+  font-size: 13px;
+  color: #7a5d00;
+}
+
+/* === Banner file label bị khóa === */
+.fs-banner-file-locked {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  background-color: #f3f4f6;
+}
+
+/* === View-only mode: MỜ NHẸ 30% + giữ form dễ đọc === */
+/* Khi admin mở form edit slot đã ACTIVE/ENDED/CANCELLED/PENDING */
+.form-locked-view .form-section,
+.form-locked-view .fs-tabs,
+.form-locked-view .fs-tab-content,
+.form-locked-view .fs-sel-table-wrap {
+  opacity: 0.7;                  /* mờ 30% (1 - 0.7 = 30%) */
+}
+/* BỎ overlay xám phủ — không cần vì input đã được readonly + mờ 30% */
+.form-locked-view .form-section::after,
+.form-locked-view .fs-tab-content::after {
+  display: none;
+}
+
+/* Input/select/textarea readonly → mờ nhẹ + nền xám nhẹ + cursor */
+.form-locked-view input[readonly],
+.form-locked-view textarea[readonly],
+.form-locked-view select[readonly] {
+  background-color: #f9fafb !important;   /* xám rất nhạt */
+  color: #4b5563 !important;              /* chữ xám đậm để dễ đọc */
+  cursor: default !important;             /* default thay vì not-allowed vì vẫn select được */
+  border-color: #e5e7eb !important;
+}
+/* KHÔNG làm mờ input/select thêm — đã mờ 30% ở container rồi */
+.form-locked-view input[readonly],
+.form-locked-view textarea[readonly] {
+  opacity: 1;
+}
+.form-locked-view input[readonly]:focus,
+.form-locked-view textarea[readonly]:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Button/file bị disabled → KHÔNG mờ thêm (đã mờ ở container 30%) */
+.form-locked-view button:disabled,
+.form-locked-view input[type="file"]:disabled {
+  opacity: 1;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* Cascade/cat trigger khi locked */
+.form-locked-view .fs-cascade-trigger,
+.form-locked-view .fs-cat-trigger {
+  opacity: 1;
+  background-color: #f9fafb !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* Tabs cũng bị mờ nhẹ */
+.form-locked-view .fs-tab-btn:disabled {
+  opacity: 1;
+  cursor: not-allowed !important;
 }
 
 /* === Banner lightbox === */

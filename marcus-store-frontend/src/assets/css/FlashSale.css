@@ -2157,6 +2157,18 @@
   color: #0369a1;
 }
 
+.toast-alert.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.toast-alert.warning {
+  border-color: #fcd34d;
+  background: #fffbeb;
+  color: #92400e;
+}
+
 .toast-alert strong {
   font-size: 0.95rem;
   font-weight: 700;

@@ -57,6 +57,29 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         return (keyword == null || keyword.isBlank()) ? null : keyword.trim();
     }
 
+    /**
+     * Kiểm tra slot có cho phép chỉnh sửa hay không (Phương án B).
+     * Cho sửa khi:
+     *   - status = 1 (SCHEDULED): đã lên lịch, chưa chạy → OK
+     *   - status = 1 (SCHEDULED) nhưng đã quá endDate (chưa chạy kịp) → vẫn coi như
+     *     "scheduled", nhưng thực tế scheduled job sẽ chuyển sang ENDED → sau đó sẽ
+     *     bị chặn. Để đơn giản ta để SCHEDULED luôn cho sửa (admin có thể "cứu" slot
+     *     quá hạn bằng cách kéo dài endDate).
+     *   - status = 1 kèm startDate > now → tức UPCOMING trong FE nhưng BE vẫn là status=1
+     *     → OK
+     *
+     * Chặn khi:
+     *   - status = 2 (ACTIVE): đang diễn ra
+     *   - status = 3 (ENDED): đã kết thúc
+     *   - status = 4 (CANCELLED): đã hủy
+     *   - status = 0 hoặc null: PENDING/chưa rõ → chặn cho chắc
+     */
+    private boolean isSlotEditable(FlashSaleSlot slot) {
+        Short s = slot.getStatus();
+        if (s == null) return false;
+        return s == 1; // chỉ cho sửa khi SCHEDULED
+    }
+
 /**
      * Validate toàn bộ request trước khi tạo slot.
      * - Thời gian hợp lệ (startDate không ở quá khứ, endDate > startDate)
@@ -361,7 +384,29 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                         HttpStatus.NOT_FOUND,
                         "Không tìm thấy flash sale với id: " + slotId));
 
-        // 2. Validate thời gian + items (tái sử dụng validateRequest của create)
+        // 2. Chặn update theo trạng thái hiện tại của slot
+        //    Quy tắc mới (Phương án B):
+        //    - status = 1 (Lên lịch)  → cho update như bình thường
+        //    - status = ?? resolve UPCOMING (endDate > now > startDate CHƯA ĐẾN, tức startDate > now)
+        //                  thì cũng cho update vì chưa chạy
+        //    - Bất kỳ trạng thái nào khác (ACTIVE=2, ENDED=3, CANCELLED=4, PENDING=…)
+        //                  → cấm update hoàn toàn, slot bất biến
+        //    Lưu ý: FE đã disable nút Sửa với các trạng thái locked, nhưng vẫn check BE
+        //    để chặn truy cập API trực tiếp (defense in depth).
+        Short currentStatus = slot.getStatus();
+        boolean isEditable = isSlotEditable(slot);
+        if (!isEditable) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Flash sale đang ở trạng thái '" + slot.getStatus()
+                            + "', không thể chỉnh sửa. Chỉ cho phép sửa khi slot ở trạng thái SCHEDULED/UPCOMING (chưa bắt đầu).");
+        }
+        boolean isRunning = currentStatus != null && currentStatus == 2;
+        boolean wantToStopRunning = isRunning
+                && request.getStatus() != null
+                && request.getStatus() != 2;
+
+        // 3. Validate thời gian + items (luôn chạy để giữ message lỗi nhất quán)
         //    Lưu ý: slot cũ có thể đã chạy nên KHÔNG chặn startDate ở quá khứ.
         if (request.getStartDate() == null || request.getEndDate() == null
                 || !request.getEndDate().isAfter(request.getStartDate())) {
@@ -375,7 +420,60 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     "Phải có ít nhất 1 sản phẩm trong Flash Sale");
         }
 
-        // 3. Load SKU map từ request
+        // 4. Nếu đang chạy (status=2) mà KHÔNG tắt đi → chặn đổi thời gian + chặn sửa items
+        //    Đoạn này hiện không bao giờ chạy vì guard isEditable() đã chặn ACTIVE,
+        //    giữ lại cho tương thích nếu sau này muốn cho ACTIVE update với điều kiện.
+        if (isRunning && !wantToStopRunning) {
+            // 4a. Chặn đổi thời gian
+            if (!slot.getStartDate().equals(request.getStartDate())
+                    || !slot.getEndDate().equals(request.getEndDate())) {
+                throw new ResponseStatusException(
+                        HttpStatus.FORBIDDEN,
+                        "Flash sale đang diễn ra, không thể thay đổi thời gian bắt đầu/kết thúc");
+            }
+            // 4b. Chặn sửa items: bắt buộc gửi đúng danh sách SKU + giá + số lượng hiện tại
+            List<FlashSaleItem> oldItemsRunning = flashSaleItemRepository.findBySlotSlotId(slotId);
+            Map<Integer, FlashSaleItem> oldItemMap = oldItemsRunning.stream()
+                    .collect(Collectors.toMap(it -> it.getId().getSkuId(), it -> it));
+
+            Set<Integer> newSkuIds = new HashSet<>();
+            for (FlashSaleItemRequest ir : request.getItems()) {
+                if (ir.getSkuId() == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "SKU id không được để trống");
+                }
+                if (!newSkuIds.add(ir.getSkuId())) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "SKU id bị trùng trong request: " + ir.getSkuId());
+                }
+                FlashSaleItem old = oldItemMap.get(ir.getSkuId());
+                if (old == null) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Flash sale đang diễn ra, không thể thêm SKU mới: " + ir.getSkuId());
+                }
+                if (old.getOriginalPrice().compareTo(ir.getOriginalPrice()) != 0) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Flash sale đang diễn ra, không thể thay đổi giá gốc của SKU " + ir.getSkuId());
+                }
+                if (old.getFlashSalePrice().compareTo(ir.getFlashSalePrice()) != 0) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Flash sale đang diễn ra, không thể thay đổi giá Flash Sale của SKU " + ir.getSkuId());
+                }
+                if (!old.getFlashSaleQuantity().equals(ir.getFlashSaleQuantity())) {
+                    throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                            "Flash sale đang diễn ra, không thể thay đổi số lượng Flash Sale của SKU "
+                                    + ir.getSkuId());
+                }
+            }
+            // Không được xoá SKU đang chạy
+            Set<Integer> oldSkuIds = oldItemMap.keySet();
+            if (!oldSkuIds.equals(newSkuIds)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Flash sale đang diễn ra, không thể thêm/xoá sản phẩm khỏi slot");
+            }
+        }
+
+        // 5. Load SKU map từ request
         List<FlashSaleItemRequest> itemRequests = request.getItems();
         List<Integer> skuIds = itemRequests.stream()
                 .map(FlashSaleItemRequest::getSkuId)
@@ -384,10 +482,11 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         Map<Integer, ProductSku> skuMap = skus.stream()
                 .collect(Collectors.toMap(ProductSku::getSkuId, s -> s));
 
-        // 4. Validate SKU tồn tại + giá/số lượng hợp lệ (tái sử dụng helper trong validateRequest)
-        //    Lấy tay vì startDate có thể ở quá khứ nhưng phần còn lại giống create.
-        Set<Integer> seenSkuIds = new HashSet<>();
-        for (FlashSaleItemRequest ir : itemRequests) {
+        // 6. Validate chi tiết items (giá > 0, flashSalePrice < originalPrice, số lượng hợp lệ, không vượt tồn kho)
+        //    Bỏ qua khi đang chạy (status=2 & không tắt) vì đã chặn ở bước 4b.
+        if (!(isRunning && !wantToStopRunning)) {
+            Set<Integer> seenSkuIds = new HashSet<>();
+            for (FlashSaleItemRequest ir : itemRequests) {
             if (ir.getSkuId() == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                         "SKU id không được để trống");
@@ -426,8 +525,9 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                         ir.getSkuId(), stock));
             }
         }
+        }
 
-        // 5. Build map items cũ theo skuId để check soldQuantity
+        // 7. Build map items cũ theo skuId để check soldQuantity
         //    (tránh vi phạm CHECK constraint flash_sale_quantity >= soldQuantity)
         List<FlashSaleItem> oldItems = flashSaleItemRepository.findBySlotSlotId(slotId);
         Map<Integer, Integer> oldSoldQtyBySku = oldItems.stream()
@@ -443,7 +543,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             }
         }
 
-        // 6. Validate overlap với slot khác (status 1/2), trừ chính mình
+        // 8. Validate overlap với slot khác (status 1/2), trừ chính mình
         List<FlashSaleSlot> overlapping = flashSaleSlotRepository
                 .findOverlappingSlots(request.getStartDate(), request.getEndDate(), slotId);
         if (!overlapping.isEmpty()) {
@@ -456,18 +556,27 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     "Khung giờ đã bị trùng với các flash sale khác: " + detail);
         }
 
-        // 7. Update field trên entity
-        slot.setName(request.getName());
-        slot.setStartDate(request.getStartDate());
-        slot.setEndDate(request.getEndDate());
-        if (request.getStatus() != null) {
-            slot.setStatus(request.getStatus());
+        // 9. Update field trên entity
+        //    Khi đang chạy (status=2) và KHÔNG tắt đi: KHÔNG cập nhật thời gian, status giữ nguyên = 2
+        if (isRunning && !wantToStopRunning) {
+            slot.setName(request.getName());
+            slot.setBannerImageUrl(request.getBannerImageUrl());
+            // status giữ nguyên = 2, startDate/endDate giữ nguyên
+        } else {
+            slot.setName(request.getName());
+            slot.setStartDate(request.getStartDate());
+            slot.setEndDate(request.getEndDate());
+            if (request.getStatus() != null) {
+                slot.setStatus(request.getStatus());
+            }
+            slot.setBannerImageUrl(request.getBannerImageUrl());
         }
-        slot.setBannerImageUrl(request.getBannerImageUrl());
 
-        // 8. Replace items: clear collection (orphanRemoval sẽ xoá cũ) + add mới
-        slot.getFlashSaleItems().clear();
-        for (FlashSaleItemRequest ir : itemRequests) {
+        // 10. Replace items: clear collection (orphanRemoval sẽ xoá cũ) + add mới
+        //     BỎ QUA khi đang chạy (status=2 & không tắt) để giữ nguyên items đang bán
+        if (!(isRunning && !wantToStopRunning)) {
+            slot.getFlashSaleItems().clear();
+            for (FlashSaleItemRequest ir : itemRequests) {
             FlashSaleItemId itemId = new FlashSaleItemId();
             itemId.setSlotId(slotId);
             itemId.setSkuId(ir.getSkuId());
@@ -484,10 +593,11 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             }
             slot.getFlashSaleItems().add(newItem);
         }
+        }
 
         FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
 
-        // 9. Build response giống createFlashSale để có items[] (form chỉnh sửa render lại đúng)
+        // 11. Build response giống createFlashSale để có items[] (form chỉnh sửa render lại đúng)
         Map<Integer, ProductSku> skuMapForResponse = skuMap; // đã load ở bước 3
         List<FlashSaleItemResponse> itemResponses = new ArrayList<>();
         for (FlashSaleItem savedItem : savedSlot.getFlashSaleItems()) {
@@ -561,10 +671,10 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
     // ========================================================
     // SCHEDULED: Tự động chuyển trạng thái flash sale theo thời gian
-    // Chạy mỗi 5 phút (cron: giây phút giờ ngày-tháng tháng thứ)
+    // Chạy mỗi 1 phút (cron: giây phút giờ ngày-tháng tháng thứ)
     // ========================================================
     @Override
-    @Scheduled(cron = "0 */5 * * * *")
+    @Scheduled(cron = "0 * * * * *")
     @Transactional
     public void autoUpdateFlashSaleStatuses() {
         LocalDateTime now = LocalDateTime.now();
