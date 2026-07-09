@@ -59,6 +59,8 @@ public class CheckoutService {
     private AdminNotificationService notificationService;
     @Autowired
     private ShippingService shippingService; // NÂNG CẤP: Thêm ShippingService để tính trợ giá
+    @Autowired
+    private OrderTransactionService orderTransactionService;
 
     @Transactional(readOnly = true)
     public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -154,7 +156,6 @@ public class CheckoutService {
             totalWeightGram += itemWeight;
         }
 
-        // --- BẮT ĐẦU: LOGIC XỬ LÝ PHÍ SHIP VÀ TRỢ GIÁ (ĐÃ ĐƯỢC CHUẨN HÓA) ---
         Integer rawShippingFee = ghnService.calculateShippingFee(
                 req.getToDistrictId(), req.getToWardCode(), totalWeightGram, totalAmount.intValue());
         BigDecimal ghnStandardFee = BigDecimal.valueOf(rawShippingFee);
@@ -204,10 +205,18 @@ public class CheckoutService {
                 .subtract(freeshipAmount);
 
         order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
-        // --- KẾT THÚC: LOGIC DÒNG TIỀN ---
 
         Order savedOrder = orderRepository.save(order);
+        String transactionType = "COD".equalsIgnoreCase(savedOrder.getPaymentMethod())
+                ? "COD_COLLECTION"
+                : savedOrder.getPaymentMethod() + "_PAYMENT";
 
+        orderTransactionService.recordTransaction(
+                savedOrder,
+                savedOrder.getFinalAmount(),
+                transactionType,
+                "PENDING",
+                "Khởi tạo giao dịch chờ thanh toán cho đơn hàng mới");
         if (appliedVoucherId != null) {
             voucherService.confirmVoucherUsage(appliedVoucherId, currentUserId);
         }
