@@ -4,12 +4,18 @@ import com.fpoly.marcusstore.dto.request.PostRequestDTO;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.dto.response.PostResponseDTO;
 import com.fpoly.marcusstore.service.PostService;
+import com.fpoly.marcusstore.service.CloudinaryService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/posts")
@@ -18,6 +24,9 @@ public class AdminPostController {
 
     @Autowired
     private PostService postService;
+
+    @Autowired
+    private CloudinaryService cloudinaryService;
 
     // GET /api/admin/posts
     @GetMapping
@@ -31,7 +40,29 @@ public class AdminPostController {
         return ApiResponse.success(postService.getOne(id));
     }
 
-    // POST /api/admin/posts
+   
+    @GetMapping("/check-slug")
+    public ApiResponse<Map<String, Boolean>> checkSlug(
+            @RequestParam String slug,
+            @RequestParam(required = false) Integer excludeId) {
+        boolean exists = postService.checkSlugExists(slug, excludeId);
+        return ApiResponse.success(Map.of("exists", exists));
+    }
+
+        // POST /api/admin/posts/upload-image
+    @PostMapping(value = "/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('POST_CREATE')")
+    public ApiResponse<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) {
+        try {
+            String url = cloudinaryService.uploadImage(file);
+            return ApiResponse.success(Map.of("url", url));
+        } catch (IOException e) {
+            throw new RuntimeException("Upload ảnh thất bại: " + e.getMessage());
+        }
+    }
+
+
+     // POST /api/admin/posts
     @PostMapping
     @PreAuthorize("hasAuthority('POST_CREATE')")
     public ApiResponse<PostResponseDTO> add(@Valid @RequestBody PostRequestDTO req) {
