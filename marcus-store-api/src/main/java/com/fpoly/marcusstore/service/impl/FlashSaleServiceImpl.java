@@ -586,7 +586,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
 
         // 11. Build response giống createFlashSale để có items[] (form chỉnh sửa render lại đúng)
-        Map<Integer, ProductSku> skuMapForResponse = skuMap; // đã load ở bước 3
+        Map<Integer, ProductSku> skuMapForResponse = skuMap;
         List<FlashSaleItemResponse> itemResponses = new ArrayList<>();
         for (FlashSaleItem savedItem : savedSlot.getFlashSaleItems()) {
             ProductSku sku = skuMapForResponse.get(savedItem.getId().getSkuId());
