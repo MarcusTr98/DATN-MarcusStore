@@ -53,14 +53,15 @@ public class CheckoutService {
     private VoucherRepository voucherRepository;
     @Autowired
     private VoucherService voucherService;
-
     @Autowired
     private GhnService ghnService;
-  
     @Autowired
     private AdminNotificationService notificationService;
+    @Autowired
+    private ShippingService shippingService; // NÂNG CẤP: Thêm ShippingService để tính trợ giá
+    @Autowired
+    private OrderTransactionService orderTransactionService;
 
-    // Hàm tính phí ship cho Frontend gọi real-time
     @Transactional(readOnly = true)
     public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
         Integer currentUserId = SecurityUtils.getCurrentUserId();
@@ -78,7 +79,7 @@ public class CheckoutService {
         for (CartItem item : cartItems) {
             int weight = item.getSku().getWeightGram() != null ? item.getSku().getWeightGram() : 500;
             totalWeightGram += (weight * item.getQuantity());
-            totalAmount += item.getSku().getPrice().intValue() * item.getQuantity(); // CỘNG TIỀN
+            totalAmount += item.getSku().getPrice().intValue() * item.getQuantity();
         }
 
         return ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(), totalWeightGram,
@@ -117,13 +118,12 @@ public class CheckoutService {
         order.setRecipientName(req.getRecipientName());
         order.setRecipientPhone(req.getRecipientPhone());
         order.setShippingAddress(req.getShippingAddress());
-
         order.setToDistrictId(req.getToDistrictId());
         order.setToWardCode(req.getToWardCode());
-
         order.setPaymentMethod(req.getPaymentMethod());
         order.setPaymentStatus("COD".equalsIgnoreCase(req.getPaymentMethod()) ? "UNPAID" : "PENDING");
         order.setOrderStatus("PENDING");
+        order.setDeliveryNote(req.getNote());
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         int totalWeightGram = 0;
@@ -156,12 +156,14 @@ public class CheckoutService {
             totalWeightGram += itemWeight;
         }
 
-        Integer shippingFee = ghnService.calculateShippingFee(
-                req.getToDistrictId(),
-                req.getToWardCode(),
-                totalWeightGram,
-                totalAmount.intValue());
-        BigDecimal shippingFeeDecimal = BigDecimal.valueOf(shippingFee);
+        Integer rawShippingFee = ghnService.calculateShippingFee(
+                req.getToDistrictId(), req.getToWardCode(), totalWeightGram, totalAmount.intValue());
+        BigDecimal ghnStandardFee = BigDecimal.valueOf(rawShippingFee);
+
+        var shippingCalc = shippingService.calculateFinalShipping(totalAmount, ghnStandardFee);
+        BigDecimal discountedShippingFee = shippingCalc.getDiscountedShippingFee(); // Phí khách thực trả
+        BigDecimal shopShippingSubsidy = ghnStandardFee.subtract(discountedShippingFee); // Tiền shop bù
+
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal freeshipAmount = BigDecimal.ZERO;
         Voucher voucher = null;
@@ -171,19 +173,15 @@ public class CheckoutService {
             ApplyVoucherRequest applyReq = ApplyVoucherRequest.builder()
                     .voucherCode(req.getVoucherCode())
                     .orderAmount(totalAmount)
-                    .shippingFee(shippingFeeDecimal)
+                    .shippingFee(ghnStandardFee) // Gửi phí ship gốc để Voucher xử lý
                     .build();
 
             VoucherApplyResult result = voucherService.applyVoucher(applyReq, currentUserId);
 
             if (!result.isApplied()) {
-                // Throw ResponseStatusException kèm errorCode để FE phân biệt loại lỗi
-                // (mở lại modal chọn voucher khi voucher bị khóa / hết hạn / hết lượt)
                 String reason = result.getMessage();
                 String code = result.getErrorCode();
-                String fullReason = (code != null && !code.isBlank())
-                        ? reason + "|" + code
-                        : reason;
+                String fullReason = (code != null && !code.isBlank()) ? reason + "|" + code : reason;
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fullReason);
             }
 
@@ -191,26 +189,34 @@ public class CheckoutService {
             freeshipAmount = result.getFreeshipAmount() != null ? result.getFreeshipAmount() : BigDecimal.ZERO;
             appliedVoucherId = result.getVoucherId();
             voucher = voucherRepository.findById(appliedVoucherId).orElse(null);
-
             order.setVoucher(voucher);
         }
 
+        // Lưu giữ liệu dòng tiền gốc vào Database
         order.setTotalAmount(totalAmount);
-        order.setShippingFee(shippingFeeDecimal);
+        order.setShippingFee(ghnStandardFee);
+        order.setShippingSubsidy(shopShippingSubsidy); // Lưu 60K trợ giá vào DB
         order.setDiscountAmount(discountAmount);
 
-        BigDecimal finalAmount = totalAmount.add(shippingFeeDecimal)
+        // Tính Final Amount bằng toán học chặt chẽ
+        BigDecimal finalAmount = totalAmount
+                .add(discountedShippingFee) // Cộng phí ship ĐÃ TRỪ TRỢ GIÁ
                 .subtract(discountAmount)
                 .subtract(freeshipAmount);
 
         order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
         Order savedOrder = orderRepository.save(order);
+        String transactionType = "COD".equalsIgnoreCase(savedOrder.getPaymentMethod())
+                ? "COD_COLLECTION"
+                : savedOrder.getPaymentMethod() + "_PAYMENT";
 
-        // Re-validate voucher lần cuối trước khi trừ quota:
-        // - Voucher có thể đã bị admin khóa giữa lúc user apply và lúc thanh toán
-        // - Có thể vừa hết lượt do race condition với user khác
-        // - Nếu throw, @Transactional ở method cha sẽ rollback toàn bộ Order
+        orderTransactionService.recordTransaction(
+                savedOrder,
+                savedOrder.getFinalAmount(),
+                transactionType,
+                "PENDING",
+                "Khởi tạo giao dịch chờ thanh toán cho đơn hàng mới");
         if (appliedVoucherId != null) {
             voucherService.confirmVoucherUsage(appliedVoucherId, currentUserId);
         }
@@ -234,9 +240,8 @@ public class CheckoutService {
         try {
             String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
             java.text.NumberFormat formatVN = java.text.NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
-            String formattedAmount = formatVN.format(savedOrder.getFinalAmount());
             String notifMessage = "Khách hàng " + savedOrder.getRecipientName() + " vừa đặt một đơn hàng trị giá "
-                    + formattedAmount + "đ.";
+                    + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
             notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage, savedOrder.getOrderCode());
         } catch (Exception e) {
             log.error("[Cảnh báo] Lỗi khi bắn thông báo WebSocket", e);

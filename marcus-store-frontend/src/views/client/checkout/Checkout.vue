@@ -25,7 +25,9 @@
       :is-loading="isAvailableVouchersLoading"
       :pre-selected-id="null"
       :title="reSelectVoucherMessage ? 'Voucher không khả dụng' : 'Chọn 1 Voucher Áp Dụng'"
-      :subtitle="reSelectVoucherMessage || 'Hệ thống tự động chọn mã có giá trị giảm cao nhất cho bạn'"
+      :subtitle="
+        reSelectVoucherMessage || 'Hệ thống tự động chọn mã có giá trị giảm cao nhất cho bạn'
+      "
       @close="closeReSelectVoucherModal"
       @confirm="handleVoucherModalConfirm"
     />
@@ -70,6 +72,10 @@
 
     <div class="checkout-body">
       <div class="checkout-left">
+        <router-link to="/cart" class="btn-back-to-cart">
+          <i class="fas fa-arrow-left"></i> Quay lại giỏ hàng
+        </router-link>
+
         <!-- Danh sách địa chỉ đã lưu -->
         <div class="checkout-card mb-3" v-if="savedAddresses.length > 0">
           <div class="checkout-card__title">
@@ -78,14 +84,7 @@
             <span class="address-count-badge">{{ savedAddresses.length }}</span>
           </div>
 
-          <div
-            class="saved-address-list"
-            style="
-              display: grid;
-              grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-              gap: 12px;
-            "
-          >
+          <div class="saved-address-list">
             <button
               v-for="addr in savedAddresses"
               :key="addr.addressId"
@@ -269,11 +268,8 @@
           <div class="payment-options">
             <label class="payment-option payment-option--active">
               <input type="radio" checked class="payment-option__radio" />
-              <div
-                class="payment-option__icon"
-                style="background: transparent; width: auto; padding: 0 10px"
-              >
-                <i class="fas fa-shipping-fast text-danger" style="font-size: 28px"></i>
+              <div class="payment-option__icon payment-option__icon--plain">
+                <i class="fas fa-shipping-fast text-danger shipping-method-icon"></i>
               </div>
               <div class="payment-option__body">
                 <span class="shipping-option__name">Giao Hàng Nhanh (GHN)</span>
@@ -283,15 +279,7 @@
                 <span class="payment-option__desc" v-else>Giao hàng tận nơi toàn quốc</span>
               </div>
 
-              <div
-                style="
-                  font-size: 15px;
-                  font-weight: 800;
-                  color: #d92d20;
-                  padding-right: 15px;
-                  text-align: right;
-                "
-              >
+              <div class="shipping-fee-display">
                 <i class="fas fa-spinner fa-spin text-muted" v-if="isFeeLoading"></i>
                 <template v-else-if="toWardCode">
                   <span v-if="hasFreeshipVoucher" class="text-success">Miễn phí</span>
@@ -299,13 +287,7 @@
                     <!-- Hiển thị phí gốc bị gạch ngang nếu có Freeship hoặc giảm giá ship từ hệ thống -->
                     <del
                       v-if="shippingData.standardShippingFee > shippingData.discountedShippingFee"
-                      style="
-                        font-size: 12px;
-                        color: #9ca3af;
-                        font-weight: 500;
-                        display: block;
-                        line-height: 1;
-                      "
+                      class="shipping-fee-original"
                     >
                       {{ shippingData.standardShippingFee?.toLocaleString('vi-VN') }}₫
                     </del>
@@ -316,9 +298,7 @@
                     >
                   </template>
                 </template>
-                <span class="text-muted" style="font-size: 12px; font-weight: 500" v-else>
-                  Chưa xác định
-                </span>
+                <span class="text-muted shipping-fee-undetermined" v-else> Chưa xác định </span>
               </div>
 
               <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
@@ -481,11 +461,7 @@
 
             <!-- Nút chọn voucher -->
             <div class="order-totals__row" v-else>
-              <button
-                type="button"
-                class="btn-voucher-select"
-                @click="openVoucherModal"
-              >
+              <button type="button" class="btn-voucher-select" @click="openVoucherModal">
                 <i class="fas fa-ticket-alt me-1"></i> Chọn Voucher
               </button>
             </div>
@@ -648,8 +624,7 @@ const savedVoucher = JSON.parse(localStorage.getItem('selectedVoucher') || 'null
 const appliedVoucherCode = ref(savedVoucher?.code || '')
 
 // Tích hợp Shipping Data mới theo Backend (Cơ chế Upsell/Freeship của Marcus)
-const estimatedDelivery = ref('')
-const shippingData = ref({
+const getDefaultShippingData = () => ({
   standardShippingFee: 0,
   discountedShippingFee: 0,
   isFreeship: false,
@@ -658,6 +633,15 @@ const shippingData = ref({
   amountUntilFreeship: 0,
   suggestionMessage: '',
 })
+
+const estimatedDelivery = ref('')
+const shippingData = ref(getDefaultShippingData())
+
+// Reset toàn bộ state phí ship + ngày giao dự kiến (dùng khi đổi địa chỉ/tỉnh/huyện/xã)
+const resetShippingState = () => {
+  shippingData.value = getDefaultShippingData()
+  estimatedDelivery.value = ''
+}
 
 const discountAmount = ref(0)
 const hasFreeshipVoucher = ref(false)
@@ -673,92 +657,6 @@ const availableVouchers = ref([])
 const isAvailableVouchersLoading = ref(false)
 const v2SelectedId = ref(null)
 
-// ─── Computed v2 voucher list (giống Cart.vue)
-const v2Vouchers = computed(() => {
-  const cartTotal = Number(cartData.value?.totalAmount ?? 0)
-  return availableVouchers.value.map((v) => {
-    const discountType = (v.discountType || '').toUpperCase()
-    const isAmount = discountType === 'AMOUNT'
-    const isPercent = discountType === 'PERCENT'
-    const isFreeship = discountType === 'FREESHIP'
-
-    let title = ''
-    let discountPercent = 0
-    if (isAmount) title = `Giảm ${formatCurrency(v.discountValue)} toàn sàn`
-    else if (isPercent) { title = `Giảm ${v.discountValue}% toàn sàn`; discountPercent = v.discountValue }
-    else if (isFreeship) title = `Miễn phí vận chuyển ${formatCurrency(v.discountValue)}`
-    else title = `Giảm ${formatCurrency(v.discountValue)} toàn sàn`
-
-    const active = v.isActive && !v.isUsed && cartTotal >= (v.minOrderValue || 0)
-
-    let disabledReason = ''
-    if (!v.isActive) disabledReason = 'Voucher không còn hoạt động'
-    else if (v.isUsed) disabledReason = 'Voucher đã được sử dụng'
-    else if (cartTotal < (v.minOrderValue || 0)) {
-      disabledReason = `Chưa đủ điều kiện: Mua thêm ${formatCurrency((v.minOrderValue || 0) - cartTotal)}`
-    }
-
-    return {
-      id: v.voucherId,
-      voucherCode: v.voucherCode,
-      title,
-      discountType,
-      minOrder: v.minOrderValue,
-      discountValue: v.discountValue,
-      discountPercent,
-      maxDiscountAmount: v.maxDiscountAmount || 0,
-      expiryLabel: `Hạn dùng đến: ${new Date(v.endDate).toLocaleDateString('vi-VN')}`,
-      icon: isFreeship ? 'fas fa-truck' : 'fas fa-tag',
-      iconClass: isFreeship ? 'v2-icon-box--freeship' : isPercent ? 'v2-icon-box--percent' : 'v2-icon-box--amount',
-      active,
-      disabledReason,
-    }
-  })
-})
-
-function estimatedDiscountValue(voucher, totalAmount) {
-  if (!voucher.active) return 0
-  if (voucher.discountType === 'AMOUNT') return Math.min(voucher.discountValue, totalAmount)
-  if (voucher.discountType === 'PERCENT') {
-    const raw = (voucher.discountPercent / 100) * totalAmount
-    return Math.min(raw, voucher.maxDiscountAmount > 0 ? voucher.maxDiscountAmount : raw)
-  }
-  if (voucher.discountType === 'FREESHIP') return voucher.discountValue
-  return 0
-}
-
-const v2ActiveVouchers = computed(() => {
-  const total = Number(cartData.value?.totalAmount ?? 0)
-  const list = v2Vouchers.value
-    .filter((v) => v.active)
-    .map((v) => ({ ...v, _discount: estimatedDiscountValue(v, total) }))
-    .sort((a, b) => b._discount - a._discount)
-  if (list.length > 0) list[0].isBest = true
-  return list.map(({ _discount, ...rest }) => rest)
-})
-
-const v2DisabledVouchers = computed(() => v2Vouchers.value.filter((v) => !v.active))
-
-function selectVoucherFromModal2(id) {
-  v2SelectedId.value = v2SelectedId.value === id ? null : id
-}
-
-async function applySelectedVoucherFromModal() {
-  const picked = v2Vouchers.value.find((v) => v.id === v2SelectedId.value)
-  if (picked) {
-    clearAppliedVoucher()
-    appliedVoucherCode.value = picked.voucherCode
-    localStorage.setItem('selectedVoucher', JSON.stringify({
-      code: picked.voucherCode,
-      type: picked.discountType,
-    }))
-  } else {
-    clearAppliedVoucher()
-  }
-  isReSelectVoucherModalOpen.value = false
-  v2SelectedId.value = null
-}
-
 // ─── Modal thông báo voucher không khả dụng (Modal 1 - bước 1)
 //      Hiện khi backend re-validate fail khi user bấm Đặt hàng.
 //      Bấm "Đồng ý" mới mở Modal 2 (chọn lại voucher).
@@ -767,8 +665,7 @@ const voucherInvalidMessage = ref('')
 
 const openVoucherInvalidModal = (message) => {
   voucherInvalidMessage.value =
-    message ||
-    'Voucher hiện không còn khả dụng. Vui lòng chọn voucher khác để tiếp tục thanh toán.'
+    message || 'Voucher hiện không còn khả dụng. Vui lòng chọn voucher khác để tiếp tục thanh toán.'
   isVoucherInvalidModalOpen.value = true
 }
 
@@ -838,7 +735,7 @@ const openVoucherModal = async () => {
   // Pre-select current voucher nếu có
   if (appliedVoucherCode.value) {
     const current = availableVouchers.value.find(
-      (v) => v.voucherCode?.toUpperCase() === appliedVoucherCode.value.toUpperCase()
+      (v) => v.voucherCode?.toUpperCase() === appliedVoucherCode.value.toUpperCase(),
     )
     if (current) {
       v2SelectedId.value = current.voucherId
@@ -852,39 +749,31 @@ const closeCheckoutVoucherModal = () => {
   v2SelectedId.value = null
 }
 
+// Lưu voucher được chọn vào state + localStorage (dùng chung cho cả 2 modal voucher)
+const persistSelectedVoucher = (picked) => {
+  appliedVoucherCode.value = picked.voucherCode
+  localStorage.setItem(
+    'selectedVoucher',
+    JSON.stringify({ code: picked.voucherCode, type: picked.discountType }),
+  )
+}
+
 // Handle voucher confirmation từ VoucherModal (re-select)
 const handleVoucherModalConfirm = (picked) => {
-  if (picked) {
-    clearAppliedVoucher()
-    appliedVoucherCode.value = picked.voucherCode
-    localStorage.setItem('selectedVoucher', JSON.stringify({
-      code: picked.voucherCode,
-      type: picked.discountType,
-    }))
-  } else {
-    clearAppliedVoucher()
-  }
+  clearAppliedVoucher()
+  if (picked) persistSelectedVoucher(picked)
   closeReSelectVoucherModal()
 }
 
 // Handle voucher confirmation từ VoucherModal (checkout)
 const handleCheckoutVoucherConfirm = (picked) => {
+  clearAppliedVoucher()
   if (picked) {
-    clearAppliedVoucher()
-    appliedVoucherCode.value = picked.voucherCode
-    localStorage.setItem('selectedVoucher', JSON.stringify({
-      code: picked.voucherCode,
-      type: picked.discountType,
-    }))
-    // Preview voucher immediately
-    previewVoucher()
-  } else {
-    clearAppliedVoucher()
+    persistSelectedVoucher(picked)
+    previewVoucher() // Preview voucher ngay sau khi chọn
   }
   closeCheckoutVoucherModal()
 }
-
-const formatCurrency = (value) => `${Number(value || 0).toLocaleString('vi-VN')}₫`
 
 const orderForm = ref({
   recipientName: '',
@@ -934,7 +823,7 @@ const formatDeliveryDate = (isoDate) => {
   }
 }
 
-const validatePhone = (phone) => /(03|05|07|08|09)\d{8}/.test(phone)
+const validatePhone = (phone) => /^(03|05|07|08|09)\d{8}$/.test(phone)
 
 const validateEmail = (email) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -985,16 +874,7 @@ const previewVoucher = async () => {
 // ─── 1. Phí vận chuyển GHN & Tính toán Freeship
 const calculateShippingFee = async () => {
   if (!toDistrictId.value || !toWardCode.value) {
-    shippingData.value = {
-      standardShippingFee: 0,
-      discountedShippingFee: 0,
-      isFreeship: false,
-      isAllowedToOrder: true,
-      blockMessage: '',
-      amountUntilFreeship: 0,
-      suggestionMessage: '',
-    }
-    estimatedDelivery.value = ''
+    resetShippingState()
     return
   }
 
@@ -1018,15 +898,7 @@ const calculateShippingFee = async () => {
       throw new Error('Không thể lấy thông tin phí vận chuyển')
     }
   } catch {
-    shippingData.value = {
-      standardShippingFee: 0,
-      discountedShippingFee: 0,
-      isFreeship: false,
-      isAllowedToOrder: true,
-      blockMessage: '',
-      amountUntilFreeship: 0,
-      suggestionMessage: '',
-    }
+    resetShippingState()
     feeError.value = 'Không thể tính phí vận chuyển. Vui lòng kiểm tra địa chỉ hoặc thử lại!'
   } finally {
     isFeeLoading.value = false
@@ -1061,16 +933,7 @@ const clearSelectedAddress = () => {
   activeAddressId.value = null
   toDistrictId.value = null
   toWardCode.value = ''
-  shippingData.value = {
-    standardShippingFee: 0,
-    discountedShippingFee: 0,
-    isFreeship: false,
-    isAllowedToOrder: true,
-    blockMessage: '',
-    amountUntilFreeship: 0,
-    suggestionMessage: '',
-  }
-  estimatedDelivery.value = ''
+  resetShippingState()
   manualProvinceId.value = null
   manualDistrictId.value = null
   manualWardCode.value = ''
@@ -1092,16 +955,7 @@ const onManualProvinceChange = async () => {
   manualWardCode.value = ''
   toDistrictId.value = null
   toWardCode.value = ''
-  shippingData.value = {
-    standardShippingFee: 0,
-    discountedShippingFee: 0,
-    isFreeship: false,
-    isAllowedToOrder: true,
-    blockMessage: '',
-    amountUntilFreeship: 0,
-    suggestionMessage: '',
-  }
-  estimatedDelivery.value = ''
+  resetShippingState()
   ghnDistricts.value = []
   ghnWards.value = []
   if (!manualProvinceId.value) return
@@ -1118,16 +972,7 @@ const onManualDistrictChange = async () => {
   manualWardCode.value = ''
   toWardCode.value = ''
   toDistrictId.value = manualDistrictId.value ?? null
-  shippingData.value = {
-    standardShippingFee: 0,
-    discountedShippingFee: 0,
-    isFreeship: false,
-    isAllowedToOrder: true,
-    blockMessage: '',
-    amountUntilFreeship: 0,
-    suggestionMessage: '',
-  }
-  estimatedDelivery.value = ''
+  resetShippingState()
   ghnWards.value = []
   if (!manualDistrictId.value) return
 
@@ -1288,8 +1133,6 @@ const handleCheckout = async () => {
     isProcessing.value = false
   }
 }
-
-const isModalMounted = ref(false)
 
 onMounted(async () => {
   await prefillUserEmail()

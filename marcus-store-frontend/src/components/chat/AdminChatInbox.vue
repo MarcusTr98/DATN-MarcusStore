@@ -1,18 +1,19 @@
 <template>
   <div class="admin-chat-widget no-print">
-    <!-- Nút thả nổi -->
+    <!-- NÚT THẢ NỔI DÍNH MÉP BÊN PHẢI (SIDE TAB) -->
     <button
-      class="chat-trigger-btn shadow-lg"
+      class="chat-side-tab shadow-lg"
       @click="chatStore.toggleChatPanel"
       :class="{ 'is-hidden': chatStore.isOpen }"
     >
-      <i class="fas fa-headset"></i>
-      <span v-if="chatStore.notificationCount > 0" class="unclaimed-dot">
+      <span v-if="chatStore.notificationCount > 0" class="chat-badge">
         {{ chatStore.notificationCount }}
       </span>
+      <i class="fas fa-headset icon-headset"></i>
+      <span class="tab-text">HỖ TRỢ</span>
     </button>
 
-    <!-- Panel nổi -->
+    <!-- KHUNG CHAT (PANEL) -->
     <transition name="panel-slide">
       <div v-show="chatStore.isOpen" class="chat-panel shadow-lg">
         <!-- Header panel -->
@@ -98,7 +99,6 @@
                 </div>
               </div>
 
-              <!-- Trong phần conv-footer -->
               <div class="conv-footer">
                 <input
                   v-model="inputMsg"
@@ -139,7 +139,6 @@ const chatStore = useAdminChatStore()
 const inputMsg = ref('')
 const convBody = ref(null)
 
-// Lấy thông tin ai đang phụ trách phòng đang mở
 const activeRoomClaimedBy = computed(() => {
   const room = chatStore.rooms.find((r) => r.roomId === chatStore.activeRoomId)
   return room?.claimedBy ?? null
@@ -178,59 +177,78 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* CSS GIỮ NGUYÊN BẢN CŨ CỦA BẠN - KHÔNG CẦN CHỈNH SỬA GÌ Ở PHẦN NÀY */
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
 
 .admin-chat-widget {
   font-family: 'Be Vietnam Pro', sans-serif;
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
   z-index: 1050;
 }
 
-.chat-trigger-btn {
-  width: 60px;
-  height: 60px;
+/* NÚT THẢ NỔI DÍNH MÉP (SIDE TAB) */
+.chat-side-tab {
+  position: fixed;
+  top: 50%;
+  right: -5px;
+  transform: translateY(-50%);
+  width: 46px;
+  padding: 16px 8px;
   background: linear-gradient(135deg, #1d4ed8, #3b82f6);
   color: #fff;
   border: none;
-  border-radius: 50%;
-  font-size: 24px;
+  border-radius: 12px 0 0 12px;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  position: relative;
+  gap: 10px;
+  box-shadow: -4px 0 15px rgba(29, 78, 216, 0.3);
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 1050;
 }
 
-.chat-trigger-btn:hover {
-  transform: translateY(-4px);
+.chat-side-tab:hover {
+  right: 0;
+  padding-right: 12px;
   background: linear-gradient(135deg, #1e40af, #2563eb);
 }
 
-.chat-trigger-btn.is-hidden {
+.chat-side-tab.is-hidden {
+  right: -60px;
   opacity: 0;
   visibility: hidden;
-  transform: scale(0.8);
 }
 
-.unclaimed-dot {
+.icon-headset {
+  font-size: 20px;
+}
+
+.tab-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  transform: rotate(180deg);
+}
+
+/* CHẤM ĐỎ CẢNH BÁO TIN NHẮN MỚI */
+.chat-badge {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -6px;
+  left: -6px;
   min-width: 22px;
   height: 22px;
   padding: 0 5px;
   background: #ef4444;
   border: 2px solid #fff;
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4);
   animation: ping-badge 1.6s infinite;
 }
 
@@ -243,10 +261,11 @@ onBeforeUnmount(() => {
   }
 }
 
+/* KHUNG CHAT BÊN TRONG */
 .chat-panel {
-  position: absolute;
-  bottom: 74px;
-  right: 0;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
   width: 640px;
   height: 480px;
   background: #fff;
@@ -256,6 +275,8 @@ onBeforeUnmount(() => {
   flex-direction: column;
   transform-origin: bottom right;
   border: 1px solid #dbeafe;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  z-index: 1050;
 }
 
 .panel-slide-enter-active,
@@ -294,6 +315,7 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
+/* CỘT TRÁI (DANH SÁCH PHÒNG) */
 .room-list {
   width: 220px;
   min-width: 220px;
@@ -325,7 +347,6 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid #eaf2ff;
   transition: background 0.15s;
 }
-
 .room-item:hover {
   background: #eaf2ff;
 }
@@ -366,14 +387,12 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
 }
-
 .room-top-line {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 4px;
 }
-
 .room-name {
   font-weight: 600;
   font-size: 13px;
@@ -382,13 +401,11 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
 .room-time {
   font-size: 10px;
   color: #93b4e0;
   flex-shrink: 0;
 }
-
 .room-preview {
   margin: 2px 0 0;
   font-size: 12px;
@@ -398,6 +415,7 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 
+/* CỘT PHẢI (KHUNG CHAT) */
 .conversation-panel {
   flex: 1;
   display: flex;
@@ -412,7 +430,6 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
 }
-
 .conv-sub {
   font-size: 11px;
   color: #93b4e0;
@@ -445,7 +462,6 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 8px;
 }
-
 .msg-row {
   display: flex;
 }
@@ -466,13 +482,11 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   word-wrap: break-word;
 }
-
 .is-admin .msg-bubble {
   background: linear-gradient(135deg, #1d4ed8, #3b82f6);
   color: #fff;
   border-bottom-right-radius: 4px;
 }
-
 .is-customer .msg-bubble {
   background: #fff;
   color: #1e3a5f;
@@ -494,7 +508,6 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 8px;
 }
-
 .conv-input {
   flex: 1;
   border: 1px solid #dbeafe;
@@ -540,9 +553,9 @@ onBeforeUnmount(() => {
 @media (max-width: 700px) {
   .chat-panel {
     width: calc(100vw - 32px);
-    right: -8px;
+    right: 16px;
   }
-  p .room-list {
+  .room-list {
     width: 160px;
     min-width: 160px;
   }

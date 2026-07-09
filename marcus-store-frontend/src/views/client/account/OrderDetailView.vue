@@ -218,6 +218,15 @@
                         </div>
                       </div>
                     </div>
+                    <div class="info-line" v-if="selectedOrder.deliveryNote">
+                      <i class="fa-solid fa-clipboard-user"></i>
+                      <div>
+                        <div class="info-label">Ghi chú của bạn</div>
+                        <div class="info-value" style="font-style: italic">
+                          "{{ selectedOrder.deliveryNote }}"
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </section>
 
@@ -230,18 +239,31 @@
                   </div>
 
                   <div class="summary-body">
+                    <!-- NÂNG CẤP: Bảng tóm tắt tài chính chuẩn xác cho Client -->
                     <div class="summary-row">
                       <span>Tạm tính</span>
                       <strong>{{ formatMoney(selectedOrder.totalAmount) }}</strong>
                     </div>
-                    <div class="summary-row discount">
-                      <span>Giảm giá</span>
+
+                    <div class="summary-row discount" v-if="selectedOrder.discountAmount > 0">
+                      <span>Giảm giá Voucher</span>
                       <strong>-{{ formatMoney(selectedOrder.discountAmount) }}</strong>
                     </div>
+
                     <div class="summary-row">
                       <span>Phí vận chuyển</span>
                       <strong>{{ formatMoney(selectedOrder.shippingFee) }}</strong>
                     </div>
+
+                    <div
+                      class="summary-row discount"
+                      v-if="selectedOrder.shippingSubsidy > 0"
+                      style="color: #10b981"
+                    >
+                      <span>Trợ giá vận chuyển</span>
+                      <strong>-{{ formatMoney(selectedOrder.shippingSubsidy) }}</strong>
+                    </div>
+
                     <div class="summary-total">
                       <div class="summary-row">
                         <span>Thanh toán</span>
@@ -256,10 +278,7 @@
                         :disabled="cancelling || !canCancelOrder"
                         @click="handleCancelOrder"
                       >
-                        <i
-                          v-if="cancelling"
-                          class="fa-solid fa-spinner fa-spin"
-                        ></i>
+                        <i v-if="cancelling" class="fa-solid fa-spinner fa-spin"></i>
                         <i v-else class="fa-solid fa-ban"></i>
                         {{ cancelling ? 'Đang hủy đơn...' : 'Hủy đơn hàng' }}
                       </button>
@@ -272,11 +291,7 @@
         </div>
       </div>
 
-      <div
-        v-if="cancelModal.open"
-        class="modal-backdrop"
-        @click.self="closeCancelModal"
-      >
+      <div v-if="cancelModal.open" class="modal-backdrop" @click.self="closeCancelModal">
         <div class="modal-card" role="dialog" aria-modal="true">
           <div class="modal-header">
             <h4 class="modal-title">
@@ -296,7 +311,8 @@
           <div class="modal-body">
             <p class="modal-text">
               Vui lòng cho Marcus Store biết lý do bạn muốn hủy đơn
-              <strong>{{ cancelModal.orderCode }}</strong>.
+              <strong>{{ cancelModal.orderCode }}</strong
+              >.
             </p>
             <textarea
               v-model="cancelModal.reason"
@@ -306,9 +322,7 @@
               placeholder="Ví dụ: Đặt nhầm size, đổi ý không muốn mua nữa..."
               :disabled="cancelling"
             ></textarea>
-            <div class="modal-counter">
-              {{ cancelModal.reason.length }}/500
-            </div>
+            <div class="modal-counter">{{ cancelModal.reason.length }}/500</div>
 
             <div
               v-if="cancelModal.feedback.message"
@@ -318,7 +332,11 @@
             >
               <i
                 class="fa-solid"
-                :class="cancelModal.feedback.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'"
+                :class="
+                  cancelModal.feedback.type === 'error'
+                    ? 'fa-circle-exclamation'
+                    : 'fa-circle-check'
+                "
               ></i>
               <span>{{ cancelModal.feedback.message }}</span>
             </div>
@@ -339,10 +357,7 @@
               :disabled="cancelling || !cancelModal.reason.trim()"
               @click="confirmCancelOrder"
             >
-              <i
-                v-if="cancelling"
-                class="fa-solid fa-spinner fa-spin"
-              ></i>
+              <i v-if="cancelling" class="fa-solid fa-spinner fa-spin"></i>
               <i v-else class="fa-solid fa-check"></i>
               {{ cancelling ? 'Đang xử lý...' : 'Xác nhận hủy' }}
             </button>
@@ -357,7 +372,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
-// 1. Đổi lại đúng API của Client (chứ không dùng AdminOrderApi nữa)
 import UserOrderApi from '@/api/userOrder.js'
 import '@/assets/css/OrderDetailView.css'
 
@@ -372,7 +386,6 @@ async function fetchOrderDetail() {
     error.value = null
     const orderCode = route.params.id
 
-    // 2. Gọi đúng hàm lấy chi tiết đơn của User
     const response = await UserOrderApi.userOrderDetail(orderCode)
 
     selectedOrder.value = response.data
@@ -459,15 +472,15 @@ async function confirmCancelOrder() {
 }
 
 const statusConfig = {
-  CREATED:   { label: 'Tạo đơn',               className: 'pending',    icon: 'fa-file-circle-plus' },
-  PENDING:   { label: 'Chờ xác nhận',          className: 'pending',    icon: 'fa-clock' },
-  CONFIRMED: { label: 'Đã xác nhận',           className: 'confirmed',  icon: 'fa-circle-check' },
-  PROCESSING:{ label: 'Đang chuẩn bị',          className: 'processing', icon: 'fa-boxes-packing' },
-  PACKED:    { label: 'Đã đóng gói',            className: 'processing', icon: 'fa-box' },
-  SHIPPING:  { label: 'Đang giao',              className: 'shipping',   icon: 'fa-truck-fast' },
-  DELIVERED: { label: 'Giao thành công',        className: 'delivered',  icon: 'fa-circle-check' },
-  CANCELLED: { label: 'Đã hủy',                className: 'cancelled',  icon: 'fa-ban' },
-  FAILED:    { label: 'Giao thất bại',          className: 'failed',     icon: 'fa-triangle-exclamation' },
+  CREATED: { label: 'Tạo đơn', className: 'pending', icon: 'fa-file-circle-plus' },
+  PENDING: { label: 'Chờ xác nhận', className: 'pending', icon: 'fa-clock' },
+  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed', icon: 'fa-circle-check' },
+  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing', icon: 'fa-boxes-packing' },
+  PACKED: { label: 'Đã đóng gói', className: 'processing', icon: 'fa-box' },
+  SHIPPING: { label: 'Đang giao', className: 'shipping', icon: 'fa-truck-fast' },
+  DELIVERED: { label: 'Giao thành công', className: 'delivered', icon: 'fa-circle-check' },
+  CANCELLED: { label: 'Đã hủy', className: 'cancelled', icon: 'fa-ban' },
+  FAILED: { label: 'Giao thất bại', className: 'failed', icon: 'fa-triangle-exclamation' },
 }
 
 const defaultTimelineSteps = [
@@ -487,27 +500,22 @@ const visibleTimelineSteps = computed(() => {
     (selectedOrder.value.history || []).map((item) => [item.status, item]),
   )
 
-  // Xác định các bước flow đã đi qua dựa trên currentStatus
   const currentIndex = defaultTimelineSteps.findIndex((step) => step.status === currentStatus)
   const isTerminalStatus = currentStatus === 'CANCELLED' || currentStatus === 'FAILED'
   const isCompletedStatus = currentStatus === 'COMPLETED'
 
   let flowStatuses
   if (isTerminalStatus) {
-    // Trạng thái kết thúc: hiển thị tất cả các bước đã đi qua
-    // từ PENDING đến bước hiện tại trước khi cancel/fail, lấy từ history
     flowStatuses = defaultTimelineSteps
       .filter((step) => historyByStatus.has(step.status))
       .map((step) => step.status)
     flowStatuses.push(currentStatus)
   } else if (currentIndex >= 0 || isCompletedStatus) {
-    // COMPLETED: hiển thị đầy đủ flow như DELIVERED (không hiện COMPLETED trên timeline)
     flowStatuses = [...defaultTimelineSteps.map((step) => step.status)]
   } else {
     flowStatuses = ['PENDING', currentStatus]
   }
 
-  // Luôn bắt đầu timeline bằng CREATED
   const statuses = ['CREATED', ...new Set(flowStatuses)]
 
   return statuses.map((status, index) => {
@@ -518,8 +526,8 @@ const visibleTimelineSteps = computed(() => {
       status === 'CREATED' ? selectedOrder.value.createdAt : historyItem?.createdAt,
       historyItem?.note,
     )
-    timelineStep.isCurrent = (currentStatus === status) ||
-      (currentStatus === 'COMPLETED' && status === 'DELIVERED')
+    timelineStep.isCurrent =
+      currentStatus === status || (currentStatus === 'COMPLETED' && status === 'DELIVERED')
     return timelineStep
   })
 })
@@ -527,9 +535,7 @@ const visibleTimelineSteps = computed(() => {
 const displayHistory = computed(() => {
   if (!selectedOrder.value) return []
 
-  // Lọc bỏ COMPLETED cho UI client (vẫn giữ ở admin)
-  const history = (selectedOrder.value.history || [])
-    .filter((item) => item.status !== 'COMPLETED')
+  const history = (selectedOrder.value.history || []).filter((item) => item.status !== 'COMPLETED')
   const hasCreated = history.some((item) => item.status === 'CREATED')
 
   if (hasCreated) return history
@@ -551,12 +557,10 @@ const displayPaymentDate = computed(() => {
   const isCOD = order.paymentMethod === 'COD'
   const hasPaymentDate = order.paymentDate
 
-  // Nếu đã có paymentDate thì hiển thị paymentDate
   if (hasPaymentDate) {
     return formatDateTime(hasPaymentDate)
   }
 
-  // Nếu là COD và chưa có paymentDate, lấy thời gian DELIVERED từ history
   if (isCOD) {
     const history = order.history || []
     const deliveredItem = history.find((item) => item.status === 'DELIVERED')

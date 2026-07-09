@@ -75,6 +75,9 @@ public class Order {
     @Column(name = "shipping_fee", precision = 18, scale = 2)
     private BigDecimal shippingFee;
 
+    @Column(name = "shipping_subsidy", precision = 18, scale = 2)
+    private BigDecimal shippingSubsidy = BigDecimal.ZERO;
+
     @Column(name = "tracking_code", length = 100)
     private String trackingCode;
 
@@ -88,6 +91,9 @@ public class Order {
 
     @Column(name = "to_ward_code", length = 20)
     private String toWardCode;
+
+    @Column(name = "delivery_note", length = 500)
+    private String deliveryNote;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
