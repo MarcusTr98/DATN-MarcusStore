@@ -12,21 +12,25 @@ import java.util.List;
 
 @Repository
 public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, Integer> {
-    // Phân trang
-    // Phân trang - sắp xếp: ACTIVE trước, sau đó UPCOMING, còn lại theo startDate DESC
+    // Phân trang - sắp xếp theo thứ tự ưu tiên:
+    //   ACTIVE (2) → SCHEDULED (1) → ENDED (3) → CANCELLED (4)
+    // Trong cùng nhóm: slot ACTIVE/SCHEDULED/ENDED sắp theo startDate ASC,
+    // CANCELLED sắp theo updatedAt DESC (slot hủy sau cùng nằm cuối cùng).
     @Query(value = """
         SELECT f FROM FlashSaleSlot f
         WHERE (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
           AND (:status IS NULL OR f.status = :status)
+          AND (:now IS NULL OR :now = :now)
         ORDER BY
-          CASE
-            WHEN f.status = 2 AND f.startDate <= :now AND f.endDate >= :now THEN 1
-            WHEN f.status = 1 AND f.startDate >  :now                       THEN 2
-            WHEN f.status = 3                                                THEN 3
-            WHEN f.status = 4                                                THEN 4
+          CASE f.status
+            WHEN 2 THEN 1
+            WHEN 1 THEN 2
+            WHEN 3 THEN 3
+            WHEN 4 THEN 4
             ELSE 5
           END,
-          f.startDate ASC
+          CASE WHEN f.status = 4 THEN f.updatedAt ELSE f.startDate END ASC,
+          f.slotId ASC
         """,
             countQuery = """
         SELECT COUNT(f) FROM FlashSaleSlot f
@@ -80,7 +84,6 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
     long sumFlashSaleQuantityInActiveSlots(@Param("now") LocalDateTime now);
 
     // Scheduled: tìm slot đang 'Lên lịch' (1) mà đã đến giờ bắt đầu
-    // và đang trong khoảng [startDate, endDate] → cần chuyển sang 'Đang diễn ra' (2)
     @Query("""
             SELECT s FROM FlashSaleSlot s
             WHERE s.status = 1
@@ -90,7 +93,7 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
     List<FlashSaleSlot> findSlotsToActivate(@Param("now") LocalDateTime now);
 
     // Scheduled: tìm slot đang 'Đang diễn ra' (2) mà đã quá endDate
-    // → cần chuyển sang 'Đã kết thúc' (3)
+
     @Query("""
             SELECT s FROM FlashSaleSlot s
             WHERE s.status = 2
@@ -99,7 +102,7 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
     List<FlashSaleSlot> findSlotsToExpire(@Param("now") LocalDateTime now);
 
     // Scheduled: tìm slot 'Lên lịch' (1) mà endDate đã qua mà chưa kịp chạy
-    // (slot bị quên, không bao giờ active) → cũng chuyển sang 'Đã kết thúc' (3)
+
     @Query("""
             SELECT s FROM FlashSaleSlot s
             WHERE s.status = 1
@@ -107,13 +110,11 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
             """)
     List<FlashSaleSlot> findOverdueScheduledSlots(@Param("now") LocalDateTime now);
 
-    // =====================================================================
     // Chặn 2 flash sale chạy cùng khung giờ
     // 2 khoảng [start, end] giao nhau khi: startA < endB AND startB < endA
     // Chỉ tính các slot ĐANG hoạt động (2) hoặc ĐÃ lên lịch (1).
     // Bỏ qua: 0 (xóa), 3 (đã kết thúc), 4 (đã hủy) vì không còn chiếm khung giờ.
-    // excludeSlotId = null khi tạo mới; truyền id hiện tại khi update để bỏ qua chính nó.
-    // =====================================================================
+
     @Query("""
             SELECT s FROM FlashSaleSlot s
             WHERE s.status IN (1, 2)

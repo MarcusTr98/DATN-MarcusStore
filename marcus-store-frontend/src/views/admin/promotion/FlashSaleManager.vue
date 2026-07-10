@@ -67,12 +67,10 @@
             <label class="form-label">Trạng thái</label>
             <select v-model="filters.status" class="form-select">
               <option value="ALL">Tất cả</option>
-              <option value="ACTIVE">Đang diễn ra</option>
-              <option value="SCHEDULED">Đã lên lịch</option>
-              <option value="UPCOMING">Sắp diễn ra</option>
-              <option value="ENDED">Đã kết thúc</option>
-              <option value="CANCELLED">Đã hủy</option>
-              <option value="PENDING">Chờ xử lý</option>
+              <option value="1">Đã lên lịch</option>
+              <option value="2">Đang diễn ra</option>
+              <option value="3">Đã kết thúc</option>
+              <option value="4">Đã hủy</option>
             </select>
           </div>
 
@@ -162,11 +160,11 @@
                 >
                   <i class="bi bi-bar-chart-line-fill"></i>
                 </button>
-                <!-- Slot SCHEDULED/UPCOMING: giữ nút Xóa -->
+                <!-- Slot SCHEDULED/UPCOMING: nút Hủy chiến dịch (SCHEDULED sẽ chuyển sang CANCELLED, các trạng thái khác sẽ xóa) -->
                 <button
                   v-else
                   class="icon-button danger ms-1"
-                  title="Xóa"
+                  :title="Number(slot.status) === 1 ? 'Hủy chiến dịch' : 'Xóa'"
                   @click="openDelModal(slot)"
                 >
                   <i class="bi bi-trash3"></i>
@@ -929,7 +927,7 @@
       </div>
     </div>
 
-    <!-- DELETE CONFIRM -->
+    <!-- DELETE / CANCEL CONFIRM -->
     <div
       class="modal-backdrop-custom"
       v-if="showDelModal"
@@ -938,8 +936,11 @@
       <div class="flashsale-modal flashsale-modal--sm">
         <div class="modal-head">
           <div>
-            <h2>Xóa chiến dịch này?</h2>
-            <p>Hành động này không thể hoàn tác.</p>
+            <h2>{{ isCancellingSlot ? 'Hủy chiến dịch này?' : 'Xóa chiến dịch này?' }}</h2>
+            <p>{{ isCancellingSlot
+              ? 'Chiến dịch sẽ chuyển sang trạng thái "Đã hủy" và được đẩy xuống cuối bảng.'
+              : 'Hành động này không thể hoàn tác.' }}
+            </p>
           </div>
           <button class="modal-close-btn" @click="closeDelModal">
             <i class="bi bi-x-lg"></i>
@@ -948,10 +949,13 @@
         <div class="voucher-form">
           <div class="form-section">
             <div class="section-title">
-              <span><i class="bi bi-trash3"></i></span>
+              <span><i :class="isCancellingSlot ? 'bi bi-x-circle' : 'bi bi-trash3'"></i></span>
               <div>
                 <h3>{{ delTarget?.name }}</h3>
-                <p>Chiến dịch sẽ bị xóa vĩnh viễn khỏi hệ thống.</p>
+                <p>{{ isCancellingSlot
+                  ? 'Chiến dịch sẽ bị hủy và có thể xem lại ở trạng thái "Đã hủy".'
+                  : 'Chiến dịch sẽ bị xóa vĩnh viễn khỏi hệ thống.' }}
+                </p>
               </div>
             </div>
           </div>
@@ -959,9 +963,11 @@
             <button type="button" class="btn-soft" @click="closeDelModal">
               <i class="bi bi-x-circle"></i>Hủy bỏ
             </button>
-            <button type="button" class="btn-primary-action" style="background:#dc3545"
+            <button type="button" class="btn-primary-action"
+                    :style="isCancellingSlot ? 'background:#f59e0b' : 'background:#dc3545'"
                     @click="confirmDel">
-              <i class="bi bi-trash3"></i>Xóa ngay
+              <i :class="isCancellingSlot ? 'bi bi-x-circle-fill' : 'bi bi-trash3'"></i>
+              {{ isCancellingSlot ? 'Hủy chiến dịch' : 'Xóa ngay' }}
             </button>
           </div>
         </div>
@@ -1067,36 +1073,54 @@ watch(pageSize, () => {
   currentPage.value = 0
   loadSlots()
 })
+/**
+ * Map status code từ DB sang label hiển thị.
+ * Chỉ có 4 trạng thái thật trong hệ thống:
+ *   1 = SCHEDULED  (Đã lên lịch)
+ *   2 = ACTIVE     (Đang diễn ra)
+ *   3 = ENDED      (Đã kết thúc)
+ *   4 = CANCELLED  (Đã hủy)
+ *
+ * Scheduler BE tự động chuyển trạng thái theo thời gian (cron mỗi phút),
+ * nên FE không cần tự tính "UPCOMING/PENDING" từ ngày nữa.
+ */
 function resolveStatus(slot) {
-  if (slot.status === 2) return 'ACTIVE'
-  if (slot.status === 3) return 'ENDED'
-  if (slot.status === 4) return 'CANCELLED'
-  if (slot.status === 1) return 'SCHEDULED'
-  if (slot.startDate) {
-    const start = new Date(slot.startDate)
-    if (now < start) return 'UPCOMING'
+  switch (Number(slot.status)) {
+    case 1: return 'SCHEDULED'
+    case 2: return 'ACTIVE'
+    case 3: return 'ENDED'
+    case 4: return 'CANCELLED'
+    default: return 'SCHEDULED' // fallback an toàn
   }
-  return 'PENDING'
 }
 
 const statusPriority = {
   SCHEDULED: 1,
   ACTIVE: 2,
-  UPCOMING: 3,
-  ENDED: 4,
-  CANCELLED: 5,
-  PENDING: 6,
+  ENDED: 3,
+  // CANCELLED đẩy xuống cuối bảng (lớn hơn mọi status khác).
+  // Slot bị hủy qua nút Xóa sẽ chuyển sang status = 4 → rơi xuống đây.
+  CANCELLED: 99,
 }
 
 const slotsWithStatus = computed(() =>
   [...slots.value]
     .map(s => ({ ...s, resolvedStatus: resolveStatus(s) }))
     .sort((a, b) => {
-      const pa = statusPriority[a.resolvedStatus] ?? 99
-      const pb = statusPriority[b.resolvedStatus] ?? 99
+      const pa = statusPriority[a.resolvedStatus] ?? 50
+      const pb = statusPriority[b.resolvedStatus] ?? 50
       if (pa !== pb) return pa - pb
-      // Cùng nhóm: ưu tiên flash sale mới tạo (createdAt mới nhất) lên đầu
-      // Nếu thiếu createdAt thì fallback theo startDate sớm nhất
+      // Nhóm CANCELLED: slot hủy sau cùng (updatedAt mới nhất) nằm cuối cùng.
+      if (a.resolvedStatus === 'CANCELLED' && b.resolvedStatus === 'CANCELLED') {
+        const ua = a.updatedAt ? new Date(a.updatedAt).getTime() : null
+        const ub = b.updatedAt ? new Date(b.updatedAt).getTime() : null
+        if (ua != null && ub != null) return ua - ub
+        if (ua != null) return 1
+        if (ub != null) return -1
+        return 0
+      }
+      // Cùng nhóm (khác CANCELLED): ưu tiên flash sale mới tạo (createdAt mới nhất) lên đầu.
+      // Nếu thiếu createdAt thì fallback theo startDate sớm nhất.
       const ca = a.createdAt ? new Date(a.createdAt).getTime() : null
       const cb = b.createdAt ? new Date(b.createdAt).getTime() : null
       if (ca != null && cb != null) return cb - ca
@@ -1106,9 +1130,18 @@ const slotsWithStatus = computed(() =>
     })
 )
 
-const filteredSlots = computed(() => {
-  return slotsWithStatus.value
-})
+function formatDateTime(value) {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (isNaN(d.getTime())) return String(value)
+  return d.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 function formatVND(value) {
   if (value === null || value === undefined || value === '') return '-'
@@ -1154,12 +1187,10 @@ function formatDateTime(value) {
 
 function statusBadgeLabel(slot) {
   const map = {
-    ACTIVE: 'Đang diễn ra',
     SCHEDULED: 'Đã lên lịch',
-    UPCOMING: 'Sắp diễn ra',
+    ACTIVE: 'Đang diễn ra',
     ENDED: 'Đã kết thúc',
     CANCELLED: 'Đã hủy',
-    PENDING: 'Chờ xử lý',
   }
   return map[slot.resolvedStatus] || slot.resolvedStatus
 }
@@ -1168,30 +1199,25 @@ function statusBadgeClass(slot) {
   return {
     ACTIVE: '',
     SCHEDULED: 'warning',
-    UPCOMING: 'warning',
     ENDED: 'inactive',
     CANCELLED: 'danger',
-    PENDING: 'info',
   }[slot.resolvedStatus] || 'info'
 }
 
 /**
- * Phương án B: chỉ cho phép chỉnh sửa khi slot ở SCHEDULED hoặc UPCOMING
- * (tức là chưa bắt đầu). Khi đã ACTIVE / ENDED / CANCELLED / PENDING
- * thì khóa hoàn toàn.
+ * Quy tắc khóa form edit:
+ *   - status = 1 (SCHEDULED / Đã lên lịch): cho sửa
+ *   - status = 2 (ACTIVE / Đang diễn ra): khóa
+ *   - status = 3 (ENDED / Đã kết thúc): khóa
+ *   - status = 4 (CANCELLED / Đã hủy): khóa
  *
- * Tại sao khóa cả PENDING? Vì trạng thái này là fallback khi không xác định
- * được thời gian, an toàn nhất là không cho sửa.
+ * Scheduler BE tự động chuyển status theo thời gian (cron mỗi phút),
+ * nên FE không cần check thời gian để tự tính "UPCOMING" nữa.
  */
 function isSlotLocked(slot) {
   if (!slot) return true
-  // Ưu tiên backend status (chính xác nhất). Nếu status = 1 → cho sửa.
-  if (slot.status != null) {
-    return slot.status !== 1
-  }
-  // Fallback dựa trên resolvedStatus (FE tự tính)
-  const editable = ['SCHEDULED', 'UPCOMING']
-  return !editable.includes(slot.resolvedStatus)
+  // Chỉ status = 1 (SCHEDULED) là cho sửa
+  return Number(slot.status) !== 1
 }
 
 /**
@@ -1202,7 +1228,6 @@ function lockReason(slot) {
     ACTIVE: 'Flash Sale đang diễn ra, không thể chỉnh sửa',
     ENDED: 'Flash Sale đã kết thúc, không thể chỉnh sửa',
     CANCELLED: 'Flash Sale đã bị hủy, không thể chỉnh sửa',
-    PENDING: 'Flash Sale chưa sẵn sàng, không thể chỉnh sửa',
   }
   return map[slot?.resolvedStatus] || 'Flash Sale đã bị khóa, không thể chỉnh sửa'
 }
@@ -1247,12 +1272,6 @@ function openBannerPreview(url) {
 
 function closeBannerPreview() {
   bannerLightboxUrl.value = ''
-}
-
-function onKeyDown(e) {
-  if (e.key === 'Escape' && bannerPreviewUrl.value) {
-    closeBannerPreview()
-  }
 }
 
 const defaultForm = {
@@ -1720,19 +1739,6 @@ function openCreateModal() {
 }
 
 /**
- * Khi admin click nút Sửa trên slot đã khóa → mở form view-only (không toast).
- * Helper này hiện không được gọi trực tiếp nhưng giữ lại để dùng cho test/debug.
- */
-// eslint-disable-next-line no-unused-vars
-function onLockedEditClick(slot) {
-  showToast({
-    type: 'warning',
-    title: 'Không thể chỉnh sửa',
-    message: lockReason(slot),
-  })
-}
-
-/**
  * Mở modal Xem chi tiết thống kê cho slot đã ACTIVE/ENDED/CANCELLED/PENDING.
  * Component con (FlashSaleDetailModal) tự gọi API lấy items + soldQuantity.
  */
@@ -1988,6 +1994,10 @@ async function saveSlot() {
 const showDelModal = ref(false)
 const delTarget = ref(null)
 
+// Slot ở trạng thái SCHEDULED (status = 1) khi bấm Xóa sẽ được hủy (đổi sang CANCELLED = 4)
+// chứ không xóa vĩnh viễn. Cờ này dùng để đổi text/tooltip của modal xác nhận.
+const isCancellingSlot = computed(() => Number(delTarget.value?.status) === 1)
+
 function openDelModal(slot) {
   delTarget.value = slot
   showDelModal.value = true
@@ -2000,17 +2010,34 @@ function closeDelModal() {
 
 async function confirmDel() {
   if (!delTarget.value) return
-  const ok = await flashSaleStore.deleteSlotById(delTarget.value.slotId)
-  if (ok) {
-    showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
-    closeDelModal()
-  } else {
-    showToast({
-      type: 'error',
-      title: 'Lỗi',
-      message: flashSaleStore.error || 'Không thể xóa Flash Sale.',
-    })
-    closeDelModal()
+  const target = delTarget.value
+  const isScheduled = Number(target.status) === 1
+
+  // CHỈ những slot ở trạng thái SCHEDULED (status = 1) mới được "Hủy chiến dịch".
+  // Tất cả trạng thái khác (ACTIVE/ENDED/CANCELLED) đều đã khóa (nút Xóa bị ẩn)
+  // nên nhánh này là đường duy nhất confirmDel chạy tới.
+  if (isScheduled) {
+    const ok = await flashSaleStore.toggleSlotStatus(target.slotId, 4)
+    if (ok) {
+      const idx = slots.value.findIndex((s) => s.slotId === target.slotId)
+      if (idx !== -1) {
+        slots.value[idx] = { ...slots.value[idx], status: 4 }
+      }
+      await loadSlots()
+      showToast({
+        type: 'success',
+        title: 'Thành công',
+        message: 'Đã hủy chiến dịch Flash Sale.',
+      })
+      closeDelModal()
+    } else {
+      showToast({
+        type: 'error',
+        title: 'Lỗi',
+        message: flashSaleStore.error || 'Không thể hủy Flash Sale.',
+      })
+      closeDelModal()
+    }
   }
 }
 

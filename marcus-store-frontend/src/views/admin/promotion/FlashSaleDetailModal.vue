@@ -432,16 +432,13 @@ function formatDate(date) {
 
 function formatCurrency(value) {
   const num = Number(value || 0)
-  if (num >= 1_000_000_000) {
-    return (num / 1_000_000_000).toFixed(2).replace(/\.00$/, '') + ' tỷ'
-  }
-  if (num >= 1_000_000) {
-    return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + ' triệu'
-  }
-  if (num >= 1_000) {
-    return num.toLocaleString('vi-VN') + ' ₫'
-  }
-  return num.toLocaleString('vi-VN') + ' ₫'
+  // Hiển thị giá chính xác tuyệt đối (KHÔNG làm tròn sang triệu/tỷ).
+  // Dùng VND với dấu chấm phân cách hàng nghìn theo locale vi-VN.
+  return num.toLocaleString('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  })
 }
 
 function getDiscountPercent(item) {

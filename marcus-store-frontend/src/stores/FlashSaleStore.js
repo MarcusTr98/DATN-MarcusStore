@@ -237,39 +237,18 @@ export const useFlashSaleStore = defineStore('flashSale', {
       }
     },
 
-    async deleteSlotById(slotId) {
-      try {
-        this.loading = true
-        this.error = null
-
-        await flashSaleApi.deleteFlashSaleSlot(slotId)
-
-        this.slots = this.slots.filter((s) => s.slotId !== slotId)
-        this.stats = buildFallbackStats(this.slots, this.pagination.totalElements - 1)
-
-        return true
-      } catch (error) {
-        console.error('lỗi deleteSlotById:', error)
-        this.error =
-          error.response?.data?.message ||
-          error.response?.data?.data ||
-          'Không thể xóa flash sale'
-        return false
-      } finally {
-        this.loading = false
-      }
-    },
-
     async toggleSlotStatus(slotId, status) {
       try {
         this.loading = true
         this.error = null
 
-        await flashSaleApi.toggleFlashSaleSlot(slotId, status)
+        // BE trả về FlashSaleResponse sau khi đổi status, dùng để sync local state
+        const res = await flashSaleApi.toggleFlashSaleSlot(slotId, status)
+        const updated = mapSlot(res.data)
 
         const index = this.slots.findIndex((s) => s.slotId === slotId)
         if (index !== -1) {
-          this.slots[index] = { ...this.slots[index], status }
+          this.slots[index] = updated
         }
 
         return true
