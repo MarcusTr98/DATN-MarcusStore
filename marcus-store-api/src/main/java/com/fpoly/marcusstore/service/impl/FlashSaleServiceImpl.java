@@ -34,7 +34,10 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     private final FlashSaleSlotRepository flashSaleSlotRepository;
     private final FlashSaleItemRepository flashSaleItemRepository;
     private final ProductSkuRepository productSkuRepository;
-    // Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
+
+
+    //  Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
+
     private FlashSaleResponse toResponse(FlashSaleSlot slot,
                                          Map<Integer, Integer> qtyMap,
                                          Map<Integer, Integer> usedMap) {
