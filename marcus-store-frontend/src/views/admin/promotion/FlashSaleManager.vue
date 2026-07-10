@@ -1130,18 +1130,9 @@ const slotsWithStatus = computed(() =>
     })
 )
 
-function formatDateTime(value) {
-  if (!value) return '-'
-  const d = new Date(value)
-  if (isNaN(d.getTime())) return String(value)
-  return d.toLocaleString('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+const filteredSlots = computed(() => {
+  return slotsWithStatus.value
+})
 
 function formatVND(value) {
   if (value === null || value === undefined || value === '') return '-'
@@ -1272,6 +1263,12 @@ function openBannerPreview(url) {
 
 function closeBannerPreview() {
   bannerLightboxUrl.value = ''
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' && bannerPreviewUrl.value) {
+    closeBannerPreview()
+  }
 }
 
 const defaultForm = {
@@ -1739,6 +1736,19 @@ function openCreateModal() {
 }
 
 /**
+ * Khi admin click nút Sửa trên slot đã khóa → mở form view-only (không toast).
+ * Helper này hiện không được gọi trực tiếp nhưng giữ lại để dùng cho test/debug.
+ */
+// eslint-disable-next-line no-unused-vars
+function onLockedEditClick(slot) {
+  showToast({
+    type: 'warning',
+    title: 'Không thể chỉnh sửa',
+    message: lockReason(slot),
+  })
+}
+
+/**
  * Mở modal Xem chi tiết thống kê cho slot đã ACTIVE/ENDED/CANCELLED/PENDING.
  * Component con (FlashSaleDetailModal) tự gọi API lấy items + soldQuantity.
  */
@@ -2014,8 +2024,8 @@ async function confirmDel() {
   const isScheduled = Number(target.status) === 1
 
   // CHỈ những slot ở trạng thái SCHEDULED (status = 1) mới được "Hủy chiến dịch".
-  // Tất cả trạng thái khác (ACTIVE/ENDED/CANCELLED) đều đã khóa (nút Xóa bị ẩn)
-  // nên nhánh này là đường duy nhất confirmDel chạy tới.
+  // Tất cả trạng thái khác (ACTIVE/ENDED/CANCELLED) đều đã khóa (nút Xóa bị ẩn).
+  // Giữ nhánh này để tương thích với logic cũ + defense in depth.
   if (isScheduled) {
     const ok = await flashSaleStore.toggleSlotStatus(target.slotId, 4)
     if (ok) {
@@ -2038,6 +2048,21 @@ async function confirmDel() {
       })
       closeDelModal()
     }
+    return
+  }
+
+  // Fallback: còn nhánh deleteSlotById cho trường hợp đặc biệt (hiện không dùng).
+  const ok = await flashSaleStore.deleteSlotById(target.slotId)
+  if (ok) {
+    showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
+    closeDelModal()
+  } else {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: flashSaleStore.error || 'Không thể xóa Flash Sale.',
+    })
+    closeDelModal()
   }
 }
 
