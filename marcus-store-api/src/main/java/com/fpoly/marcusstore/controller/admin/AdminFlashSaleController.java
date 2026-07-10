@@ -69,6 +69,14 @@ public class AdminFlashSaleController {
         return flashSaleService.updateFlashSaleStatus(slotId, request.getStatus());
     }
 
+    // Đổi trạng thái nhanh cho slot
+    @PatchMapping("/flashsale/{slotId}/status")
+    public FlashSaleResponse updateFlashSaleStatus(
+            @PathVariable("slotId") Integer slotId,
+            @RequestBody @Valid UpdateFlashSaleStatusRequest request) {
+        return flashSaleService.updateFlashSaleStatus(slotId, request.getStatus());
+    }
+
     // FE gọi khi admin nhập startDate/endDate để cảnh báo sớm.
     @GetMapping("/flashsale/check-overlap")
     public java.util.List<FlashSaleResponse> checkOverlap(

@@ -2478,3 +2478,229 @@
     width: 100%;
   }
 }
+/* === Banner thumbnail trong bảng === */
+.banner-thumb {
+  width: 96px;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: zoom-in;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.banner-thumb:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.banner-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* === Icon button khi bị khóa (slot ACTIVE/ENDED/CANCELLED/PENDING) — LÀM ĐẬM === */
+/* Mục đích: nút 👁️ vẫn phải nổi bật, dễ click, dễ thấy */
+.icon-button-locked {
+  opacity: 1 !important;          /* KHÔNG mờ icon */
+  cursor: pointer !important;     /* vẫn click được mở form */
+  color: #2563eb;                 /* xanh dương đậm thay vì xám */
+  font-weight: 700;
+  transform: scale(1.08);         /* phóng to nhẹ để nổi bật */
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.icon-button-locked:hover {
+  color: #1d4ed8;
+  transform: scale(1.15);
+  background: rgba(37, 99, 235, 0.08);
+}
+.icon-button-locked i {
+  font-size: 1.1em;               /* icon to hơn */
+  font-weight: 700;
+}
+.icon-button.danger {
+  color: #dc2626;
+  font-weight: 700;
+}
+.icon-button.danger:hover {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.08);
+}
+.icon-button.danger i {
+  font-size: 1.1em;
+}
+
+/* === Icon button Xem chi tiết thống kê (slot đã ACTIVE/ENDED/CANCELLED/PENDING) === */
+/* Màu teal/cyan đậm để phân biệt với nút Sửa (xanh) và Xóa (đỏ) */
+.icon-button-detail {
+  color: #0891b2;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.icon-button-detail:hover {
+  color: #0e7490;
+  background: rgba(8, 145, 178, 0.10);
+  transform: scale(1.08);
+}
+.icon-button-detail:active {
+  transform: scale(0.96);
+}
+.icon-button-detail i {
+  font-size: 1.1em;
+}
+
+/* === Banner cảnh báo trong modal khi slot bị khóa === */
+.fs-locked-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 24px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  color: #7a5d00;
+}
+.fs-locked-banner i {
+  font-size: 24px;
+  color: #b8860b;
+  flex-shrink: 0;
+}
+.fs-locked-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fs-locked-banner strong {
+  font-size: 14px;
+  color: #5c4400;
+}
+.fs-locked-banner span {
+  font-size: 13px;
+  color: #7a5d00;
+}
+
+/* === Banner file label bị khóa === */
+.fs-banner-file-locked {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+  pointer-events: none;
+  background-color: #f3f4f6;
+}
+
+/* === View-only mode: MỜ NHẸ 30% + giữ form dễ đọc === */
+/* Khi admin mở form edit slot đã ACTIVE/ENDED/CANCELLED/PENDING */
+.form-locked-view .form-section,
+.form-locked-view .fs-tabs,
+.form-locked-view .fs-tab-content,
+.form-locked-view .fs-sel-table-wrap {
+  opacity: 0.7;                  /* mờ 30% (1 - 0.7 = 30%) */
+}
+/* BỎ overlay xám phủ — không cần vì input đã được readonly + mờ 30% */
+.form-locked-view .form-section::after,
+.form-locked-view .fs-tab-content::after {
+  display: none;
+}
+
+/* Input/select/textarea readonly → mờ nhẹ + nền xám nhẹ + cursor */
+.form-locked-view input[readonly],
+.form-locked-view textarea[readonly],
+.form-locked-view select[readonly] {
+  background-color: #f9fafb !important;   /* xám rất nhạt */
+  color: #4b5563 !important;              /* chữ xám đậm để dễ đọc */
+  cursor: default !important;             /* default thay vì not-allowed vì vẫn select được */
+  border-color: #e5e7eb !important;
+}
+/* KHÔNG làm mờ input/select thêm — đã mờ 30% ở container rồi */
+.form-locked-view input[readonly],
+.form-locked-view textarea[readonly] {
+  opacity: 1;
+}
+.form-locked-view input[readonly]:focus,
+.form-locked-view textarea[readonly]:focus {
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+/* Button/file bị disabled → KHÔNG mờ thêm (đã mờ ở container 30%) */
+.form-locked-view button:disabled,
+.form-locked-view input[type="file"]:disabled {
+  opacity: 1;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* Cascade/cat trigger khi locked */
+.form-locked-view .fs-cascade-trigger,
+.form-locked-view .fs-cat-trigger {
+  opacity: 1;
+  background-color: #f9fafb !important;
+  cursor: not-allowed !important;
+  pointer-events: none;
+}
+
+/* Tabs cũng bị mờ nhẹ */
+.form-locked-view .fs-tab-btn:disabled {
+  opacity: 1;
+  cursor: not-allowed !important;
+}
+
+/* === Banner lightbox === */
+.banner-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  outline: none;
+  cursor: zoom-out;
+}
+.banner-lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  cursor: default;
+}
+.banner-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.banner-lightbox-close:hover {
+  background: #fff;
+  transform: rotate(90deg);
+}
+
+/* Fade transition cho lightbox */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
