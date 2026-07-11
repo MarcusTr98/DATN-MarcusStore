@@ -19,6 +19,13 @@ public interface FlashSaleService {
     // Tạo mới
    FlashSaleResponse createFlashSale(FlashSaleSlotRequest request);
 
+    // Cập nhật
+    FlashSaleResponse updateFlashSale(Integer slotId, FlashSaleSlotRequest request);
+
+    // Đổi trạng thái nhanh (admin): dùng cho hủy chiến dịch đã lên lịch (status 1 -> 4)
+    // hoặc các thao tác đổi status nhanh khác. Trả về slot sau khi cập nhật.
+    FlashSaleResponse updateFlashSaleStatus(Integer slotId, Short status);
+
     // Scheduled: auto-update status theo thời gian + khoá tổng SP khi hết hạn
     void autoUpdateFlashSaleStatuses();
 

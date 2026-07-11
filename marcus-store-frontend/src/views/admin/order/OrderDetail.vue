@@ -135,15 +135,9 @@
                   <span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong>
                 </div>
                 <div v-if="orderDetail.voucherCode" class="summary-row">
-                  <span
-                    >Mã giảm giá:
-                    <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span
-                  >
+
+                  <span>Mã giảm giá: <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span>
                   <strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
-                </div>
-                <div class="summary-row">
-                  <span>Phí vận chuyển</span>
-                  <strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong>
                 </div>
                 <div
                   v-if="orderDetail.shippingSubsidy > 0"
@@ -152,6 +146,10 @@
                 >
                   <span>Trợ giá vận chuyển </span>
                   <strong>- {{ formatCurrency(orderDetail.shippingSubsidy) }}</strong>
+                </div>
+                <div v-if="subTotal >= 5000000" class="summary-row">
+                  <span>Giảm giá vận chuyển </span>
+                  <strong>---</strong>
                 </div>
                 <div class="summary-row total">
                   <span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong>
@@ -375,15 +373,15 @@ watch(
 )
 
 const orderStatusMap = {
-  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
-  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
-  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing' },
-  PACKED: { label: 'Đã đóng gói', className: 'processing' },
-  SHIPPING: { label: 'Đang giao', className: 'shipping' },
-  DELIVERED: { label: 'Giao thành công', className: 'shipping' },
-  COMPLETED: { label: 'Hoàn thành', className: 'completed' },
-  CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
-  FAILED: { label: 'Giao thất bại', className: 'failed' },
+  PENDING:   { label: 'Chờ xác nhận',    className: 'pending' },
+  CONFIRMED: { label: 'Đã xác nhận',     className: 'confirmed' },
+  PROCESSING:{ label: 'Đang chuẩn bị',    className: 'processing' },
+  PACKED:    { label: 'Đã đóng gói',      className: 'processing' },
+  SHIPPING:  { label: 'Đang giao',        className: 'shipping' },
+  DELIVERED: { label: 'Giao thành công',  className: 'shipping' },
+  COMPLETED: { label: 'Hoàn thành',       className: 'completed' },
+  CANCELLED: { label: 'Đã hủy',           className: 'cancelled' },
+  FAILED:    { label: 'Giao thất bại',    className: 'failed' },
 }
 
 const paymentStatusMap = {
@@ -422,7 +420,10 @@ const allowedTransitions = {
     { value: 'DELIVERED', label: 'Giao thành công' },
     { value: 'FAILED', label: 'Giao thất bại' },
   ],
-  DELIVERED: [{ value: 'COMPLETED', label: 'Đối soát hoàn tất' }],
+
+  DELIVERED: [
+    { value: 'COMPLETED', label: 'Đối soát hoàn tất' },
+  ],
   COMPLETED: [],
   CANCELLED: [],
   FAILED: [

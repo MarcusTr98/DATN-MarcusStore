@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.controller.admin;
 
 import com.fpoly.marcusstore.dto.request.FlashSaleSlotRequest;
+import com.fpoly.marcusstore.dto.request.UpdateFlashSaleStatusRequest;
 import com.fpoly.marcusstore.dto.response.FlashSaleResponse;
 import com.fpoly.marcusstore.dto.response.FlashSaleStatsResponse;
 import com.fpoly.marcusstore.service.FlashSaleService;
@@ -53,8 +54,23 @@ public class AdminFlashSaleController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    // Cập nhật flash sale (admin)
+    @PutMapping("/flashsale/{slotId}")
+    public FlashSaleResponse updateFlashSale(
+            @PathVariable("slotId") Integer slotId,
+            @RequestBody @Valid FlashSaleSlotRequest request) {
+        return flashSaleService.updateFlashSale(slotId, request);
+    }
+
+    // Đổi trạng thái nhanh cho slot
+    @PatchMapping("/flashsale/{slotId}/status")
+    public FlashSaleResponse updateFlashSaleStatus(
+            @PathVariable("slotId") Integer slotId,
+            @RequestBody @Valid UpdateFlashSaleStatusRequest request) {
+        return flashSaleService.updateFlashSaleStatus(slotId, request.getStatus());
+    }
+
     // FE gọi khi admin nhập startDate/endDate để cảnh báo sớm.
-    // Trả về danh sách slot overlap (rỗng = OK).
     @GetMapping("/flashsale/check-overlap")
     public java.util.List<FlashSaleResponse> checkOverlap(
             @RequestParam("startDate") String startDate,

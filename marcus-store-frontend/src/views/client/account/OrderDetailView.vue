@@ -278,7 +278,11 @@
                         :disabled="cancelling || !canCancelOrder"
                         @click="handleCancelOrder"
                       >
-                        <i v-if="cancelling" class="fa-solid fa-spinner fa-spin"></i>
+
+                        <i
+                          v-if="cancelling"
+                          class="fa-solid fa-spinner fa-spin"
+                        ></i>
                         <i v-else class="fa-solid fa-ban"></i>
                         {{ cancelling ? 'Đang hủy đơn...' : 'Hủy đơn hàng' }}
                       </button>
@@ -290,8 +294,11 @@
           </section>
         </div>
       </div>
-
-      <div v-if="cancelModal.open" class="modal-backdrop" @click.self="closeCancelModal">
+      <div
+        v-if="cancelModal.open"
+        class="modal-backdrop"
+        @click.self="closeCancelModal"
+      >
         <div class="modal-card" role="dialog" aria-modal="true">
           <div class="modal-header">
             <h4 class="modal-title">
@@ -311,8 +318,8 @@
           <div class="modal-body">
             <p class="modal-text">
               Vui lòng cho Marcus Store biết lý do bạn muốn hủy đơn
-              <strong>{{ cancelModal.orderCode }}</strong
-              >.
+
+              <strong>{{ cancelModal.orderCode }}</strong>.
             </p>
             <textarea
               v-model="cancelModal.reason"
@@ -322,7 +329,10 @@
               placeholder="Ví dụ: Đặt nhầm size, đổi ý không muốn mua nữa..."
               :disabled="cancelling"
             ></textarea>
-            <div class="modal-counter">{{ cancelModal.reason.length }}/500</div>
+
+            <div class="modal-counter">
+              {{ cancelModal.reason.length }}/500
+            </div>
 
             <div
               v-if="cancelModal.feedback.message"
@@ -332,11 +342,7 @@
             >
               <i
                 class="fa-solid"
-                :class="
-                  cancelModal.feedback.type === 'error'
-                    ? 'fa-circle-exclamation'
-                    : 'fa-circle-check'
-                "
+                :class="cancelModal.feedback.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'"
               ></i>
               <span>{{ cancelModal.feedback.message }}</span>
             </div>
@@ -357,7 +363,11 @@
               :disabled="cancelling || !cancelModal.reason.trim()"
               @click="confirmCancelOrder"
             >
-              <i v-if="cancelling" class="fa-solid fa-spinner fa-spin"></i>
+
+              <i
+                v-if="cancelling"
+                class="fa-solid fa-spinner fa-spin"
+              ></i>
               <i v-else class="fa-solid fa-check"></i>
               {{ cancelling ? 'Đang xử lý...' : 'Xác nhận hủy' }}
             </button>
@@ -472,15 +482,17 @@ async function confirmCancelOrder() {
 }
 
 const statusConfig = {
-  CREATED: { label: 'Tạo đơn', className: 'pending', icon: 'fa-file-circle-plus' },
-  PENDING: { label: 'Chờ xác nhận', className: 'pending', icon: 'fa-clock' },
-  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed', icon: 'fa-circle-check' },
-  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing', icon: 'fa-boxes-packing' },
-  PACKED: { label: 'Đã đóng gói', className: 'processing', icon: 'fa-box' },
-  SHIPPING: { label: 'Đang giao', className: 'shipping', icon: 'fa-truck-fast' },
-  DELIVERED: { label: 'Giao thành công', className: 'delivered', icon: 'fa-circle-check' },
-  CANCELLED: { label: 'Đã hủy', className: 'cancelled', icon: 'fa-ban' },
-  FAILED: { label: 'Giao thất bại', className: 'failed', icon: 'fa-triangle-exclamation' },
+
+  CREATED:   { label: 'Tạo đơn',               className: 'pending',    icon: 'fa-file-circle-plus' },
+  PENDING:   { label: 'Chờ xác nhận',          className: 'pending',    icon: 'fa-clock' },
+  CONFIRMED: { label: 'Đã xác nhận',           className: 'confirmed',  icon: 'fa-circle-check' },
+  PROCESSING:{ label: 'Đang chuẩn bị',          className: 'processing', icon: 'fa-boxes-packing' },
+  PACKED:    { label: 'Đã đóng gói',            className: 'processing', icon: 'fa-box' },
+  SHIPPING:  { label: 'Đang giao',              className: 'shipping',   icon: 'fa-truck-fast' },
+  DELIVERED: { label: 'Giao thành công',        className: 'delivered',  icon: 'fa-circle-check' },
+  CANCELLED: { label: 'Đã hủy',                className: 'cancelled',  icon: 'fa-ban' },
+  FAILED:    { label: 'Giao thất bại',          className: 'failed',     icon: 'fa-triangle-exclamation' },
+
 }
 
 const defaultTimelineSteps = [
@@ -511,6 +523,8 @@ const visibleTimelineSteps = computed(() => {
       .map((step) => step.status)
     flowStatuses.push(currentStatus)
   } else if (currentIndex >= 0 || isCompletedStatus) {
+
+    // COMPLETED: hiển thị đầy đủ flow như DELIVERED (không hiện COMPLETED trên timeline)
     flowStatuses = [...defaultTimelineSteps.map((step) => step.status)]
   } else {
     flowStatuses = ['PENDING', currentStatus]
@@ -526,8 +540,9 @@ const visibleTimelineSteps = computed(() => {
       status === 'CREATED' ? selectedOrder.value.createdAt : historyItem?.createdAt,
       historyItem?.note,
     )
-    timelineStep.isCurrent =
-      currentStatus === status || (currentStatus === 'COMPLETED' && status === 'DELIVERED')
+
+    timelineStep.isCurrent = (currentStatus === status) ||
+      (currentStatus === 'COMPLETED' && status === 'DELIVERED')
     return timelineStep
   })
 })
@@ -535,7 +550,10 @@ const visibleTimelineSteps = computed(() => {
 const displayHistory = computed(() => {
   if (!selectedOrder.value) return []
 
-  const history = (selectedOrder.value.history || []).filter((item) => item.status !== 'COMPLETED')
+
+  // Lọc bỏ COMPLETED cho UI client (vẫn giữ ở admin)
+  const history = (selectedOrder.value.history || [])
+    .filter((item) => item.status !== 'COMPLETED')
   const hasCreated = history.some((item) => item.status === 'CREATED')
 
   if (hasCreated) return history
@@ -557,10 +575,14 @@ const displayPaymentDate = computed(() => {
   const isCOD = order.paymentMethod === 'COD'
   const hasPaymentDate = order.paymentDate
 
+
+  // Nếu đã có paymentDate thì hiển thị paymentDate
   if (hasPaymentDate) {
     return formatDateTime(hasPaymentDate)
   }
 
+
+  // Nếu là COD và chưa có paymentDate, lấy thời gian DELIVERED từ history
   if (isCOD) {
     const history = order.history || []
     const deliveredItem = history.find((item) => item.status === 'DELIVERED')

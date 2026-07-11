@@ -265,11 +265,13 @@ export const useFlashSaleStore = defineStore('flashSale', {
         this.loading = true
         this.error = null
 
-        await flashSaleApi.toggleFlashSaleSlot(slotId, status)
+        // BE trả về FlashSaleResponse sau khi đổi status, dùng để sync local state
+        const res = await flashSaleApi.toggleFlashSaleSlot(slotId, status)
+        const updated = mapSlot(res.data)
 
         const index = this.slots.findIndex((s) => s.slotId === slotId)
         if (index !== -1) {
-          this.slots[index] = { ...this.slots[index], status }
+          this.slots[index] = updated
         }
 
         return true
