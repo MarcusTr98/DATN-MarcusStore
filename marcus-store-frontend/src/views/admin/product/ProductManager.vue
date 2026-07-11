@@ -419,7 +419,7 @@
 
             <div v-else class="images-grid">
               <div
-                v-for="img in productImages"
+                v-for="img in sortedProductImages"
                 :key="img.imageId"
                 class="img-card"
                 :class="{ 'is-primary': img.isPrimary }"
@@ -572,6 +572,16 @@ const stats = computed(() => [
   { label: 'Đang hiển thị', value: products.value.filter((p) => p.status).length, highlight: true },
   { label: 'Đã ẩn', value: products.value.filter((p) => !p.status).length, highlight: false },
 ])
+
+// Ảnh chính (isPrimary) luôn đứng đầu, các ảnh còn lại sắp theo displayOrder tăng dần.
+// BE trả displayOrder = null cho ảnh chính nên không dùng để sort ảnh chính, chỉ cần đưa lên đầu.
+const sortedProductImages = computed(() => {
+  const primary = productImages.value.filter((img) => img.isPrimary)
+  const secondary = productImages.value
+    .filter((img) => !img.isPrimary)
+    .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+  return [...primary, ...secondary]
+})
 
 const baseModal = ref({
   visible: false,

@@ -38,9 +38,14 @@ public class ProductImgServiceImpl implements ProductImgService {
                 .build();
     }
 
-    // Tách publicId từ ImageUrl trong db để xóa ảnh trên Cloundinary
     private String extractPublicId(String imageUrl) {
+        if (imageUrl == null || !imageUrl.contains("/upload/")) {
+            return null;
+        }
         String[] parts = imageUrl.split("/upload/");
+        if (parts.length < 2 || parts[1] == null || parts[1].isBlank()) {
+            return null;
+        }
         String afterUpload = parts[1];
         return afterUpload.replaceFirst("v\\d+/", "").replaceAll("\\.[^.]+$", "");
     }
@@ -67,21 +72,38 @@ public class ProductImgServiceImpl implements ProductImgService {
 
         List<ProductImage> images = imgRepo.findByProduct_ProductId(productId);
 
+        ProductImage productImage = new ProductImage();
+        productImage.setImageUrl(imageUrl);
+        productImage.setProduct(product);
+
         if (Boolean.TRUE.equals(imgRequest.getIsPrimary())) {
-            images.forEach(img -> img.setIsPrimary(false));
-            imgRepo.saveAll(images);
+            List<ProductImage> secondaryImages = images.stream()
+                    .sorted((a, b) -> {
+                        Integer oa = a.getDisplayOrder() != null ? a.getDisplayOrder() : Integer.MAX_VALUE;
+                        Integer ob = b.getDisplayOrder() != null ? b.getDisplayOrder() : Integer.MAX_VALUE;
+                        return oa.compareTo(ob);
+                    })
+                    .collect(Collectors.toList());
+
+            int order = 1;
+            for (ProductImage img : secondaryImages) {
+                img.setIsPrimary(false);
+                img.setDisplayOrder(order++);
+            }
+            imgRepo.saveAll(secondaryImages);
+
+            productImage.setIsPrimary(true);
+            productImage.setDisplayOrder(null);
 
             product.setThumbnailUrl(imageUrl);
             productRepo.save(product);
+        } else {
+            long secondaryCount = images.stream()
+                    .filter(img -> !Boolean.TRUE.equals(img.getIsPrimary()))
+                    .count();
+            productImage.setIsPrimary(false);
+            productImage.setDisplayOrder((int) secondaryCount + 1);
         }
-
-        int displayOrder = images.size() + 1;
-
-        ProductImage productImage = new ProductImage();
-        productImage.setImageUrl(imageUrl);
-        productImage.setIsPrimary(imgRequest.getIsPrimary() != null ? imgRequest.getIsPrimary() : false);
-        productImage.setDisplayOrder(displayOrder);
-        productImage.setProduct(product);
 
         return toImgResponse(imgRepo.save(productImage));
     }
@@ -95,7 +117,9 @@ public class ProductImgServiceImpl implements ProductImgService {
         if (file != null && !file.isEmpty()) {
             try {
                 String oldPublicId = extractPublicId(productImage.getImageUrl());
-                cloudinaryService.deleteImage(oldPublicId);
+                if (oldPublicId != null) {
+                    cloudinaryService.deleteImage(oldPublicId);
+                }
                 String newImageUrl = cloudinaryService.uploadImage(file);
 
                 if (!newImageUrl.equals(productImage.getImageUrl())) {
@@ -108,18 +132,46 @@ public class ProductImgServiceImpl implements ProductImgService {
 
         if (imgRequest.getIsPrimary() != null) {
             if (Boolean.TRUE.equals(imgRequest.getIsPrimary())) {
-                List<ProductImage> images = imgRepo.findByProduct_ProductId(productImage.getProduct().getProductId());
-                images.forEach(img -> img.setIsPrimary(false));
-                imgRepo.saveAll(images);
-
                 Product product = productImage.getProduct();
+                List<ProductImage> images = imgRepo.findByProduct_ProductId(product.getProductId());
+
+                List<ProductImage> secondaryImages = images.stream()
+                        .filter(img -> !img.getImageId().equals(productImage.getImageId()))
+                        .sorted((a, b) -> {
+                            Integer oa = a.getDisplayOrder() != null ? a.getDisplayOrder() : Integer.MAX_VALUE;
+                            Integer ob = b.getDisplayOrder() != null ? b.getDisplayOrder() : Integer.MAX_VALUE;
+                            return oa.compareTo(ob);
+                        })
+                        .collect(Collectors.toList());
+
+                int order = 1;
+                for (ProductImage img : secondaryImages) {
+                    img.setIsPrimary(false);
+                    img.setDisplayOrder(order++);
+                }
+                imgRepo.saveAll(secondaryImages);
+
+                productImage.setIsPrimary(true);
+                productImage.setDisplayOrder(null);
+
                 product.setThumbnailUrl(productImage.getImageUrl());
                 productRepo.save(product);
+            } else {
+                boolean wasPrimary = Boolean.TRUE.equals(productImage.getIsPrimary());
+                productImage.setIsPrimary(false);
+
+                if (wasPrimary) {
+                    List<ProductImage> images = imgRepo.findByProduct_ProductId(productImage.getProduct().getProductId());
+                    long secondaryCount = images.stream()
+                            .filter(img -> !Boolean.TRUE.equals(img.getIsPrimary())
+                                    && !img.getImageId().equals(productImage.getImageId()))
+                            .count();
+                    productImage.setDisplayOrder((int) secondaryCount + 1);
+                }
             }
-            productImage.setIsPrimary(imgRequest.getIsPrimary());
         }
 
-        if (imgRequest.getDisplayOrder() != null) {
+        if (imgRequest.getDisplayOrder() != null && !Boolean.TRUE.equals(productImage.getIsPrimary())) {
             productImage.setDisplayOrder(imgRequest.getDisplayOrder());
         }
 
@@ -127,17 +179,72 @@ public class ProductImgServiceImpl implements ProductImgService {
     }
 
     @Override
+    @Transactional
     public void deleteProductImg(Integer id) {
         ProductImage productImage = imgRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với id: " + id));
 
+        Product product = productImage.getProduct();
+        boolean wasPrimary = Boolean.TRUE.equals(productImage.getIsPrimary());
+
         try {
             String publicId = extractPublicId(productImage.getImageUrl());
-            cloudinaryService.deleteImage(publicId);
-
-            imgRepo.delete(productImage);
+            if (publicId != null) {
+                cloudinaryService.deleteImage(publicId);
+            }
         } catch (IOException e) {
             throw new RuntimeException("Xóa ảnh thất bại");
+        }
+
+        imgRepo.delete(productImage);
+
+        List<ProductImage> remainingImages = imgRepo.findByProduct_ProductId(product.getProductId());
+
+        if (wasPrimary) {
+            List<ProductImage> sorted = remainingImages.stream()
+                    .sorted((a, b) -> {
+                        Integer oa = a.getDisplayOrder() != null ? a.getDisplayOrder() : Integer.MAX_VALUE;
+                        Integer ob = b.getDisplayOrder() != null ? b.getDisplayOrder() : Integer.MAX_VALUE;
+                        return oa.compareTo(ob);
+                    })
+                    .collect(Collectors.toList());
+
+            if (!sorted.isEmpty()) {
+                ProductImage newPrimary = sorted.get(0);
+                List<ProductImage> newSecondary = sorted.subList(1, sorted.size());
+
+                int order = 1;
+                for (ProductImage img : newSecondary) {
+                    img.setIsPrimary(false);
+                    img.setDisplayOrder(order++);
+                }
+                imgRepo.saveAll(newSecondary);
+
+                newPrimary.setIsPrimary(true);
+                newPrimary.setDisplayOrder(null);
+                imgRepo.save(newPrimary);
+
+                product.setThumbnailUrl(newPrimary.getImageUrl());
+                productRepo.save(product);
+            } else {
+                product.setThumbnailUrl(null);
+                productRepo.save(product);
+            }
+        } else {
+            List<ProductImage> secondaryImages = remainingImages.stream()
+                    .filter(img -> !Boolean.TRUE.equals(img.getIsPrimary()))
+                    .sorted((a, b) -> {
+                        Integer oa = a.getDisplayOrder() != null ? a.getDisplayOrder() : Integer.MAX_VALUE;
+                        Integer ob = b.getDisplayOrder() != null ? b.getDisplayOrder() : Integer.MAX_VALUE;
+                        return oa.compareTo(ob);
+                    })
+                    .collect(Collectors.toList());
+
+            int order = 1;
+            for (ProductImage img : secondaryImages) {
+                img.setDisplayOrder(order++);
+            }
+            imgRepo.saveAll(secondaryImages);
         }
     }
 }

@@ -23,7 +23,7 @@ public class ProductImage {
     private Boolean isPrimary = false;
 
     @Column(name = "display_order")
-    private Integer displayOrder = 0;
+    private Integer displayOrder;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id", nullable = false)
