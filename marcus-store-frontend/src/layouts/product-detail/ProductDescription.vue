@@ -1,41 +1,37 @@
 <template>
   <div class="pd-desc">
-    <div class="pd-desc__tabs">
-      <button
-        v-for="t in tabs"
-        :key="t.value"
-        type="button"
-        class="pd-desc__tab"
-        :class="{ active: activeTab === t.value }"
-        @click="activeTab = t.value"
-      >
-        {{ t.label }}
-      </button>
-    </div>
+    <div class="pd-desc__heading">Thông số kỹ thuật</div>
 
-    <div class="pd-desc__content">
-      <!-- Mô tả -->
-      <div v-if="activeTab === 'description'" class="pd-desc__section">
-        <div v-if="descriptionHtml" class="pd-desc__html" v-html="descriptionHtml" />
-        <p v-else class="pd-desc__empty">Chưa có mô tả cho sản phẩm này.</p>
-      </div>
-
-      <!-- Thông số kỹ thuật -->
-      <div v-else-if="activeTab === 'specs'" class="pd-desc__section">
-        <div v-if="specs.length > 0" class="pd-desc__specs">
-          <div v-for="(row, idx) in specs" :key="idx" class="pd-desc__spec-row">
-            <span class="pd-desc__spec-label">{{ row.label }}</span>
-            <span class="pd-desc__spec-value">{{ row.value }}</span>
-          </div>
+    <div
+      v-if="specs.length > 0"
+      class="pd-desc__specs-wrap"
+      :class="{ 'is-expanded': expanded }"
+    >
+      <div class="pd-desc__specs" ref="specsBox">
+        <div v-for="(row, idx) in specs" :key="idx" class="pd-desc__spec-row">
+          <span class="pd-desc__spec-label">{{ row.label }}</span>
+          <span class="pd-desc__spec-value">{{ row.value }}</span>
         </div>
-        <p v-else class="pd-desc__empty">Chưa có thông số kỹ thuật.</p>
       </div>
+
+      <div v-if="!expanded && isOverflowing" class="pd-desc__fade" />
     </div>
+    <p v-else class="pd-desc__empty">Chưa có thông số kỹ thuật.</p>
+
+    <button
+      v-if="isOverflowing"
+      type="button"
+      class="pd-desc__toggle-btn"
+      @click="expanded = !expanded"
+    >
+      {{ expanded ? 'Thu gọn' : 'Xem thêm' }}
+      <i :class="expanded ? 'ti ti-chevron-up' : 'ti ti-chevron-down'" aria-hidden="true" />
+    </button>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, ref, nextTick, onMounted, watch } from 'vue'
 
 const props = defineProps({
   description: { type: String, default: '' },
@@ -47,20 +43,11 @@ const props = defineProps({
   totalStock: { type: Number, default: 0 },
 })
 
-const tabs = [
-  { value: 'description', label: 'Mô tả sản phẩm' },
-  { value: 'specs', label: 'Thông số kỹ thuật' },
-]
-const activeTab = ref('description')
+const COLLAPSED_HEIGHT = 360 // px - khớp chiều cao với ProductSuggestions bên phải
 
-const descriptionHtml = computed(() => {
-  if (!props.description) return ''
-  return props.description
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br/>')
-})
+const expanded = ref(false)
+const isOverflowing = ref(false)
+const specsBox = ref(null)
 
 const specs = computed(() => {
   const rows = []
@@ -93,6 +80,17 @@ const specs = computed(() => {
   }
   return rows
 })
+
+function checkOverflow() {
+  nextTick(() => {
+    if (specsBox.value) {
+      isOverflowing.value = specsBox.value.scrollHeight > COLLAPSED_HEIGHT
+    }
+  })
+}
+
+onMounted(checkOverflow)
+watch(specs, checkOverflow)
 </script>
 
 <style scoped>
@@ -100,45 +98,23 @@ const specs = computed(() => {
   background: #fff;
   border: 1px solid #eee;
   border-radius: 10px;
-  overflow: hidden;
-}
-
-.pd-desc__tabs {
-  display: flex;
-  border-bottom: 1px solid #eee;
-  background: #fafafa;
-}
-
-.pd-desc__tab {
-  flex: 1;
-  padding: 14px 16px;
-  background: transparent;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  color: #555;
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: all 0.15s ease;
-}
-.pd-desc__tab:hover {
-  color: #e11d1d;
-}
-.pd-desc__tab.active {
-  color: #e11d1d;
-  background: #fff;
-  border-bottom-color: #e11d1d;
-}
-
-.pd-desc__content {
   padding: 20px 24px;
 }
 
-.pd-desc__html {
-  font-size: 14.5px;
-  line-height: 1.7;
-  color: #333;
-  white-space: pre-wrap;
+.pd-desc__heading {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 16px;
+}
+
+.pd-desc__specs-wrap {
+  position: relative;
+  max-height: 360px;
+  overflow: hidden;
+}
+.pd-desc__specs-wrap.is-expanded {
+  max-height: none;
 }
 
 .pd-desc__specs {
@@ -151,14 +127,16 @@ const specs = computed(() => {
 
 .pd-desc__spec-row {
   display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 12px;
-  padding: 12px 16px;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 24px;
+  padding: 14px 20px;
   font-size: 14px;
-  background: #fff;
 }
 .pd-desc__spec-row:nth-child(odd) {
   background: #fafafa;
+}
+.pd-desc__spec-row:not(:last-child) {
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .pd-desc__spec-label {
@@ -168,6 +146,39 @@ const specs = computed(() => {
 .pd-desc__spec-value {
   color: #1a1a1a;
   font-weight: 600;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.pd-desc__fade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 70px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, 1));
+  pointer-events: none;
+}
+
+.pd-desc__toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  background: #fafafa;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #e11d1d;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.pd-desc__toggle-btn:hover {
+  background: #f5f5f5;
 }
 
 .pd-desc__empty {
@@ -181,6 +192,7 @@ const specs = computed(() => {
   .pd-desc__spec-row {
     grid-template-columns: 1fr;
     gap: 4px;
+    padding: 12px 16px;
   }
 }
 </style>

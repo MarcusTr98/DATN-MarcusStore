@@ -1,10 +1,14 @@
 <template>
   <div class="pd-policy">
-    <div v-for="item in items" :key="item.title" class="pd-policy__item">
-      <i :class="item.icon" aria-hidden="true" />
-      <div class="pd-policy__text">
-        <span class="pd-policy__title">{{ item.title }}</span>
-        <span class="pd-policy__desc">{{ item.desc }}</span>
+    <div class="pd-policy__heading">Cam kết sản phẩm:</div>
+
+    <div class="pd-policy__grid">
+      <div v-for="item in items" :key="item.title" class="pd-policy__item">
+        <i :class="item.icon" aria-hidden="true" />
+        <div class="pd-policy__text">
+          <span class="pd-policy__title">{{ item.title }}</span>
+          <span class="pd-policy__desc">{{ item.desc }}</span>
+        </div>
       </div>
     </div>
   </div>
@@ -38,18 +42,28 @@ const items = computed(() => [
 
 <style scoped>
 .pd-policy {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
   background: #fafafa;
   border: 1px solid #eee;
   border-radius: 10px;
   padding: 14px 16px;
 }
 
+.pd-policy__heading {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin-bottom: 10px;
+}
+
+.pd-policy__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
 .pd-policy__item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -57,12 +71,13 @@ const items = computed(() => [
   font-size: 22px;
   color: #e11d1d;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .pd-policy__text {
   display: flex;
   flex-direction: column;
-  line-height: 1.3;
+  line-height: 1.35;
   min-width: 0;
 }
 
@@ -70,21 +85,17 @@ const items = computed(() => [
   font-size: 13.5px;
   font-weight: 600;
   color: #1a1a1a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .pd-policy__desc {
   font-size: 12px;
   color: #777;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
 }
 
 @media (max-width: 768px) {
-  .pd-policy {
+  .pd-policy__grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }

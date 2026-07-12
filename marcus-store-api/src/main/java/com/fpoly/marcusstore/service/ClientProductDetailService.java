@@ -11,7 +11,6 @@ import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductImage;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.core.ProductSpecValue;
-import com.fpoly.marcusstore.repository.core.ProductRepository;
 import com.fpoly.marcusstore.repository.shopping.ClientProductDetailRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.WishlistRepository;
@@ -42,7 +41,6 @@ public class ClientProductDetailService {
 
     @Transactional(readOnly = true)
     public ClientProductDetailResponse getProductDetailBySlug(String slug, Integer currentUserId) {
-         // 5 query riêng tránh MultipleBagFetchException
         Product product = productDetailRepository.findBySlugAndStatusTrue(slug)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm với slug: " + slug));
 
