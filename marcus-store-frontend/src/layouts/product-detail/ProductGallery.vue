@@ -6,6 +6,18 @@
         -{{ discountPercent }}%
       </div>
 
+      <button
+        v-if="imageList.length > 1"
+        type="button"
+        class="pd-gallery__nav pd-gallery__nav--prev"
+        aria-label="Ảnh trước"
+        @click="prevImage"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+          <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
       <img
         v-if="activeImage"
         :src="activeImage"
@@ -16,6 +28,18 @@
         <i class="ti ti-photo" aria-hidden="true"></i>
         <span>Chưa có ảnh</span>
       </div>
+
+      <button
+        v-if="imageList.length > 1"
+        type="button"
+        class="pd-gallery__nav pd-gallery__nav--next"
+        aria-label="Ảnh sau"
+        @click="nextImage"
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
+          <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Thumbnails -->
@@ -67,6 +91,16 @@ function selectImage(idx) {
 function onHover(idx) {
   // TGDD style: hover thumbnail -> đổi ảnh chính ngay
   activeIndex.value = idx
+}
+
+// Chuyển ảnh trước/sau (vòng lặp)
+function prevImage() {
+  if (!imageList.value.length) return
+  activeIndex.value = (activeIndex.value - 1 + imageList.value.length) % imageList.value.length
+}
+function nextImage() {
+  if (!imageList.value.length) return
+  activeIndex.value = (activeIndex.value + 1) % imageList.value.length
 }
 
 // Reset khi đổi sản phẩm
@@ -131,6 +165,40 @@ watch(
   padding: 4px 10px;
   border-radius: 4px;
   z-index: 2;
+}
+
+/* Nút chuyển ảnh trước/sau - đè lên ảnh, 2 bên trái/phải */
+.pd-gallery__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #e11d1d;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #e11d1d;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.pd-gallery__nav svg {
+  display: block;
+}
+.pd-gallery__nav:hover {
+  background: #e11d1d;
+  color: #fff;
+  transform: translateY(-50%) scale(1.08);
+}
+.pd-gallery__nav--prev {
+  left: 12px;
+}
+.pd-gallery__nav--next {
+  right: 12px;
 }
 
 .pd-gallery__thumbs {

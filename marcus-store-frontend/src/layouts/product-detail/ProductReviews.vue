@@ -65,21 +65,68 @@
 
     <!-- Action: đọc đánh giá -->
     <div v-if="reviewCount > 0" class="pd-reviews__actions">
-      <button type="button" class="pd-reviews__read-btn">
+      <button type="button" class="pd-reviews__read-btn" @click="toggleReviews">
         <i class="ti ti-message-dots" aria-hidden="true" />
-        Đọc đánh giá
+        {{ showReviews ? 'Ẩn đánh giá' : 'Đọc đánh giá' }}
+        <i
+          class="ti ti-chevron-down pd-reviews__read-btn-chevron"
+          :class="{ 'is-open': showReviews }"
+          aria-hidden="true"
+        />
       </button>
+    </div>
+
+    <!-- Danh sách đánh giá chi tiết -->
+    <div v-if="showReviews && reviewCount > 0" class="pd-reviews__list">
+      <div v-if="reviews.length === 0" class="pd-reviews__list-empty">
+        <i class="ti ti-loader-2" aria-hidden="true" />
+        <span>Chưa tải được nội dung đánh giá.</span>
+      </div>
+
+      <div v-else class="pd-reviews__list-items">
+        <div v-for="(rv, idx) in reviews" :key="rv.reviewId || idx" class="pd-review-item">
+          <div class="pd-review-item__header">
+            <div class="pd-review-item__avatar">
+              {{ (rv.userName || 'K').charAt(0).toUpperCase() }}
+            </div>
+            <div class="pd-review-item__meta">
+              <div class="pd-review-item__name">{{ rv.userName || 'Khách hàng' }}</div>
+              <div class="pd-review-item__stars">
+                <span
+                  v-for="n in 5"
+                  :key="n"
+                  class="pd-review-item__star"
+                  :class="{ full: (rv.rating || 0) >= n }"
+                >★</span>
+              </div>
+            </div>
+            <div v-if="rv.createdAt" class="pd-review-item__date">
+              {{ formatDate(rv.createdAt) }}
+            </div>
+          </div>
+          <p v-if="rv.comment" class="pd-review-item__comment">{{ rv.comment }}</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
+
 const props = defineProps({
   productName: { type: String, default: '' },
   rating: { type: Number, default: 0 },
   reviewCount: { type: Number, default: 0 },
   reviewDistribution: { type: Array, default: () => [] },
+  reviews: { type: Array, default: () => [] },
 })
+
+const showReviews = ref(false)
+
+function toggleReviews() {
+  showReviews.value = !showReviews.value
+}
 
 function getStarClass(n) {
   const r = props.rating || 0
@@ -99,6 +146,15 @@ function formatReviewCount(n) {
   if (!n) return '0 đánh giá'
   if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k+ đánh giá`
   return `${n} đánh giá`
+}
+
+function formatDate(dateStr) {
+  try {
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('vi-VN')
+  } catch {
+    return ''
+  }
 }
 
 const satisfiedCount = Math.round((props.reviewCount || 0) * ((props.rating || 0) / 5))
@@ -322,6 +378,92 @@ function formatSatisfiedDesc(satisfied, total) {
 }
 .pd-reviews__read-btn i {
   font-size: 16px;
+}
+.pd-reviews__read-btn-chevron {
+  transition: transform 0.2s ease;
+  font-size: 14px !important;
+}
+.pd-reviews__read-btn-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* Danh sách đánh giá */
+.pd-reviews__list {
+  border-top: 1px solid #eee;
+  padding: 20px 24px 24px;
+}
+.pd-reviews__list-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: #999;
+  font-size: 14px;
+}
+.pd-reviews__list-items {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.pd-review-item {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.pd-review-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.pd-review-item__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pd-review-item__avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e11d1d;
+  color: #fff;
+  font-weight: 700;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pd-review-item__meta {
+  flex: 1;
+  min-width: 0;
+}
+.pd-review-item__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+.pd-review-item__stars {
+  display: flex;
+  gap: 1px;
+  margin-top: 2px;
+}
+.pd-review-item__star {
+  font-size: 13px;
+  color: #ccc;
+}
+.pd-review-item__star.full {
+  color: #ffb800;
+}
+.pd-review-item__date {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #999;
+}
+.pd-review-item__comment {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.5;
 }
 
 @media (max-width: 768px) {

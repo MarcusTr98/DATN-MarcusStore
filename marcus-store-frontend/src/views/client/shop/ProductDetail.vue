@@ -21,7 +21,10 @@
       <nav class="pd-breadcrumb">
         <router-link to="/">Trang chủ</router-link>
         <i class="ti ti-chevron-right" aria-hidden="true" />
-        <router-link v-if="product.parentCategorySlug" :to="`/category/${product.parentCategorySlug}`">
+        <router-link
+          v-if="product.parentCategorySlug"
+          :to="`/category/${product.parentCategorySlug}`"
+        >
           {{ product.parentCategoryName }}
         </router-link>
         <i v-if="product.parentCategorySlug" class="ti ti-chevron-right" aria-hidden="true" />
@@ -41,6 +44,9 @@
             :thumbnail-url="product.thumbnailUrl"
             :discount-percent="currentSku?.discountPercent || 0"
           />
+
+          <!-- Policy -->
+          <div><PolicyStrip :total-stock="product.totalStock" /></div>
         </div>
 
         <div class="pd-top__right">
@@ -66,8 +72,7 @@
             @change="onVariantChange"
           />
 
-          <!-- Policy -->
-          <PolicyStrip :total-stock="product.totalStock" />
+          <Voucher />
 
           <!-- Buy actions -->
           <BuyActions
@@ -83,15 +88,21 @@
 
       <!-- Description + specs -->
       <div class="pd-bottom">
-        <ProductDescription
-          :description="product.description"
-          :specifications="product.specifications"
-          :current-sku="currentSku"
-          :product-name="product.productName"
-          :brand="product.brand"
-          :total-skus="product.totalSkus"
-          :total-stock="product.totalStock"
-        />
+        <div class="pd-bottom__left">
+          <ProductDescription
+            :description="product.description"
+            :specifications="product.specifications"
+            :current-sku="currentSku"
+            :product-name="product.productName"
+            :brand="product.brand"
+            :total-skus="product.totalSkus"
+            :total-stock="product.totalStock"
+          />
+        </div>
+
+        <div class="pd-bottom__right">
+          <ProductSuggestions />
+        </div>
       </div>
 
       <!-- Reviews (panel riêng bên dưới) -->
@@ -131,6 +142,8 @@ import PolicyStrip from '@/layouts/product-detail/PolicyStrip.vue'
 import ProductDescription from '@/layouts/product-detail/ProductDescription.vue'
 import ProductReviews from '@/layouts/product-detail/ProductReviews.vue'
 import BuyActions from '@/layouts/product-detail/BuyActions.vue'
+import ProductSuggestions from '@/layouts/product-detail/ProductSuggestions.vue'
+import Voucher from '@/layouts/product-detail/Voucher.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -164,9 +177,7 @@ const currentSku = computed(() => {
 
   // Tìm SKU có đủ attributeValues khớp selectedVariant
   const match = skus.find((sku) =>
-    (sku.attributeValues || []).every(
-      (av) => selectedVariant.value[av.attributeId] === av.valueId,
-    ),
+    (sku.attributeValues || []).every((av) => selectedVariant.value[av.attributeId] === av.valueId),
   )
   if (match) return match
 
@@ -347,7 +358,9 @@ watch(() => route.params.slug, fetchProduct)
 }
 
 @keyframes pd-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Breadcrumb */
@@ -399,10 +412,6 @@ watch(() => route.params.slug, fetchProduct)
   gap: 18px;
 }
 
-.pd-bottom {
-  margin-top: 20px;
-}
-
 .pd-reviews-section {
   margin-top: 20px;
 }
@@ -414,6 +423,19 @@ watch(() => route.params.slug, fetchProduct)
   }
   .pd-breadcrumb {
     padding: 8px 4px;
+  }
+}
+
+.pd-bottom {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 992px) {
+  .pd-bottom {
+    grid-template-columns: 1fr;
   }
 }
 </style>
