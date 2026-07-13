@@ -1,26 +1,13 @@
 import { ref, computed, onUnmounted, watch } from 'vue'
 
-/**
- * Composable quản lý bộ đếm ngược cho Flash Sale.
- *
- * Đầu vào:
- *   - slotsRef: Ref<Array<{ status, startDate, endDate }>> (vd. store.clientSlots)
- *
- * Hành vi:
- *   - Tự động chọn slot "đang diễn ra" (status=2) ưu tiên đầu tiên.
- *   - Nếu không có ACTIVE thì chọn slot "sắp diễn ra" (status=1) đầu tiên.
- *   - Trả về:
- *       + label: 'KẾT THÚC SAU' | 'BẮT ĐẦU SAU' | ''
- *       + timer: { hours: 'HH', minutes: 'MM', seconds: 'SS' }  (đã padStart(2, '0'))
- *       + targetSlot: ref tới slot đang được đếm ngược
- *   - Khi đồng hồ chạm 00:00:00, gọi callback onExpire() để FE refetch dữ liệu mới.
- *
- * Usage:
- *   const { label, timer, targetSlot } = useFlashSaleCountdown(
- *       () => flashSaleStore.clientSlots,
- *       () => flashSaleStore.fetchClientSlots(20),
- *   )
- */
+
+ //    - Tự động chọn slot "đang diễn ra" (status=2) ưu tiên đầu tiên.
+ //    - Nếu không có ACTIVE thì chọn slot "sắp diễn ra" (status=1) đầu tiên.
+ //    - Trả về:
+ //        + label: 'KẾT THÚC SAU' | 'BẮT ĐẦU SAU' | ''
+ //        + timer: { hours: 'HH', minutes: 'MM', seconds: 'SS' }  (đã padStart(2, '0'))
+ //        + targetSlot: ref tới slot đang được đếm ngược
+
 export function useFlashSaleCountdown(getSlots, onExpire) {
     const now = ref(Date.now())
     let intervalId = null
@@ -120,5 +107,9 @@ export function useFlashSaleCountdown(getSlots, onExpire) {
         timer,
         label,
         targetSlot,
+        remainingSeconds,
+        start,
+        stop,
+
     }
 }
