@@ -38,7 +38,7 @@ const flashSaleApi = {
   },
 
 
-   //Lấy cây brand -> categoryL2 -> sku để admin chọn sản phẩm cho Flash Sale.
+  //Lấy cây brand -> categoryL2 -> sku để admin chọn sản phẩm cho Flash Sale.
 
 
   getProductCascade({ includeOutOfStock = false } = {}) {

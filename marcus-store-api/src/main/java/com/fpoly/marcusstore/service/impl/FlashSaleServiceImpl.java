@@ -36,7 +36,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     private final ProductSkuRepository productSkuRepository;
 
 
-    //  Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
+    // Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
 
     private FlashSaleResponse toResponse(FlashSaleSlot slot,
                                          Map<Integer, Integer> qtyMap,
@@ -81,18 +81,31 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         return (keyword == null || keyword.isBlank()) ? null : keyword.trim();
     }
 
-
-     // Kiểm tra slot có cho phép chỉnh sửa hay không.
-
+    /**
+     * Kiểm tra slot có cho phép chỉnh sửa hay không.
+     * <p>
+     * Chỉ có 4 trạng thái trong hệ thống:
+     * 1 = SCHEDULED  (Đã lên lịch) → cho sửa
+     * 2 = ACTIVE     (Đang diễn ra) → khóa
+     * 3 = ENDED      (Đã kết thúc)  → khóa
+     * 4 = CANCELLED  (Đã hủy)       → khóa
+     * <p>
+     * Scheduler tự động chuyển trạng thái theo thời gian, không cần admin thao tác.
+     */
     private boolean isSlotEditable(FlashSaleSlot slot) {
         Short s = slot.getStatus();
         if (s == null) return false;
         return s == 1;
     }
 
-
-     // Validate toàn bộ request trước khi tạo slot.
-
+    /**
+     * Validate toàn bộ request trước khi tạo slot.
+     * - Thời gian hợp lệ (startDate không ở quá khứ, endDate > startDate)
+     * - Items không null/rỗng, không trùng SKU trong cùng request
+     * - Mọi SKU đều tồn tại trong DB
+     * - Giá hợp lệ (originalPrice > 0, 0 < flashSalePrice < originalPrice)
+     * - Số lượng hợp lệ (flashSaleQuantity >= 1, không vượt tồn kho SKU)
+     */
     private void validateRequest(FlashSaleSlotRequest request,
                                  Map<Integer, ProductSku> skuMap) {
         // 1. Thời gian
@@ -884,6 +897,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     overdue.stream().map(FlashSaleSlot::getSlotId).toList());
         }
     }
+
     /**
      * Lấy ảnh đại diện cho SKU từ Product cha (product.thumbnailUrl).
      * Giữ nguyên sku.skuImageUrl trong DB, không xóa.
@@ -893,5 +907,4 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         String thumb = sku.getProduct().getThumbnailUrl();
         return (thumb != null && !thumb.isBlank()) ? thumb : null;
     }
-
 }
