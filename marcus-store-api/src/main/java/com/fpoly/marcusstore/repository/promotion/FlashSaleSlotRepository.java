@@ -110,6 +110,23 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
             """)
     List<FlashSaleSlot> findOverdueScheduledSlots(@Param("now") LocalDateTime now);
 
+    // Lấy các slot còn hiệu lực cho client (ACTIVE hoặc SCHEDULED có startDate trong vòng 2h tới)
+    // Service sẽ tự sort & filter theo ưu tiên hiển thị (slot đang diễn ra trước, slot sắp diễn ra trong 2h sau).
+    @Query("""
+            SELECT s FROM FlashSaleSlot s
+            WHERE (
+                  (s.status = 2 AND s.startDate <= :now AND s.endDate >= :now)
+               OR (s.status = 1 AND s.startDate > :now AND s.startDate <= :upcomingThreshold)
+            )
+            ORDER BY
+              CASE s.status WHEN 2 THEN 1 ELSE 2 END,
+              CASE WHEN s.status = 2 THEN s.endDate ELSE s.startDate END ASC,
+              s.slotId ASC
+            """)
+    List<FlashSaleSlot> findActiveAndUpcomingSlots(
+            @Param("now") LocalDateTime now,
+            @Param("upcomingThreshold") LocalDateTime upcomingThreshold);
+
     // Chặn 2 flash sale chạy cùng khung giờ
     // 2 khoảng [start, end] giao nhau khi: startA < endB AND startB < endA
     // Chỉ tính các slot ĐANG hoạt động (2) hoặc ĐÃ lên lịch (1).

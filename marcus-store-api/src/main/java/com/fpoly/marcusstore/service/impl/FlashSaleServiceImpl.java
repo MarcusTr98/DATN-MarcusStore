@@ -254,7 +254,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productName(sku != null && sku.getProduct() != null
                             ? sku.getProduct().getProductName() : null)
                     .skuCode(sku != null ? sku.getSkuCode() : null)
-                    .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
+                    .skuImageUrl(resolveSkuImageUrl(sku))
                     .originalPrice(item.getOriginalPrice())
                     .flashSalePrice(item.getFlashSalePrice())
                     .flashSaleQuantity(item.getFlashSaleQuantity())
@@ -350,7 +350,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productId(sku.getProduct() != null ? sku.getProduct().getProductId() : null)
                     .productName(sku.getProduct() != null ? sku.getProduct().getProductName() : null)
                     .skuCode(sku.getSkuCode())
-                    .skuImageUrl(sku.getSkuImageUrl())
+                    .skuImageUrl(resolveSkuImageUrl(sku))
                     .originalPrice(saved.getOriginalPrice())
                     .flashSalePrice(saved.getFlashSalePrice())
                     .flashSaleQuantity(saved.getFlashSaleQuantity())
@@ -599,7 +599,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productName(sku != null && sku.getProduct() != null
                             ? sku.getProduct().getProductName() : null)
                     .skuCode(sku != null ? sku.getSkuCode() : null)
-                    .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
+                    .skuImageUrl(resolveSkuImageUrl(sku))
                     .originalPrice(savedItem.getOriginalPrice())
                     .flashSalePrice(savedItem.getFlashSalePrice())
                     .flashSaleQuantity(savedItem.getFlashSaleQuantity())
@@ -699,6 +699,59 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                 .toList();
     }
 
+    // Lấy danh sách slot "đang diễn ra" + "sắp diễn ra trong vòng 2h" cho client.
+    // Trả về FlashSaleResponse kèm items[], đã sắp xếp đúng thứ tự ưu tiên.
+    @Override
+    @Transactional(readOnly = true)
+    public List<FlashSaleResponse> getActiveAndUpcomingFlashSaleSlots(int limit) {
+        LocalDateTime now = LocalDateTime.now();
+        // Cửa sổ "sắp diễn ra" trong vòng 2 tiếng tới
+        LocalDateTime upcomingThreshold = now.plusHours(2);
+
+        // 1. Lấy tất cả slot ACTIVE đang chạy + SCHEDULED sắp chạy trong 2h tới
+        //    (Repository đã lọc đúng điều kiện 2 nhóm này)
+        List<FlashSaleSlot> slots = flashSaleSlotRepository
+                .findActiveAndUpcomingSlots(now, upcomingThreshold);
+
+        if (slots.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. Phân tách 2 nhóm để sort theo đúng ưu tiên nghiệp vụ
+        List<FlashSaleSlot> activeGroup = new ArrayList<>();
+        List<FlashSaleSlot> upcomingGroup = new ArrayList<>();
+        for (FlashSaleSlot s : slots) {
+            Short status = s.getStatus();
+            if (status != null && status == 2) {
+                activeGroup.add(s);
+            } else if (status != null && status == 1) {
+                upcomingGroup.add(s);
+            }
+        }
+
+        // 3. Sắp xếp theo yêu cầu nghiệp vụ:
+        //    - Nhóm ACTIVE: endDate ASC (slot kết thúc gần nhất đứng trước)
+        //    - Nhóm SCHEDULED: startDate ASC (slot bắt đầu sớm nhất đứng trước)
+        activeGroup.sort(Comparator.comparing(FlashSaleSlot::getEndDate));
+        upcomingGroup.sort(Comparator.comparing(FlashSaleSlot::getStartDate));
+
+        // 4. Ghép 2 nhóm: ACTIVE trước, SCHEDULED sau; áp dụng limit
+        List<FlashSaleSlot> combined = new ArrayList<>(activeGroup.size() + upcomingGroup.size());
+        combined.addAll(activeGroup);
+        combined.addAll(upcomingGroup);
+        if (limit > 0 && combined.size() > limit) {
+            combined = combined.subList(0, limit);
+        }
+
+        // 5. Build response kèm items[] cho từng slot
+        //    (1 query batch mỗi slot - số slot client hiển thị thường rất nhỏ)
+        List<FlashSaleResponse> result = new ArrayList<>(combined.size());
+        for (FlashSaleSlot slot : combined) {
+            result.add(buildSlotDetailResponse(slot));
+        }
+        return result;
+    }
+
     // SCHEDULED: Tự động chuyển trạng thái flash sale theo thời gian
     // Chạy mỗi 1 phút (cron: giây phút giờ ngày-tháng tháng thứ)
     @Override
@@ -736,5 +789,22 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     overdue.size(),
                     overdue.stream().map(FlashSaleSlot::getSlotId).toList());
         }
+    }
+
+    /**
+     * Lấy ảnh đại diện cho SKU:
+     *  - Ưu tiên sku.skuImageUrl nếu có giá trị hợp lệ
+     *  - Fallback sang product.thumbnailUrl (ảnh sản phẩm cha, thường là Cloudinary URL)
+     *  - Cuối cùng trả null nếu cả 2 đều rỗng
+     */
+    private String resolveSkuImageUrl(ProductSku sku) {
+        if (sku == null) return null;
+        String skuImg = sku.getSkuImageUrl();
+        if (skuImg != null && !skuImg.isBlank()) return skuImg;
+        if (sku.getProduct() != null) {
+            String thumb = sku.getProduct().getThumbnailUrl();
+            if (thumb != null && !thumb.isBlank()) return thumb;
+        }
+        return null;
     }
 }

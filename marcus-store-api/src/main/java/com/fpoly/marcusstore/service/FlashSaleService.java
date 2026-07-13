@@ -40,4 +40,15 @@ public interface FlashSaleService {
             java.time.LocalDateTime startDate,
             java.time.LocalDateTime endDate,
             Integer excludeSlotId);
+
+    // Client: lấy danh sách slot đang diễn ra + sắp diễn ra trong vòng 2h
+    // Trả về FlashSaleResponse kèm items[] để FE render card sản phẩm.
+    // Sắp xếp theo yêu cầu nghiệp vụ:
+    //   1. Ưu tiên slot "đang diễn ra" (status=2, now nằm giữa startDate và endDate),
+    //      trong nhóm này slot kết thúc gần nhất đứng trước (endDate ASC).
+    //   2. Tiếp theo slot "sắp diễn ra trong vòng 2h" (status=1, startDate trong (now, now+2h]),
+    //      trong nhóm này slot bắt đầu sớm nhất đứng trước (startDate ASC).
+    //   3. Các slot ngoài 2 khung trên bị loại bỏ.
+    // Tham số 'limit' giới hạn tổng số slot trả về (mặc định 20).
+    java.util.List<FlashSaleResponse> getActiveAndUpcomingFlashSaleSlots(int limit);
 }

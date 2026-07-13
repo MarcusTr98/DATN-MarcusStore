@@ -33,7 +33,7 @@
             <span>FLASH SALE</span>
           </div>
           <h1 class="hero-title">
-            <span class="title-line">MARCUS</span>
+            <span class="title-line">{{ featuredSlotName }}</span>
             <span class="title-line accent">FLASH SALE</span>
           </h1>
           <p class="hero-subtitle">Giảm đến <strong>50%++</strong> cho hàng ngàn sản phẩm công nghệ</p>
@@ -104,21 +104,82 @@
         :style="{ '--enter-delay': (index * 80) + 'ms' }"
         @click="goToProduct(product)"
       >
-        <span class="card-tag" :style="{ animationDelay: (index * 0.35) + 's' }">
-          <svg viewBox="0 0 24 24" class="lightning-icon"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
-          SALE
-        </span>
-        <span class="card-discount">-{{ product.discount }}%</span>
-        <div class="thumb">
-          <span class="product-emoji">{{ product.emoji }}</span>
-
+        <!-- Khối badge góc trên trái: SALE + % giảm -->
+        <div class="card-badges">
+          <span class="card-tag" :style="{ animationDelay: (index * 0.35) + 's' }">
+            <svg viewBox="0 0 24 24" class="lightning-icon"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
+            SALE
+          </span>
+          <span class="card-discount">Giảm {{ product.discount }}%</span>
         </div>
+
+        <!-- Nút góc trên phải: tim + giỏ hàng -->
+        <div class="card-actions" @click.stop>
+          <button
+            type="button"
+            class="icon-btn"
+            :class="{ active: product.favorited }"
+            :title="product.favorited ? 'Đã yêu thích' : 'Yêu thích'"
+            @click="toggleFavorite(product)"
+          >
+            <svg viewBox="0 0 24 24" class="icon-svg">
+              <path
+                :fill="product.favorited ? 'currentColor' : 'none'"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="icon-btn"
+            :class="{ adding: product.addingToCart }"
+            title="Thêm vào giỏ hàng"
+            @click.stop="addToCart(product)"
+          >
+            <svg viewBox="0 0 24 24" class="icon-svg">
+              <path
+                v-if="!product.addingToCart"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"
+              />
+              <path
+                v-else
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Ảnh sản phẩm -->
+        <div class="thumb">
+          <img
+            v-if="product.image"
+            :src="product.image"
+            :alt="product.name"
+            class="product-image"
+            @error="(e) => { console.warn('[HomeFlashSale] image failed:', product.image, e); e.target.style.display='none' }"
+          />
+          <span v-else class="product-emoji">{{ product.emoji }}</span>
+        </div>
+
+        <!-- Tên + mô tả -->
         <div class="card-name">{{ product.name }}</div>
         <div class="card-spec">{{ product.spec }}</div>
-        <div class="price-row">
-          <span class="price-now">{{ formatPrice(product.displayPrice) }}</span>
-          <span class="price-old">{{ formatPrice(product.originalPrice) }}</span>
-        </div>
+
+        <!-- Thanh tiến trình kho -->
         <div class="scarcity">
           <div class="bar-row">
             <span>Đã bán {{ product.soldPercent }}%</span>
@@ -130,8 +191,42 @@
             </div>
           </div>
         </div>
+
+        <!-- Giá -->
+        <div class="price-row">
+          <span class="price-now">{{ formatPrice(product.displayPrice) }}</span>
+          <span class="price-old">{{ formatPrice(product.originalPrice) }}</span>
+        </div>
+
+        <!-- Chip biến thể (màu sắc, dung lượng...) -->
+        <div v-if="product.variants && product.variants.length" class="variant-chips">
+          <span
+            v-for="(variant, vIdx) in product.variants"
+            :key="vIdx"
+            class="variant-chip"
+          >
+            {{ variant }}
+          </span>
+        </div>
+
+        <!-- Tag khuyến mãi đi kèm -->
+        <ul v-if="product.promos && product.promos.length" class="promo-tags">
+          <li v-for="(promo, pIdx) in product.promos" :key="pIdx" class="promo-tag">
+            <span class="promo-icon" v-html="promo.icon"></span>
+            <span class="promo-text">{{ promo.text }}</span>
+          </li>
+        </ul>
+
+        <!-- CTA lớn: MUA NGAY -->
         <button type="button" class="cta" @click.stop="handleBuyClick($event, product)">
-          Mua ngay
+          <span class="cta-text">MUA NGAY</span>
+          <span class="cta-icon">
+            <svg viewBox="0 0 24 24"><path
+              fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round"
+              d="M5 12h14M13 6l6 6-6 6"
+            /></svg>
+          </span>
           <span
             v-for="ripple in product.ripples"
             :key="ripple.id"
@@ -159,10 +254,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import '@/assets/css/FlashSalePage.css'
+
 const router = useRouter()
+const flashSaleStore = useFlashSaleStore()
+const { clientSlots, clientLoading, featuredSlot } = storeToRefs(flashSaleStore)
+
+// Tên slot Flash Sale đang hiển thị (ưu tiên ACTIVE, rồi SCHEDULED).
+const featuredSlotName = computed(() => {
+  const slot = featuredSlot.value
+  if (slot && slot.name) return slot.name
+  if (Array.isArray(clientSlots.value) && clientSlots.value.length > 0) {
+    const upcoming = clientSlots.value.find((s) => Number(s.status) === 1)
+    if (upcoming?.name) return upcoming.name
+  }
+  return 'FLASH SALE'
+})
 
 // Countdown Timer
 const timer = ref({ hours: '05', minutes: '32', seconds: '47' })
@@ -191,17 +302,160 @@ const flashSlots = ref([
   { time: '20:00 CH', isLive: false },
 ])
 
-// Products
-const flashSaleProducts = ref([
-  { id: 1, name: 'iPhone 15 Pro Max 256GB', slug: 'iphone-15-pro-max', spec: 'Titan tự nhiên · 5G', emoji: '📱', price: 27990000, originalPrice: 34990000, discount: 20, soldPercent: 85, left: 6, displayPrice: 0, ripples: [] },
-  { id: 2, name: 'Samsung Galaxy S24 Ultra', slug: 'samsung-galaxy-s24-ultra', spec: '12GB/256GB · Galaxy AI', emoji: '📱', price: 22490000, originalPrice: 29990000, discount: 25, soldPercent: 92, left: 3, displayPrice: 0, ripples: [] },
-  { id: 3, name: 'MacBook Air M2 13"', slug: 'macbook-air-m2', spec: '8GB/256GB · Midnight', emoji: '💻', price: 21990000, originalPrice: 28990000, discount: 24, soldPercent: 78, left: 9, displayPrice: 0, ripples: [] },
-  { id: 4, name: 'Laptop Gaming ROG Strix', slug: 'rog-strix', spec: 'RTX 4060 · 16GB/512GB', emoji: '💻', price: 26990000, originalPrice: 35990000, discount: 25, soldPercent: 64, left: 12, displayPrice: 0, ripples: [] },
-  { id: 5, name: 'Apple Watch Series 9', slug: 'apple-watch-series-9', spec: 'GPS · 45mm', emoji: '⌚', price: 8490000, originalPrice: 11990000, discount: 29, soldPercent: 97, left: 2, displayPrice: 0, ripples: [] },
-  { id: 6, name: 'Samsung Galaxy Watch 6', slug: 'galaxy-watch-6', spec: 'Bluetooth · 44mm', emoji: '⌚', price: 5290000, originalPrice: 7490000, discount: 29, soldPercent: 70, left: 14, displayPrice: 0, ripples: [] },
-  { id: 7, name: 'Loa JBL Flip 6', slug: 'jbl-flip-6', spec: 'Chống nước IP67', emoji: '🔊', price: 2190000, originalPrice: 3290000, discount: 33, soldPercent: 99, left: 3, displayPrice: 0, ripples: [] },
-  { id: 8, name: 'AirPods Pro 2', slug: 'airpods-pro-2', spec: 'Chống ồn chủ động', emoji: '🎧', price: 4990000, originalPrice: 6490000, discount: 23, soldPercent: 88, left: 7, displayPrice: 0, ripples: [] },
-])
+// === Sản phẩm hiển thị trên trang chủ ===
+// Lấy từ featuredSlot.items khi có dữ liệu từ BE; fallback về dữ liệu mẫu nếu BE rỗng.
+const fallbackProducts = [
+  {
+    id: 'fs-1',
+    name: 'iPhone 15 Pro Max 256GB',
+    slug: 'iphone-15-pro-max',
+    spec: 'Titan tự nhiên · 5G',
+    emoji: '📱',
+    image: null,
+    price: 27990000,
+    originalPrice: 34990000,
+    discount: 20,
+    soldPercent: 85,
+    left: 6,
+    displayPrice: 0,
+    ripples: [],
+    favorited: false,
+    addingToCart: false,
+    variants: ['Titan Tự Nhiên', '256GB'],
+    promos: [
+      { icon: '🎓', text: 'Học sinh/Sinh viên giảm đến 500.000đ' },
+      { icon: '🎁', text: 'Quà tặng kèm: Tai nghe 300k' },
+      { icon: '🛡️', text: 'Bảo hành chính hãng 12 tháng' },
+    ],
+  },
+  {
+    id: 'fs-2',
+    name: 'Samsung Galaxy S24 Ultra',
+    slug: 'samsung-galaxy-s24-ultra',
+    spec: '12GB/256GB · Galaxy AI',
+    emoji: '📱',
+    image: null,
+    price: 22490000,
+    originalPrice: 29990000,
+    discount: 25,
+    soldPercent: 92,
+    left: 3,
+    displayPrice: 0,
+    ripples: [],
+    favorited: false,
+    addingToCart: false,
+    variants: ['Titan Gray', '256GB'],
+    promos: [
+      { icon: '🎓', text: 'Học sinh/Sinh viên giảm đến 400.000đ' },
+      { icon: '🎁', text: 'Quà tặng kèm: Sạc nhanh 25W' },
+      { icon: '🛡️', text: 'Bảo hành chính hãng 12 tháng' },
+    ],
+  },
+  {
+    id: 'fs-3',
+    name: 'MacBook Air M2 13"',
+    slug: 'macbook-air-m2',
+    spec: '8GB/256GB · Midnight',
+    emoji: '💻',
+    image: null,
+    price: 21990000,
+    originalPrice: 28990000,
+    discount: 24,
+    soldPercent: 78,
+    left: 9,
+    displayPrice: 0,
+    ripples: [],
+    favorited: false,
+    addingToCart: false,
+    variants: ['Midnight', '8GB / 256GB'],
+    promos: [
+      { icon: '🎓', text: 'Sinh viên giảm thêm đến 5%' },
+      { icon: '🛡️', text: 'Bảo hành chính hãng 12 tháng' },
+    ],
+  },
+  {
+    id: 'fs-4',
+    name: 'Laptop Gaming ROG Strix',
+    slug: 'rog-strix',
+    spec: 'RTX 4060 · 16GB/512GB',
+    emoji: '💻',
+    image: null,
+    price: 26990000,
+    originalPrice: 35990000,
+    discount: 25,
+    soldPercent: 64,
+    left: 12,
+    displayPrice: 0,
+    ripples: [],
+    favorited: false,
+    addingToCart: false,
+    variants: ['Eclipse Gray', '16GB / 512GB'],
+    promos: [
+      { icon: '🎁', text: 'Tặng kèm: Chuột gaming + Túi' },
+      { icon: '🛡️', text: 'Bảo hành chính hãng 24 tháng' },
+    ],
+  },
+]
+
+// Map item từ FlashSaleStore (BE) sang shape card UI
+function mapItemToCard(item, idx) {
+  const totalQty = Number(item.flashSaleQuantity ?? 0)
+  const soldQty = Number(item.soldQuantity ?? 0)
+  const soldPercent = totalQty > 0 ? Math.min(100, Math.round((soldQty / totalQty) * 100)) : 0
+  const remaining = Math.max(0, Number(item.remainingQuantity ?? totalQty - soldQty))
+
+  return {
+    id: item.skuId ?? `fs-${idx}`,
+    name: item.productName || item.skuCode || `Sản phẩm Flash Sale #${idx + 1}`,
+    slug: item.skuCode || `flash-sale-${item.skuId ?? idx}`,
+    spec: item.skuCode ? `Mã: ${item.skuCode}` : 'Sản phẩm chính hãng',
+    emoji: '🛍️',
+    image: item.skuImageUrl || null,
+    price: Number(item.flashSalePrice ?? 0),
+    originalPrice: Number(item.originalPrice ?? item.flashSalePrice ?? 0),
+    discount: item.discountPercent ?? 0,
+    soldPercent,
+    left: remaining,
+    displayPrice: 0,
+    ripples: [],
+    favorited: false,
+    addingToCart: false,
+    // Tách phần biến thể từ skuCode (vd "IP15PM-256-TIT") — fallback hiển thị mã SKU gọn
+    variants: item.skuCode ? deriveVariantsFromSku(item.skuCode) : [],
+    // Các tag khuyến mãi đi kèm hiển thị cố định (BE chưa trả) — dùng helper này khi API chưa có
+    promos: derivePromoTags(item),
+  }
+}
+
+// Tách phân biệt mãu/dung lượng từ skuCode theo pattern "PREFIX-COLOR-STORAGE"
+function deriveVariantsFromSku(skuCode) {
+  if (!skuCode) return []
+  const parts = String(skuCode).split('-').filter(Boolean)
+  // Bỏ phần prefix model, lấy 2 đoạn cuối
+  const tail = parts.slice(-2)
+  return tail
+    .map((p) => p.replace(/_/g, ' ').trim())
+    .filter((p) => p.length > 0)
+}
+
+// Sinh promo tags mặc định (BE chưa có field promo thì vẫn hiển thị 3 tag quen thuộc)
+function derivePromoTags(item) {
+  const tags = []
+  const price = Number(item.originalPrice ?? 0)
+  if (price > 10000000) {
+    tags.push({ icon: '🎓', text: 'Học sinh/Sinh viên giảm đến 500.000đ' })
+  }
+  tags.push({ icon: '🛡️', text: 'Bảo hành chính hãng 12 tháng' })
+  return tags
+}
+
+const flashSaleProducts = computed(() => {
+  const slot = featuredSlot.value
+  if (slot && Array.isArray(slot.items) && slot.items.length) {
+    return slot.items.slice(0, 8).map(mapItemToCard)
+  }
+  return fallbackProducts
+})
 
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
@@ -210,7 +464,7 @@ const goToProduct = (product) => {
   router.push(`/product/${product.slug}`)
 }
 
-// --- Hiệu ứng "đếm số" cho giá khi card xuất hiện ---
+// Đếm số tăng dần cho giá khi card xuất hiện
 const animateCountUp = (product, delayMs = 0) => {
   const duration = 900
   const to = product.price
@@ -232,7 +486,7 @@ const animateCountUp = (product, delayMs = 0) => {
   requestAnimationFrame(step)
 }
 
-// --- Hiệu ứng ripple khi bấm "Mua ngay" ---
+// Ripple khi bấm "MUA NGAY"
 const handleBuyClick = (event, product) => {
   const btn = event.currentTarget
   const rect = btn.getBoundingClientRect()
@@ -246,7 +500,22 @@ const handleBuyClick = (event, product) => {
     product.ripples = product.ripples.filter((r) => r.id !== ripple.id)
   }, 650)
 
-  // TODO: gắn logic thêm vào giỏ hàng thật ở đây
+  // TODO: gắn logic thêm vào giỏ hàng + chuyển checkout thật ở đây
+  addToCart(product)
+}
+
+// Toggle yêu thích (UI-only — chưa gắn API wishlist)
+const toggleFavorite = (product) => {
+  product.favorited = !product.favorited
+}
+
+// Thêm vào giỏ (UI-only — chưa gắn cart API; hiển thị tick xanh ~600ms)
+const addToCart = (product) => {
+  if (product.addingToCart) return
+  product.addingToCart = true
+  setTimeout(() => {
+    product.addingToCart = false
+  }, 700)
 }
 
 // FOMO popup
@@ -285,33 +554,30 @@ const fallingDotsContainer = ref(null)
 const createFallingDots = () => {
   const container = fallingDotsContainer.value
   if (!container) {
-    console.log('Container not found')
     return
   }
 
   const isMobile = window.innerWidth < 640
   const count = isMobile ? 60 : 120
 
-  // Quãng đường rơi = đúng chiều cao thật của banner (thay vì số cứng 400px)
+  // Quãng đường rơi = đúng chiều cao thật của banner
   const fallDistance = container.offsetHeight || 340
 
-  container.innerHTML = '' // Clear existing
+  container.innerHTML = ''
 
   for (let i = 0; i < count; i++) {
     const dot = document.createElement('div')
     dot.classList.add('falling-dot')
 
-    // Random properties với distribution đều
-    const x = Math.random() * 100 // 0% - 100% spread evenly
+    const x = Math.random() * 100
     const size = 3 + Math.random() * 8
-    const duration = 2.5 + Math.random() * 4 // 2.5s - 6.5s
-    const delay = Math.random() * 6 // 0s - 6s spread
+    const duration = 2.5 + Math.random() * 4
+    const delay = Math.random() * 6
     const isWhite = Math.random() > 0.4
 
-    // Gán trực tiếp từng style property
     dot.style.position = 'absolute'
     dot.style.left = `${x}%`
-    dot.style.top = '-20px' // Fixed start position above
+    dot.style.top = '-20px'
     dot.style.width = `${size}px`
     dot.style.height = `${size}px`
     dot.style.background = isWhite ? '#fff' : '#fbbf24'
@@ -323,24 +589,31 @@ const createFallingDots = () => {
     dot.style.animationTimingFunction = 'linear'
     dot.style.animationIterationCount = 'infinite'
     dot.style.boxShadow = `0 0 ${size}px ${isWhite ? 'rgba(255,255,255,0.9)' : 'rgba(251,191,36,0.9)'}`
-    dot.style.opacity = '0' // Start invisible
+    dot.style.opacity = '0'
 
     container.appendChild(dot)
   }
-  console.log('Created', count, 'falling dots')
 }
 
 let resizeHandler = null
 
-onMounted(() => {
+onMounted(async () => {
   timerInterval = setInterval(tickTimer, 1000)
   createFallingDots()
 
-  // Tạo lại các chấm khi resize để quãng rơi luôn khớp chiều cao banner
   resizeHandler = () => createFallingDots()
   window.addEventListener('resize', resizeHandler)
 
-  // Đếm số giá tăng dần, chạy sau khi card entrance animation gần xong, so le từng card
+  // Kéo dữ liệu Flash Sale ACTIVE từ BE (nếu có) để đổ vào card
+  try {
+    if (!flashSaleStore.clientSlots || flashSaleStore.clientSlots.length === 0) {
+      await flashSaleStore.fetchClientSlots(8)
+    }
+  } catch (e) {
+    console.warn('[HomeFlashSale] không tải được dữ liệu flash sale:', e)
+  }
+
+  // Đếm số giá tăng dần sau khi card entrance animation gần xong
   flashSaleProducts.value.forEach((product, index) => {
     animateCountUp(product, 300 + index * 80)
   })
@@ -357,10 +630,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-
 </style>
 
 
 <style>
-
 </style>

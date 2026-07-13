@@ -1,7 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,500;0,700;0,800;0,900;1,900&family=Inter:wght@400;500;600;700;800;900&display=swap');
 
 .flash-sale-page {
-  /* Light Theme - đồng bộ với web */
   --ms-bg: #f8f9fa;
   --ms-bg-card: #ffffff;
   --ms-bg-dark: #1a1a2e;
@@ -9,15 +8,12 @@
   --ms-text-light: #6c757d;
   --ms-text-muted: #9aa3b5;
   --ms-border: #e9ecef;
-
-  /* Accent Colors - giữ nguyên flame theme */
   --flame-red: #e11d1d;
   --flame-red-2: #c0392b;
   --flame-orange: #ff6b00;
   --flame-gold: #f59e0b;
   --neon-yellow: #fbbf24;
   --flame-gradient: linear-gradient(135deg, var(--flame-red), var(--flame-orange));
-
   background: var(--ms-bg);
   min-height: 100vh;
   color: var(--ms-text);
@@ -96,8 +92,6 @@
   align-items: center;
   justify-content: center;
 }
-
-/* Hero Background Effects */
 .hero-bg {
   position: absolute;
   width: 100%;
@@ -107,8 +101,6 @@
   overflow: hidden;
   pointer-events: none;
 }
-
-/* Wave shapes */
 .wave {
   position: absolute;
   width: 200%;
@@ -137,8 +129,6 @@
   0%, 100% { transform: translateX(0) rotate(0deg); }
   50% { transform: translateX(2%) rotate(1deg); }
 }
-
-/* Decorative circles */
 .deco-circle {
   position: absolute;
   border-radius: 50%;
@@ -161,8 +151,6 @@
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-20px); }
 }
-
-/* Lightning decorations */
 .lightning-deco {
   position: absolute;
   color: rgba(255, 255, 255, 0.15);
@@ -193,8 +181,6 @@
   0%, 100% { opacity: 0.15; transform: scale(1) rotate(15deg); }
   50% { opacity: 0.25; transform: scale(1.1) rotate(20deg); }
 }
-
-/* === Falling Dots Effect (container/layout only — keyframes are global, see unscoped style block below) === */
 .falling-dots {
   position: absolute;
   width: 100%;
@@ -205,8 +191,6 @@
   pointer-events: none;
   z-index: 1;
 }
-
-/* Hero Content */
 .hero-content {
   position: relative;
   z-index: 2;
@@ -218,12 +202,10 @@
   width: 100%;
   max-width: 1200px;
 }
-
 .hero-left {
   text-align: left;
   color: #fff;
 }
-
 .hero-badge {
   display: inline-flex;
   align-items: center;
@@ -247,7 +229,6 @@
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.2); }
 }
-
 .hero-title {
   margin: 0 0 12px 0;
   font-family: 'Be Vietnam Pro', sans-serif;
@@ -266,7 +247,6 @@
   color: #fbbf24;
   text-shadow: 0 4px 30px rgba(251, 191, 36, 0.5);
 }
-
 .hero-subtitle {
   font-size: clamp(14px, 2vw, 18px);
   color: rgba(255, 255, 255, 0.9);
@@ -276,7 +256,6 @@
   color: #fbbf24;
   font-weight: 800;
 }
-
 .countdown-wrapper {
   text-align: left;
 }
@@ -328,8 +307,6 @@
   font-weight: 900;
   margin: 0 2px;
 }
-
-/* Hero Stats */
 .hero-right {
   text-align: center;
 }
@@ -369,8 +346,6 @@
   height: 50px;
   background: rgba(255, 255, 255, 0.3);
 }
-
-/* Responsive Hero */
 @media (max-width: 900px) {
   .hero-content {
     flex-direction: column;
@@ -416,7 +391,14 @@
   color: var(--ms-text);
 }
 .section-head h2 span { color: var(--flame-red); }
-.see-all { font-size: 13px; font-weight: 700; color: var(--flame-orange); white-space: nowrap; text-decoration: none; transition: color 0.2s; }
+.see-all {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--flame-orange);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: color 0.2s;
+}
 .see-all:hover { color: var(--flame-red); }
 
 /* === Product Grid === */
@@ -425,21 +407,20 @@
   z-index: 2;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  padding: 0 5vw 10px;
+  gap: 14px;
+  padding: 0 5vw 8px;
 }
 .flash-card {
-  background: var(--ms-bg-card);
+  background: #ffffff;
   border: 1px solid var(--ms-border);
   border-radius: 14px;
-  padding: 14px;
+  padding: 8px 12px 12px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
   position: relative;
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
   cursor: pointer;
-  /* Stagger entrance: mỗi card xuất hiện lệch nhau theo --enter-delay (gán qua index ở template) */
   animation: card-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
   animation-delay: var(--enter-delay, 0ms);
 }
@@ -455,10 +436,10 @@
   border-color: var(--flame-orange);
   box-shadow: 0 12px 30px rgba(225, 29, 29, 0.15);
 }
+.flash-card:hover .thumb img,
 .flash-card:hover .thumb .product-emoji {
-  transform: scale(1.1);
+  transform: scale(1.06);
 }
-/* Card sắp cháy hàng (còn <= 3 sản phẩm): viền đỏ nhấp nháy để nổi bật hơn hẳn */
 .flash-card.low-stock::after {
   content: '';
   position: absolute;
@@ -472,11 +453,24 @@
   0%, 100% { opacity: 0.35; box-shadow: 0 0 0 0 rgba(225, 29, 29, 0.35); }
   50% { opacity: 1; box-shadow: 0 0 14px 2px rgba(225, 29, 29, 0.45); }
 }
-.card-tag {
+
+/* === Badges góc trên trái: SALE lightning + % giảm giá === */
+.card-badges {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 2;
+  top: 10px;
+  left: 10px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  pointer-events: none;
+}
+.card-tag {
+  position: relative;
+  top: auto;
+  left: auto;
+  z-index: auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -488,7 +482,6 @@
   padding: 5px 9px 5px 7px;
   border-radius: 6px;
   box-shadow: 0 4px 10px rgba(225, 29, 29, 0.3);
-  /* Rung nhẹ theo chu kỳ để thu hút mắt, không rung liên tục gây khó chịu */
   animation: badge-shake 5s ease-in-out infinite;
   transform-origin: center;
 }
@@ -503,18 +496,75 @@
 }
 .lightning-icon { width: 11px; height: 11px; fill: #fff; }
 .card-discount {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 2;
+  position: relative;
+  top: auto;
+  right: auto;
+  z-index: auto;
+  display: inline-block;
+  background: #fff;
+  color: var(--flame-red);
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 900;
   font-style: italic;
-  font-size: 15px;
-  color: var(--flame-red);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(225, 29, 29, 0.25);
+  box-shadow: 0 2px 6px rgba(225, 29, 29, 0.12);
+  white-space: nowrap;
 }
+
+/* === Icon buttons góc trên phải: yêu thích + giỏ hàng === */
+.card-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--ms-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ms-text-light);
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  transition: transform 0.18s ease, color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.icon-btn:hover {
+  transform: translateY(-2px) scale(1.05);
+  color: var(--flame-red);
+  border-color: rgba(225, 29, 29, 0.4);
+}
+.icon-btn.active {
+  color: var(--flame-red);
+  border-color: rgba(225, 29, 29, 0.45);
+  animation: heart-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.icon-btn.adding {
+  color: #16a34a;
+  border-color: rgba(22, 163, 74, 0.45);
+  background: rgba(22, 163, 74, 0.08);
+}
+@keyframes heart-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+.icon-svg { width: 16px; height: 16px; display: block; }
+
+/* === Ảnh sản phẩm === */
 .thumb {
-  aspect-ratio: 1/1;
+  aspect-ratio: 4/3;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -524,15 +574,111 @@
   overflow: hidden;
   position: relative;
 }
-.product-emoji { font-size: 3.5rem; user-select: none; transition: transform 0.3s ease; display: inline-block; }
-.card-name { font-size: 14px; font-weight: 700; color: var(--ms-text); line-height: 1.3; }
-.card-spec { font-size: 11.5px; color: var(--ms-text-muted); margin-top: -6px; }
-.price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.price-now { font-family: 'Be Vietnam Pro', sans-serif; font-weight: 900; font-style: italic; color: var(--flame-red); font-size: 19px; font-variant-numeric: tabular-nums; }
-.price-old { font-size: 12.5px; color: var(--ms-text-muted); text-decoration: line-through; }
-.scarcity { display: flex; flex-direction: column; gap: 5px; }
-.bar-row { display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; font-weight: 800; color: var(--ms-text-light); letter-spacing: 0.03em; }
-.bar-track { height: 7px; border-radius: 999px; background: var(--ms-bg); border: 1px solid var(--ms-border); overflow: hidden; }
+.product-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+  display: block;
+}
+.product-emoji {
+  font-size: 2.6rem;
+  user-select: none;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+/* === Tên + mô tả === */
+.card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ms-text);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(1.3em * 1);
+  margin-top: 4px;
+}
+.card-spec {
+  font-size: 11.5px;
+  color: var(--ms-text-muted);
+}
+
+/* === Chip biến thể (màu/dung lượng) === */
+.variant-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.variant-chip {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ms-text-light);
+  background: var(--ms-bg);
+  border: 1px solid var(--ms-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+/* === Tag khuyến mãi đi kèm === */
+.promo-tags {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.promo-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ms-text-light);
+  padding: 4px 0;
+}
+.promo-tag + .promo-tag {
+  border-top: 1px dashed var(--ms-border);
+  padding-top: 5px;
+  margin-top: 2px;
+}
+.promo-icon {
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+.promo-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* === Thanh tiến trình kho === */
+.scarcity { display: flex; flex-direction: column; gap: 4px; }
+.bar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--ms-text-light);
+  letter-spacing: 0.03em;
+}
+.bar-track {
+  height: 7px;
+  border-radius: 999px;
+  background: var(--ms-bg);
+  border: 1px solid var(--ms-border);
+  overflow: hidden;
+}
 .bar-fill {
   height: 100%;
   border-radius: 999px;
@@ -541,7 +687,6 @@
   position: relative;
   overflow: hidden;
 }
-/* Dải sáng chạy ngang trên thanh tiến trình để trông "sống" hơn */
 .bar-shimmer {
   position: absolute;
   top: 0;
@@ -565,33 +710,87 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
 }
-/* Sản phẩm càng gần hết hàng, chữ "Sắp cháy" càng nháy nhanh + đậm màu hơn */
 .flash-card.low-stock .blink {
   color: var(--flame-red);
   animation-duration: 0.8s;
 }
-.cta {
-  margin-top: 2px;
-  width: 100%;
-  padding: 11px 0;
-  border-radius: 10px;
+
+/* === Giá === */
+.price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.price-now {
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 900;
   font-style: italic;
-  font-size: 14.5px;
-  letter-spacing: 0.02em;
+  color: var(--flame-red);
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.price-old {
+  font-size: 12.5px;
+  color: var(--ms-text-muted);
+  text-decoration: line-through;
+}
+
+/* === CTA lớn: MUA NGAY === */
+.cta {
+  margin-top: auto;
+  width: 100%;
+  padding: 10px 0;
+  border-radius: 10px;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.06em;
   color: #fff;
   text-transform: uppercase;
-  background: var(--flame-gradient);
-  box-shadow: 0 4px 15px rgba(225, 29, 29, 0.3);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  background: linear-gradient(135deg, #ff4d4f 0%, #e11d1d 50%, #b80e17 100%);
+  background-size: 200% 200%;
+  background-position: 0% 50%;
+  box-shadow: 0 6px 18px rgba(225, 29, 29, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background-position 0.45s ease;
   border: none;
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
 }
-.cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(225, 29, 29, 0.4); }
+.cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 25%, rgba(255, 255, 255, 0.35) 50%, transparent 75%);
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+.cta:hover {
+  transform: translateY(-2px);
+  background-position: 100% 50%;
+  box-shadow: 0 10px 24px rgba(225, 29, 29, 0.5);
+}
+.cta:hover::before {
+  transform: translateX(100%);
+}
 .cta:active { transform: translateY(0); }
+.cta-text { position: relative; z-index: 1; }
+.cta-icon {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.25s ease;
+}
+.cta-icon svg { width: 16px; height: 16px; }
+.cta:hover .cta-icon { transform: translateX(4px); }
+
 /* Ripple lan tỏa từ điểm bấm khi click "Mua ngay" */
 .ripple {
   position: absolute;
@@ -607,9 +806,8 @@
   to { transform: translate(-50%, -50%) scale(20); opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .card-tag, .bar-shimmer, .flash-card.low-stock::after { animation: none; }
+  .card-tag, .bar-shimmer, .flash-card.low-stock::after, .cta::before { animation: none; }
 }
-
 
 /* === Promo Banners === */
 .promo-grid {
@@ -620,7 +818,6 @@
   gap: 16px;
   padding: 36px 5vw 60px;
 }
-/* === Promo Banners - Phiên bản đậm đà === */
 .promo {
   border-radius: 22px;
   padding: 26px;
@@ -633,42 +830,33 @@
   overflow: hidden;
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
-
-/* Hiệu ứng Hover nhìn nổi khối rõ ràng hơn */
 .promo:hover {
   transform: translateY(-4px);
 }
-
-/* --- Khối màu Đậm đà & Sắc nét hơn --- */
 .promo-a {
   border: 1.5px solid rgba(225, 29, 29, 0.2);
   border-left: 6px solid var(--flame-red);
   background: linear-gradient(135deg, rgba(225, 29, 29, 0.12) 0%, #ffffff 65%);
 }
 .promo-a:hover { box-shadow: 0 12px 30px rgba(225, 29, 29, 0.15); }
-
 .promo-b {
   border: 1.5px solid rgba(255, 107, 0, 0.2);
   border-left: 6px solid var(--flame-orange);
   background: linear-gradient(135deg, rgba(255, 107, 0, 0.12) 0%, #ffffff 65%);
 }
 .promo-b:hover { box-shadow: 0 12px 30px rgba(255, 107, 0, 0.15); }
-
 .promo-c {
   border: 1.5px solid rgba(245, 158, 11, 0.25);
   border-left: 6px solid var(--flame-gold);
   background: linear-gradient(135deg, rgba(245, 158, 11, 0.14) 0%, #ffffff 65%);
 }
 .promo-c:hover { box-shadow: 0 12px 30px rgba(245, 158, 11, 0.15); }
-
 .promo-d {
   border: 1.5px solid rgba(139, 92, 246, 0.2);
   border-left: 6px solid #8b5cf6;
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, #ffffff 65%);
 }
 .promo-d:hover { box-shadow: 0 12px 30px rgba(139, 92, 246, 0.15); }
-
-/* --- Phần chữ hiển thị rõ ràng, tương phản cao --- */
 .promo .tag {
   font-size: 11px;
   font-weight: 800;
@@ -676,29 +864,28 @@
   text-transform: uppercase;
   margin-bottom: 2px;
 }
-.promo-a .tag { color: #b91c1c; } /* Đậm hơn đỏ gốc */
-.promo-b .tag { color: #c2410c; } /* Đậm hơn cam gốc */
-.promo-c .tag { color: #b45309; } /* Đậm hơn vàng gốc */
-.promo-d .tag { color: #6d28d9; } /* Đậm hơn tím gốc */
-
+.promo-a .tag { color: #b91c1c; }
+.promo-b .tag { color: #c2410c; }
+.promo-c .tag { color: #b45309; }
+.promo-d .tag { color: #6d28d9; }
 .promo h3 {
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 900;
   font-style: italic;
   font-size: clamp(21px, 3vw, 26px);
   text-transform: uppercase;
-  color: #000000; /* Đen tuyền 100% cực kỳ sắc nét */
+  color: #000000;
   margin: 0;
 }
-
 .promo p {
   font-size: 13.5px;
-  font-weight: 500; /* Tăng độ dày nét chữ */
-  color: #1f2937; /* Đổi từ màu xám sang xám than rất đậm */
+  font-weight: 500;
+  color: #1f2937;
   margin: 0;
   max-width: 85%;
   line-height: 1.45;
 }
+
 /* === Footer === */
 .flash-footer {
   position: relative;
@@ -791,8 +978,17 @@
 .fomo-dot svg { width: 16px; height: 16px; fill: #fff; }
 .fomo-text b { display: block; font-size: 12.5px; font-weight: 700; color: var(--ms-text); line-height: 1.35; }
 .fomo-text span { font-size: 11px; color: var(--ms-text-muted); }
-.fomo-close { position: absolute; top: 6px; right: 8px; font-size: 14px; color: var(--ms-text-muted); background: none; border: none; line-height: 1; cursor: pointer; }
-/* Thanh đếm ngược nhỏ cho biết còn bao lâu toast sẽ tự đóng */
+.fomo-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 14px;
+  color: var(--ms-text-muted);
+  background: none;
+  border: none;
+  line-height: 1;
+  cursor: pointer;
+}
 .fomo-progress-track {
   position: absolute;
   left: 10px;
@@ -830,6 +1026,8 @@
   .flash-card { padding: 10px; border-radius: 12px; }
   .price-now { font-size: 17px; }
   .cta { padding: 13px 0; font-size: 14px; }
+  .icon-btn { width: 30px; height: 30px; }
+  .icon-svg { width: 14px; height: 14px; }
   .promo-grid { padding: 28px 4vw 90px; gap: 12px; }
   .promo { padding: 20px; min-height: 130px; }
   .promo h3 { max-width: 100%; font-size: 22px; }
