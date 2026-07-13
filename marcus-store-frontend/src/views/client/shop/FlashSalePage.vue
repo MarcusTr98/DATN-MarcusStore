@@ -754,7 +754,7 @@ function prepareCheckoutSelection(cartItem, product, ownSlot) {
       (cartItem.totalPrice || 0) > 0
         ? cartItem.totalPrice
         : ((cartItem.price || 0) > 0 ? cartItem.price : product.price) *
-          (cartItem.quantity ?? 1),
+        (cartItem.quantity ?? 1),
     isFlashSale: true,
     flashSaleSlotId: ownSlot?.slotId ?? product.slotId ?? null,
     flashSaleSlotName:
