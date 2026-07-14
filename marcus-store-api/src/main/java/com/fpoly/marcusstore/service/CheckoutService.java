@@ -76,9 +76,9 @@ public class CheckoutService {
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
                 Integer currentUserId = SecurityUtils.getCurrentUserId();
                 List<CartItem> cartItems = cartItemRepository.findByCart_CartId(
-                                cartRepository.findByUserUserId(currentUserId)
-                                                .orElseThrow(() -> new RuntimeException("Giỏ hàng rỗng"))
-                                                .getCartId());
+                        cartRepository.findByUserUserId(currentUserId)
+                                .orElseThrow(() -> new RuntimeException("Giỏ hàng rỗng"))
+                                .getCartId());
 
                 if (cartItems.isEmpty())
                         return 0;
@@ -93,42 +93,42 @@ public class CheckoutService {
                 }
 
                 return ghnService.calculateShippingFee(req.getToDistrictId(), req.getToWardCode(), totalWeightGram,
-                                totalAmount);
+                        totalAmount);
         }
 
         @Transactional
         public Order processCheckout(CheckoutRequestDTO req) {
                 log.info("📥 [CHECKOUT API] Dữ liệu Frontend gửi lên: Name={}, Phone={}, District={}, Ward={}",
-                                req.getRecipientName(), req.getRecipientPhone(), req.getToDistrictId(),
-                                req.getToWardCode());
+                        req.getRecipientName(), req.getRecipientPhone(), req.getToDistrictId(),
+                        req.getToWardCode());
 
                 if (req.getToDistrictId() == null || req.getToWardCode() == null || req.getToWardCode().isBlank()) {
                         throw new RuntimeException(
-                                        "Lỗi hệ thống: Dữ liệu Quận/Huyện hoặc Phường/Xã bị trống từ Frontend gửi lên!");
+                                "Lỗi hệ thống: Dữ liệu Quận/Huyện hoặc Phường/Xã bị trống từ Frontend gửi lên!");
                 }
 
                 Integer currentUserId = SecurityUtils.getCurrentUserId();
                 User user = userRepository.findById(currentUserId)
-                                .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
 
                 List<Integer> requestedCartItemIds = req.getCartItemIds();
                 List<CartItem> cartItems = cartItemRepository
-                                .findByCart_User_UserIdAndCartItemIdIn(currentUserId, requestedCartItemIds);
+                        .findByCart_User_UserIdAndCartItemIdIn(currentUserId, requestedCartItemIds);
 
                 int requestedItemCount = new HashSet<>(requestedCartItemIds).size();
                 if (cartItems.isEmpty() || cartItems.size() != requestedItemCount) {
                         throw new ResponseStatusException(
-                                        HttpStatus.BAD_REQUEST,
-                                        "Giỏ hàng chứa sản phẩm không hợp lệ hoặc không thuộc tài khoản hiện tại.");
+                                HttpStatus.BAD_REQUEST,
+                                "Giỏ hàng chứa sản phẩm không hợp lệ hoặc không thuộc tài khoản hiện tại.");
                 }
 
                 List<Integer> skuIds = cartItems.stream()
-                                .map(item -> item.getSku().getSkuId())
-                                .sorted().collect(Collectors.toList());
+                        .map(item -> item.getSku().getSkuId())
+                        .sorted().collect(Collectors.toList());
 
                 List<ProductSku> lockedSkus = productSkuRepository.findByIdsForUpdate(skuIds);
                 Map<Integer, ProductSku> skuMap = lockedSkus.stream()
-                                .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
+                        .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
 
                 Order order = new Order();
                 order.setOrderCode("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
@@ -150,7 +150,7 @@ public class CheckoutService {
                         ProductSku sku = skuMap.get(cartItem.getSku().getSkuId());
                         if (sku == null || !sku.getIsActive()) {
                                 throw new RuntimeException(
-                                                "Sản phẩm " + cartItem.getSku().getSkuCode() + " không còn tồn tại.");
+                                        "Sản phẩm " + cartItem.getSku().getSkuCode() + " không còn tồn tại.");
                         }
 
                         int buyQuantity = cartItem.getQuantity();
@@ -168,74 +168,74 @@ public class CheckoutService {
                                 // 2. Cart có thể chứa SP FS từ slot đã bị admin hủy SAU khi user thêm vào giỏ.
                                 // Nếu vi phạm → throw 409 CONFLICT với mã lỗi FS_CANCELLED để FE nhận biết.
                                 FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
-                                                .orElseThrow(() -> new ResponseStatusException(
-                                                                HttpStatus.CONFLICT,
-                                                                "FLASH_SALE_NOT_FOUND|Slot Flash Sale #" + slotId
-                                                                                + " không còn tồn tại."));
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_NOT_FOUND|Slot Flash Sale #" + slotId
+                                                        + " không còn tồn tại."));
 
                                 Short slotStatus = slot.getStatus();
                                 if (slotStatus == null) {
                                         throw new ResponseStatusException(
-                                                        HttpStatus.CONFLICT,
-                                                        "FLASH_SALE_INVALID|Slot Flash Sale '" + slot.getName()
-                                                                        + "' có trạng thái không hợp lệ.");
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_INVALID|Slot Flash Sale '" + slot.getName()
+                                                        + "' có trạng thái không hợp lệ.");
                                 }
 
                                 // Status 4 = CANCELLED → admin đã hủy
                                 if (slotStatus == 4) {
                                         throw new ResponseStatusException(
-                                                        HttpStatus.CONFLICT,
-                                                        "FLASH_SALE_CANCELLED|Flash Sale '" + slot.getName()
-                                                                        + "' đã bị admin hủy. Vui lòng xóa sản phẩm khỏi giỏ hàng.");
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_CANCELLED|Flash Sale '" + slot.getName()
+                                                        + "' đã bị admin hủy. Vui lòng xóa sản phẩm khỏi giỏ hàng.");
                                 }
 
                                 // Status 3 = ENDED → slot đã kết thúc (scheduler tự chuyển)
                                 if (slotStatus == 3) {
                                         throw new ResponseStatusException(
-                                                        HttpStatus.CONFLICT,
-                                                        "FLASH_SALE_ENDED|Flash Sale '" + slot.getName()
-                                                                        + "' đã kết thúc. Vui lòng xóa sản phẩm khỏi giỏ hàng.");
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_ENDED|Flash Sale '" + slot.getName()
+                                                        + "' đã kết thúc. Vui lòng xóa sản phẩm khỏi giỏ hàng.");
                                 }
 
                                 // Status 0 = xóa mềm / archived
                                 if (slotStatus == 0) {
                                         throw new ResponseStatusException(
-                                                        HttpStatus.CONFLICT,
-                                                        "FLASH_SALE_UNAVAILABLE|Flash Sale '" + slot.getName()
-                                                                        + "' không còn khả dụng.");
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_UNAVAILABLE|Flash Sale '" + slot.getName()
+                                                        + "' không còn khả dụng.");
                                 }
 
                                 // Check thời gian hiệu lực (phòng trường hợp scheduler chưa kịp chuyển status)
                                 LocalDateTime now = LocalDateTime.now();
                                 if (now.isBefore(slot.getStartDate())) {
                                         throw new ResponseStatusException(
-                                                        HttpStatus.CONFLICT,
-                                                        "FLASH_SALE_NOT_STARTED|Flash Sale '" + slot.getName()
-                                                                        + "' chưa bắt đầu.");
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_NOT_STARTED|Flash Sale '" + slot.getName()
+                                                        + "' chưa bắt đầu.");
                                 }
                                 if (!now.isBefore(slot.getEndDate())) {
                                         throw new ResponseStatusException(
-                                                        HttpStatus.CONFLICT,
-                                                        "FLASH_SALE_ENDED|Flash Sale '" + slot.getName()
-                                                                        + "' đã kết thúc.");
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_ENDED|Flash Sale '" + slot.getName()
+                                                        + "' đã kết thúc.");
                                 }
 
                                 FlashSaleItem fsi = flashSaleItemRepository
-                                                .findForUpdate(slotId, skuId)
-                                                .orElseThrow(() -> new ResponseStatusException(
-                                                                HttpStatus.CONFLICT,
-                                                                "FLASH_SALE_CANCELLED|Flash Sale cho sản phẩm "
-                                                                                + sku.getSkuCode()
-                                                                                + " không còn khả dụng (có thể đã bị admin hủy)."));
+                                        .findForUpdate(slotId, skuId)
+                                        .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_CANCELLED|Flash Sale cho sản phẩm "
+                                                        + sku.getSkuCode()
+                                                        + " không còn khả dụng (có thể đã bị admin hủy)."));
 
                                 int remaining = fsi.getFlashSaleQuantity() - fsi.getSoldQuantity();
                                 if (remaining < buyQuantity) {
                                         throw new ResponseStatusException(
-                                                        HttpStatus.CONFLICT,
-                                                        "FLASH_SALE_OUT_OF_STOCK|Sản phẩm " + sku.getSkuCode()
-                                                                        + " đã hết Flash Sale (còn " + remaining
-                                                                        + ", bạn đặt " + buyQuantity
-                                                                        + "). Vui lòng chọn sản phẩm khác.");
+                                                HttpStatus.CONFLICT,
+                                                "FLASH_SALE_OUT_OF_STOCK|Sản phẩm " + sku.getSkuCode()
+                                                        + " đã hết Flash Sale (còn " + remaining
+                                                        + ", bạn đặt " + buyQuantity
+                                                        + "). Vui lòng chọn sản phẩm khác.");
                                 }
 
                                 fsi.setSoldQuantity(fsi.getSoldQuantity() + buyQuantity);
@@ -246,8 +246,8 @@ public class CheckoutService {
 
                         if (currentStock < buyQuantity) {
                                 throw new RuntimeException(
-                                                "Sản phẩm " + sku.getSkuCode() + " không đủ số lượng. Tồn kho: "
-                                                                + currentStock);
+                                        "Sản phẩm " + sku.getSkuCode() + " không đủ số lượng. Tồn kho: "
+                                                + currentStock);
                         }
 
                         sku.setStockQuantity(currentStock - buyQuantity);
@@ -286,7 +286,7 @@ public class CheckoutService {
                 }
 
                 Integer rawShippingFee = ghnService.calculateShippingFee(
-                                req.getToDistrictId(), req.getToWardCode(), totalWeightGram, totalAmount.intValue());
+                        req.getToDistrictId(), req.getToWardCode(), totalWeightGram, totalAmount.intValue());
                 BigDecimal ghnStandardFee = BigDecimal.valueOf(rawShippingFee);
 
                 var shippingCalc = shippingService.calculateFinalShipping(totalAmount, ghnStandardFee);
@@ -300,10 +300,10 @@ public class CheckoutService {
 
                 if (req.getVoucherCode() != null && !req.getVoucherCode().trim().isEmpty()) {
                         ApplyVoucherRequest applyReq = ApplyVoucherRequest.builder()
-                                        .voucherCode(req.getVoucherCode())
-                                        .orderAmount(totalAmount)
-                                        .shippingFee(ghnStandardFee) // Gửi phí ship gốc để Voucher xử lý
-                                        .build();
+                                .voucherCode(req.getVoucherCode())
+                                .orderAmount(totalAmount)
+                                .shippingFee(ghnStandardFee) // Gửi phí ship gốc để Voucher xử lý
+                                .build();
 
                         VoucherApplyResult result = voucherService.applyVoucher(applyReq, currentUserId);
 
@@ -315,9 +315,9 @@ public class CheckoutService {
                         }
 
                         discountAmount = result.getDiscountAmount() != null ? result.getDiscountAmount()
-                                        : BigDecimal.ZERO;
+                                : BigDecimal.ZERO;
                         freeshipAmount = result.getFreeshipAmount() != null ? result.getFreeshipAmount()
-                                        : BigDecimal.ZERO;
+                                : BigDecimal.ZERO;
                         appliedVoucherId = result.getVoucherId();
                         voucher = voucherRepository.findById(appliedVoucherId).orElse(null);
                         order.setVoucher(voucher);
@@ -331,9 +331,9 @@ public class CheckoutService {
 
                 // Tính Final Amount bằng toán học chặt chẽ
                 BigDecimal finalAmount = totalAmount
-                                .add(discountedShippingFee) // Cộng phí ship ĐÃ TRỪ TRỢ GIÁ
-                                .subtract(discountAmount)
-                                .subtract(freeshipAmount);
+                        .add(discountedShippingFee) // Cộng phí ship ĐÃ TRỪ TRỢ GIÁ
+                        .subtract(discountAmount)
+                        .subtract(freeshipAmount);
 
                 order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
@@ -345,15 +345,15 @@ public class CheckoutService {
                 // CK_FlashSaleItems_Qty)
 
                 String transactionType = "COD".equalsIgnoreCase(savedOrder.getPaymentMethod())
-                                ? "COD_COLLECTION"
-                                : savedOrder.getPaymentMethod() + "_PAYMENT";
+                        ? "COD_COLLECTION"
+                        : savedOrder.getPaymentMethod() + "_PAYMENT";
 
                 orderTransactionService.recordTransaction(
-                                savedOrder,
-                                savedOrder.getFinalAmount(),
-                                transactionType,
-                                "PENDING",
-                                "Khởi tạo giao dịch chờ thanh toán cho đơn hàng mới");
+                        savedOrder,
+                        savedOrder.getFinalAmount(),
+                        transactionType,
+                        "PENDING",
+                        "Khởi tạo giao dịch chờ thanh toán cho đơn hàng mới");
                 if (appliedVoucherId != null) {
                         voucherService.confirmVoucherUsage(appliedVoucherId, currentUserId);
                 }
@@ -377,12 +377,12 @@ public class CheckoutService {
                 try {
                         String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
                         java.text.NumberFormat formatVN = java.text.NumberFormat
-                                        .getInstance(new java.util.Locale("vi", "VN"));
+                                .getInstance(new java.util.Locale("vi", "VN"));
                         String notifMessage = "Khách hàng " + savedOrder.getRecipientName()
-                                        + " vừa đặt một đơn hàng trị giá "
-                                        + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
+                                + " vừa đặt một đơn hàng trị giá "
+                                + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
                         notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage,
-                                        savedOrder.getOrderCode());
+                                savedOrder.getOrderCode());
                 } catch (Exception e) {
                         log.error("[Cảnh báo] Lỗi khi bắn thông báo WebSocket", e);
                 }

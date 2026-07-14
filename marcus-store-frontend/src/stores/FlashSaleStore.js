@@ -507,6 +507,9 @@ export const useFlashSaleStore = defineStore('flashSale', {
     },
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     async restoreFlashSale(slotId) {
       try {
         this.loading = true
@@ -533,8 +536,11 @@ export const useFlashSaleStore = defineStore('flashSale', {
       }
     },
 
+<<<<<<< HEAD
 =======
 >>>>>>> f87a0fb (dang lam do giao dien flashsale client)
+=======
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
      // Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
 
