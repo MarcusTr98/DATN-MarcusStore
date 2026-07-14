@@ -149,7 +149,7 @@
           </div>
 
           <!-- Newsletter -->
-          <div class="footer-col">
+          <div class="footer-col" id="newsletter">
             <h5 class="footer-col-title">Nhận ưu đãi độc quyền</h5>
             <p class="footer-newsletter-desc">
               Đăng ký nhận bản tin để nhận ngay <strong>voucher 100K</strong> và cập nhật những ưu
@@ -157,6 +157,7 @@
             </p>
             <div class="newsletter-form">
               <input
+                id="newsletterEmail"
                 type="email"
                 class="newsletter-input"
                 placeholder="Nhập địa chỉ email của bạn..."
