@@ -4,13 +4,15 @@
       <div class="deco-circle circle-1" ref="circle1"></div>
       <div class="deco-circle circle-2" ref="circle2"></div>
       <div class="content">
-        <div class="brand">
-          <div class="menu-icon">☰</div>
+        <router-link to="/" class="brand brand-logo-link">
+          <div class="logo-icon-box">
+            <i class="fas fa-mobile-alt"></i>
+          </div>
           <div>
             <h1>MarcusStore</h1>
             <p>Chào mừng bạn đến với MarcusStore!</p>
           </div>
-        </div>
+        </router-link>
         <div class="features">
           <div class="feature-item">
             <div class="icon">
@@ -82,6 +84,11 @@
           <h2>Tạo tài khoản mới</h2>
           <p>Tham gia MarcusStore - Mua sắm thả ga!</p>
         </div>
+
+        <div v-if="isNewsletterSignup" class="newsletter-banner">
+          🎁 Bạn sẽ nhận ngay <strong>voucher 100K</strong> sau khi hoàn tất đăng ký!
+        </div>
+
         <div class="social-login">
           <button type="button" class="social-btn social-gg" @click="registerGoogle">
             <span class="social-icon">
@@ -158,7 +165,15 @@
         </form>
 
         <div class="bottom-link">
-          Đã có tài khoản? <router-link to="/auth/login">Đăng nhập</router-link>
+          <router-link to="/" class="back-home-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5"/>
+              <path d="M12 19 5 12l7-7"/>
+            </svg>
+            Về trang chủ
+          </router-link>
+          <span class="bottom-link-divider">|</span>
+          <span class="bottom-link-text">Đã có tài khoản? <router-link to="/auth/login">Đăng nhập</router-link></span>
         </div>
       </div>
     </div>
@@ -172,7 +187,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal.vue'
@@ -181,9 +196,13 @@ import '@/assets/css/Register.css'
 const showTermsModal = ref(false)
 const showPrivacyModal = ref(false)
 const router = useRouter()
+const route = useRoute()
 const showRegisterPassword = ref(false)
 const showRegisterConfirm = ref(false)
 const loading = ref(false)
+
+// true nếu người dùng đến từ form "Nhận ưu đãi độc quyền" ở footer (?email=...&newsletter=1)
+const isNewsletterSignup = ref(false)
 
 const registerGoogle = () => {
   window.location.href =
@@ -283,6 +302,13 @@ const triggerShake = () => {
 
 onMounted(() => {
   nextTick(() => setIndicatorToActive())
+
+  // Đến từ footer "Nhận ưu đãi độc quyền": tự điền email + đánh dấu newsletter
+  const queryEmail = route.query.email
+  if (queryEmail && typeof queryEmail === 'string') {
+    registerForm.email = queryEmail
+  }
+  isNewsletterSignup.value = route.query.newsletter === '1'
 })
 
 const handleRegister = async () => {
@@ -330,6 +356,7 @@ const handleRegister = async () => {
       email: registerForm.email,
       fullName: registerForm.fullName,
       phoneNumber: registerForm.phone,
+      newsletterSignup: isNewsletterSignup.value,
     }
 
     const response = await api.post('/auth/register/request', payload)
@@ -347,7 +374,9 @@ const handleRegister = async () => {
     showModal(
       'success',
       'Đăng ký thành công',
-      'Mã OTP đã được gửi đến email của bạn.'
+      isNewsletterSignup.value
+        ? 'Mã OTP đã được gửi đến email của bạn. Voucher 100K sẽ được cộng vào tài khoản ngay sau khi xác thực!'
+        : 'Mã OTP đã được gửi đến email của bạn.'
     )
 
     setTimeout(() => {
@@ -395,5 +424,78 @@ const handleRegister = async () => {
 </script>
 
 <style scoped>
+.brand-logo-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
 
+.logo-icon-box {
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+}
+
+.logo-icon-box i {
+  color: #d70018;
+  font-size: 22px;
+}
+
+.brand-logo-link:hover .logo-icon-box {
+  transform: scale(1.05);
+}
+
+.newsletter-banner {
+  background: linear-gradient(90deg, #fff4ec, #ffe8da);
+  border: 1px solid #ffd3b6;
+  color: #b5501f;
+  font-size: 13.5px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.bottom-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.bottom-link-divider {
+  color: #cbd5e1;
+}
+
+.back-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.back-home-btn:hover {
+  color: #d70018;
+  text-decoration: underline;
+}
+
+.back-home-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.back-home-btn:hover svg {
+  transform: translateX(-3px);
+}
 </style>

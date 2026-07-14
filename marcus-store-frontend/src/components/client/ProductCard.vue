@@ -216,6 +216,13 @@
     :message="notifyModal.message"
     @close="notifyModal.visible = false"
   />
+
+<LoginRequiredModal
+    :visible="loginModal.visible"
+    :title="loginModal.title"
+    :message="loginModal.message"
+    @close="loginModal.visible = false"
+/>
 </template>
 
 <script setup>
@@ -226,7 +233,21 @@ import VoucherCard from '@/layouts/home/VoucherCard.vue'
 import { useCartStore } from '@/stores/cartStore'
 import BaseModal from '@/components/BaseModal.vue'
 import wishlist from '@/composables/useWishlistShared'
+import LoginRequiredModal from '../LoginRequiredModal.vue'
+const loginModal = reactive({
+  visible: false,
+  title: '',
+  message: '',
+})
 
+function isLoggedIn() {
+    return !!localStorage.getItem("ACCESS_TOKEN")
+}
+function openLoginModal(title, message) {
+  loginModal.title = title
+  loginModal.message = message
+  loginModal.visible = true
+}
 onMounted(() => {
   wishlist.fetchIds()
 })
@@ -516,6 +537,13 @@ function isWished(productId) {
 const togglingIds = ref(new Set())
 
 async function toggleWishlist(productId) {
+if (!isLoggedIn()) {
+  openLoginModal(
+    'Lưu sản phẩm yêu thích',
+    'Vui lòng đăng nhập để lưu và quản lý các sản phẩm yêu thích của bạn.',
+  )
+  return
+}
   if (togglingIds.value.has(productId)) return
   togglingIds.value.add(productId)
   try {
@@ -546,6 +574,13 @@ function showNotify(type, title, message) {
 }
 
 async function addToCart(product) {
+if (!isLoggedIn()) {
+  openLoginModal(
+    'Thêm vào giỏ hàng',
+    'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng và tiến hành thanh toán.',
+  )
+  return
+}
   if (!product?.skuId) {
     console.warn('Sản phẩm không có skuId, bỏ qua:', product)
     return
