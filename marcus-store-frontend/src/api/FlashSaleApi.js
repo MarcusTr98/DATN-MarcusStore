@@ -36,6 +36,10 @@ const flashSaleApi = {
   restoreFlashSale(slotId) {
     return api.post(`/admin/flashsale/${slotId}/restore`)
   },
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
 
   //Lấy cây brand -> categoryL2 -> sku để admin chọn sản phẩm cho Flash Sale.

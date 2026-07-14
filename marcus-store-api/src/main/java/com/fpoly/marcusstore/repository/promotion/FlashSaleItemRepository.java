@@ -60,8 +60,8 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Fl
                         ORDER BY s.startDate ASC
                         """)
         List<FlashSaleItem> findActiveFlashSaleItemBySku(
-                        @Param("skuId") Integer skuId,
-                        @Param("now") LocalDateTime now);
+                @Param("skuId") Integer skuId,
+                @Param("now") LocalDateTime now);
 
         /**
          * Khoá dòng FlashSaleItem tại thời điểm checkout (PESSIMISTIC_WRITE) để
@@ -82,7 +82,7 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Fl
                           AND s.status IN (1, 2)
                         """)
         Optional<FlashSaleItem> findForUpdate(@Param("slotId") Integer slotId,
-                        @Param("skuId") Integer skuId);
+                                              @Param("skuId") Integer skuId);
 
         // Marcus thêm: Dùng khi hủy đơn: phải hoàn soldQuantity kể cả slot đã kết
         // thúc/hủy.
@@ -94,5 +94,5 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Fl
                           AND fi.id.skuId = :skuId
                         """)
         Optional<FlashSaleItem> findForRestore(@Param("slotId") Integer slotId,
-                        @Param("skuId") Integer skuId);
+                                               @Param("skuId") Integer skuId);
 }

@@ -66,7 +66,11 @@
                 </div>
                 <div class="item-details">
                   <div class="item-name">{{ item.name }}</div>
+<<<<<<< HEAD
                   <div class="item-variant">{{ expandColorName(item.variant) }}</div>
+=======
+                  <div class="item-variant">{{ item.variant }}</div>
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
                   <!-- Badge Flash Sale cho sản phẩm FS -->
                   <span v-if="item.isFlashSale" class="item-badge flash-sale-badge">
                     ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
@@ -1162,8 +1166,12 @@ function handleCheckout() {
     thumbnailUrl: item.thumbnailUrl,
     quantity: item.quantity,
     price: item.price,
+<<<<<<< HEAD
     originalPrice: item.originalPrice,
     totalPrice: (item.isFlashSale ? item.flashSalePrice : item.price) * item.quantity,
+=======
+    totalPrice: item.price * item.quantity,
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     // Thông tin Flash Sale
     isFlashSale: item.isFlashSale || false,
     flashSaleSlotId: item.flashSaleSlotId || null,

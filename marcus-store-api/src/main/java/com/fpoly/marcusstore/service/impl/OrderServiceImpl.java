@@ -202,10 +202,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus,
-            LocalDate fromDate, LocalDate toDate, Pageable pageable) {
+                                             LocalDate fromDate, LocalDate toDate, Pageable pageable) {
         return orderRepository.searchOrders(
-                normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
-                fromDate, toDate, pageable)
+                        normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
+                        fromDate, toDate, pageable)
                 .map(this::toResponse);
     }
 
@@ -251,7 +251,7 @@ public class OrderServiceImpl implements OrderService {
         Map<Integer, ProductSku> skuVariantMap = skuIds.isEmpty()
                 ? Map.of()
                 : productSkuRepository.findBySkuIdIn(skuIds).stream()
-                        .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
+                .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
 
         List<OrderStatusHistoryResponse> historyResponses = histories.stream()
                 .map(history -> OrderStatusHistoryResponse.builder()
@@ -298,20 +298,20 @@ public class OrderServiceImpl implements OrderService {
                             ProductSku skuWithVariants = skuVariantMap.getOrDefault(sku.getSkuId(), sku);
                             List<ClientSkuAttributeValueResponse> variants = skuWithVariants
                                     .getAttributeValues() == null
-                                            ? List.of()
-                                            : skuWithVariants.getAttributeValues().stream()
-                                                    .map(av -> ClientSkuAttributeValueResponse.builder()
-                                                            .valueId(av.getValueId())
-                                                            .attributeId(av.getAttribute() != null
-                                                                    ? av.getAttribute().getAttributeId()
-                                                                    : null)
-                                                            .attributeName(av.getAttribute() != null
-                                                                    ? av.getAttribute().getAttributeName()
-                                                                    : null)
-                                                            .valueString(av.getValueString())
-                                                            .valueMeta(av.getValueMeta())
-                                                            .build())
-                                                    .toList();
+                                    ? List.of()
+                                    : skuWithVariants.getAttributeValues().stream()
+                                    .map(av -> ClientSkuAttributeValueResponse.builder()
+                                            .valueId(av.getValueId())
+                                            .attributeId(av.getAttribute() != null
+                                                    ? av.getAttribute().getAttributeId()
+                                                    : null)
+                                            .attributeName(av.getAttribute() != null
+                                                    ? av.getAttribute().getAttributeName()
+                                                    : null)
+                                            .valueString(av.getValueString())
+                                            .valueMeta(av.getValueMeta())
+                                            .build())
+                                    .toList();
                             return OrderItemDetailResponse.builder()
                                     .skuId(sku.getSkuId())
                                     .skuCode(sku.getSkuCode())

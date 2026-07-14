@@ -87,12 +87,19 @@ public class CartService {
 
             Integer quantity = item.getQuantity();
             BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
+<<<<<<< HEAD
             // Ưu tiên lấy Product.thumbnailUrl (ảnh sản phẩm cha).
             // sku.skuImageUrl trong DB vẫn giữ nguyên, không xóa.
             String thumbnailUrl = item.getSku().getProduct() != null
                     ? item.getSku().getProduct().getThumbnailUrl()
                     : null;
             if (thumbnailUrl != null && thumbnailUrl.isBlank()) thumbnailUrl = null;
+=======
+            String imageUrl = item.getSku().getSkuImageUrl();
+            if (imageUrl == null || imageUrl.isBlank()) {
+                imageUrl = item.getSku().getProduct().getThumbnailUrl();
+            }
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
             return CartItemResponse.builder()
                     .cartItemId(item.getCartItemId())
