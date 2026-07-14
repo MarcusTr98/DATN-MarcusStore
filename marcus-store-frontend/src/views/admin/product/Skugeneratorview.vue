@@ -634,7 +634,7 @@ const fetchProducts = async () => {
     const res = await api.get('/admin/product', {
       params: {
         page: currentPage.value,
-        size: 9,
+        size: 8,
         keyword: searchQuery.value,
         filter: filterStatus.value,
       },
