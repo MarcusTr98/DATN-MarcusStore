@@ -20,7 +20,6 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
         SELECT f FROM FlashSaleSlot f
         WHERE (:keyword IS NULL OR LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%')))
           AND (:status IS NULL OR f.status = :status)
-          AND (:now IS NULL OR :now = :now)
         ORDER BY
           CASE f.status
             WHEN 2 THEN 1
@@ -40,7 +39,6 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
     Page<FlashSaleSlot> searchFlashSaleSlots(
             @Param("keyword") String keyword,
             @Param("status") Short status,
-            @Param("now") LocalDateTime now,
             Pageable pageable
     );
     // Tổng số slot theo filter hiện tại
@@ -144,6 +142,20 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
             @Param("newStartDate") LocalDateTime newStartDate,
             @Param("newEndDate") LocalDateTime newEndDate,
             @Param("excludeSlotId") Integer excludeSlotId);
+
+    // Cancelled: tìm slot đã bị admin hủy (4) mà vẫn còn hiệu lực hoặc sắp diễn ra trong tương lai.
+    // Dùng cho client API để FE biết slot nào đã bị hủy và hiển thị modal thông báo.
+    // Lọc các slot CANCELLED có khoảng thời gian overlap với [now, endWindow].
+    @Query("""
+            SELECT s FROM FlashSaleSlot s
+            WHERE s.status = 4
+              AND s.startDate <= :endWindow
+              AND s.endDate >= :now
+            ORDER BY s.startDate ASC
+            """)
+    List<FlashSaleSlot> findCancelledSlotsInRange(
+            @Param("now") LocalDateTime now,
+            @Param("endWindow") LocalDateTime endWindow);
 
     // Kiểm tra overlap cho việc khôi phục flash sale đã hủy.
     // Tìm các slot ACTIVE (2) hoặc SCHEDULED (1) trùng với khoảng [restoreStart, restoreEnd].

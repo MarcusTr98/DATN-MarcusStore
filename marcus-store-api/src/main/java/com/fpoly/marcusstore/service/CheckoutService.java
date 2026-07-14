@@ -12,9 +12,11 @@ import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleSlotRepository;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
@@ -30,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -65,6 +68,8 @@ public class CheckoutService {
     private OrderTransactionService orderTransactionService;
     @Autowired
     private FlashSaleItemRepository flashSaleItemRepository;
+    @Autowired
+    private FlashSaleSlotRepository flashSaleSlotRepository;
 
     @Transactional(readOnly = true)
     public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -139,6 +144,93 @@ public class CheckoutService {
             }
 
             int buyQuantity = cartItem.getQuantity();
+
+            // CHECK FLASH SALE: khoá dòng + kiểm tra còn hàng trước khi cộng soldQuantity
+            // Tránh lỗi CHECK constraint CK_FlashSaleItems_Qty khi khách khác đã mua hết
+            if (cartItem.getFlashSaleSlot() != null) {
+                Integer slotId = cartItem.getFlashSaleSlot().getSlotId();
+                Integer skuId = sku.getSkuId();
+
+                // VALIDATE SLOT: chặn đặt hàng khi admin đã hủy Flash Sale (status=4)
+                // hoặc slot đã kết thúc/hết hạn (status=3) hoặc ngoài khung giờ.
+                // Tầng bảo vệ quan trọng nhất — bắt buộc phải có vì:
+                //   1. User có thể bypass UI modal (DevTools, refresh nhanh, gọi thẳng API).
+                //   2. Cart có thể chứa SP FS từ slot đã bị admin hủy SAU khi user thêm vào giỏ.
+                // Nếu vi phạm → throw 409 CONFLICT với mã lỗi FS_CANCELLED để FE nhận biết.
+                FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.CONFLICT,
+                                "FLASH_SALE_NOT_FOUND|Slot Flash Sale #" + slotId
+                                        + " không còn tồn tại."));
+
+                Short slotStatus = slot.getStatus();
+                if (slotStatus == null) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "FLASH_SALE_INVALID|Slot Flash Sale '" + slot.getName()
+                                    + "' có trạng thái không hợp lệ.");
+                }
+
+                // Status 4 = CANCELLED → admin đã hủy
+                if (slotStatus == 4) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "FLASH_SALE_CANCELLED|Flash Sale '" + slot.getName()
+                                    + "' đã bị admin hủy. Vui lòng xóa sản phẩm khỏi giỏ hàng.");
+                }
+
+                // Status 3 = ENDED → slot đã kết thúc (scheduler tự chuyển)
+                if (slotStatus == 3) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "FLASH_SALE_ENDED|Flash Sale '" + slot.getName()
+                                    + "' đã kết thúc. Vui lòng xóa sản phẩm khỏi giỏ hàng.");
+                }
+
+                // Status 0 = xóa mềm / archived
+                if (slotStatus == 0) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "FLASH_SALE_UNAVAILABLE|Flash Sale '" + slot.getName()
+                                    + "' không còn khả dụng.");
+                }
+
+                // Check thời gian hiệu lực (phòng trường hợp scheduler chưa kịp chuyển status)
+                LocalDateTime now = LocalDateTime.now();
+                if (now.isBefore(slot.getStartDate())) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "FLASH_SALE_NOT_STARTED|Flash Sale '" + slot.getName()
+                                    + "' chưa bắt đầu.");
+                }
+                if (!now.isBefore(slot.getEndDate())) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "FLASH_SALE_ENDED|Flash Sale '" + slot.getName()
+                                    + "' đã kết thúc.");
+                }
+
+                FlashSaleItem fsi = flashSaleItemRepository
+                        .findForUpdate(slotId, skuId)
+                        .orElseThrow(() -> new ResponseStatusException(
+                                HttpStatus.CONFLICT,
+                                "FLASH_SALE_CANCELLED|Flash Sale cho sản phẩm " + sku.getSkuCode()
+                                        + " không còn khả dụng (có thể đã bị admin hủy)."));
+
+                int remaining = fsi.getFlashSaleQuantity() - fsi.getSoldQuantity();
+                if (remaining < buyQuantity) {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "FLASH_SALE_OUT_OF_STOCK|Sản phẩm " + sku.getSkuCode()
+                                    + " đã hết Flash Sale (còn " + remaining
+                                    + ", bạn đặt " + buyQuantity
+                                    + "). Vui lòng chọn sản phẩm khác.");
+                }
+
+                fsi.setSoldQuantity(fsi.getSoldQuantity() + buyQuantity);
+                flashSaleItemRepository.save(fsi);
+            }
+
             int currentStock = sku.getStockQuantity();
 
             if (currentStock < buyQuantity) {
@@ -233,19 +325,8 @@ public class CheckoutService {
 
         Order savedOrder = orderRepository.save(order);
 
-        // Cập nhật soldQuantity cho Flash Sale (chỉ khi thanh toán thành công)
-        for (CartItem cartItem : cartItems) {
-            if (cartItem.getFlashSaleSlot() != null) {
-                flashSaleItemRepository.findItemsBySlotIdWithSlot(cartItem.getFlashSaleSlot().getSlotId())
-                        .stream()
-                        .filter(item -> item.getId().getSkuId().equals(cartItem.getSku().getSkuId()))
-                        .findFirst()
-                        .ifPresent(fsi -> {
-                            fsi.setSoldQuantity(fsi.getSoldQuantity() + cartItem.getQuantity());
-                            flashSaleItemRepository.save(fsi);
-                        });
-            }
-        }
+        // (Đã cập nhật soldQuantity cho Flash Sale ngay trong vòng lặp kiểm tra cart phía trên
+        //  để tránh vượt quá flashSaleQuantity và nổ CHECK constraint CK_FlashSaleItems_Qty)
 
         String transactionType = "COD".equalsIgnoreCase(savedOrder.getPaymentMethod())
                 ? "COD_COLLECTION"

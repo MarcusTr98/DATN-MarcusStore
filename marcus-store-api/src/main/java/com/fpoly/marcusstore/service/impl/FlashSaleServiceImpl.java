@@ -36,7 +36,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     private final ProductSkuRepository productSkuRepository;
 
 
-    //  Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
+    // Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
 
     private FlashSaleResponse toResponse(FlashSaleSlot slot,
                                          Map<Integer, Integer> qtyMap,
@@ -52,6 +52,27 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                 .createdAt(slot.getCreatedAt())
                 .updatedAt(slot.getUpdatedAt())
                 .bannerImageUrl(slot.getBannerImageUrl())
+                // Slot CANCELLED được map từ các nơi gọi hàm này nên mặc định false.
+                .isCancelled(false)
+                .build();
+    }
+
+    // Tạo response rỗng cho slot CANCELLED — chỉ giữ thông tin slot, KHÔNG trả items[].
+    // FE dùng để nhận biết slotId đã bị admin hủy và hiển thị modal thông báo.
+    private FlashSaleResponse buildCancelledSlotResponse(FlashSaleSlot slot) {
+        return FlashSaleResponse.builder()
+                .slotId(slot.getSlotId())
+                .name(slot.getName())
+                .startDate(slot.getStartDate())
+                .endDate(slot.getEndDate())
+                .status(slot.getStatus())
+                .quantityFlashSaleSlot(0)
+                .usedQuantity(0)
+                .createdAt(slot.getCreatedAt())
+                .updatedAt(slot.getUpdatedAt())
+                .bannerImageUrl(slot.getBannerImageUrl())
+                .isCancelled(true)
+                .items(Collections.emptyList())
                 .build();
     }
 
@@ -183,7 +204,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     public Page<FlashSaleResponse> getFlashSaleSlotsPage(String keyword, Short status, Pageable pageable) {
         String normalizedKeyword = normalizeKeyword(keyword);
         Page<FlashSaleSlot> page = flashSaleSlotRepository
-                .searchFlashSaleSlots(normalizedKeyword, status, LocalDateTime.now(), pageable);
+                .searchFlashSaleSlots(normalizedKeyword, status, pageable);
 
         // Lấy tổng quantity theo batch trong 1 query duy nhất
         List<Integer> slotIds = page.getContent().stream()
@@ -774,6 +795,10 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
     // Lấy danh sách slot "đang diễn ra" + "sắp diễn ra trong vòng 2h" cho client.
     // Trả về FlashSaleResponse kèm items[], đã sắp xếp đúng thứ tự ưu tiên.
+    //
+    // Bổ sung: còn trả thêm các slot đã bị admin hủy (CANCELLED = 4) mà có khoảng thời gian
+    // overlap với [now, now+2h]. Slot CANCELLED không có items[] và được đánh dấu isCancelled=true.
+    // Mục đích: FE nhận biết slotId nào đã bị hủy để hiển thị modal thông báo khi khách tương tác.
     @Override
     @Transactional(readOnly = true)
     public List<FlashSaleResponse> getActiveAndUpcomingFlashSaleSlots(int limit) {
@@ -787,7 +812,8 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                 .findActiveAndUpcomingSlots(now, upcomingThreshold);
 
         if (slots.isEmpty()) {
-            return List.of();
+            // Vẫn tiếp tục xử lý slot CANCELLED ở bước 6 bên dưới
+            slots = new ArrayList<>();
         }
 
         // 2. Phân tách 2 nhóm để sort theo đúng ưu tiên nghiệp vụ
@@ -822,6 +848,15 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         for (FlashSaleSlot slot : combined) {
             result.add(buildSlotDetailResponse(slot));
         }
+
+        // 6. Bổ sung slot CANCELLED (đã bị admin hủy) trong khung [now, upcomingThreshold]
+        //    để FE nhận biết slotId nào đã bị hủy. Không áp dụng limit.
+        List<FlashSaleSlot> cancelledSlots = flashSaleSlotRepository
+                .findCancelledSlotsInRange(now, upcomingThreshold);
+        for (FlashSaleSlot slot : cancelledSlots) {
+            result.add(buildCancelledSlotResponse(slot));
+        }
+
         return result;
     }
 

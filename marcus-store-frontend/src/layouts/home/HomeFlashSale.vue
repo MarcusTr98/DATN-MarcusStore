@@ -80,7 +80,7 @@
 
             <div class="hfs-stock">
               <div class="hfs-stock-row">
-                <span>Đã bán {{ product.soldPercent }}%</span>
+                <span class="hfs-sold-text">Đã bán {{ product.soldPercent }}%</span>
                 <span class="blink">Còn {{ product.left }} SP</span>
               </div>
               <div class="hfs-stock-track">
@@ -92,6 +92,14 @@
               <span class="hfs-price-now">{{ formatPrice(product.displayPrice) }}</span>
               <span class="hfs-price-old">{{ formatPrice(product.originalPrice) }}</span>
             </div>
+
+            <button type="button" class="hfs-buy-btn" @click.stop="goToProduct(product)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/>
+              </svg>
+              <span>Mua ngay</span>
+            </button>
           </article>
 
           <!-- Nút Xem thêm chen vào cuối danh sách -->
@@ -152,19 +160,29 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Modal thông báo Flash Sale đã bị admin hủy -->
+    <CancelledFlashSaleModal
+      :visible="showCancelledModal"
+      @close="handleCancelledClose"
+      @confirm="handleCancelledConfirm"
+    />
   </section>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onBeforeUnmount, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
+import { useCartStore } from '@/stores/cartStore'
 import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
+import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import '@/assets/css/HomeFlashSale.css'
 
 const router = useRouter()
 const flashSaleStore = useFlashSaleStore()
+const cartStore = useCartStore()
 const { clientSlots, clientLoading } = storeToRefs(flashSaleStore)
 
 const MAX_PRODUCTS = 10
@@ -181,14 +199,6 @@ const { label: miniLabel, timer: miniTimer } = useFlashSaleCountdown(
 )
 
 // ==== Slot gần nhất (featured) ====
-// Quy tắc chọn slot "gần nhất":
-//   1. Ưu tiên slot ACTIVE (status=2) - lấy slot ACTIVE có endDate sớm nhất
-//      (slot sắp kết thúc nhất = nóng nhất, đẩy lên carousel chính)
-//   2. Nếu không có ACTIVE → lấy slot SCHEDULED (status=1) có startDate sớm nhất
-//      (slot sắp bắt đầu nhất = sắp diễn ra kế tiếp)
-// Trả về slot đó + chỉ items của slot đó (KHÔNG gộp nhiều slot).
-//
-// Robust: chấp nhận endDate/startDate bị null/missing → fallback sort theo thứ tự gốc.
 function safeDate(v) {
   if (!v) return null
   const d = new Date(v)
@@ -197,7 +207,6 @@ function safeDate(v) {
 
 const nearestSlot = computed(() => {
   const slots = Array.isArray(clientSlots.value) ? clientSlots.value : []
-  // Debug log: in cấu trúc BE trả về để dễ chẩn đoán
   if (slots.length > 0) {
     console.log('[HomeFlashSale] clientSlots count:', slots.length)
     console.log('[HomeFlashSale] slot statuses:', slots.map((s) => ({
@@ -214,7 +223,6 @@ const nearestSlot = computed(() => {
   // 1. Ưu tiên ACTIVE (status=2)
   const active = slots.filter((s) => Number(s.status) === 2)
   if (active.length > 0) {
-    // Sort: slot có endDate hợp lệ → sớm nhất trước; null → xếp cuối
     return [...active].sort((a, b) => {
       const da = safeDate(a.endDate)
       const db = safeDate(b.endDate)
@@ -238,35 +246,27 @@ const nearestSlot = computed(() => {
     })[0]
   }
 
-  // 3. Fallback cuối cùng: lấy slot bất kỳ (kể cả ENDED, CANCELLED) để user vẫn thấy sản phẩm
-  //    miễn là slot có items. Đây là trường hợp API hiếm khi trả về status lạ.
-  const any = slots.find((s) => Array.isArray(s.items) && s.items.length > 0)
-  return any || null
+  return null
 })
 
 // ==== Dữ liệu sản phẩm ====
-// Lấy 100% từ BE (Pinia store), chỉ từ 1 slot gần nhất (xem nearestSlot ở trên).
-// Không fallback — nếu BE không có data hoặc slot không có items → hiện empty state.
 function mapItemToCard(item, idx) {
   const totalQty = Number(item.flashSaleQuantity ?? 0)
   const soldQty = Number(item.soldQuantity ?? 0)
   const soldPercent = totalQty > 0 ? Math.min(100, Math.round((soldQty / totalQty) * 100)) : 0
   const remaining = Math.max(0, Number(item.remainingQuantity ?? totalQty - soldQty))
-  // Ưu tiên flashSalePrice (giá khuyến mãi) — đây là giá thực user phải trả.
-  // originalPrice (giá gốc) là giá để tính % giảm + gạch ngang.
-  // Khi flashSalePrice = 0/null (FS kết thúc), dùng originalPrice thay thế.
   const flashPrice = Number(item.flashSalePrice ?? 0)
   const origPrice = Number(item.originalPrice ?? 0)
   const price = flashPrice > 0 ? flashPrice : origPrice
-  // Tính % giảm từ BE: ưu tiên discountPercent BE trả, fallback tự tính
   const discountFromBE = Number(item.discountPercent ?? 0)
   const discount = discountFromBE > 0
     ? discountFromBE
     : (origPrice > 0 && price > 0 && price < origPrice
-        ? Math.floor(((origPrice - price) / origPrice) * 100)
-        : 0)
+      ? Math.floor(((origPrice - price) / origPrice) * 100)
+      : 0)
   return {
     id: item.skuId ?? `fs-${idx}`,
+    skuId: item.skuId ?? item.id,
     name: item.productName || item.skuCode || `Sản phẩm Flash Sale #${idx + 1}`,
     slug: item.skuCode || `flash-sale-${item.skuId ?? idx}`,
     spec: item.skuCode ? `Mã: ${item.skuCode}` : 'Sản phẩm chính hãng',
@@ -278,17 +278,15 @@ function mapItemToCard(item, idx) {
     soldPercent,
     left: remaining,
     displayPrice: 0,
+    slotId: item._slotId || null,
   }
 }
 
-// Chỉ lấy items của slot gần nhất (nearestSlot) — không gộp slot.
-// KHÔNG filter price>0 ở đây để tránh loại nhầm SP admin đang cập nhật.
-// animateCountUp đã có early-return nếu price=0.
-// Lấy tối đa MAX_PRODUCTS.
 const allProducts = computed(() => {
   const slot = nearestSlot.value
   if (!slot || !Array.isArray(slot.items) || slot.items.length === 0) return []
-  const mapped = slot.items.map(mapItemToCard)
+  const itemsWithSlot = slot.items.map((it) => ({ ...it, _slotId: slot.slotId }))
+  const mapped = itemsWithSlot.map(mapItemToCard)
   console.log(
     `[HomeFlashSale] Slot #${slot.slotId} "${slot.name}" status=${slot.status}: ` +
     `${slot.items.length} items render carousel.`,
@@ -296,7 +294,6 @@ const allProducts = computed(() => {
   return mapped.slice(0, MAX_PRODUCTS)
 })
 
-// 10 sản phẩm hiển thị (cộng thêm 1 slot cho nút "Xem thêm")
 const displayedProducts = computed(() => allProducts.value)
 const remainingCount = computed(() => Math.max(0, allProducts.value.length - VISIBLE_DEFAULT))
 
@@ -357,7 +354,6 @@ const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
 
 // ==== Toast ====
-// Teleport ra body + bỏ nextTick để tránh flicker (visible→hidden→visible khi click liên tục)
 const toast = reactive({
   show: false,
   type: 'warning',
@@ -376,24 +372,179 @@ function showToast({ type = 'warning', title, message }) {
   }, 2800)
 }
 
+// ==== Modal thông báo Flash Sale bị admin hủy ====
+const showCancelledModal = ref(false)
+const hasHandledCancelled = ref(false)
+
+function openCancelledModal() {
+  if (hasHandledCancelled.value) return
+  showCancelledModal.value = true
+}
+
+function handleCancelledClose() {
+  showCancelledModal.value = false
+}
+
+async function handleCancelledConfirm() {
+  if (hasHandledCancelled.value) return
+  hasHandledCancelled.value = true
+  showCancelledModal.value = false
+  try {
+    await flashSaleStore.fetchClientSlots(20)
+  } catch (e) {
+    console.warn('Refetch slots failed:', e)
+  }
+}
+
+onBeforeUnmount(() => {
+  hasHandledCancelled.value = false
+})
+
 // ==== Điều hướng sản phẩm ====
-// Nếu chưa có slot ACTIVE (status=2) thì chặn + hiện thông báo,
-// user vẫn thấy sản phẩm nhưng click sẽ không chuyển trang.
 const isFlashSaleActive = computed(() => {
   if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return false
   return clientSlots.value.some((s) => Number(s.status) === 2)
 })
 
-function goToProduct(product) {
+function ensureProductSlotIsBuyable(product) {
+  if (product.slotId && flashSaleStore.isSlotCancelled(product.slotId)) {
+    openCancelledModal()
+    return false
+  }
+  if (product.slotId && !flashSaleStore.isSlotActive(product.slotId)) {
+    const ownSlot = flashSaleStore.getSlotById(product.slotId)
+    let msg = 'Sản phẩm này không nằm trong Flash Sale đang diễn ra'
+    if (ownSlot) {
+      const status = Number(ownSlot.status)
+      if (status === 1) msg = 'Flash Sale này chưa bắt đầu'
+      else if (status === 3) msg = 'Flash Sale này đã kết thúc'
+      else if (status === 4) msg = 'Flash Sale này đã bị admin hủy'
+    }
+    showToast({ type: 'warning', title: 'Oops!', message: msg })
+    return false
+  }
   if (!isFlashSaleActive.value) {
     showToast({
       type: 'warning',
       title: 'Oops!',
       message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
     })
-    return
+    return false
   }
-  router.push(`/product/${product.slug}`)
+  return true
+}
+
+function prepareCheckoutSelection(cartItem, product, ownSlot) {
+  const item = {
+    cartItemId: cartItem.cartItemId,
+    productName: cartItem.name || product.name,
+    variantName: cartItem.variant || '',
+    skuCode: cartItem.skuCode || product.spec?.replace('Mã: ', '') || '',
+    skuId: cartItem.skuId ?? product.skuId,
+    imageUrl: cartItem.imageUrl || product.image || '',
+    quantity: cartItem.quantity ?? 1,
+    price: cartItem.price ?? product.price,
+    totalPrice:
+      cartItem.totalPrice ?? (cartItem.price ?? product.price) * (cartItem.quantity ?? 1),
+    isFlashSale: true,
+    flashSaleSlotId: ownSlot?.slotId ?? product.slotId ?? null,
+    flashSaleSlotName:
+      ownSlot?.name || ownSlot?.slotName || product.slotName || 'Flash Sale',
+  }
+
+  localStorage.setItem('selectedCartItems', JSON.stringify([item]))
+  localStorage.setItem('selectedSubtotal', String(item.totalPrice))
+}
+
+const buyNow = async (product) => {
+  try {
+    if (!ensureProductSlotIsBuyable(product)) return
+
+    const ownSlot = flashSaleStore.getSlotById(product.slotId)
+    if (!ownSlot || Number(ownSlot.status) !== 2) {
+      showToast({
+        type: 'warning',
+        title: 'Oops!',
+        message: 'Sản phẩm này không nằm trong Flash Sale đang diễn ra',
+      })
+      return
+    }
+
+    if (product.left <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Hết hàng!',
+        message: 'Sản phẩm đã hết hàng trong Flash Sale này',
+      })
+      return
+    }
+
+    if (!Array.isArray(cartStore.items) || cartStore.items.length === 0) {
+      try {
+        await cartStore.fetchCart()
+      } catch (e) {
+        console.warn('[HomeFlashSale] fetchCart thất bại:', e)
+      }
+    }
+
+    const existingItem =
+      (cartStore.items || []).find(
+        (ci) => ci.skuId === product.skuId && ci.isFlashSale === true,
+      ) ||
+      (cartStore.items || []).find((ci) => ci.skuId === product.skuId) ||
+      null
+
+    let matchedItem = existingItem
+
+    if (!matchedItem) {
+      const success = await cartStore.addToCartWithFlashSale(
+        product.skuId,
+        1,
+        ownSlot.slotId,
+        product.price,
+      )
+
+      if (!success) {
+        showToast({
+          type: 'error',
+          title: 'Lỗi!',
+          message: cartStore.error || 'Không thể thêm vào giỏ',
+        })
+        return
+      }
+
+      matchedItem =
+        (cartStore.items || []).find(
+          (ci) => ci.skuId === product.skuId && ci.isFlashSale === true,
+        ) ||
+        (cartStore.items || []).find((ci) => ci.skuId === product.skuId) ||
+        null
+    }
+
+    if (!matchedItem) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: 'Không tìm thấy sản phẩm trong giỏ, vui lòng thử lại.',
+      })
+      return
+    }
+
+    prepareCheckoutSelection(matchedItem, product, ownSlot)
+    router.push('/checkout')
+  } catch (error) {
+    console.error('Lỗi mua ngay:', error)
+    showToast({
+      type: 'error',
+      title: 'Lỗi!',
+      message: error.response?.data?.message || 'Không thể mua ngay',
+    })
+  }
+}
+
+function goToProduct(product) {
+  if (!ensureProductSlotIsBuyable(product)) return
+  buyNow(product)
 }
 
 // Animate count up cho giá
@@ -413,13 +564,26 @@ const animateCountUp = (product, delayMs = 0) => {
   requestAnimationFrame(step)
 }
 
+// FIX: Watch displayedProducts thay vì chỉ gọi animateCountUp 1 lần trong onMounted.
+// Trước đây: mỗi lần refreshTimer (60s) fetch lại dữ liệu → allProducts computed
+// chạy lại → mapItemToCard tạo object MỚI với displayPrice=0, nhưng không có gì
+// gọi lại animateCountUp cho các object mới này → giá bị "đứng" ở 0đ cho tới khi F5.
+// Giờ dùng watch({ immediate: true }) để tự động chạy animation mỗi khi
+// displayedProducts thay đổi (bao gồm cả lần đầu mount và mỗi lần refetch sau này).
+watch(
+  displayedProducts,
+  (products) => {
+    products.forEach((p, i) => animateCountUp(p, i * 50))
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
   updateVisibleCount()
   await nextTick()
   measureCardWidth()
 
   try {
-    // Lấy tối đa 20 slot (mỗi slot có nhiều items) để đảm bảo đủ 10 sản phẩm
     await flashSaleStore.fetchClientSlots(20)
   } catch (e) {
     console.warn('[HomeFlashSale] không tải được dữ liệu flash sale:', e)
@@ -427,7 +591,6 @@ onMounted(async () => {
 
   await nextTick()
   measureCardWidth()
-  displayedProducts.value.forEach((p, i) => animateCountUp(p, 200 + i * 50))
 
   // Đo lại sau khi ảnh load xong (ảnh có thể làm thay đổi flex/height)
   setTimeout(() => measureCardWidth(), 350)

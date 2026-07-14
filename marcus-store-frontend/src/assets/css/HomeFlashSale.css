@@ -25,14 +25,20 @@
 .home-flash-sale {
   position: relative;
   background: #ffffff;
-  padding: 26px 24px 32px;
-  margin: 0 5vw 24px;
+  padding: 26px 0 32px;
+  margin: 0 0 24px;
   overflow: hidden;
   isolation: isolate;
   border: 2px solid var(--fs-home-red);
   border-radius: 18px;
   box-shadow: 0 10px 30px rgba(225, 29, 29, 0.12);
   animation: hfs-border-glow 3.6s ease-in-out infinite;
+}
+
+.home-flash-sale::after {
+  content: '';
+  display: block;
+  clear: both;
 }
 
 @keyframes hfs-border-glow {
@@ -64,13 +70,14 @@
   gap: 16px;
   margin-bottom: 18px;
   flex-wrap: wrap;
-  padding: 0;
+  padding: 0 24px;
 }
 .hfs-title-wrap {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  padding-left: 8px;
 }
 .hfs-title {
   display: inline-flex;
@@ -168,10 +175,11 @@
 /* ==== Carousel wrapper ==== */
 .hfs-carousel {
   position: relative;
+  padding: 0 24px;
 }
 .hfs-viewport {
   overflow: hidden;
-  padding: 6px 4px 14px;
+  padding: 6px 0 14px;
   /* mask fade ở mép giúp UX mượt hơn */
   -webkit-mask-image: linear-gradient(
     90deg,
@@ -279,12 +287,13 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--fs-home-text);
-  line-height: 1.3;
+  line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(1.3em * 2);
+  min-height: calc(1.35em * 2);
+  margin-top: 8px;
 }
 .hfs-spec {
   font-size: 11px;
@@ -298,8 +307,8 @@
 .hfs-stock {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 2px;
+  gap: 4px;
+  margin-top: 4px;
 }
 .hfs-stock-row {
   display: flex;
@@ -308,6 +317,9 @@
   font-size: 10.5px;
   font-weight: 700;
   color: var(--fs-home-text-light);
+}
+.hfs-sold-text {
+  color: var(--fs-home-text-muted);
 }
 .hfs-stock-row .blink {
   color: var(--fs-home-red);
@@ -347,22 +359,62 @@
 /* Giá */
 .hfs-price-row {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   flex-wrap: wrap;
+  margin-top: auto;
+  padding-top: 4px;
 }
 .hfs-price-now {
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 900;
   font-style: italic;
   color: var(--fs-home-red);
-  font-size: 17px;
+  font-size: 20px;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .hfs-price-old {
   font-size: 12px;
   color: var(--fs-home-text-muted);
   text-decoration: line-through;
+}
+
+/* Nút Mua ngay */
+.hfs-buy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: linear-gradient(135deg, var(--fs-home-red) 0%, var(--fs-home-orange) 100%);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+  box-shadow: 0 4px 12px rgba(225, 29, 29, 0.3);
+}
+.hfs-buy-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.hfs-buy-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(225, 29, 29, 0.45);
+}
+.hfs-buy-btn:active {
+  transform: translateY(0);
+}
+.hfs-buy-btn.adding {
+  opacity: 0.7;
+  pointer-events: none;
 }
 
 /* ==== Nút điều hướng mũi tên ==== */
@@ -528,7 +580,10 @@
 
 /* Mobile: 2 card, luôn hiện nav */
 @media (max-width: 560px) {
-  .home-flash-sale { padding: 18px 14px 22px; margin: 0 3vw 18px; border-radius: 14px; }
+  .home-flash-sale { padding: 18px 0 22px; margin: 0 0 18px; border-radius: 14px; }
+  .hfs-carousel { padding: 0 14px; }
+  .hfs-head { padding: 0 14px; }
+  .hfs-title-wrap { padding-left: 4px; }
   .hfs-card,
   .hfs-card--more {
     flex: 0 0 calc((100% - 14px) / 2);

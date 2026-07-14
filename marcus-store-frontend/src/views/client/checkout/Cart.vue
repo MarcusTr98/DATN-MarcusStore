@@ -463,6 +463,13 @@
       </div>
     </div>
 
+    <!-- Modal thông báo Flash Sale đã bị admin hủy (dùng chung component) -->
+    <CancelledFlashSaleModal
+      :visible="showCancelledModal"
+      @close="showCancelledModal = false"
+      @confirm="handleCancelledConfirm"
+    />
+
     <!-- Modal thông báo áp dụng voucher thành công -->
     <div
       class="v-modal-overlay"
@@ -544,11 +551,77 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cartStore'
+import { useFlashSaleStore } from '@/stores/FlashSaleStore'
+import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import '@/assets/css/cart.css'
 import voucherApiClient from '@/api/voucherApiClient.js'
+const router = useRouter()
 const cartStore = useCartStore()
+const flashSaleStore = useFlashSaleStore()
+
+// ==== Flash Sale bị admin hủy ====
+// Khi giỏ hàng chứa SP FS từ slot đã CANCELLED → hiện modal thông báo + reload trang.
+// Khi user bấm "Đồng ý" sẽ xóa luôn các SP FS bị hủy khỏi giỏ rồi reload.
+const showCancelledModal = ref(false)
+
+// Cờ chặn vòng lặp modal bật liên tục: khi user đã xác nhận xử lý FS bị hủy,
+// không tự động mở lại modal trong cùng 1 phiên trang. Reset khi F5 hoặc đổi route.
+const hasHandledCancelled = ref(false)
+
+function findCancelledFlashSaleItem() {
+  const slots = flashSaleStore.clientSlots
+  if (!Array.isArray(slots)) return null
+  return cartItems.value.find(
+    (item) =>
+      item.isFlashSale &&
+      item.flashSaleSlotId &&
+      flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
+  ) || null
+}
+
+async function handleCancelledConfirm() {
+  // Đánh dấu "đã xử lý" NGAY LẬP TỨC để chặn vòng lặp vô tận.
+  // Nếu để nguyên thì:
+  //   1. User bấm "Đồng ý" → modal đóng
+  //   2. reload() chạy → onMounted chạy lại → tìm lại thấy SP CANCELLED → modal mở lại
+  //   3. Vòng lặp → modal bật/tắt liên tục.
+  // Cờ hasHandledCancelled chỉ reset khi F5 thật sự hoặc đổi route, không bị trigger
+  // bởi onMounted của chính lần redirect này.
+  if (hasHandledCancelled.value) return
+  hasHandledCancelled.value = true
+
+  // Thu gom SKU id của các SP FS thuộc slot bị hủy để xóa khỏi giỏ.
+  const cancelledSkuIds = cartItems.value
+    .filter(
+      (item) =>
+        item.isFlashSale &&
+        item.flashSaleSlotId &&
+        flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
+    )
+    .map((item) => item.skuId)
+  if (cancelledSkuIds.length) {
+    try {
+      await cartStore.removeManyItemFromCart(cancelledSkuIds)
+    } catch (e) {
+      console.warn('Không thể xóa SP FS bị hủy khỏi giỏ:', e)
+    }
+  }
+
+  // Đóng modal trước, rồi chuyển về trang chủ.
+  // Dùng router.push thay vì window.location.reload() vì:
+  //   - Tránh reload toàn trang (UX mượt hơn, giữ SPA state)
+  //   - User rời khỏi /cart → / nên không trigger lại onMounted của Cart.vue
+  //   - Ngay cả khi user back lại /cart, modal không tự bật vì hasHandledCancelled = true
+  //     và cartItems không còn SP CANCELLED (đã xóa ở trên).
+  showCancelledModal.value = false
+  await router.replace({ path: '/' }).catch(() => {
+    // Fallback nếu router có vấn đề → reload trang chủ
+    window.location.href = '/'
+  })
+}
 
 onMounted(async () => {
   // Xóa dữ liệu checkout cũ nếu có
@@ -556,11 +629,40 @@ onMounted(async () => {
   localStorage.removeItem('selectedSubtotal')
   // Giữ lại selectedVoucherCode để user vẫn thấy voucher đã chọn
 
-  await cartStore.fetchCart()
+  // Tải song song cả cart và danh sách slot FS để check slot CANCELLED sớm nhất có thể.
+  await Promise.all([cartStore.fetchCart(), flashSaleStore.fetchClientSlots(20)])
   await fetchAvailableVouchers()
 
   // Khôi phục trạng thái checkbox từ localStorage (nếu có)
   restoreSelectedItems()
+
+  // Nếu giỏ đã có SP FS thuộc slot bị hủy (do admin hủy sau khi user thêm vào giỏ) → hiện modal.
+  // Guard: bỏ qua nếu user đã xử lý trong phiên này rồi.
+  if (!hasHandledCancelled.value && findCancelledFlashSaleItem()) {
+    showCancelledModal.value = true
+  }
+})
+
+// Theo dõi khi clientSlots thay đổi (vd: scheduler reload, refresh thủ công...) để phát hiện
+// slot vừa bị admin hủy trong khi user đang ở trang giỏ hàng.
+watch(
+  () => flashSaleStore.clientSlots,
+  () => {
+    if (
+      !showCancelledModal.value &&
+      !hasHandledCancelled.value &&
+      findCancelledFlashSaleItem()
+    ) {
+      showCancelledModal.value = true
+    }
+  },
+  { deep: true },
+)
+
+// Khi component bị huỷ (user rời /cart hoặc SPA remount), reset cờ để lần sau
+// quay lại /cart mà vẫn còn SP CANCELLED thì modal có thể hiện lại.
+onBeforeUnmount(() => {
+  hasHandledCancelled.value = false
 })
 
 // Khôi phục trạng thái checkbox từ localStorage
@@ -986,6 +1088,13 @@ function scrollAccessories(direction) {
 function handleCheckout() {
   if (selectedCount.value === 0) {
     showAlert('Vui lòng chọn ít nhất một sản phẩm để thanh toán')
+    return
+  }
+
+  // Chặn checkout nếu giỏ có SP thuộc Flash Sale đã bị admin hủy.
+  // (User phải bấm "Đồng ý" ở modal để hệ thống xóa các SP đó khỏi giỏ + reload)
+  if (findCancelledFlashSaleItem()) {
+    showCancelledModal.value = true
     return
   }
 

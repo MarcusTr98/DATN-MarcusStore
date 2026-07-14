@@ -16,9 +16,11 @@
     </section>
 
     <!-- Hero Banner Section -->
-    <section class="flash-hero" :class="{ 'has-banner': activeSlot?.bannerImageUrl }">
-      <!-- Banner image làm background khi có -->
-      <div v-if="activeSlot?.bannerImageUrl" class="hero-banner-bg">
+    <section class="flash-hero" :class="{ 'has-banner': showBanner }">
+      <!-- Banner image làm background khi có.
+           Guard: chỉ hiện khi activeSlot còn valid (ACTIVE/SCHEDULED + còn thời gian).
+           Nếu admin vừa hủy slot → showBanner=false → banner được ẩn hoàn toàn. -->
+      <div v-if="showBanner" class="hero-banner-bg">
         <img :src="activeSlot.bannerImageUrl" alt="Flash Sale Banner" />
         <div class="hero-banner-overlay"></div>
       </div>
@@ -324,46 +326,96 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Modal thông báo Flash Sale đã bị admin hủy -->
+    <CancelledFlashSaleModal
+      :visible="showCancelledModal"
+      @close="showCancelledModal = false"
+      @confirm="handleCancelledConfirm"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onBeforeUnmount, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
 import { useCartStore } from '@/stores/cartStore'
+import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import '@/assets/css/FlashSalePage.css'
 
 const router = useRouter()
 const flashSaleStore = useFlashSaleStore()
 const cartStore = useCartStore()
-const { clientSlots, clientLoading, displaySlots, bannerStats } = storeToRefs(flashSaleStore)
+const { clientSlots, displaySlots, bannerStats } = storeToRefs(flashSaleStore)
 const stats = computed(() => bannerStats.value || {})
 
 // ==== Lấy dữ liệu Flash Sale từ BE ====
-async function fetchFlashSales(silent = false) {
+async function fetchFlashSales() {
   await flashSaleStore.fetchClientSlots(20)
 }
 
-// Tên slot Flash Sale đang hiển thị (ưu tiên ACTIVE, rồi SCHEDULED).
-// Rơi về 'FLASH SALE' nếu BE chưa có dữ liệu.
+// Tên slot Flash Sale đang hiển thị (ưu tiên ACTIVE=2, rồi SCHEDULED=1).
+// Lưu ý: KHÔNG fallback về clientSlots[0] vì slot[0] có thể là CANCELLED (4) hoặc
+// ENDED (3) → sẽ làm banner của slot đã chết vẫn hiển thị.
+// Trả null khi không có slot hợp lệ → template render empty state.
 const activeSlot = computed(() => {
   if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return null
+
+  // Lọc chỉ giữ slot ACTIVE/SCHEDULED, loại bỏ CANCELLED/ENDED để banner không
+  // "chết" hiển thị khi admin vừa hủy nhưng call BE chưa kịp cập nhật status.
+  const validStatuses = [1, 2]
+  const validSlots = clientSlots.value.filter((s) => validStatuses.includes(Number(s.status)))
+
   return (
-    clientSlots.value.find((s) => Number(s.status) === 2) ||
-    clientSlots.value.find((s) => Number(s.status) === 1) ||
-    clientSlots.value[0]
+    validSlots.find((s) => Number(s.status) === 2) ||
+    validSlots.find((s) => Number(s.status) === 1) ||
+    null
   )
 })
-const slotName = computed(() => activeSlot.value?.name || 'FLASH SALE')
+const slotName = computed(() => activeSlot.value?.name || '')
+
+// Guard quyết định có hiển thị banner hay không. Bắt buộc phải có vì:
+//   - bannerImageUrl có thể tới từ slot đã CANCELLED (activeSlot đã được lọc ở trên,
+//     nhưng thêm 1 lớp phòng vệ theo status + thời gian thực tế là rất tốt).
+//   - Scheduler có thể chưa kịp chuyển status=2→3 sau endDate nhưng banner vẫn load OK.
+//   - Cũng phòng trường hợp clientSlots còn cũ trong cache Pinia trước khi refresh.
+const showBanner = computed(() => {
+  const slot = activeSlot.value
+  if (!slot) return false
+  if (!slot.bannerImageUrl) return false
+
+  const status = Number(slot.status)
+  // Chỉ ACTIVE (2) hoặc SCHEDULED (1) mới được phép hiển thị banner
+  if (status !== 1 && status !== 2) return false
+
+  // Check thời gian thực tế - phòng trường hợp scheduler chưa kịp chuyển status
+  // hoặc data load từ cache bị stale.
+  //   • ACTIVE: phải đang trong [startDate, endDate)
+  //   • SCHEDULED: startDate có thể chưa tới (banner hẹn giờ), endDate có thể null
+  const now = Date.now()
+  const startMs = slot.startDate ? new Date(slot.startDate).getTime() : null
+  const endMs = slot.endDate ? new Date(slot.endDate).getTime() : null
+
+  if (status === 2) {
+    // ACTIVE: bắt buộc trong khung giờ
+    if (startMs && now < startMs) return false
+    if (endMs && now >= endMs) return false
+    return true
+  }
+
+  // SCHEDULED: đảm bảo slot chưa kết thúc (slot.scheduled có thể hiển thị trước giờ)
+  if (status === 1 && endMs && now >= endMs) return false
+  return true
+})
 
 // ==== Bộ đếm ngược động (chạy mỗi giây) ====
 // Hết giờ -> tự gọi lại API để cập nhật danh sách mà không cần F5.
 const { label: countdownLabel, timer } = useFlashSaleCountdown(
   () => flashSaleStore.clientSlots,
-  () => fetchFlashSales(true),
+  () => fetchFlashSales(),
 )
 
 // Timeline: lấy từ store getter (đã chuẩn hoá ở store), fallback hiển thị placeholder
@@ -473,15 +525,81 @@ const isFlashSaleActive = computed(() => {
   return clientSlots.value.some((s) => Number(s.status) === 2)
 })
 
-const goToProduct = (product) => {
+/**
+ * Kiểm tra slot của sản phẩm có hợp lệ để thực hiện hành động (mua ngay / thêm giỏ / click xem).
+ * Thứ tự ưu tiên:
+ *   1. Slot bị admin hủy (isCancelled=true) → bật modal cancelled.
+ *   2. Slot của sản phẩm không ACTIVE (status≠2 hoặc ngoài khung giờ) → toast warning + chặn.
+ *      Phân biệt rõ message cho từng trạng thái: SCHEDULED / ENDED / CANCELLED.
+ *   3. Không có slot nào đang ACTIVE (fallback) → toast "FS chưa bắt đầu".
+ *
+ * Trả về: true nếu sản phẩm có thể tiếp tục, false nếu đã hiển thị feedback cho user.
+ *
+ * Lưu ý: Check SLOT CỦA SẢN PHẨM (dựa trên product.slotId), không phải slot ACTIVE đầu tiên
+ * trong clientSlots. Tránh bug: sản phẩm thuộc slot B (status≠2) nhưng nhầm dùng slot A (đang active)
+ * để truyền cho API add-to-cart.
+ */
+function ensureProductSlotIsBuyable(product) {
+  // 1. Đã bị admin hủy → modal cancelled
+  if (product.slotId && flashSaleStore.isSlotCancelled(product.slotId)) {
+    openCancelledModal()
+    return false
+  }
+  // 2. Slot của sản phẩm không ACTIVE
+  if (product.slotId && !flashSaleStore.isSlotActive(product.slotId)) {
+    const ownSlot = flashSaleStore.getSlotById(product.slotId)
+    let msg = 'Sản phẩm này không nằm trong Flash Sale đang diễn ra'
+    if (ownSlot) {
+      const status = Number(ownSlot.status)
+      if (status === 1) msg = 'Flash Sale này chưa bắt đầu'
+      else if (status === 3) msg = 'Flash Sale này đã kết thúc'
+      else if (status === 4) msg = 'Flash Sale này đã bị admin hủy'
+    }
+    showToast({ type: 'warning', title: 'Oops!', message: msg })
+    return false
+  }
+  // 3. Không có FS nào đang diễn ra → fallback
   if (!isFlashSaleActive.value) {
     showToast({
       type: 'warning',
       title: 'Oops!',
       message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
     })
-    return
+    return false
   }
+  return true
+}
+
+// ==== Modal thông báo Flash Sale bị admin hủy ====
+const showCancelledModal = ref(false)
+const hasHandledCancelled = ref(false)
+
+function openCancelledModal() {
+  if (hasHandledCancelled.value) return
+  showCancelledModal.value = true
+}
+
+async function handleCancelledConfirm() {
+  if (hasHandledCancelled.value) return
+  hasHandledCancelled.value = true
+
+  showCancelledModal.value = false
+  // Điều hướng về trang chủ thay vì reload trang FS.
+  // reload() sẽ tải lại clientSlots → vẫn còn slot CANCELLED → modal có thể mở lại
+  // nếu user back về /khuyen-mai. Điều hướng về home là đủ vì user đã rời context FS.
+  await router.replace({ path: '/' }).catch(() => {
+    window.location.href = '/'
+  })
+}
+
+onBeforeUnmount(() => {
+  hasHandledCancelled.value = false
+})
+
+const goToProduct = (product) => {
+  // Check slot của sản phẩm (không phải slot ACTIVE global).
+  // Helper sẽ tự bật modal cancelled / toast warning tương ứng nếu không hợp lệ.
+  if (!ensureProductSlotIsBuyable(product)) return
   router.push(`/product/${product.slug}`)
 }
 
@@ -521,8 +639,146 @@ const handleBuyClick = (event, product) => {
     product.ripples = product.ripples.filter((r) => r.id !== ripple.id)
   }, 650)
 
-  // TODO: gắn logic thêm vào giỏ hàng thật ở đây
-  addToCart(product)
+  // "Mua ngay" = thêm vào giỏ + chuyển thẳng sang trang Checkout
+  buyNow(product)
+}
+
+// Chuẩn bị dữ liệu `selectedCartItems` từ cartItem vừa thêm vào localStorage
+// để Checkout.vue có thể đọc lại ngay khi mount (xem Checkout.vue -> getInitialCartData).
+// Chỉ chọn đúng cartItem vừa được thêm (skuId trùng + là Flash Sale + cùng slotId nếu có).
+// 'ownSlot' là slot của sản phẩm (luôn được verify ACTIVE trước khi truyền vào).
+function prepareCheckoutSelection(cartItem, product, ownSlot) {
+  const item = {
+    cartItemId: cartItem.cartItemId,
+    productName: cartItem.name || product.name,
+    variantName: cartItem.variant || '',
+    skuCode: cartItem.skuCode || product.spec?.replace('Mã: ', '') || '',
+    skuId: cartItem.skuId ?? product.skuId,
+    imageUrl: cartItem.imageUrl || product.image || '',
+    quantity: cartItem.quantity ?? 1,
+    price: cartItem.price ?? product.price,
+    totalPrice:
+      cartItem.totalPrice ?? (cartItem.price ?? product.price) * (cartItem.quantity ?? 1),
+    // Thông tin Flash Sale để Checkout.vue hiển thị badge + áp dụng giá FS
+    isFlashSale: true,
+    flashSaleSlotId: ownSlot?.slotId ?? product.slotId ?? null,
+    flashSaleSlotName:
+      ownSlot?.name || ownSlot?.slotName || product.slotName || 'Flash Sale',
+  }
+
+  localStorage.setItem('selectedCartItems', JSON.stringify([item]))
+  localStorage.setItem('selectedSubtotal', String(item.totalPrice))
+}
+
+// Thêm sản phẩm Flash Sale vào giỏ rồi chuyển thẳng sang Checkout.
+// Nếu SP đã có trong giỏ thì KHÔNG add thêm (tránh lỗi vượt tồn kho của FS),
+// chỉ điều hướng thẳng tới Checkout với cartItem hiện có — đúng yêu cầu:
+// "click Mua ngay → sang checkout → sau khi mua SP sẽ mất khỏi giỏ".
+const buyNow = async (product) => {
+  if (product.addingToCart) return
+  product.addingToCart = true
+
+  try {
+    // Check slot của sản phẩm (không phải slot ACTIVE global).
+    // Helper sẽ tự bật modal cancelled / toast warning nếu không hợp lệ.
+    if (!ensureProductSlotIsBuyable(product)) return
+
+    // Dùng slot CỦA SẢN PHẨM (product.slotId), không phải slot ACTIVE đầu tiên
+    // trong clientSlots. Tránh nhầm: nếu sản phẩm thuộc slot B (status≠2) mà
+    // clientSlots có slot A (status=2) → truyền nhầm slot A cho API.
+    const ownSlot = flashSaleStore.getSlotById(product.slotId)
+    if (!ownSlot || Number(ownSlot.status) !== 2) {
+      showToast({
+        type: 'warning',
+        title: 'Oops!',
+        message: 'Sản phẩm này không nằm trong Flash Sale đang diễn ra',
+      })
+      return
+    }
+
+    if (product.left <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Hết hàng!',
+        message: 'Sản phẩm đã hết hàng trong Flash Sale này',
+      })
+      return
+    }
+
+    // Đảm bảo cartStore có dữ liệu mới nhất trước khi kiểm tra SP đã có trong giỏ chưa.
+    // Nếu cartStore.items chưa có gì (vd: vào thẳng FlashSalePage không qua header), fetch trước.
+    if (!Array.isArray(cartStore.items) || cartStore.items.length === 0) {
+      try {
+        await cartStore.fetchCart()
+      } catch (e) {
+        console.warn('[buyNow] fetchCart thất bại, tiếp tục với items hiện có:', e)
+      }
+    }
+
+    // Tìm cartItem hiện có (nếu SP đã được thêm vào giỏ trước đó).
+    // Ưu tiên cartItem đang ở Flash Sale (isFlashSale=true) để giữ giá FS.
+    const existingItem =
+      (cartStore.items || []).find(
+        (ci) => ci.skuId === product.skuId && ci.isFlashSale === true,
+      ) ||
+      (cartStore.items || []).find((ci) => ci.skuId === product.skuId) ||
+      null
+
+    let matchedItem = existingItem
+
+    // Chỉ addToCart khi SP chưa có trong giỏ. Nếu đã có thì dùng luôn cartItem hiện tại
+    // để đi tiếp — không cần gọi backend lần nữa (tránh vượt tồn kho FS).
+    if (!matchedItem) {
+      const success = await cartStore.addToCartWithFlashSale(
+        product.skuId,
+        1,
+        ownSlot.slotId,    // ← slot CỦA SẢN PHẨM (không phải slot ACTIVE đầu tiên)
+        product.price,
+      )
+
+      if (!success) {
+        showToast({
+          type: 'error',
+          title: 'Lỗi!',
+          message: cartStore.error || 'Không thể thêm vào giỏ',
+        })
+        return
+      }
+
+      matchedItem =
+        (cartStore.items || []).find(
+          (ci) => ci.skuId === product.skuId && ci.isFlashSale === true,
+        ) ||
+        (cartStore.items || []).find((ci) => ci.skuId === product.skuId) ||
+        null
+    }
+
+    if (!matchedItem) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: 'Không tìm thấy sản phẩm trong giỏ, vui lòng thử lại.',
+      })
+      return
+    }
+
+    prepareCheckoutSelection(matchedItem, product, ownSlot)
+
+    // Nếu chưa đăng nhập, router.beforeEach sẽ redirect sang /auth/login
+    // (do route /checkout có meta.requiresAuth = true) và quay lại /checkout sau đăng nhập.
+    router.push('/checkout')
+  } catch (error) {
+    console.error('Lỗi mua ngay:', error)
+    showToast({
+      type: 'error',
+      title: 'Lỗi!',
+      message: error.response?.data?.message || 'Không thể mua ngay',
+    })
+  } finally {
+    setTimeout(() => {
+      product.addingToCart = false
+    }, 700)
+  }
 }
 
 // Toggle yêu thích (UI-only — chưa gắn API wishlist)
@@ -534,26 +790,20 @@ const toggleFavorite = (product) => {
 const addToCart = async (product) => {
   if (product.addingToCart) return
   product.addingToCart = true
-  
+
   try {
-    // Kiểm tra xem Flash Sale có đang active không
-    if (!isFlashSaleActive.value) {
+    // Check slot của sản phẩm (không phải slot ACTIVE global).
+    // Helper sẽ tự bật modal cancelled / toast warning nếu không hợp lệ.
+    if (!ensureProductSlotIsBuyable(product)) return
+
+    // Dùng slot CỦA SẢN PHẨM (product.slotId), không phải slot ACTIVE đầu tiên
+    // trong clientSlots. Tránh nhầm slot khi sản phẩm không thuộc slot ACTIVE đầu tiên.
+    const ownSlot = flashSaleStore.getSlotById(product.slotId)
+    if (!ownSlot || Number(ownSlot.status) !== 2) {
       showToast({
         type: 'warning',
         title: 'Oops!',
-        message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
-      })
-      return
-    }
-
-    // Tìm slot đang active để lấy slotId
-    const activeSlot = clientSlots.value.find(s => Number(s.status) === 2)
-    
-    if (!activeSlot || !product.slotId) {
-      showToast({
-        type: 'error',
-        title: 'Lỗi!',
-        message: 'Không tìm thấy thông tin Flash Sale',
+        message: 'Sản phẩm này không nằm trong Flash Sale đang diễn ra',
       })
       return
     }
@@ -572,10 +822,10 @@ const addToCart = async (product) => {
     const success = await cartStore.addToCartWithFlashSale(
       product.skuId,           // skuId
       1,                      // quantity
-      activeSlot.slotId,      // flashSaleSlotId
+      ownSlot.slotId,         // flashSaleSlotId (của sản phẩm)
       product.price           // flashSalePrice
     )
-    
+
     if (success) {
       showToast({
         type: 'success',
@@ -685,6 +935,7 @@ const createFallingDots = () => {
 }
 
 let resizeHandler = null
+let refreshTimer = null
 
 onMounted(async () => {
   // Tải dữ liệu Flash Sale ACTIVE + sắp diễn ra từ BE
@@ -702,19 +953,21 @@ onMounted(async () => {
 
   setTimeout(showNextFomo, 1800)
   fomoTimer = setInterval(showNextFomo, 6000)
+
+  // Refresh dữ liệu mỗi 30s để cập nhật status slot (cancel/restore từ admin).
+  // Trước đây trang này KHÔNG có interval refetch → dẫn đến `clientSlots` bị stale,
+  // user click sản phẩm vẫn thấy modal cancelled dù admin đã restore slot.
+  // Có interval 60s trên HomeFlashSale.vue, trang này nên có tương tự để đồng bộ.
+  refreshTimer = setInterval(() => {
+    flashSaleStore.fetchClientSlots(20).catch(() => {})
+  }, 30000)
 })
 
 onUnmounted(() => {
   clearInterval(fomoTimer)
+  if (refreshTimer) clearInterval(refreshTimer)
   if (resizeHandler) window.removeEventListener('resize', resizeHandler)
 })
 </script>
 
-<style scoped>
 
-</style>
-
-
-<style>
-
-</style>

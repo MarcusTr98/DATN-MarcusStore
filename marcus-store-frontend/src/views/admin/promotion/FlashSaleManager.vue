@@ -1090,7 +1090,7 @@ const {
   cascadeTree, cascadeLoading, cascadeError,
 } = storeToRefs(flashSaleStore)
 
-const now = new Date()
+
 
 /* ── FILTERS ── */
 const filters = reactive({
@@ -1196,10 +1196,6 @@ const slotsWithStatus = computed(() =>
       return new Date(a.startDate) - new Date(b.startDate)
     })
 )
-
-const filteredSlots = computed(() => {
-  return slotsWithStatus.value
-})
 
 function formatVND(value) {
   if (value === null || value === undefined || value === '') return '-'
@@ -1353,12 +1349,6 @@ function openBannerPreview(url) {
 
 function closeBannerPreview() {
   bannerLightboxUrl.value = ''
-}
-
-function onKeyDown(e) {
-  if (e.key === 'Escape' && bannerPreviewUrl.value) {
-    closeBannerPreview()
-  }
 }
 
 const defaultForm = {
@@ -1825,18 +1815,6 @@ function openCreateModal() {
   flashSaleStore.fetchCascade({ includeOutOfStock: false })
 }
 
-/**
- * Khi admin click nút Sửa trên slot đã khóa → mở form view-only (không toast).
- * Helper này hiện không được gọi trực tiếp nhưng giữ lại để dùng cho test/debug.
- */
-// eslint-disable-next-line no-unused-vars
-function onLockedEditClick(slot) {
-  showToast({
-    type: 'warning',
-    title: 'Không thể chỉnh sửa',
-    message: lockReason(slot),
-  })
-}
 
 /**
  * Mở modal Xem chi tiết thống kê cho slot đã ACTIVE/ENDED/CANCELLED/PENDING.

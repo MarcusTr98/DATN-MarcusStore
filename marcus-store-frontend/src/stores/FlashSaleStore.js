@@ -1,7 +1,7 @@
 // Pinia store cho Flash Sale - cả Admin và Client dùng chung.
 // Admin CRUD: fetchSlots / fetchOneSlot / addSlot / updateSlot / deleteSlotById / toggleSlotStatus
 // Admin khác: fetchCascade / fetchOverlap
-// Client storefront: fetchClientSlots + getter primarySlot / displaySlots
+// Client storefront: fetchClientSlots + getter displaySlots
 
 import { defineStore } from 'pinia'
 import flashSaleApi from '@/api/FlashSaleApi.js'
@@ -82,6 +82,9 @@ function mapClientSlot(slot) {
     startDate: slot.startDate || null,
     endDate: slot.endDate || null,
     status: Number(slot.status ?? 0),
+    // Flag cho biết slot đã bị admin hủy. BE trả kèm slot CANCELLED trong cùng response
+    // để FE có thể hiển thị modal thông báo khi khách tương tác với sản phẩm thuộc slot này.
+    isCancelled: slot.isCancelled === true,
     items: items.map((it) => ({
       skuId: it.skuId,
       productId: it.productId,
@@ -199,26 +202,6 @@ export const useFlashSaleStore = defineStore('flashSale', {
   }),
 
   getters: {
-    // Slot featured cho trang chủ: ACTIVE đầu tiên (BE đã sort ACTIVE trước theo startDate ASC).
-    // Fallback về slot đầu tiên nếu không có ACTIVE (ví dụ chỉ có SCHEDULED).
-    featuredSlot(state) {
-      if (!Array.isArray(state.clientSlots) || state.clientSlots.length === 0) return null
-      return (
-        state.clientSlots.find((s) => Number(s.status) === 2) ||
-        state.clientSlots[0] ||
-        null
-      )
-    },
-    // Slot ưu tiên cho countdown: ưu tiên ACTIVE trước, rồi SCHEDULED.
-    // Tương đương featuredSlot nhưng semantic rõ ràng cho bộ đếm ngược.
-    primarySlot(state) {
-      if (!Array.isArray(state.clientSlots) || state.clientSlots.length === 0) return null
-      return (
-        state.clientSlots.find((s) => Number(s.status) === 2) ||
-        state.clientSlots.find((s) => Number(s.status) === 1) ||
-        null
-      )
-    },
     // Chuẩn bị dữ liệu cho thanh timeline trên FlashSalePage.vue.
     // Trả về tối đa 4 entry: slot đang diễn ra (live) + các slot sắp diễn ra tiếp theo.
     displaySlots(state) {
@@ -273,6 +256,37 @@ export const useFlashSaleStore = defineStore('flashSale', {
         liveLabel,
         liveSubLabel,
       }
+    },
+    // Kiểm tra 1 slotId cụ thể đã bị admin hủy chưa.
+    // FE dùng để chặn click "Mua ngay" / "Thêm giỏ" khi slot CANCELLED.
+    isSlotCancelled: (state) => (slotId) => {
+      if (!Array.isArray(state.clientSlots) || slotId == null) return false
+      const slot = state.clientSlots.find((s) => s.slotId === slotId)
+      return slot ? slot.isCancelled === true : false
+    },
+    // Lấy slot theo slotId trong clientSlots. Dùng để check trạng thái slot
+    // của riêng 1 sản phẩm (tránh phụ thuộc slot ACTIVE đầu tiên - global).
+    getSlotById: (state) => (slotId) => {
+      if (!Array.isArray(state.clientSlots) || slotId == null) return null
+      return state.clientSlots.find((s) => s.slotId === slotId) || null
+    },
+    // Kiểm tra 1 slotId cụ thể có đang ACTIVE không.
+    // Tiêu chí: status=2 VÀ thời gian thực tế 'now' nằm trong [startDate, endDate).
+    // Check thêm thời gian thực tế để phòng trường hợp scheduler chưa kịp cập nhật status
+    // hoặc clientSlots bị stale sau khi admin cancel/restore.
+    isSlotActive: (state) => (slotId) => {
+      if (!Array.isArray(state.clientSlots) || slotId == null) return false
+      const slot = state.clientSlots.find((s) => s.slotId === slotId)
+      if (!slot) return false
+      // Bắt buộc status=2
+      if (Number(slot.status) !== 2) return false
+      // Check thời gian thực tế
+      const now = Date.now()
+      const startMs = slot.startDate ? new Date(slot.startDate).getTime() : null
+      const endMs = slot.endDate ? new Date(slot.endDate).getTime() : null
+      if (startMs && now < startMs) return false
+      if (endMs && now >= endMs) return false
+      return true
     },
   },
 

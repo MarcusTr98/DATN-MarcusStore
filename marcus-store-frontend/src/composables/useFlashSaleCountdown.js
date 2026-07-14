@@ -120,8 +120,5 @@ export function useFlashSaleCountdown(getSlots, onExpire) {
         timer,
         label,
         targetSlot,
-        remainingSeconds,
-        start,
-        stop,
     }
 }
