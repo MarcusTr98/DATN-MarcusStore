@@ -24,4 +24,7 @@ public class RegisterRequest {
         message = "Số điện thoại không hợp lệ"
     )
     private String phoneNumber;
+
+        // true nếu user đăng ký từ form "Nhận ưu đãi độc quyền" ở footer (nhập email → điền sẵn ở trang đăng ký)
+    private Boolean newsletterSignup = false;
 }
