@@ -1,9 +1,25 @@
 /* src/assets/css/variables.css */
 :root {
-  --ms-primary: #e11d1d; /* Màu đỏ chủ đạo mới của bạn */
+  /* Tông màu Đỏ chủ đạo (Marcus Store) */
+  --ms-primary: #e11d1d;
   --ms-primary-hover: #c0392b;
-  --ms-accent: #ff6b00; /* Màu cam làm điểm nhấn */
-  --ms-dark: #1a1a2e; /* Nền footer */
+
+  /* Tông màu nhấn (Pink/Rose) theo chuẩn thiết kế Voucher/SKU */
+  --ms-accent: #f55d9b; /* Tương đương bg nút Add/Tạo SKU */
+  --ms-accent-hover: #ec4d8d;
+  --ms-accent-light: #ffe4ef; /* Dùng cho hover background */
+  --ms-accent-border: #f3d6e3; /* Dùng cho viền Card/Table */
+
+  /* Nền và Text */
+  --ms-bg-body: #fff7fa; /* Trắng hồng nhẹ (Nền tổng thể) */
+  --ms-bg-card: #ffffff; /* Nền trắng thẻ Card */
+  --ms-text-main: #202636; /* Text đậm */
+  --ms-text-muted: #6b7280; /* Text nhạt/phụ */
+
+  /* Các màu cơ bản khác */
+  --ms-dark: #1a1a2e;
   --ms-white: #ffffff;
   --ms-gray: #9aa3b5;
+  --ms-success: #10b981;
+  --ms-danger: #ef4444;
 }

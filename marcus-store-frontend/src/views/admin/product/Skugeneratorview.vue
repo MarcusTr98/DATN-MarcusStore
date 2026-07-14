@@ -1,504 +1,521 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <div class="header-left">
-        <div class="header-icon-box">
-          <i class="fa-solid fa-layer-group"></i>
-        </div>
-        <div class="header-text-group">
-          <p class="breadcrumb-text">Sản phẩm</p>
-          <h1 class="page-title">Tạo Biến thể SKU</h1>
-          <p class="page-subtitle">Tạo và quản lý các biến thể SKU theo thuộc tính sản phẩm</p>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="step-indicator">
-          <div class="step" :class="{ active: currentStep >= 1, done: currentStep > 1 }">
-            <span class="step-num">1</span><span class="step-label">Chọn SP</span>
+  <div class="skug-page">
+    <div class="skug-container">
+      <!-- HEADER CHUẨN MASTER DATA -->
+      <div class="skug-header">
+        <div class="skug-header-left">
+          <div class="skug-header-icon">
+            <i class="fa-solid fa-layer-group"></i>
           </div>
-          <div class="step-line" :class="{ active: currentStep > 1 }"></div>
-          <div class="step" :class="{ active: currentStep >= 2, done: currentStep > 2 }">
-            <span class="step-num">2</span><span class="step-label">Chọn thuộc tính</span>
-          </div>
-          <div class="step-line" :class="{ active: currentStep > 2 }"></div>
-          <div class="step" :class="{ active: currentStep >= 3 }">
-            <span class="step-num">3</span><span class="step-label">Điền & Lưu</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- BƯỚC 1: CHỌN SẢN PHẨM -->
-    <div class="card step-card" :class="{ collapsed: currentStep > 1 }">
-      <div class="card-header-row" @click="currentStep > 1 && (currentStep = 1)">
-        <div class="card-title-group">
-          <span class="step-badge">01</span>
           <div>
-            <h3 class="card-title">Sản phẩm gốc</h3>
-            <p class="card-subtitle">Chọn sản phẩm bạn muốn tạo biến thể SKU</p>
+            <p class="skug-breadcrumb">Sản phẩm</p>
+            <h1 class="skug-title">
+              Tạo Biến thể SKU
+              <span class="skug-badge"><span class="skug-badge-dot"></span>Master Data</span>
+            </h1>
+            <p class="skug-subtitle">Tạo và quản lý các biến thể SKU theo thuộc tính sản phẩm</p>
           </div>
         </div>
-        <div v-if="selectedProduct" class="selected-summary">
-          <span class="selected-tag">{{ selectedProduct.productName }}</span>
+
+        <div class="skug-header-right">
+          <div class="skug-steps">
+            <div
+              class="skug-step"
+              :class="{ 'is-active': currentStep >= 1, 'is-done': currentStep > 1 }"
+            >
+              <span class="skug-step-num">1</span><span class="skug-step-label">Chọn SP</span>
+            </div>
+            <div class="skug-step-line" :class="{ 'is-active': currentStep > 1 }"></div>
+            <div
+              class="skug-step"
+              :class="{ 'is-active': currentStep >= 2, 'is-done': currentStep > 2 }"
+            >
+              <span class="skug-step-num">2</span
+              ><span class="skug-step-label">Chọn thuộc tính</span>
+            </div>
+            <div class="skug-step-line" :class="{ 'is-active': currentStep > 2 }"></div>
+            <div class="skug-step" :class="{ 'is-active': currentStep >= 3 }">
+              <span class="skug-step-num">3</span><span class="skug-step-label">Điền & Lưu</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card-body" v-show="currentStep === 1">
-        <div class="filter-toolbar">
-          <div class="search-box">
-            <input
-              v-model="searchQuery"
-              placeholder="Nhập tên sản phẩm cần tìm..."
-              @keyup.enter="handleSearch"
-            />
-            <button class="btn-search" @click="handleSearch" title="Tìm kiếm">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+      <!-- BƯỚC 1: CHỌN SẢN PHẨM -->
+      <div class="skug-card" :class="{ 'is-collapsed': currentStep > 1 }">
+        <div class="skug-card-header" @click="currentStep > 1 && (currentStep = 1)">
+          <div class="skug-card-title-group">
+            <span class="skug-step-badge">01</span>
+            <div>
+              <h3 class="skug-card-title">Sản phẩm gốc</h3>
+              <p class="skug-card-subtitle">Chọn sản phẩm bạn muốn tạo biến thể SKU</p>
+            </div>
+          </div>
+          <div v-if="selectedProduct" class="skug-selected-summary">
+            <span class="skug-selected-tag">{{ selectedProduct.productName }}</span>
+          </div>
+        </div>
+
+        <div class="skug-card-body" v-show="currentStep === 1">
+          <div class="skug-toolbar">
+            <div class="skug-search">
+              <input
+                v-model="searchQuery"
+                placeholder="Nhập tên sản phẩm cần tìm..."
+                @keyup.enter="handleSearch"
+              />
+              <button class="skug-btn-search" @click="handleSearch" title="Tìm kiếm">
+                <i class="fa-solid fa-search"></i>
+              </button>
+            </div>
+
+            <div>
+              <select
+                v-model="filterStatus"
+                @change="handleFilterChange"
+                class="skug-status-select"
               >
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-              </svg>
+                <option value="all">Tất cả sản phẩm</option>
+                <option value="no_sku">Chưa có biến thể</option>
+                <option value="has_sku">Đã có biến thể</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="skug-product-grid">
+            <div
+              v-for="p in products"
+              :key="p.productId"
+              class="skug-product-option"
+              :class="{ 'is-active': selectedProductId === p.productId }"
+              @click="selectProduct(p)"
+            >
+              <div class="skug-product-check">
+                <i
+                  v-if="selectedProductId === p.productId"
+                  class="fa-solid fa-check"
+                  style="color: #fff; font-size: 12px"
+                ></i>
+              </div>
+              <div class="skug-product-thumb">
+                {{ p.productName ? p.productName.charAt(0).toUpperCase() : 'P' }}
+              </div>
+              <div class="skug-product-info">
+                <p class="skug-product-name">{{ p.productName }}</p>
+                <p class="skug-product-brand">{{ p.brand }}</p>
+              </div>
+            </div>
+            <div v-if="products.length === 0" class="skug-empty">
+              <p>Không tìm thấy sản phẩm nào phù hợp.</p>
+            </div>
+          </div>
+
+          <div class="skug-pagination" v-if="totalPages > 1">
+            <button
+              class="skug-btn-page"
+              :disabled="currentPage === 0"
+              @click="changePage(currentPage - 1)"
+            >
+              ← Trước
+            </button>
+            <span class="skug-page-info">Trang {{ currentPage + 1 }} / {{ totalPages }}</span>
+            <button
+              class="skug-btn-page"
+              :disabled="currentPage >= totalPages - 1"
+              @click="changePage(currentPage + 1)"
+            >
+              Sau →
             </button>
           </div>
 
-          <div class="filter-box">
-            <select v-model="filterStatus" @change="handleFilterChange" class="status-select">
-              <option value="all">Tất cả sản phẩm</option>
-              <option value="no_sku">Chưa có biến thể</option>
-              <option value="has_sku">Đã có biến thể</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="product-select-grid">
-          <div
-            v-for="p in products"
-            :key="p.productId"
-            class="product-option"
-            :class="{ active: selectedProductId === p.productId }"
-            @click="selectProduct(p)"
-          >
-            <div class="product-option-check">
-              <svg
-                v-if="selectedProductId === p.productId"
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-              >
-                <path
-                  d="M2 6l3 3 5-5"
-                  stroke="#fff"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </div>
-            <div class="product-option-thumb">
-              {{ p.productName ? p.productName.charAt(0).toUpperCase() : 'P' }}
-            </div>
-            <div class="product-option-info">
-              <p class="product-option-name">{{ p.productName }}</p>
-              <p class="product-option-brand">{{ p.brand }}</p>
-            </div>
-          </div>
-          <div v-if="products.length === 0" class="empty-state">
-            <p>Không tìm thấy sản phẩm nào phù hợp.</p>
-          </div>
-        </div>
-
-        <div class="pagination-wrapper" v-if="totalPages > 1">
-          <button
-            class="btn-page"
-            :disabled="currentPage === 0"
-            @click="changePage(currentPage - 1)"
-          >
-            ← Trước
-          </button>
-          <span class="page-info">Trang {{ currentPage + 1 }} / {{ totalPages }}</span>
-          <button
-            class="btn-page"
-            :disabled="currentPage >= totalPages - 1"
-            @click="changePage(currentPage + 1)"
-          >
-            Sau →
-          </button>
-        </div>
-
-        <div class="card-footer-row">
-          <button class="btn-primary" :disabled="!selectedProductId" @click="currentStep = 2">
-            Tiếp tục →
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- TÍNH NĂNG MỚI: BẢNG SKU ĐÃ TỒN TẠI TRONG CSDL -->
-    <div class="card step-card" v-if="selectedProductId && existingSkus.length > 0">
-      <div class="card-header-row no-pointer">
-        <div class="card-title-group">
-          <span class="step-badge" style="background: #ecfdf5; color: #10b981">
-            <i class="fa-solid fa-check-double"></i>
-          </span>
-          <div>
-            <h3 class="card-title">SKU Đang Hoạt Động ({{ existingSkus.length }})</h3>
-            <p class="card-subtitle">
-              Các biến thể đã tồn tại trong hệ thống. Hãy đối chiếu để tránh tạo trùng!
-            </p>
-          </div>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="sku-table-wrapper">
-          <table class="sku-table">
-            <thead>
-              <tr>
-                <th class="th-variant">Tổ hợp biến thể</th>
-                <th class="th-sku">Mã SKU</th>
-                <th class="th-price">Giá bán (₫)</th>
-                <th class="th-stock">Tồn kho</th>
-                <th class="th-del">Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(sku, idx) in existingSkus" :key="sku.skuId" class="sku-row">
-                <td>
-                  <div class="variant-name-cell">
-                    <span class="variant-label">
-                      {{
-                        sku.attributeValues
-                          ? sku.attributeValues.map((v) => v.valueString).join(' / ')
-                          : '---'
-                      }}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <code style="color: #db2777; font-weight: bold">{{ sku.skuCode }}</code>
-                </td>
-                <td>{{ formatMoney(sku.price) }}</td>
-                <td>{{ sku.stockQuantity }}</td>
-                <td>
-                  <button
-                    class="btn-row-del"
-                    @click="deleteExistingSku(sku.skuId, idx)"
-                    title="Xóa SKU này khỏi CSDL"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                      <path
-                        d="M2 3.5h9M5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M4 3.5l.667 7h3.666L9 3.5H4z"
-                        stroke="currentColor"
-                        stroke-width="1.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- BƯỚC 2: CHỌN THUỘC TÍNH -->
-    <div class="card step-card" :class="{ collapsed: currentStep !== 2, locked: currentStep < 2 }">
-      <div class="card-header-row" @click="currentStep > 2 && (currentStep = 2)">
-        <div class="card-title-group">
-          <span class="step-badge" :class="{ dim: currentStep < 2 }">02</span>
-          <div>
-            <h3 class="card-title">Chọn Thuộc tính & Giá trị</h3>
-            <p class="card-subtitle">Tick vào các giá trị muốn tạo biến thể</p>
-          </div>
-        </div>
-        <div v-if="currentStep > 2" class="selected-summary">
-          <span class="selected-tag">{{ getTotalSelected() }} giá trị đã chọn</span>
-          <span class="edit-hint">Nhấn để thay đổi</span>
-        </div>
-      </div>
-
-      <div class="card-body" v-show="currentStep === 2">
-        <div class="attributes-section">
-          <div v-for="attr in attributes" :key="attr.attributeId" class="attribute-block">
-            <div class="attribute-block-header">
-              <label class="attribute-toggle">
-                <input
-                  type="checkbox"
-                  :checked="isAttributeSelected(attr.attributeId)"
-                  @change="toggleAttribute(attr.attributeId)"
-                />
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                <span class="attribute-block-name">{{ attr.attributeName }}</span>
-              </label>
-              <span class="attr-value-count">
-                {{ getSelectedValueCount(attr.attributeId) }}/{{
-                  getAttrValues(attr.attributeId).length
-                }}
-                đã chọn
-              </span>
-            </div>
-
-            <div class="values-tag-row" v-if="isAttributeSelected(attr.attributeId)">
-              <button
-                v-for="val in getAttrValues(attr.attributeId)"
-                :key="val.valueId"
-                class="value-tag"
-                :class="{ active: isValueSelected(val.valueId) }"
-                @click="toggleValue(val)"
-              >
-                <span class="value-tag-dot" :style="getColorStyle(val.valueString)"></span>
-                {{ val.valueString }}
-                <svg
-                  v-if="isValueSelected(val.valueId)"
-                  width="10"
-                  height="10"
-                  viewBox="0 0 10 10"
-                  fill="none"
-                >
-                  <path
-                    d="M2 5l2.5 2.5L8 2.5"
-                    stroke="currentColor"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
-            <p v-else class="attr-disabled-hint">Bật để chọn giá trị cho thuộc tính này</p>
-          </div>
-        </div>
-
-        <div class="preview-count" v-if="getTotalSelected() > 0">
-          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-            <path
-              d="M13 7.5A5.5 5.5 0 1 1 2 7.5a5.5 5.5 0 0 1 11 0z"
-              stroke="#ec4899"
-              stroke-width="1.5"
-            />
-            <path d="M7.5 5v3l2 1.5" stroke="#ec4899" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-          Hệ thống sẽ sinh ra <strong>{{ getCartesianCount() }} biến thể</strong>
-        </div>
-
-        <div class="card-footer-row">
-          <button class="btn-cancel" @click="currentStep = 1">← Quay lại</button>
-          <button
-            class="btn-primary"
-            :disabled="getTotalSelected() === 0"
-            @click="generateVariantsAndNext"
-          >
-            Tạo Ma trận SKU →
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- BƯỚC 3: MA TRẬN SKU MỚI -->
-    <div class="card step-card" :class="{ locked: currentStep < 3 }">
-      <div class="card-header-row">
-        <div class="card-title-group">
-          <span class="step-badge" :class="{ dim: currentStep < 3 }">03</span>
-          <div>
-            <h3 class="card-title">
-              Ma trận SKU
-              <span v-if="generatedSkus.length" class="count-pill"
-                >{{ generatedSkus.length }} biến thể</span
-              >
-            </h3>
-            <p class="card-subtitle">Điền giá bán, tồn kho và chỉnh sửa mã SKU trước khi lưu</p>
+          <div class="skug-card-footer">
+            <button
+              class="skug-btn-primary"
+              :disabled="!selectedProductId"
+              @click="currentStep = 2"
+            >
+              Tiếp tục →
+            </button>
           </div>
         </div>
       </div>
 
-      <div class="card-body" v-if="currentStep === 3 && generatedSkus.length > 0">
-        <div class="bulk-bar">
-          <div class="bulk-bar-label">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M7 1.5L8.8 5.1l4 .6-2.9 2.8.7 3.9L7 10.5l-3.6 1.9.7-3.9L1.2 5.7l4-.6L7 1.5z"
-                fill="#f472b6"
-              />
-            </svg>
-            Áp dụng hàng loạt
-          </div>
-          <div class="bulk-inputs">
-            <div class="bulk-field">
-              <label>Giá bán (₫)</label>
-              <input
-                v-model="bulkPrice"
-                type="number"
-                placeholder="VD: 29990000"
-                class="bulk-input"
-              />
+      <!-- BẢNG SKU ĐÃ TỒN TẠI TRONG CSDL -->
+      <div class="skug-card" v-if="selectedProductId && existingSkus.length > 0">
+        <div class="skug-card-header no-pointer">
+          <div class="skug-card-title-group">
+            <span class="skug-step-badge" style="background: #ecfdf5; color: #10b981">
+              <i class="fa-solid fa-database"></i>
+            </span>
+            <div>
+              <h3 class="skug-card-title">SKU Đang Hoạt Động ({{ existingSkus.length }})</h3>
+              <p class="skug-card-subtitle">
+                Các biến thể đã tồn tại. Hệ thống sẽ khóa nếu bạn tạo trùng thuộc tính với bảng này!
+              </p>
             </div>
-            <div class="bulk-field">
-              <label>Tồn kho</label>
-              <input v-model="bulkStock" type="number" placeholder="VD: 10" class="bulk-input" />
-            </div>
-            <button class="btn-bulk-apply" @click="applyBulkSettings">Áp dụng tất cả</button>
           </div>
         </div>
-
-        <div class="sku-table-wrapper">
-          <table class="sku-table">
-            <thead>
-              <tr>
-                <th class="th-variant">Biến thể</th>
-                <th class="th-sku">Mã SKU</th>
-                <th class="th-price">Giá bán (₫)</th>
-                <th class="th-stock">Tồn kho</th>
-                <th class="th-del"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- NÂNG CẤP: Gắn class bôi đỏ (is-duplicate-row) nếu biến thể đã tồn tại -->
-              <tr
-                v-for="(sku, index) in generatedSkus"
-                :key="index"
-                class="sku-row"
-                :class="{ 'is-duplicate-row': isComboExists(sku.comboValues) }"
-              >
-                <td>
-                  <div class="variant-name-cell">
-                    <div class="variant-dots">
-                      <span
-                        v-for="(val, vi) in sku.comboValues"
-                        :key="vi"
-                        class="variant-dot"
-                        :style="getColorStyle(val)"
-                        :title="val"
-                      ></span>
+        <div class="skug-card-body">
+          <div class="skug-table-wrap">
+            <table class="skug-table">
+              <thead>
+                <tr>
+                  <th>Tổ hợp biến thể</th>
+                  <th>Mã SKU</th>
+                  <th style="width: 140px">Giá gốc (₫)</th>
+                  <th style="width: 140px">Giá bán (₫)</th>
+                  <th>Tồn kho</th>
+                  <th>Hành động</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(sku, idx) in existingSkus" :key="sku.skuId" class="skug-row">
+                  <td>
+                    <div class="skug-variant-cell">
+                      <span class="skug-variant-label">
+                        {{
+                          sku.attributeValues
+                            ? sku.attributeValues.map((v) => v.valueString).join(' / ')
+                            : '---'
+                        }}
+                      </span>
                     </div>
-                    <span class="variant-label">{{ sku.variantName }}</span>
-                    <!-- Nhãn cảnh báo đỏ -->
-                    <span v-if="isComboExists(sku.comboValues)" class="badge-duplicate"
-                      >Đã có trong DB</span
+                  </td>
+                  <td>
+                    <code style="color: #db2777; font-weight: bold">{{ sku.skuCode }}</code>
+                  </td>
+                  <td style="color: #94a3b8; text-decoration: line-through">
+                    {{ formatMoney(sku.originalPrice || sku.price) }}
+                  </td>
+                  <td style="font-weight: 600">{{ formatMoney(sku.price) }}</td>
+                  <td>{{ sku.stockQuantity }}</td>
+                  <td>
+                    <button
+                      class="skug-btn-row-del"
+                      @click="confirmDeleteSku(sku.skuId, idx)"
+                      title="Vô hiệu hóa SKU"
                     >
-                  </div>
-                </td>
-
-                <td>
-                  <input
-                    v-model="sku.skuCode"
-                    @input="clearFieldError(index, 'skuCode')"
-                    class="table-input mono"
-                    :class="{
-                      'is-invalid':
-                        fieldErrors[`skus[${index}].skuCode`] || isDuplicateSku(sku.skuCode, index),
-                    }"
-                    placeholder="IP16-BLK-256"
-                  />
-                  <div class="error-text" v-if="isDuplicateSku(sku.skuCode, index)">
-                    Mã SKU bị trùng lặp!
-                  </div>
-                  <div class="error-text" v-else-if="fieldErrors[`skus[${index}].skuCode`]">
-                    {{ fieldErrors[`skus[${index}].skuCode`] }}
-                  </div>
-                </td>
-
-                <td>
-                  <input
-                    v-model="sku.price"
-                    @input="clearFieldError(index, 'price')"
-                    type="number"
-                    class="table-input"
-                    :class="{ 'is-invalid': fieldErrors[`skus[${index}].price`] }"
-                    placeholder="0"
-                    min="0"
-                  />
-                  <div class="error-text" v-if="fieldErrors[`skus[${index}].price`]">
-                    {{ fieldErrors[`skus[${index}].price`] }}
-                  </div>
-                </td>
-
-                <td>
-                  <input
-                    v-model="sku.stock"
-                    @input="clearFieldError(index, 'stock')"
-                    type="number"
-                    class="table-input narrow"
-                    :class="{ 'is-invalid': fieldErrors[`skus[${index}].stock`] }"
-                    placeholder="0"
-                    min="0"
-                  />
-                  <div class="error-text" v-if="fieldErrors[`skus[${index}].stock`]">
-                    {{ fieldErrors[`skus[${index}].stock`] }}
-                  </div>
-                </td>
-
-                <td>
-                  <button
-                    class="btn-row-del"
-                    @click="generatedSkus.splice(index, 1)"
-                    title="Xóa dòng này"
-                  >
-                    <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                      <path
-                        d="M2 3.5h9M5 3.5V2.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 .5.5v1M4 3.5l.667 7h3.666L9 3.5H4z"
-                        stroke="currentColor"
-                        stroke-width="1.5"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      />
-                    </svg>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Cảnh báo nếu có trùng lặp -->
-        <div v-if="hasAnyDuplicate" class="duplicate-warning-box">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-          Phát hiện các biến thể hoặc Mã SKU bị trùng lặp. Vui lòng xóa các dòng bị bôi đỏ hoặc đổi
-          Mã SKU trước khi lưu!
-        </div>
-
-        <div class="card-footer-row">
-          <button class="btn-cancel" @click="currentStep = 2">← Quay lại</button>
-          <button
-            class="btn-primary btn-save"
-            @click="saveAllSkus"
-            :disabled="isSaving || hasAnyDuplicate"
-          >
-            <span v-if="isSaving" class="spinner"></span>
-            {{ isSaving ? 'Đang lưu...' : `Lưu ${generatedSkus.length} SKU vào Database` }}
-          </button>
+                      <i class="fa-solid fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Modal Thông báo -->
-    <Transition name="modal">
-      <div class="modal-backdrop" v-if="alertModal.show" @click.self="alertModal.show = false">
-        <div class="modal-box alert-modal-box">
-          <div class="modal-body text-center">
-            <div class="alert-icon" :class="alertModal.type">
-              <span v-if="alertModal.type === 'success'">✓</span>
-              <span v-else>✕</span>
+      <!-- BƯỚC 2: CHỌN THUỘC TÍNH -->
+      <div
+        class="skug-card"
+        :class="{ 'is-collapsed': currentStep !== 2, 'is-locked': currentStep < 2 }"
+      >
+        <div class="skug-card-header" @click="currentStep > 2 && (currentStep = 2)">
+          <div class="skug-card-title-group">
+            <span class="skug-step-badge" :class="{ 'is-dim': currentStep < 2 }">02</span>
+            <div>
+              <h3 class="skug-card-title">Chọn Thuộc tính & Giá trị</h3>
+              <p class="skug-card-subtitle">Tick vào các giá trị muốn tạo biến thể</p>
             </div>
-            <h4 class="alert-title">
-              {{ alertModal.type === 'success' ? 'Thành công' : 'Thông báo lỗi' }}
-            </h4>
-            <p class="alert-message">{{ alertModal.message }}</p>
           </div>
-          <div class="modal-footer justify-center">
-            <button class="btn-primary" @click="alertModal.show = false">Đóng</button>
+          <div v-if="currentStep > 2" class="skug-selected-summary">
+            <span class="skug-selected-tag">{{ getTotalSelected() }} giá trị đã chọn</span>
+            <span class="skug-edit-hint">Nhấn để thay đổi</span>
+          </div>
+        </div>
+
+        <div class="skug-card-body" v-show="currentStep === 2">
+          <div class="skug-attrs-section">
+            <div v-for="attr in attributes" :key="attr.attributeId" class="skug-attr-block">
+              <div class="skug-attr-block-header">
+                <label class="skug-attr-toggle">
+                  <input
+                    type="checkbox"
+                    :checked="isAttributeSelected(attr.attributeId)"
+                    @change="toggleAttribute(attr.attributeId)"
+                  />
+                  <span class="skug-toggle-track"><span class="skug-toggle-thumb"></span></span>
+                  <span class="skug-attr-block-name">{{ attr.attributeName }}</span>
+                </label>
+                <span class="skug-attr-value-count">
+                  {{ getSelectedValueCount(attr.attributeId) }}/{{
+                    getAttrValues(attr.attributeId).length
+                  }}
+                  đã chọn
+                </span>
+              </div>
+
+              <div class="skug-values-row" v-if="isAttributeSelected(attr.attributeId)">
+                <button
+                  v-for="val in getAttrValues(attr.attributeId)"
+                  :key="val.valueId"
+                  class="skug-value-tag"
+                  :class="{ 'is-active': isValueSelected(val.valueId) }"
+                  @click="toggleValue(val)"
+                >
+                  <span class="skug-value-dot" :style="getColorStyle(val.valueString)"></span>
+                  {{ val.valueString }}
+                  <i
+                    v-if="isValueSelected(val.valueId)"
+                    class="fa-solid fa-check"
+                    style="font-size: 10px; margin-left: 4px"
+                  ></i>
+                </button>
+              </div>
+              <p v-else class="skug-attr-hint">Bật để chọn giá trị cho thuộc tính này</p>
+            </div>
+          </div>
+
+          <div class="skug-preview-count" v-if="getTotalSelected() > 0">
+            Hệ thống sẽ sinh ra <strong>{{ getCartesianCount() }} biến thể</strong>
+          </div>
+
+          <div class="skug-card-footer">
+            <button class="skug-btn-cancel" @click="currentStep = 1">← Quay lại</button>
+            <button
+              class="skug-btn-primary"
+              :disabled="getTotalSelected() === 0"
+              @click="generateVariantsAndNext"
+            >
+              Tạo Ma trận SKU →
+            </button>
           </div>
         </div>
       </div>
-    </Transition>
+
+      <!-- BƯỚC 3: MA TRẬN SKU MỚI -->
+      <div class="skug-card" :class="{ 'is-locked': currentStep < 3 }">
+        <div class="skug-card-header no-pointer">
+          <div class="skug-card-title-group">
+            <span class="skug-step-badge" :class="{ 'is-dim': currentStep < 3 }">03</span>
+            <div>
+              <h3 class="skug-card-title">
+                Ma trận SKU
+                <span v-if="generatedSkus.length" class="skug-selected-tag"
+                  >{{ generatedSkus.length }} biến thể</span
+                >
+              </h3>
+              <p class="skug-card-subtitle">
+                Điền giá bán, tồn kho và chỉnh sửa mã SKU trước khi lưu
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="skug-card-body" v-if="currentStep === 3 && generatedSkus.length > 0">
+          <div class="skug-bulk-bar">
+            <div class="skug-bulk-label">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Áp dụng hàng loạt
+            </div>
+            <div class="skug-bulk-inputs">
+              <div class="skug-bulk-field">
+                <label
+                  >Giá gốc (₫)
+                  <span style="font-weight: normal; color: #888">(Tùy chọn)</span></label
+                >
+                <input
+                  v-model="bulkOriginalPrice"
+                  type="number"
+                  placeholder="Trống = Giá bán"
+                  class="skug-bulk-input"
+                />
+              </div>
+              <div class="skug-bulk-field">
+                <label>Giá bán (₫)</label>
+                <input
+                  v-model="bulkPrice"
+                  type="number"
+                  placeholder="VD: 25000000"
+                  class="skug-bulk-input"
+                />
+              </div>
+              <div class="skug-bulk-field">
+                <label>Tồn kho</label>
+                <input
+                  v-model="bulkStock"
+                  type="number"
+                  placeholder="VD: 10"
+                  class="skug-bulk-input"
+                />
+              </div>
+              <button class="skug-btn-bulk" @click="applyBulkSettings">Áp dụng tất cả</button>
+            </div>
+          </div>
+
+          <div class="skug-table-wrap">
+            <table class="skug-table">
+              <thead>
+                <tr>
+                  <th>Biến thể</th>
+                  <th>Mã SKU</th>
+                  <th style="width: 140px">Giá gốc (₫)</th>
+                  <th style="width: 140px">Giá bán (₫)</th>
+                  <th>Tồn kho</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="(sku, index) in generatedSkus"
+                  :key="index"
+                  class="skug-row"
+                  :class="{ 'is-duplicate-row': isComboExists(sku.comboValues) }"
+                >
+                  <td>
+                    <div class="skug-variant-cell">
+                      <div class="skug-variant-dots">
+                        <span
+                          v-for="(val, vi) in sku.comboValues"
+                          :key="vi"
+                          class="skug-variant-dot"
+                          :style="getColorStyle(val)"
+                          :title="val"
+                        ></span>
+                      </div>
+                      <span class="skug-variant-label">{{ sku.variantName }}</span>
+                      <span v-if="isComboExists(sku.comboValues)" class="skug-badge-duplicate">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Đã có trong DB
+                      </span>
+                    </div>
+                  </td>
+
+                  <td>
+                    <input
+                      v-model="sku.skuCode"
+                      @input="clearFieldError(index, 'skuCode')"
+                      class="skug-table-input is-mono"
+                      :class="{
+                        'is-invalid':
+                          fieldErrors[`skus[${index}].skuCode`] ||
+                          isDuplicateSku(sku.skuCode, index),
+                      }"
+                      placeholder="VD: IP16-BLK"
+                    />
+                    <div class="skug-error-text" v-if="isDuplicateSku(sku.skuCode, index)">
+                      Mã SKU bị trùng lặp!
+                    </div>
+                    <div class="skug-error-text" v-else-if="fieldErrors[`skus[${index}].skuCode`]">
+                      {{ fieldErrors[`skus[${index}].skuCode`] }}
+                    </div>
+                  </td>
+
+                  <td>
+                    <input
+                      v-model="sku.originalPrice"
+                      @input="clearFieldError(index, 'originalPrice')"
+                      type="number"
+                      class="skug-table-input is-muted"
+                      :class="{ 'is-invalid': fieldErrors[`skus[${index}].originalPrice`] }"
+                      placeholder="Trống = Giá bán"
+                      min="0"
+                    />
+                  </td>
+
+                  <td>
+                    <input
+                      v-model="sku.price"
+                      @input="clearFieldError(index, 'price')"
+                      type="number"
+                      class="skug-table-input"
+                      :class="{ 'is-invalid': fieldErrors[`skus[${index}].price`] }"
+                      placeholder="0"
+                      min="0"
+                    />
+                    <div class="skug-error-text" v-if="fieldErrors[`skus[${index}].price`]">
+                      {{ fieldErrors[`skus[${index}].price`] }}
+                    </div>
+                  </td>
+
+                  <td>
+                    <input
+                      v-model="sku.stock"
+                      @input="clearFieldError(index, 'stock')"
+                      type="number"
+                      class="skug-table-input is-narrow"
+                      :class="{ 'is-invalid': fieldErrors[`skus[${index}].stock`] }"
+                      placeholder="0"
+                      min="0"
+                    />
+                    <div class="skug-error-text" v-if="fieldErrors[`skus[${index}].stock`]">
+                      {{ fieldErrors[`skus[${index}].stock`] }}
+                    </div>
+                  </td>
+
+                  <td>
+                    <button
+                      class="skug-btn-row-del"
+                      @click="generatedSkus.splice(index, 1)"
+                      title="Xóa dòng này"
+                    >
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-if="hasAnyDuplicate" class="skug-duplicate-warning">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            Phát hiện các biến thể đã tồn tại hoặc Mã SKU bị trùng. Vui lòng đổi Mã SKU hoặc xóa các
+            dòng bị bôi đỏ!
+          </div>
+
+          <div class="skug-card-footer">
+            <button class="skug-btn-cancel" @click="currentStep = 2">← Quay lại</button>
+            <button
+              class="skug-btn-primary"
+              @click="saveAllSkus"
+              :disabled="isSaving || hasAnyDuplicate"
+            >
+              <span v-if="isSaving" class="skug-spinner"></span>
+              {{ isSaving ? 'Đang lưu...' : `Lưu ${generatedSkus.length} SKU vào Database` }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Thông báo -->
+      <Transition name="modal">
+        <div
+          class="skug-modal-backdrop"
+          v-if="alertModal.show"
+          @click.self="alertModal.show = false"
+        >
+          <div class="skug-modal skug-alert-modal">
+            <div class="skug-modal-body skug-text-center">
+              <div class="skug-alert-icon" :class="alertModal.type">
+                <span v-if="alertModal.type === 'success'">✓</span>
+                <span v-else-if="alertModal.type === 'error'">✕</span>
+                <span v-else>!</span>
+              </div>
+              <h4 class="skug-alert-title">
+                {{ alertModal.type === 'success' ? 'Thành công' : 'Thông báo' }}
+              </h4>
+              <p class="skug-alert-message">{{ alertModal.message }}</p>
+            </div>
+            <div class="skug-modal-footer skug-justify-center">
+              <button
+                v-if="alertModal.isConfirm"
+                class="skug-btn-cancel"
+                @click="alertModal.show = false"
+              >
+                Hủy
+              </button>
+              <button
+                v-if="alertModal.isConfirm"
+                class="skug-btn-primary"
+                style="background: #ef4444"
+                @click="executeDelete"
+              >
+                Đồng ý xóa
+              </button>
+              <button v-else class="skug-btn-primary" @click="alertModal.show = false">Đóng</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </div>
   </div>
 </template>
 
@@ -526,22 +543,31 @@ const attributes = ref([])
 const attributeValues = ref({})
 const selectedAttributeIds = ref(new Set())
 const selectedValueIds = ref(new Set())
-const selectedValueObjects = ref([])
 
 const generatedSkus = ref([])
 const bulkPrice = ref('')
 const bulkStock = ref('')
+const bulkOriginalPrice = ref('') // BIẾN GIÁ GỐC HÀNG LOẠT
 const alertModal = ref({ show: false, message: '', type: 'success' })
-
-// STATE MỚI: Quản lý SKU đang hoạt động
 const existingSkus = ref([])
 
+const skuToDelete = ref(null) // SKU đang chờ xác nhận xóa
+const confirmDeleteSku = (skuId, index) => {
+  skuToDelete.value = { skuId, index } // Lưu tạm thông tin
+  alertModal.value = {
+    show: true,
+    message:
+      'Bạn chắc chắn muốn vô hiệu hóa SKU này khỏi hệ thống? Dữ liệu đơn hàng liên quan có thể bị ảnh hưởng.',
+    type: 'error',
+    isConfirm: true, // Cờ báo hiệu đây là Modal xác nhận xóa
+  }
+}
 // FORMAT TIỀN TỆ
 const formatMoney = (value) => {
   return new Intl.NumberFormat('vi-VN').format(value || 0) + '₫'
 }
 
-// Lắng nghe sự kiện chọn sản phẩm để lấy SKU cũ[cite: 41, 48]
+// ── QUẢN LÝ DỮ LIỆU CŨ ──
 watch(selectedProductId, async (newVal) => {
   if (!newVal) {
     existingSkus.value = []
@@ -555,48 +581,46 @@ watch(selectedProductId, async (newVal) => {
   }
 })
 
-// Xóa SKU cũ trực tiếp từ CSDL[cite: 40, 48]
-const deleteExistingSku = async (skuId, index) => {
-  if (!confirm('Bạn chắc chắn muốn vô hiệu hóa SKU này khỏi hệ thống?')) return
+const executeDelete = async () => {
+  if (!skuToDelete.value) return
+  const { skuId, index } = skuToDelete.value
+
   try {
     await api.delete(`/admin/skus/${skuId}`)
     existingSkus.value.splice(index, 1)
-    showAlert('Đã xóa SKU thành công!', 'success')
+    alertModal.value.show = false
+    showAlert('Đã vô hiệu hóa SKU thành công!', 'success')
   } catch (e) {
-    showAlert('Lỗi khi xóa: ' + (e.response?.data?.message || e.message), 'error')
+    alertModal.value.show = false
+    showAlert('Lỗi khi vô hiệu hóa: ' + (e.response?.data?.message || e.message), 'error')
+  } finally {
+    skuToDelete.value = null
   }
 }
 
-// KIỂM TRA TRÙNG LẶP COMBO (Ví dụ: Đỏ - 256GB đã có trong DB chưa)
+// ── THUẬT TOÁN KIỂM TRA TRÙNG LẶP ──
 const isComboExists = (comboValues) => {
   return existingSkus.value.some((sku) => {
     if (!sku.attributeValues) return false
     const existingCombo = sku.attributeValues.map((v) => v.valueString)
     if (existingCombo.length !== comboValues.length) return false
-    // Kiểm tra xem tất cả các thuộc tính của combo mới có nằm trong combo cũ không
     return comboValues.every((val) => existingCombo.includes(val))
   })
 }
 
-// KIỂM TRA TRÙNG MÃ SKU GÕ TAY[cite: 48]
 const clearFieldError = (index, fieldName) => {
   const key = `skus[${index}].${fieldName}`
-  if (fieldErrors.value[key]) {
-    delete fieldErrors.value[key]
-  }
+  if (fieldErrors.value[key]) delete fieldErrors.value[key]
 }
 
 const isDuplicateSku = (code, currentIndex) => {
   if (!code) return false
-  // Trùng trong bảng mới đang tạo
   const inNew =
     generatedSkus.value.findIndex((s, idx) => idx !== currentIndex && s.skuCode === code) !== -1
-  // Trùng mã với SKU dưới DB
   const inDb = existingSkus.value.some((s) => s.skuCode === code)
   return inNew || inDb
 }
 
-// KHÓA NÚT LƯU KHI PHÁT HIỆN LỖI (Trùng Mã SKU HOẶC Trùng Combo)
 const hasAnyDuplicate = computed(() => {
   const codes = generatedSkus.value.map((s) => s.skuCode).filter((c) => c)
   const hasDuplicateCode = new Set(codes).size !== codes.length
@@ -604,13 +628,13 @@ const hasAnyDuplicate = computed(() => {
   return hasDuplicateCode || hasExistingCombo
 })
 
-// ── API CALLS ──
+// ── API CALLS CƠ BẢN ──
 const fetchProducts = async () => {
   try {
     const res = await api.get('/admin/product', {
       params: {
         page: currentPage.value,
-        size: 9,
+        size: 8,
         keyword: searchQuery.value,
         filter: filterStatus.value,
       },
@@ -618,10 +642,7 @@ const fetchProducts = async () => {
     products.value = res.data.data?.content || res.data.data || []
     totalPages.value = res.data.data?.totalPages || 0
   } catch (error) {
-    showAlert(
-      'Không lấy được sản phẩm: ' + (error.response?.data?.message || error.message),
-      'error',
-    )
+    showAlert('Lỗi tải sản phẩm: ' + error.message, 'error')
   }
 }
 
@@ -629,12 +650,10 @@ const handleSearch = () => {
   currentPage.value = 0
   fetchProducts()
 }
-
 const handleFilterChange = () => {
   currentPage.value = 0
   fetchProducts()
 }
-
 const changePage = (page) => {
   if (page >= 0 && page < totalPages.value) {
     currentPage.value = page
@@ -646,7 +665,6 @@ const fetchAttributesAndValues = async () => {
   try {
     const attrRes = await api.get('/admin/attributes')
     attributes.value = attrRes.data?.data || []
-
     await Promise.all(
       attributes.value.map(async (attr) => {
         try {
@@ -658,7 +676,7 @@ const fetchAttributesAndValues = async () => {
       }),
     )
   } catch {
-    showAlert('Lỗi tải danh sách thuộc tính', 'error')
+    showAlert('Lỗi tải thuộc tính', 'error')
   }
 }
 
@@ -666,12 +684,11 @@ onMounted(async () => {
   await Promise.all([fetchProducts(), fetchAttributesAndValues()])
 })
 
-// ── ACTIONS ──
+// ── THAO TÁC FORM ──
 const selectProduct = (p) => {
   selectedProductId.value = p.productId
   selectedProduct.value = p
 }
-
 const getAttrValues = (attrId) => attributeValues.value[attrId] || []
 const isAttributeSelected = (attrId) => selectedAttributeIds.value.has(attrId)
 const isValueSelected = (valueId) => selectedValueIds.value.has(valueId)
@@ -684,12 +701,8 @@ const toggleAttribute = (attrId) => {
   if (set.has(attrId)) {
     set.delete(attrId)
     const vids = new Set(selectedValueIds.value)
-    const removedValueIds = new Set(getAttrValues(attrId).map((v) => v.valueId))
-    removedValueIds.forEach((id) => vids.delete(id))
+    getAttrValues(attrId).forEach((v) => vids.delete(v.valueId))
     selectedValueIds.value = vids
-    selectedValueObjects.value = selectedValueObjects.value.filter(
-      (v) => !removedValueIds.has(v.valueId),
-    )
   } else {
     set.add(attrId)
   }
@@ -698,17 +711,9 @@ const toggleAttribute = (attrId) => {
 
 const toggleValue = (val) => {
   const vids = new Set(selectedValueIds.value)
-  const vobjs = [...selectedValueObjects.value]
-  if (vids.has(val.valueId)) {
-    vids.delete(val.valueId)
-    const idx = vobjs.findIndex((v) => v.valueId === val.valueId)
-    if (idx !== -1) vobjs.splice(idx, 1)
-  } else {
-    vids.add(val.valueId)
-    vobjs.push(val)
-  }
+  if (vids.has(val.valueId)) vids.delete(val.valueId)
+  else vids.add(val.valueId)
   selectedValueIds.value = vids
-  selectedValueObjects.value = vobjs
 }
 
 const getCartesianCount = () => {
@@ -719,6 +724,7 @@ const getCartesianCount = () => {
   return perAttr.length ? perAttr.reduce((a, b) => a * b, 1) : 0
 }
 
+// ── THUẬT TOÁN GEN MÃ SKU ──
 const getInitials = (str) => {
   if (!str) return 'PRD'
   return str
@@ -740,17 +746,12 @@ const generateValueCode = (val) => {
     .replace(/[đĐ]/g, 'D')
     .replace(/[^a-zA-Z0-9 ]/g, '')
     .toUpperCase()
-
   const words = clean.split(' ').filter((w) => w.length > 0)
   if (words.length === 0) return ''
-
   if (words.length === 1 && /\d/.test(words[0])) return words[0].substring(0, 5)
   if (words.length === 1) return words[0].substring(0, 3)
-
   let code = ''
-  for (let i = 0; i < words.length - 1; i++) {
-    code += words[i][0]
-  }
+  for (let i = 0; i < words.length - 1; i++) code += words[i][0]
   code += words[words.length - 1].substring(0, 2)
   return code
 }
@@ -775,6 +776,7 @@ const generateVariantsAndNext = () => {
   generatedSkus.value = valueCombos.map((combo) => ({
     variantName: combo.map((v) => v.valueString).join(' / '),
     skuCode: `${baseCode}-${combo.map((v) => generateValueCode(v.valueString)).join('-')}`,
+    originalPrice: bulkOriginalPrice.value || '', // ÁP DỤNG GIÁ GỐC TỪ BULK BAR
     price: bulkPrice.value || '',
     stock: bulkStock.value || '',
     comboValues: combo.map((v) => v.valueString),
@@ -785,11 +787,13 @@ const generateVariantsAndNext = () => {
 
 const applyBulkSettings = () => {
   generatedSkus.value.forEach((sku) => {
+    if (bulkOriginalPrice.value !== '') sku.originalPrice = Number(bulkOriginalPrice.value)
     if (bulkPrice.value !== '') sku.price = Number(bulkPrice.value)
     if (bulkStock.value !== '') sku.stock = Number(bulkStock.value)
   })
 }
 
+// ── LƯU LÊN BACKEND ──
 const saveAllSkus = async () => {
   if (!selectedProductId.value || generatedSkus.value.length === 0) return
   isSaving.value = true
@@ -800,6 +804,7 @@ const saveAllSkus = async () => {
       productId: selectedProductId.value,
       skus: generatedSkus.value.map((sku) => ({
         skuCode: sku.skuCode,
+        originalPrice: sku.originalPrice ? Number(sku.originalPrice) : null, // GỬI GIÁ GỐC LÊN JAVA
         price: Number(sku.price),
         stock: Number(sku.stock),
         valueIds: sku.valueIds,
@@ -808,14 +813,13 @@ const saveAllSkus = async () => {
     await api.post('/admin/skus/batch', payload)
     showAlert(`Đã lưu ${generatedSkus.value.length} SKU thành công!`, 'success')
 
-    // Tự động load lại bảng SKU cũ để hiển thị cái vừa thêm
+    // Tự động load lại danh sách DB để hiển thị ngay
     const res = await api.get(`/admin/skus/product/${selectedProductId.value}`)
     existingSkus.value = res.data?.data || []
 
     generatedSkus.value = []
     selectedValueIds.value = new Set()
     selectedAttributeIds.value = new Set()
-    selectedValueObjects.value = []
     currentStep.value = 1
   } catch (error) {
     if (error.response?.status === 400 && error.response?.data?.data) {
@@ -830,7 +834,7 @@ const saveAllSkus = async () => {
 }
 
 const showAlert = (msg, type = 'success') => {
-  alertModal.value = { show: true, message: msg, type }
+  alertModal.value = { show: true, message: msg, type, isConfirm: false }
 }
 
 const colorKeywords = {
@@ -864,47 +868,3 @@ const getColorStyle = (valueStr) => {
   return { background: 'linear-gradient(135deg, #fce7f3, #fbcfe8)' }
 }
 </script>
-
-<style scoped>
-.table-input.is-invalid {
-  border-color: #ef4444 !important;
-  background-color: #fef2f2 !important;
-}
-.error-text {
-  color: #ef4444;
-  font-size: 11px;
-  font-weight: 600;
-  margin-top: 4px;
-  text-align: left;
-}
-
-/* CSS CHO PHẦN BÔI ĐỎ TRÙNG LẶP */
-.is-duplicate-row {
-  background-color: #fef2f2 !important;
-  opacity: 0.8;
-}
-
-.badge-duplicate {
-  font-size: 10px;
-  background: #ef4444;
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 8px;
-  font-weight: bold;
-}
-
-.duplicate-warning-box {
-  margin-top: 15px;
-  padding: 12px;
-  background-color: #fee2e2;
-  border: 1px solid #ef4444;
-  border-radius: 8px;
-  color: #b91c1c;
-  font-size: 13.5px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-</style>

@@ -117,6 +117,119 @@
             </div>
           </div>
 
+          <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
+            5. Nội dung Hero Trang chủ (Home.vue)
+          </h5>
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Nhãn nhỏ phía trên tiêu đề (badge)</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="settings.HOME_HERO_BADGE"
+                placeholder="VD: Cập nhật máy hot nhất 07/2026"
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tiêu đề chính (phần chữ trắng)</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="settings.HOME_HERO_TITLE"
+                placeholder="VD: Đổi mới."
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tiêu đề chính (phần chữ nhấn đỏ)</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="settings.HOME_HERO_TITLE_ACCENT"
+                placeholder="VD: Trả góp 0%."
+              />
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Đoạn mô tả ngắn dưới tiêu đề</label>
+              <textarea
+                class="form-control"
+                rows="3"
+                v-model="settings.HOME_HERO_LEAD"
+                placeholder="VD: Sở hữu ngay iPhone, iPad, Samsung Galaxy chính hãng..."
+              ></textarea>
+            </div>
+          </div>
+
+          <h5
+            class="fw-bold text-primary mb-3 border-bottom pb-2 d-flex align-items-center justify-content-between"
+          >
+            <span>6. Slide sản phẩm nổi bật (màn hình điện thoại Hero)</span>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary rounded-pill"
+              @click="addSlide"
+            >
+              <i class="fas fa-plus me-1"></i> Thêm slide
+            </button>
+          </h5>
+          <div class="mb-4">
+            <div
+              v-for="(slide, idx) in slidesData"
+              :key="idx"
+              class="row g-2 align-items-end mb-3 p-3 bg-light rounded-3 border"
+            >
+              <div class="col-md-3">
+                <label class="form-label fw-semibold small">Kicker (nhãn trên)</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model="slide.kicker"
+                  placeholder="VD: FLAGSHIP 2026"
+                />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold small">Tên sản phẩm</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model="slide.name"
+                  placeholder="VD: iPhone 17 Pro Max"
+                />
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold small">Giá hiển thị</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model="slide.price"
+                  placeholder="VD: 32.990.000đ"
+                />
+              </div>
+              <div class="col-md-2">
+                <label class="form-label fw-semibold small">Tag khuyến mãi</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  v-model="slide.tag"
+                  placeholder="VD: Trả góp 0%"
+                />
+              </div>
+              <div class="col-md-1 text-end">
+                <button
+                  type="button"
+                  class="btn btn-outline-danger btn-sm rounded-circle"
+                  title="Xóa slide này"
+                  :disabled="slidesData.length <= 1"
+                  @click="removeSlide(idx)"
+                >
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+            <div v-if="slidesData.length === 0" class="text-muted small">
+              Chưa có slide nào, bấm "Thêm slide" để tạo mới.
+            </div>
+          </div>
+
           <div class="text-end mt-5">
             <button
               type="submit"
@@ -178,7 +291,39 @@ const settings = ref({
   INSTAGRAM_URL: '',
   YOUTUBE_URL: '',
   STORE_LOCATION: '',
+  HOME_HERO_BADGE: '',
+  HOME_HERO_TITLE: '',
+  HOME_HERO_TITLE_ACCENT: '',
+  HOME_HERO_LEAD: '',
+  HOME_HERO_SLIDES: '',
 })
+
+// Slide gốc dùng làm mặc định khi DB chưa có dữ liệu HOME_HERO_SLIDES
+const defaultSlides = [
+  {
+    kicker: 'FLAGSHIP 2026',
+    name: 'Samsung Galaxy S26 Ultra',
+    price: '26.990.000đ',
+    tag: 'Trả góp 0%',
+  },
+  {
+    kicker: 'BÁN CHẠY NHẤT',
+    name: 'iPhone 17 Pro Max',
+    price: '32.990.000đ',
+    tag: 'Thu cũ trợ giá 5.000.000đ',
+  },
+  { kicker: 'ĐÁNG MUA', name: 'iPad Air M3', price: '16.990.000đ', tag: 'Tặng bút Apple Pencil' },
+]
+
+const slidesData = ref([])
+
+const addSlide = () => {
+  slidesData.value.push({ kicker: '', name: '', price: '', tag: '' })
+}
+
+const removeSlide = (idx) => {
+  slidesData.value.splice(idx, 1)
+}
 
 const loadSettings = async () => {
   try {
@@ -195,6 +340,19 @@ const loadSettings = async () => {
       const parsedMap = JSON.parse(settings.value.STORE_LOCATION)
       mapData.value = { ...mapData.value, ...parsedMap }
     }
+
+    if (settings.value.HOME_HERO_SLIDES) {
+      try {
+        const parsedSlides = JSON.parse(settings.value.HOME_HERO_SLIDES)
+        slidesData.value =
+          Array.isArray(parsedSlides) && parsedSlides.length ? parsedSlides : defaultSlides
+      } catch (e) {
+        console.error('Lỗi parse HOME_HERO_SLIDES:', e)
+        slidesData.value = defaultSlides
+      }
+    } else {
+      slidesData.value = defaultSlides
+    }
   } catch (error) {
     console.error('Lỗi tải cấu hình:', error)
     showAlert('error', 'Lỗi', 'Không thể tải cấu hình hệ thống!')
@@ -207,6 +365,7 @@ const saveSettings = async () => {
   try {
     isSaving.value = true
     settings.value.STORE_LOCATION = JSON.stringify(mapData.value)
+    settings.value.HOME_HERO_SLIDES = JSON.stringify(slidesData.value)
 
     // ĐÃ FIX: Bỏ "const res =" đi
     await api.put('/admin/settings/bulk-update', settings.value)

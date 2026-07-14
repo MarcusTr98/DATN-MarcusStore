@@ -2,10 +2,10 @@
   <!-- ===== TOP PROMO BANNER ===== -->
   <div class="top-promo-banner">
     <div class="container-fluid text-center py-1">
-      <span class="marquee-text">
-        🔥 Siêu sale tháng 7 – Giảm đến 50% | Free ship toàn quốc đơn từ 299k | Trả góp 0% lãi suất
-        mọi sản phẩm 🔥
-      </span>
+      <span class="marquee-text">{{
+        sysSettings.PROMO_TEXT ||
+        '🔥 Siêu sale tháng 7 – Giảm đến 50% | Free ship toàn quốc đơn từ 299k | Trả góp 0% lãi suất mọi sản phẩm 🔥'
+      }}</span>
     </div>
   </div>
 
@@ -17,11 +17,20 @@
       <div class="container hero-inner py-5">
         <div class="row align-items-center gy-5">
           <div class="col-lg-6">
-            <span class="badge-eyebrow">Cập nhật máy hot nhất 07/2026</span>
-            <h1 class="hero-title">Đổi mới. <span class="text-accent-red">Trả góp 0%.</span></h1>
+            <span class="badge-eyebrow">{{
+              sysSettings.HOME_HERO_BADGE || 'Cập nhật máy hot nhất 07/2026'
+            }}</span>
+            <h1 class="hero-title">
+              {{ sysSettings.HOME_HERO_TITLE || 'Đổi mới.' }}
+              <span class="text-accent-red">{{
+                sysSettings.HOME_HERO_TITLE_ACCENT || 'Trả góp 0%.'
+              }}</span>
+            </h1>
             <p class="hero-lead">
-              Sở hữu ngay iPhone, iPad, Samsung Galaxy chính hãng — trả góp 0% lãi suất, thu cũ đổi
-              mới trợ giá đến 3.000.000đ, giao hàng trong 2 giờ.
+              {{
+                sysSettings.HOME_HERO_LEAD ||
+                'Sở hữu ngay iPhone, iPad, Samsung Galaxy chính hãng — trả góp 0% lãi suất, thu cũ đổi mới trợ giá đến 3.000.000đ, giao hàng trong 2 giờ.'
+              }}
             </p>
             <div class="hero-cta d-flex gap-3 flex-wrap">
               <router-link to="/category/dien-thoai" class="btn btn-primary-red">
@@ -58,11 +67,11 @@
                   <p class="phone-date">{{ currentDate }}</p>
                   <transition name="fade" mode="out-in">
                     <div :key="activeHeroSlide" class="slide-content">
-                      <p class="slide-kicker">{{ heroSlides[activeHeroSlide].kicker }}</p>
-                      <p class="slide-name">{{ heroSlides[activeHeroSlide].name }}</p>
-                      <p class="slide-price">{{ heroSlides[activeHeroSlide].price }}</p>
+                      <p class="slide-kicker">{{ currentSlide.kicker }}</p>
+                      <p class="slide-name">{{ currentSlide.name }}</p>
+                      <p class="slide-price">{{ currentSlide.price }}</p>
                       <div class="slide-badge">
-                        <i class="fas fa-tag"></i> {{ heroSlides[activeHeroSlide].tag }}
+                        <i class="fas fa-tag"></i> {{ currentSlide.tag }}
                       </div>
                     </div>
                   </transition>
@@ -106,7 +115,7 @@
         </div>
       </section>
 
-      <!-- ============ SẢN PHẨM HOT (tách riêng để gọi API) ============ -->
+      <!-- ============ SẢN PHẨM HOT ============ -->
       <HomeHotProducts />
 
       <!-- ============ BANNER ĐÔI ============ -->
@@ -135,10 +144,14 @@
         </div>
       </section>
 
-      <!-- ============ SẢN PHẨM (component của team) ============ -->
+      <!-- ============ SẢN PHẨM ============ -->
       <ProductCard mode="standalone" />
 
+      <!-- ============ BÀI VIẾT  ============ -->
       <NewsAndInfoSection />
+
+      <!-- ============ tHÔNG TIN ============ -->
+      <ClientSlider />
     </div>
   </main>
 </template>
@@ -150,6 +163,10 @@ import FlashSaleSection from '@/layouts/home/HomeFlashSale.vue'
 import NewsAndInfoSection from '@/layouts/home/HomeNewAndInfo.vue'
 import HomeHotProducts from '@/layouts/home/HomeHotProducts.vue'
 import ProductCard from '@/components/client/ProductCard.vue'
+import ClientSlider from '@/components/client/ClientSlider.vue'
+import { useSettings } from '@/composables/useSettings'
+
+const { sysSettings, fetchSettings } = useSettings()
 
 // Data mượn từ Landing Page
 const categories = ref([
@@ -161,7 +178,9 @@ const categories = ref([
   { name: 'Ốp lưng', icon: 'fas fa-shield-alt', to: '/category/op-lung' },
 ])
 
-const heroSlides = ref([
+// Danh sách slide gốc, dùng làm fallback khi chưa cấu hình HOME_HERO_SLIDES
+// hoặc dữ liệu JSON trong DB bị lỗi định dạng
+const defaultHeroSlides = [
   {
     kicker: 'FLAGSHIP 2026',
     name: 'Samsung Galaxy S26 Ultra',
@@ -180,14 +199,34 @@ const heroSlides = ref([
     price: '16.990.000đ',
     tag: 'Tặng bút Apple Pencil',
   },
-])
+]
+
+// heroSlides lấy từ System_Settings (key HOME_HERO_SLIDES, lưu dạng JSON array),
+// admin chỉnh trong trang "Cấu hình hệ thống Website"
+const heroSlides = computed(() => {
+  if (!sysSettings.HOME_HERO_SLIDES) return defaultHeroSlides
+  try {
+    const parsed = JSON.parse(sysSettings.HOME_HERO_SLIDES)
+    return Array.isArray(parsed) && parsed.length ? parsed : defaultHeroSlides
+  } catch {
+    return defaultHeroSlides
+  }
+})
+
 const activeHeroSlide = ref(0)
 let heroSliderTimer = null
+
+// Slide đang active, chặn lỗi truy cập index nếu số slide vừa đổi ít hơn index hiện tại
+const currentSlide = computed(
+  () => heroSlides.value[activeHeroSlide.value % heroSlides.value.length] || heroSlides.value[0],
+)
 
 onMounted(() => {
   heroSliderTimer = setInterval(() => {
     activeHeroSlide.value = (activeHeroSlide.value + 1) % heroSlides.value.length
   }, 4000)
+
+  fetchSettings()
 })
 
 onUnmounted(() => {
@@ -696,6 +735,146 @@ const brandBanners = ref([
 @media (max-width: 768px) {
   .brand-banner {
     padding: 1.75rem;
+  }
+}
+
+/* ============ ĐẶC QUYỀN / ƯU ĐÃI - slider đôi ============ */
+.perk-slider {
+  --perk-accent: #f2711c;
+}
+
+.perk-slider-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.perk-slider-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--clr-ink);
+  margin: 0;
+}
+
+.perk-slider-nav {
+  display: flex;
+  gap: 10px;
+}
+
+.perk-nav-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #6b7280;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  transition: all 0.2s ease;
+}
+
+.perk-nav-btn:hover {
+  border-color: var(--perk-accent);
+  color: var(--perk-accent);
+  transform: translateY(-2px);
+}
+
+.perk-viewport {
+  overflow: hidden;
+}
+
+.perk-track {
+  display: flex;
+  transition: transform 0.45s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.perk-page {
+  flex: 0 0 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.perk-card {
+  position: relative;
+  border-radius: 18px;
+  border-left: 4px solid var(--perk-accent);
+  background: linear-gradient(135deg, #fff6ee 0%, #ffffff 55%);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+  padding: 1.75rem 1.75rem 1.6rem;
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.perk-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.1);
+}
+
+.perk-eyebrow {
+  display: block;
+  color: var(--perk-accent);
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.perk-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 800;
+  font-style: italic;
+  color: var(--clr-ink);
+  margin: 0 0 0.6rem;
+  text-transform: uppercase;
+}
+
+.perk-desc {
+  margin: 0;
+  color: var(--clr-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.perk-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 1.5rem;
+}
+
+.perk-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d8dee8;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.perk-dot.active {
+  width: 22px;
+  border-radius: 4px;
+  background: var(--perk-accent);
+}
+
+@media (max-width: 768px) {
+  .perk-page {
+    grid-template-columns: 1fr;
+  }
+
+  .perk-title {
+    font-size: 1.4rem;
+  }
+
+  .perk-card {
+    padding: 1.4rem;
   }
 }
 </style>

@@ -18,4 +18,5 @@ public class SkuBulkUpdateRequest {
         private BigDecimal price;
         private Integer stockQuantity;
     }
+
 }

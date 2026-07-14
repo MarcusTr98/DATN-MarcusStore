@@ -656,23 +656,42 @@ const chartOptions = computed(() => {
   const isToday = categories.includes(todayLabel)
 
   return {
-    chart: { type: 'bar', stacked: true, toolbar: { show: false }, fontFamily: 'Inter' },
+    chart: {
+      type: 'bar',
+      stacked: true,
+      toolbar: { show: false },
+      fontFamily: { family: 'Be Vietnam Pro', fallback: ['sans-serif'] },
+    },
     plotOptions: { bar: { columnWidth: '40%', borderRadius: 4 } },
     colors: ['#1f9d5e', '#f29c1f', '#e0445c'],
     xaxis: {
       categories,
       labels: {
         style: {
-          // Tô đậm màu cho nhãn ngày hôm nay, các ngày khác giữ màu xám như cũ
           colors: categories.map((c) => (c === todayLabel ? '#0b3d91' : '#6b7c93')),
         },
       },
     },
-    yaxis: { labels: { formatter: (val) => new Intl.NumberFormat('vi-VN').format(val) } },
+    yaxis: {
+      labels: {
+        formatter: (val) => {
+          if (val >= 1000000) {
+            return (val / 1000000).toFixed(0) + ' Tr'
+          }
+          return new Intl.NumberFormat('vi-VN').format(val)
+        },
+      },
+    },
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return new Intl.NumberFormat('vi-VN').format(val) + ' VNĐ'
+        },
+      },
+    },
     legend: { position: 'top', horizontalAlign: 'right' },
     dataLabels: { enabled: false },
     fill: { opacity: 1 },
-    // Đánh dấu cột của ngày hôm nay bằng 1 dải nền + nhãn "Hôm nay"
     annotations: {
       xaxis: isToday
         ? [
@@ -726,14 +745,16 @@ watch(totalPages, (val) => {
   if (currentPage.value > val) currentPage.value = val
 })
 
-// Thống kê tổng quan (dựa trên toàn bộ transactions, không bị ảnh hưởng bởi bộ lọc)
+// Thống kê tổng quan
 const stats = computed(() => {
-  const dataset = transactions.value
+  const dataset = filteredTransactions.value
   return {
     total: dataset.length,
     success: dataset.filter((t) => t.status === 'SUCCESS').length,
     pending: dataset.filter((t) => t.status === 'PENDING').length,
-    totalAmount: dataset.reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+    totalAmount: dataset
+      .filter((t) => t.status === 'SUCCESS')
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
   }
 })
 

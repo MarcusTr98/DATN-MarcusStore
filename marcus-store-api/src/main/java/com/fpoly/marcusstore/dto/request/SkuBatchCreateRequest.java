@@ -30,9 +30,12 @@ public class SkuBatchCreateRequest {
         @Min(value = 0, message = "Giá không được âm")
         private BigDecimal price;
 
+        @Min(value = 0, message = "Giá gốc không được âm")
+        private BigDecimal originalPrice;
+
         @NotNull(message = "Số lượng không được để trống")
         @Min(value = 0, message = "Số lượng không được âm")
-        private Integer stock; // Đã đổi tên thành 'stock' khớp 100% với JSON của VueJS
+        private Integer stock;
 
         @NotEmpty(message = "Danh sách thuộc tính không được để trống")
         private List<Integer> valueIds;
