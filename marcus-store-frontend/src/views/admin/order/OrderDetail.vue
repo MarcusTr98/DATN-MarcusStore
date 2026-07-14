@@ -134,23 +134,31 @@
                 <div class="summary-row">
                   <span>Tạm tính</span><strong>{{ formatCurrency(subTotal) }}</strong>
                 </div>
-                <div v-if="orderDetail.voucherCode" class="summary-row">
 
-                  <span>Mã giảm giá: <strong class="voucher-code">{{ orderDetail.voucherCode }}</strong></span>
+                <div v-if="orderDetail.discountAmount > 0" class="summary-row">
+                  <span
+                    >Mã giảm giá:
+                    <strong class="voucher-code">{{
+                      orderDetail.voucherCode || 'VOUCHER'
+                    }}</strong></span
+                  >
                   <strong>- {{ formatCurrency(orderDetail.discountAmount) }}</strong>
                 </div>
+
+                <div class="summary-row">
+                  <span>Phí vận chuyển</span>
+                  <strong>{{ formatCurrency(orderDetail.shippingFee) }}</strong>
+                </div>
+
                 <div
                   v-if="orderDetail.shippingSubsidy > 0"
                   class="summary-row"
                   style="color: #10b981"
                 >
-                  <span>Trợ giá vận chuyển </span>
+                  <span>Trợ giá vận chuyển</span>
                   <strong>- {{ formatCurrency(orderDetail.shippingSubsidy) }}</strong>
                 </div>
-                <div v-if="subTotal >= 5000000" class="summary-row">
-                  <span>Giảm giá vận chuyển </span>
-                  <strong>---</strong>
-                </div>
+
                 <div class="summary-row total">
                   <span>Tổng thanh toán</span><strong>{{ formatCurrency(finalAmount) }}</strong>
                 </div>
@@ -373,15 +381,15 @@ watch(
 )
 
 const orderStatusMap = {
-  PENDING:   { label: 'Chờ xác nhận',    className: 'pending' },
-  CONFIRMED: { label: 'Đã xác nhận',     className: 'confirmed' },
-  PROCESSING:{ label: 'Đang chuẩn bị',    className: 'processing' },
-  PACKED:    { label: 'Đã đóng gói',      className: 'processing' },
-  SHIPPING:  { label: 'Đang giao',        className: 'shipping' },
-  DELIVERED: { label: 'Giao thành công',  className: 'shipping' },
-  COMPLETED: { label: 'Hoàn thành',       className: 'completed' },
-  CANCELLED: { label: 'Đã hủy',           className: 'cancelled' },
-  FAILED:    { label: 'Giao thất bại',    className: 'failed' },
+  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
+  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
+  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing' },
+  PACKED: { label: 'Đã đóng gói', className: 'processing' },
+  SHIPPING: { label: 'Đang giao', className: 'shipping' },
+  DELIVERED: { label: 'Giao thành công', className: 'shipping' },
+  COMPLETED: { label: 'Hoàn thành', className: 'completed' },
+  CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
+  FAILED: { label: 'Giao thất bại', className: 'failed' },
 }
 
 const paymentStatusMap = {
@@ -421,9 +429,7 @@ const allowedTransitions = {
     { value: 'FAILED', label: 'Giao thất bại' },
   ],
 
-  DELIVERED: [
-    { value: 'COMPLETED', label: 'Đối soát hoàn tất' },
-  ],
+  DELIVERED: [{ value: 'COMPLETED', label: 'Đối soát hoàn tất' }],
   COMPLETED: [],
   CANCELLED: [],
   FAILED: [
@@ -446,7 +452,16 @@ const totalQuantity = computed(
   () => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0,
 )
 
-const finalAmount = computed(() => orderDetail.value?.finalAmount || 0)
+const finalAmount = computed(() => {
+  if (!orderDetail.value) return 0
+
+  const tempTotal = subTotal.value
+  const discount = Number(orderDetail.value.discountAmount || 0)
+  const shipFee = Number(orderDetail.value.shippingFee || 0)
+  const shipSubsidy = Number(orderDetail.value.shippingSubsidy || 0)
+
+  return tempTotal - discount + shipFee - shipSubsidy
+})
 
 const isStatusNoteRequired = computed(() => statusesRequiringNote.includes(selectedStatus.value))
 
