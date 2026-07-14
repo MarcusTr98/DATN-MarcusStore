@@ -1,25 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap');
-
-/*
-  QUAN TRỌNG: toàn bộ selector trong file này đều namespace bằng tiền tố
-  ".skug-" (SKU Generator). File này trước đây dùng chung tên class với
-  attributemanager.css (.page-wrapper, .btn-primary, .modal-box...) -> vì cả
-  2 file import global nên class nạp sau sẽ đè giá trị của file kia, đây là
-  nguyên nhân giao diện "nhảy" to/nhỏ mỗi lần F5. Namespace riêng cho từng
-  trang sẽ triệt tiêu hoàn toàn xung đột này.
-
-  Đồng thời file này đã thiếu CSS cho: .step-indicator/.step/.step-num/.step-line,
-  .product-option-info, .toggle-track/.toggle-thumb, .attr-disabled-hint,
-  .preview-count, .spinner, và transition cho modal -> đã bổ sung đầy đủ bên dưới.
-*/
-
 .skug-page,
 .skug-page * {
   box-sizing: border-box;
 }
 
 .skug-page {
-  /* ── Design tokens dùng chung khu Admin (hồng + Be Vietnam Pro) ── */
   --skug-accent: #ec4899;
   --skug-accent-dark: #db2777;
   --skug-accent-hover: #f472b6;

@@ -1,30 +1,17 @@
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap');
-
-/*
-  QUAN TRỌNG: toàn bộ selector trong file này đều được namespace bằng
-  tiền tố ".amg-" (Attribute Manager). Lý do: file này và sku.css trước đây
-  dùng chung tên class kiểu ".page-wrapper", ".btn-primary", ".modal-box"...
-  Vì cả 2 file đều import global (không phải <style scoped>), class nào
-  nạp sau sẽ đè giá trị của file kia -> đây chính là nguyên nhân giao diện
-  "nhảy" to/nhỏ mỗi lần F5 tùy vào việc bạn vừa mở trang nào trước đó.
-  Namespace riêng cho từng trang sẽ triệt tiêu hoàn toàn xung đột này.
-*/
-
 .amg-page,
 .amg-page * {
   box-sizing: border-box;
 }
 
 .amg-page {
-  /* ── Design tokens dùng riêng cho khu Admin (hồng + Be Vietnam Pro) ── */
   --amg-accent: #ec4899;
   --amg-accent-dark: #db2777;
   --amg-accent-hover: #f472b6;
   --amg-accent-light: #fdf2f8;
   --amg-accent-light-2: #fce7f3;
   --amg-accent-border: #fbcfe8;
-  --amg-bg-page: #fdf6f9;
-  --amg-bg-card: #ffffff;
+  --amg-bg-page: #fdf6frgb(35, 3, 22) --amg-bg-card: #ffffff;
   --amg-text-main: #111827;
   --amg-text-muted: #6b7280;
   --amg-text-soft: #9ca3af;
