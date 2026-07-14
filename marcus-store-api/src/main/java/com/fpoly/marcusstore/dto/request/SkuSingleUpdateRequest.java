@@ -15,6 +15,9 @@ public class SkuSingleUpdateRequest {
     @Min(value = 0, message = "Giá không được âm")
     private BigDecimal price;
 
+    @Min(value = 0, message = "Giá gốc không được âm")
+    private BigDecimal originalPrice;
+
     @NotNull(message = "Số lượng không được để trống")
     @Min(value = 0, message = "Số lượng không được âm")
     private Integer stockQuantity;

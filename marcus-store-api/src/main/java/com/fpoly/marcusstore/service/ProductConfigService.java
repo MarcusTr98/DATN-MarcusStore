@@ -34,17 +34,13 @@ public class ProductConfigService {
         Product product = productRepository.findById(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại!"));
 
-        // Dùng Set để chặn trùng lặp mã SKU ngay trong chính danh sách gửi lên
         java.util.Set<String> uniqueCodes = new java.util.HashSet<>();
 
         for (SkuBatchCreateRequest.SkuItem item : request.getSkus()) {
-            // Kiểm tra trùng lặp trong payload
             if (!uniqueCodes.add(item.getSkuCode())) {
                 throw new RuntimeException(
                         "Mã SKU [" + item.getSkuCode() + "] bị trùng lặp trong chính danh sách bạn đang tạo!");
             }
-
-            // Kiểm tra trùng lặp dưới Database
             if (skuRepository.existsBySkuCode(item.getSkuCode())) {
                 throw new RuntimeException(
                         "Mã SKU [" + item.getSkuCode() + "] đã tồn tại trong hệ thống. Vui lòng đổi mã khác!");
@@ -54,6 +50,12 @@ public class ProductConfigService {
             sku.setProduct(product);
             sku.setSkuCode(item.getSkuCode());
             sku.setPrice(item.getPrice());
+            if (item.getOriginalPrice() == null) {
+                sku.setOriginalPrice(item.getPrice());
+            } else {
+                sku.setOriginalPrice(item.getOriginalPrice());
+            }
+
             sku.setStockQuantity(item.getStock());
             sku.setWeightGram(500);
             sku.setIsActive(true);
@@ -82,12 +84,10 @@ public class ProductConfigService {
         skuRepository.saveAll(skusToUpdate);
     }
 
-    // 3. LẤY DANH SÁCH SKU THEO PRODUCT
     public List<ProductSku> getSkusByProductId(Integer productId) {
         return skuRepository.findByProductProductIdAndIsActiveTrue(productId);
     }
 
-    // 4. CẬP NHẬT 1 SKU LẺ
     @Transactional
     public ProductSku updateSingleSku(Integer skuId, BigDecimal price, Integer stockQuantity) {
         ProductSku sku = skuRepository.findById(skuId)
@@ -97,7 +97,6 @@ public class ProductConfigService {
         return skuRepository.save(sku);
     }
 
-    // 5. XÓA MỀM SKU
     @Transactional
     public void deleteSku(Integer skuId) {
         ProductSku sku = skuRepository.findById(skuId)
