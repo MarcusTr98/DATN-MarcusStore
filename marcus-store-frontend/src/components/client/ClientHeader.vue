@@ -53,6 +53,25 @@ const cancelLogout = () => {
   showLogoutModal.value = false
 }
 
+// ---- Yêu cầu đăng nhập khi Guest bấm vào Tài khoản / Yêu thích / Giỏ hàng / Theo dõi đơn hàng ----
+const showGuestModal = ref(false)
+const guestModalMessage = ref(
+  'Vui lòng đăng nhập để trải nghiệm đầy đủ các tiện ích mua sắm tại Marcus Store.',
+)
+
+const goOrPrompt = (path, message) => {
+  if (isLoggedIn.value) {
+    router.push(path)
+  } else {
+    if (message) guestModalMessage.value = message
+    showGuestModal.value = true
+  }
+}
+
+const closeGuestModal = () => {
+  showGuestModal.value = false
+}
+
 onMounted(() => {
   checkAuth()
 
@@ -99,10 +118,19 @@ onUnmounted(() => {
               <span>Liên hệ cửa hàng</span>
             </router-link>
             <span class="topbar-divider">|</span>
-            <router-link to="/profile/orders" class="topbar-item topbar-link">
+            <a
+              href="#"
+              class="topbar-item topbar-link"
+              @click.prevent="
+                goOrPrompt(
+                  '/profile/orders',
+                  'Vui lòng đăng nhập để theo dõi tình trạng đơn hàng của bạn.',
+                )
+              "
+            >
               <i class="fas fa-truck"></i>
               <span>Theo dõi đơn hàng</span>
-            </router-link>
+            </a>
           </div>
         </div>
       </div>
@@ -147,13 +175,22 @@ onUnmounted(() => {
             <!-- Account -->
             <div class="h-action">
               <template v-if="!isLoggedIn">
-                <router-link to="/auth/login" class="h-action-btn">
+                <a
+                  href="#"
+                  class="h-action-btn"
+                  @click.prevent="
+                    goOrPrompt(
+                      '/profile',
+                      'Vui lòng đăng nhập để quản lý tài khoản của bạn.',
+                    )
+                  "
+                >
                   <div class="h-action-icon"><i class="far fa-user"></i></div>
                   <div class="h-action-text">
                     <span class="h-action-sub">Đăng nhập</span>
                     <span class="h-action-main">Tài khoản</span>
                   </div>
-                </router-link>
+                </a>
               </template>
               <template v-else>
                 <div class="dropdown dropdown-hover">
@@ -192,7 +229,16 @@ onUnmounted(() => {
             </div>
 
             <!-- Wishlist -->
-            <router-link to="/profile/wishlist" class="h-action-btn">
+            <a
+              href="#"
+              class="h-action-btn"
+              @click.prevent="
+                goOrPrompt(
+                  '/profile/wishlist',
+                  'Vui lòng đăng nhập để xem danh sách sản phẩm yêu thích của bạn.',
+                )
+              "
+            >
               <div class="h-action-icon position-relative">
                 <i class="far fa-heart"></i>
                 <span v-if="wishlistCount > 0" class="cart-count">{{ wishlistCount }}</span>
@@ -201,10 +247,19 @@ onUnmounted(() => {
                 <span class="h-action-sub d-block">Yêu thích</span>
                 <span class="h-action-main d-block">Sản phẩm</span>
               </div>
-            </router-link>
+            </a>
 
             <!-- Cart -->
-            <router-link to="/cart" class="h-action-btn cart-action">
+            <a
+              href="#"
+              class="h-action-btn cart-action"
+              @click.prevent="
+                goOrPrompt(
+                  '/cart',
+                  'Vui lòng đăng nhập để xem và thanh toán giỏ hàng của bạn.',
+                )
+              "
+            >
               <div class="h-action-icon position-relative">
                 <i class="fas fa-shopping-cart"></i>
                 <span v-if="totalQuantity > 0" class="cart-count">{{ totalQuantity }}</span>
@@ -215,7 +270,7 @@ onUnmounted(() => {
                   >{{ totalMoney.toLocaleString('vi-VN') }}₫</span
                 >
               </div>
-            </router-link>
+            </a>
           </div>
         </div>
       </div>
@@ -304,6 +359,8 @@ onUnmounted(() => {
       </div>
     </nav>
   </header>
+
+  <!-- Modal xác nhận đăng xuất -->
   <BaseModal
     :visible="showLogoutModal"
     type="confirm"
@@ -313,4 +370,56 @@ onUnmounted(() => {
     @close="cancelLogout"
     @confirm="confirmLogout"
   />
+
+  <!-- Modal yêu cầu đăng nhập khi Guest bấm Tài khoản / Yêu thích / Giỏ hàng / Theo dõi đơn hàng -->
+  <!-- Viết inline trực tiếp tại đây, không tách file riêng -->
+  <Teleport to="body">
+    <transition name="guest-fade">
+      <div v-if="showGuestModal" class="guest-prompt-overlay" @click="closeGuestModal">
+        <div class="guest-prompt-modal shadow-lg" @click.stop>
+          <div class="modal-top-action">
+            <button class="close-btn-modal" @click="closeGuestModal">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+
+          <div class="modal-body text-center pt-0">
+            <div class="brand-logo-wrapper mb-4">
+              <div class="logo-icon-box shadow-sm">
+                <i class="fas fa-mobile-alt"></i>
+              </div>
+              <div class="logo-text-box">
+                <span class="text-marcus">Marcus</span>
+                <span class="text-store">STORE</span>
+              </div>
+            </div>
+
+            <h5 class="fw-bold mb-2 text-dark">Trải nghiệm tiện ích</h5>
+            <p class="text-muted mb-4 px-2" style="font-size: 14px; line-height: 1.5">
+              {{ guestModalMessage }}
+            </p>
+
+            <div class="action-buttons px-3 pb-2">
+              <router-link
+                to="/auth/login"
+                class="btn btn-primary login-btn w-100 mb-3 py-2 fw-bold shadow-sm"
+                @click="closeGuestModal"
+              >
+                Đăng nhập ngay
+              </router-link>
+              <div class="register-hint text-muted" style="font-size: 13px">
+                Chưa có tài khoản?
+                <router-link
+                  to="/auth/register"
+                  class="text-danger fw-bold text-decoration-none ms-1"
+                  @click="closeGuestModal"
+                  >Đăng ký</router-link
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+  </Teleport>
 </template>

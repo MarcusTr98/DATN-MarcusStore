@@ -37,4 +37,7 @@ public class PendingRegistration {
 
     @Column(name = "expired_at")
     private LocalDateTime expiredAt;
+
+    @Column(name = "is_newsletter_signup", nullable = false)
+    private Boolean newsletterSignup = false;
 }

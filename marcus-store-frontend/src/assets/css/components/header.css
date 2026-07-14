@@ -418,3 +418,136 @@
   color: #d70018;
   padding-left: 1.25rem; /* Hiệu ứng thụt lề nhẹ khi di chuột */
 }
+/* ==== CSS cho Modal yêu cầu đăng nhập (Guest Prompt Modal) ==== */
+.guest-prompt-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.guest-prompt-modal {
+  background: #fff;
+  width: 340px;
+  border-radius: 24px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.modal-top-action {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 16px 0;
+}
+
+.close-btn-modal {
+  background: #f1f5f9;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 14px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.close-btn-modal:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.modal-body {
+  padding: 0 24px 24px;
+}
+
+.brand-logo-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.logo-icon-box {
+  width: 48px;
+  height: 48px;
+  background: #d70018;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 24px;
+}
+
+.logo-text-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
+}
+
+.text-marcus {
+  font-size: 24px;
+  font-weight: 800;
+  color: #d70018;
+  letter-spacing: -0.5px;
+}
+
+.text-store {
+  font-size: 13px;
+  font-weight: 700;
+  color: #d70018;
+  letter-spacing: 2px;
+  opacity: 0.9;
+}
+
+.login-btn {
+  background: #d70018;
+  border: none;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+.login-btn:hover {
+  background: #b80014;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(215, 0, 24, 0.3) !important;
+}
+
+.register-hint a:hover {
+  text-decoration: underline !important;
+}
+
+.guest-fade-enter-active,
+.guest-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.guest-fade-enter-from,
+.guest-fade-leave-to {
+  opacity: 0;
+}
+.guest-fade-enter-active .guest-prompt-modal {
+  animation: guest-modal-pop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes guest-modal-pop {
+  0% {
+    transform: scale(0.8) translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}

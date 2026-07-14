@@ -4,13 +4,15 @@
       <div class="deco-circle circle-1" ref="circle1"></div>
       <div class="deco-circle circle-2" ref="circle2"></div>
       <div class="content">
-        <div class="brand">
-          <div class="menu-icon">☰</div>
+        <router-link to="/" class="brand brand-logo-link">
+          <div class="logo-icon-box">
+            <i class="fas fa-mobile-alt"></i>
+          </div>
           <div>
             <h1>MarcusStore</h1>
             <p>Chào mừng bạn đến với MarcusStore!</p>
           </div>
-        </div>
+        </router-link>
         <div class="features">
           <div class="feature-item">
             <div class="icon">
@@ -130,7 +132,15 @@
         </form>
 
         <div class="bottom-link">
-          Chưa có tài khoản? <router-link to="/auth/register">Đăng ký ngay</router-link>
+          <router-link to="/" class="back-home-btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 12H5"/>
+              <path d="M12 19 5 12l7-7"/>
+            </svg>
+            Về trang chủ
+          </router-link>
+          <span class="bottom-link-divider">|</span>
+          <span class="bottom-link-text">Chưa có tài khoản? <router-link to="/auth/register">Đăng ký ngay</router-link></span>
         </div>
       </div>
     </div>
@@ -341,5 +351,67 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
+.brand-logo-link {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
 
+.logo-icon-box {
+  width: 48px;
+  height: 48px;
+  background: #fff;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: transform 0.2s ease;
+}
+
+.logo-icon-box i {
+  color: #d70018;
+  font-size: 22px;
+}
+
+.brand-logo-link:hover .logo-icon-box {
+  transform: scale(1.05);
+}
+
+.bottom-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.bottom-link-divider {
+  color: #cbd5e1;
+}
+
+.back-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.back-home-btn:hover {
+  color: #d70018;
+  text-decoration: underline;
+}
+
+.back-home-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.back-home-btn:hover svg {
+  transform: translateX(-3px);
+}
 </style>

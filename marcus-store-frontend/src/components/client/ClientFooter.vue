@@ -140,18 +140,16 @@
           <div class="footer-col">
             <h5 class="footer-col-title">Chính sách & Hỗ trợ</h5>
             <ul class="footer-links">
-              <li><router-link to="/bao-hanh">Chính sách bảo hành</router-link></li>
-              <li><router-link to="/doi-tra">Chính sách đổi trả</router-link></li>
-              <li><router-link to="/giao-hang">Chính sách giao hàng</router-link></li>
-              <li><router-link to="/thanh-toan">Hướng dẫn thanh toán</router-link></li>
-              <li><router-link to="/bao-mat">Bảo mật thông tin</router-link></li>
-              <li><router-link to="/faq">Câu hỏi thường gặp</router-link></li>
-              <li><router-link to="/lien-he">Liên hệ với chúng tôi</router-link></li>
+              <li><a href="#" @click.prevent="showWarranty = true">Chính sách bảo hành</a></li>
+              <li><a href="#" @click.prevent="showReturn = true">Chính sách đổi trả</a></li>
+              <li><a href="#" @click.prevent="showShipping = true">Chính sách giao hàng</a></li>
+              <li><a href="#" @click.prevent="showPayment = true">Hướng dẫn thanh toán</a></li>
+              <li><a href="#" @click.prevent="showPrivacy = true">Bảo mật thông tin</a></li>
             </ul>
           </div>
 
           <!-- Newsletter -->
-          <div class="footer-col">
+          <div class="footer-col" id="newsletter">
             <h5 class="footer-col-title">Nhận ưu đãi độc quyền</h5>
             <p class="footer-newsletter-desc">
               Đăng ký nhận bản tin để nhận ngay <strong>voucher 100K</strong> và cập nhật những ưu
@@ -159,12 +157,19 @@
             </p>
             <div class="newsletter-form">
               <input
+                id="newsletterEmail"
                 type="email"
                 class="newsletter-input"
                 placeholder="Nhập địa chỉ email của bạn..."
+                v-model="newsletterEmail"
+                @keyup.enter="subscribeNewsletter"
+                @input="newsletterError = ''"
               />
-              <button class="newsletter-btn"><i class="fas fa-paper-plane me-2"></i>Đăng ký</button>
+              <button class="newsletter-btn" @click="subscribeNewsletter">
+                <i class="fas fa-paper-plane me-2"></i>Đăng ký
+              </button>
             </div>
+            <p v-if="newsletterError" class="footer-newsletter-error">{{ newsletterError }}</p>
 
             <h5 class="footer-col-title mt-4">Phương thức thanh toán</h5>
             <div class="payment-methods">
@@ -195,16 +200,57 @@
         </div>
       </div>
     </div>
+
+    <!-- Policy Modals -->
+    <warrantymodal :visible="showWarranty" @close="showWarranty = false" />
+    <returnmodal :visible="showReturn" @close="showReturn = false" />
+    <shippingmodal :visible="showShipping" @close="showShipping = false" />
+    <paymentmodal :visible="showPayment" @close="showPayment = false" />
+    <privacymodal :visible="showPrivacy" @close="showPrivacy = false" />
   </footer>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
+import Warrantymodal from '../Warrantymodal .vue'
+import Returnmodal from '../Returnmodal .vue'
+import Shippingmodal from '../Shippingmodal .vue'
+import Paymentmodal from '../Paymentmodal.vue'
+import Privacymodal from '../Privacymodal.vue'
+
 
 const { sysSettings, fetchSettings } = useSettings()
+const router = useRouter()
 
-onMounted(() => {
-  fetchSettings()
-})
+// ---- Chính sách & hỗ trợ: cờ bật/tắt từng modal ----
+const showWarranty = ref(false)
+const showReturn = ref(false)
+const showShipping = ref(false)
+const showPayment = ref(false)
+const showPrivacy = ref(false)
+
+// ---- Newsletter: nhập email -> điều hướng sang trang đăng ký, tự điền email ----
+const newsletterEmail = ref('')
+const newsletterError = ref('')
+
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+
+const subscribeNewsletter = () => {
+  const email = newsletterEmail.value.trim()
+  if (!isValidEmail(email)) {
+    newsletterError.value = 'Vui lòng nhập email hợp lệ.'
+    return
+  }
+  newsletterError.value = ''
+  router.push({
+    path: '/auth/register',
+    query: {
+      email,
+      newsletter: '1',
+    },
+  })
+}
+
 </script>
