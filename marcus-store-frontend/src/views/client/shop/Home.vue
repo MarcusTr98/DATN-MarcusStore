@@ -2,10 +2,10 @@
   <!-- ===== TOP PROMO BANNER ===== -->
   <div class="top-promo-banner">
     <div class="container-fluid text-center py-1">
-      <span class="marquee-text">
-        🔥 Siêu sale tháng 7 – Giảm đến 50% | Free ship toàn quốc đơn từ 299k | Trả góp 0% lãi suất
-        mọi sản phẩm 🔥
-      </span>
+      <span class="marquee-text">{{
+        sysSettings.PROMO_TEXT ||
+        '🔥 Siêu sale tháng 7 – Giảm đến 50% | Free ship toàn quốc đơn từ 299k | Trả góp 0% lãi suất mọi sản phẩm 🔥'
+      }}</span>
     </div>
   </div>
 
@@ -17,11 +17,20 @@
       <div class="container hero-inner py-5">
         <div class="row align-items-center gy-5">
           <div class="col-lg-6">
-            <span class="badge-eyebrow">Cập nhật máy hot nhất 07/2026</span>
-            <h1 class="hero-title">Đổi mới. <span class="text-accent-red">Trả góp 0%.</span></h1>
+            <span class="badge-eyebrow">{{
+              sysSettings.HOME_HERO_BADGE || 'Cập nhật máy hot nhất 07/2026'
+            }}</span>
+            <h1 class="hero-title">
+              {{ sysSettings.HOME_HERO_TITLE || 'Đổi mới.' }}
+              <span class="text-accent-red">{{
+                sysSettings.HOME_HERO_TITLE_ACCENT || 'Trả góp 0%.'
+              }}</span>
+            </h1>
             <p class="hero-lead">
-              Sở hữu ngay iPhone, iPad, Samsung Galaxy chính hãng — trả góp 0% lãi suất, thu cũ đổi
-              mới trợ giá đến 3.000.000đ, giao hàng trong 2 giờ.
+              {{
+                sysSettings.HOME_HERO_LEAD ||
+                'Sở hữu ngay iPhone, iPad, Samsung Galaxy chính hãng — trả góp 0% lãi suất, thu cũ đổi mới trợ giá đến 3.000.000đ, giao hàng trong 2 giờ.'
+              }}
             </p>
             <div class="hero-cta d-flex gap-3 flex-wrap">
               <router-link to="/category/dien-thoai" class="btn btn-primary-red">
@@ -150,6 +159,11 @@ import FlashSaleSection from '@/layouts/home/HomeFlashSale.vue'
 import NewsAndInfoSection from '@/layouts/home/HomeNewAndInfo.vue'
 import HomeHotProducts from '@/layouts/home/HomeHotProducts.vue'
 import ProductCard from '@/components/client/ProductCard.vue'
+import { useSettings } from '@/composables/useSettings'
+
+// Nội dung cấu hình được (Topbar khuyến mãi + khối Hero) lấy từ bảng System_Settings,
+// admin chỉnh trong "Cấu hình hệ thống Website". Có fallback text gốc nếu chưa cấu hình.
+const { sysSettings, fetchSettings } = useSettings()
 
 // Data mượn từ Landing Page
 const categories = ref([
@@ -188,6 +202,8 @@ onMounted(() => {
   heroSliderTimer = setInterval(() => {
     activeHeroSlide.value = (activeHeroSlide.value + 1) % heroSlides.value.length
   }, 4000)
+
+  fetchSettings()
 })
 
 onUnmounted(() => {

@@ -117,6 +117,48 @@
             </div>
           </div>
 
+          <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
+            5. Nội dung Hero Trang chủ (Home.vue)
+          </h5>
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <label class="form-label fw-semibold">Nhãn nhỏ phía trên tiêu đề (badge)</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="settings.HOME_HERO_BADGE"
+                placeholder="VD: Cập nhật máy hot nhất 07/2026"
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tiêu đề chính (phần chữ trắng)</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="settings.HOME_HERO_TITLE"
+                placeholder="VD: Đổi mới."
+              />
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold">Tiêu đề chính (phần chữ nhấn đỏ)</label>
+              <input
+                type="text"
+                class="form-control"
+                v-model="settings.HOME_HERO_TITLE_ACCENT"
+                placeholder="VD: Trả góp 0%."
+              />
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold">Đoạn mô tả ngắn dưới tiêu đề</label>
+              <textarea
+                class="form-control"
+                rows="3"
+                v-model="settings.HOME_HERO_LEAD"
+                placeholder="VD: Sở hữu ngay iPhone, iPad, Samsung Galaxy chính hãng..."
+              ></textarea>
+            </div>
+          </div>
+
           <div class="text-end mt-5">
             <button
               type="submit"
@@ -178,6 +220,10 @@ const settings = ref({
   INSTAGRAM_URL: '',
   YOUTUBE_URL: '',
   STORE_LOCATION: '',
+  HOME_HERO_BADGE: '',
+  HOME_HERO_TITLE: '',
+  HOME_HERO_TITLE_ACCENT: '',
+  HOME_HERO_LEAD: '',
 })
 
 const loadSettings = async () => {
