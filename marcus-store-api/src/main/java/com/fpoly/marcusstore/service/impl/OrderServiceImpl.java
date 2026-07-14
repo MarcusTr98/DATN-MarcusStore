@@ -50,10 +50,14 @@ public class OrderServiceImpl implements OrderService {
     private final UserVoucherRepository userVoucherRepository;
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
+<<<<<<< HEAD
     private final EmailService emailService;
 
     private final FlashSaleItemRepository flashSaleItemRepository;
 
+=======
+    private final FlashSaleItemRepository flashSaleItemRepository;
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED");
 

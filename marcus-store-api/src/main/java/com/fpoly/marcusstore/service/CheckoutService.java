@@ -12,11 +12,17 @@ import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
+<<<<<<< HEAD
 import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleSlotRepository;
+=======
+import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
@@ -68,8 +74,11 @@ public class CheckoutService {
     private OrderTransactionService orderTransactionService;
     @Autowired
     private FlashSaleItemRepository flashSaleItemRepository;
+<<<<<<< HEAD
     @Autowired
     private FlashSaleSlotRepository flashSaleSlotRepository;
+=======
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
     @Transactional(readOnly = true)
     public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -325,8 +334,24 @@ public class CheckoutService {
 
         Order savedOrder = orderRepository.save(order);
 
+<<<<<<< HEAD
         // (Đã cập nhật soldQuantity cho Flash Sale ngay trong vòng lặp kiểm tra cart phía trên
         //  để tránh vượt quá flashSaleQuantity và nổ CHECK constraint CK_FlashSaleItems_Qty)
+=======
+        // Cập nhật soldQuantity cho Flash Sale (chỉ khi thanh toán thành công)
+        for (CartItem cartItem : cartItems) {
+            if (cartItem.getFlashSaleSlot() != null) {
+                flashSaleItemRepository.findItemsBySlotIdWithSlot(cartItem.getFlashSaleSlot().getSlotId())
+                        .stream()
+                        .filter(item -> item.getId().getSkuId().equals(cartItem.getSku().getSkuId()))
+                        .findFirst()
+                        .ifPresent(fsi -> {
+                            fsi.setSoldQuantity(fsi.getSoldQuantity() + cartItem.getQuantity());
+                            flashSaleItemRepository.save(fsi);
+                        });
+            }
+        }
+>>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
         String transactionType = "COD".equalsIgnoreCase(savedOrder.getPaymentMethod())
                 ? "COD_COLLECTION"
