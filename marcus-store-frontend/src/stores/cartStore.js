@@ -4,7 +4,9 @@ import cartApi from '@/api/cartApi'
 
 // Convert dữ liệu backend trả về sang dữ liệu mà Cart.vue đang dùng
 function mapCartItem(item) {
-  // convert dữ liệu   từ BE sang FE
+  // Xác định có phải sản phẩm Flash Sale không
+  const isFlashSale = item.isFlashSale === true || item.isFlashSale === 'true' || !!item.flashSaleSlotId;
+
   return {
     id: item.skuId,
     cartItemId: item.cartItemId,
@@ -14,14 +16,21 @@ function mapCartItem(item) {
     // nếu BE có sẵn variantText thì dùng còn không thì nối chuỗi giữa color và storage
     variant: item.variantText || [item.color, item.storage].filter(Boolean).join(' / '),
     imageUrl: item.imageUrl,
+    // Nếu là Flash Sale: price = giá FS, originalPrice = giá gốc
+    // Nếu không: price = giá bán, originalPrice = giá gốc
     price: Number(item.price || 0),
-    originalPrice: Number(item.price || 0),
+    originalPrice: Number(item.originalPrice || item.price || 0),
     quantity: Number(item.quantity || 1),
     totalPrice: Number(item.totalPrice || 0),
     stockQuantity: Number(item.stockQuantity || 0),
+    // Dữ liệu Flash Sale
+    isFlashSale: isFlashSale,
+    flashSaleSlotId: item.flashSaleSlotId || null,
+    flashSaleSlotName: item.flashSaleSlotName || null,
+    flashSalePrice: Number(item.flashSalePrice || 0) || null,
     // Dữ liệu phục vụ giao diện hiện tại
     checked: false,
-    badge: 'Sản phẩm chính',
+    badge: isFlashSale ? '⚡ Flash Sale' : 'Sản phẩm chính',
     isAccessory: false,
     // Nếu chưa có ảnh thì dùng tạm mã SKU để hiển thị
     icon: item.skuCode || 'SP',
@@ -98,6 +107,35 @@ export const useCartStore = defineStore('cart', {
         console.error('Lỗi thêm giỏ hàng:', error)
 
         this.error = 'Thêm vào giỏ hàng thất bại'
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // Action mới: Thêm sản phẩm Flash Sale vào giỏ hàng
+    async addToCartWithFlashSale(skuId, quantity, flashSaleSlotId, flashSalePrice) {
+      try {
+        this.loading = true
+        this.error = null
+
+        const data = {
+          skuId,
+          quantity,
+          flashSaleSlotId,
+          flashSalePrice,
+        }
+
+        const res = await cartApi.addToCart(data)
+
+        this.cart = res.data
+        this.items = (res.data.items || []).map(mapCartItem)
+
+        return true
+      } catch (error) {
+        console.error('Lỗi thêm giỏ hàng Flash Sale:', error)
+
+        this.error = error.response?.data?.message || 'Thêm vào giỏ hàng thất bại'
         return false
       } finally {
         this.loading = false

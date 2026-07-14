@@ -645,25 +645,98 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         Short currentStatus = slot.getStatus();
 
-        // 3. Chặn đổi status nếu slot đang ở trạng thái đã đóng (2/3/4)
-        //    Slot ACTIVE/ENDED/CANCELLED là bất biến — chỉ scheduler được phép đổi.
-        if (currentStatus != null && currentStatus != 1) {
+        // 3. Chặn đổi status nếu slot đang ở trạng thái đã đóng (3/4)
+        //    Slot ENDED/CANCELLED là bất biến — chỉ scheduler được phép đổi.
+        //    Cho phép hủy: SCHEDULED (1) và ACTIVE (2) → CANCELLED (4)
+        if (currentStatus != null && currentStatus != 1 && currentStatus != 2) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Không thể đổi trạng thái của slot đang ở trạng thái '"
-                            + currentStatus + "'. Chỉ cho phép hủy slot SCHEDULED (status = 1).");
+                            + currentStatus + "'. Chỉ cho phép hủy slot SCHEDULED (status = 1) hoặc ACTIVE (status = 2).");
         }
 
-        // 4. Từ SCHEDULED chỉ cho đi tới CANCELLED (status = 4)
-        if (currentStatus == 1 && status != 4) {
+        // 4. Từ SCHEDULED (1) hoặc ACTIVE (2) chỉ cho đi tới CANCELLED (status = 4)
+        if ((currentStatus == 1 || currentStatus == 2) && status != 4) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Chỉ cho phép hủy slot SCHEDULED (chuyển sang CANCELLED = 4).");
+                    "Chỉ cho phép hủy slot SCHEDULED hoặc ACTIVE (chuyển sang CANCELLED = 4).");
         }
         slot.setStatus(status);
         flashSaleSlotRepository.save(slot);
         log.info("[FlashSale] Admin đổi status slot #{}: {} → {}", slotId, currentStatus, status);
         return buildSlotDetailResponse(slot);
+    }
+
+    /**
+     * Khôi phục Flash Sale đã bị hủy (CANCELLED) để tiếp tục chạy trong khoảng thời gian còn lại.
+     *
+     * Điều kiện 1: Thời gian khôi phục
+     * - Chỉ được phép khôi phục khi Flash Sale vẫn còn trong thời gian hiệu lực ban đầu.
+     * - Thời điểm thực hiện khôi phục phải cách thời điểm kết thúc (End Time) tối thiểu 1 tiếng.
+     *
+     * Điều kiện 2: Tránh trùng lặp khung giờ (No Overlapping)
+     * - Kiểm tra xem có Flash Sale nào khác đang ACTIVE (2) hoặc SCHEDULED (1)
+     *   trùng với khoảng thời gian còn lại [now, endDate] hay không.
+     * - Nếu có bất kỳ Flash Sale nào bị trùng, không cho phép khôi phục.
+     *
+     * Khi khôi phục thành công, trạng thái chuyển sang ACTIVE (2).
+     */
+    @Override
+    @Transactional
+    public FlashSaleResponse restoreFlashSale(Integer slotId) {
+        // 1. Tìm slot, 404 nếu không có
+        FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy flash sale với id: " + slotId));
+
+        // 2. Validate slot phải ở trạng thái CANCELLED (4)
+        Short currentStatus = slot.getStatus();
+        if (currentStatus != 4) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Chỉ có thể khôi phục các flash sale đã bị hủy (CANCELLED). Trạng thái hiện tại: " + currentStatus);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime endDate = slot.getEndDate();
+        LocalDateTime restoreDeadline = endDate.minusHours(1);
+
+        // 3. Điều kiện 1: Kiểm tra thời gian khôi phục
+        //    now phải < (endDate - 1 tiếng) để còn ít nhất 1 tiếng chạy
+        if (!now.isBefore(restoreDeadline)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Đã quá thời hạn khôi phục. Flash Sale kết thúc lúc " + endDate
+                            + ", phải khôi phục trước " + restoreDeadline + " (ít nhất 1 tiếng trước khi kết thúc).");
+        }
+
+        // 4. Điều kiện 2: Kiểm tra overlap với các slot khác
+        //    Tìm các slot ACTIVE (2) hoặc SCHEDULED (1) trùng với [now, endDate]
+        List<FlashSaleSlot> overlappingSlots = flashSaleSlotRepository
+                .findOverlappingSlotsForRestore(now, endDate, slotId);
+
+        if (!overlappingSlots.isEmpty()) {
+            String detail = overlappingSlots.stream()
+                    .map(s -> String.format("#%d '%s' (%s → %s, status=%d)",
+                            s.getSlotId(),
+                            s.getName(),
+                            s.getStartDate(),
+                            s.getEndDate(),
+                            s.getStatus()))
+                    .collect(Collectors.joining("; "));
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Không thể khôi phục do trùng khung giờ với các flash sale khác: " + detail);
+        }
+
+        // 5. Khôi phục: Chuyển status về ACTIVE (2) để tiếp tục chạy
+        slot.setStatus((short) 2);
+        FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
+
+        log.info("[FlashSale] Admin khôi phục slot #{}: {} → ACTIVE, endDate={}, now={}",
+                slotId, currentStatus, endDate, now);
+        return buildSlotDetailResponse(savedSlot);
     }
 
     // Kiểm tra khoảng thời gian có đang đụng với slot khác không.

@@ -62,7 +62,11 @@
                 <div class="item-details">
                   <div class="item-name">{{ item.name }}</div>
                   <div class="item-variant">{{ item.variant }}</div>
-                  <span class="item-badge" :class="{ accessory: item.isAccessory }">
+                  <!-- Badge Flash Sale cho sản phẩm FS -->
+                  <span v-if="item.isFlashSale" class="item-badge flash-sale-badge">
+                    ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
+                  </span>
+                  <span v-else class="item-badge" :class="{ accessory: item.isAccessory }">
                     {{ item.badge }}
                   </span>
                 </div>
@@ -1009,6 +1013,10 @@ function handleCheckout() {
     quantity: item.quantity,
     price: item.price,
     totalPrice: item.price * item.quantity,
+    // Thông tin Flash Sale
+    isFlashSale: item.isFlashSale || false,
+    flashSaleSlotId: item.flashSaleSlotId || null,
+    flashSaleSlotName: item.flashSaleSlotName || null,
   }))
   localStorage.setItem('selectedCartItems', JSON.stringify(selectedItemsData))
 

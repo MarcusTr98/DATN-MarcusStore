@@ -44,7 +44,7 @@
                   <strong class="meta-value">{{ selectedOrder.orderCode }}</strong>
                 </div>
                 <div class="meta-item">
-                  <span class="meta-label"><i class="fa-solid fa-credit-card"></i>Thanh toán</span>
+                  <span class="meta-label"><i class="fa-solid fa-credit-card"></i>Phương thức thanh toán</span>
                   <strong class="meta-value">{{
                     getPaymentMethodLabel(selectedOrder.paymentMethod)
                   }}</strong>
@@ -53,7 +53,15 @@
                   <span class="meta-label"
                     ><i class="fa-solid fa-circle-check"></i>Trạng thái TT</span
                   >
-                  <strong class="meta-value">{{ selectedOrder.paymentStatus || '---' }}</strong>
+                  <strong class="meta-value">
+                    {{
+                      selectedOrder.paymentStatus === 'PAID'
+                        ? 'Đã thanh toán'
+                        : selectedOrder.paymentStatus === 'UNPAID'
+                          ? 'Chưa thanh toán'
+                          : '---'
+                    }}
+                  </strong>
                 </div>
                 <div class="meta-item">
                   <span class="meta-label"><i class="fa-solid fa-truck-fast"></i>Mã vận đơn</span>

@@ -32,6 +32,11 @@ const flashSaleApi = {
     return api.patch(`/admin/flashsale/${slotId}/status`, { status })
   },
 
+  // Khôi phục flash sale đã bị hủy (CANCELLED -> ACTIVE)
+  restoreFlashSale(slotId) {
+    return api.post(`/admin/flashsale/${slotId}/restore`)
+  },
+
 
    //Lấy cây brand -> categoryL2 -> sku để admin chọn sản phẩm cho Flash Sale.
 

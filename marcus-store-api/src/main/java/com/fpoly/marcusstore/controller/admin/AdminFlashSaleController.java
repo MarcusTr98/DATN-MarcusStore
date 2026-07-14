@@ -61,7 +61,7 @@ public class AdminFlashSaleController {
             @RequestBody @Valid FlashSaleSlotRequest request) {
         return flashSaleService.updateFlashSale(slotId, request);
     }
-    // Đổi trạng thái nhanh cho slot
+    // Đổi trạng thái nhanh cho slot (hủy SCHEDULED/ACTIVE -> CANCELLED)
     @PatchMapping("/flashsale/{slotId}/status")
     public FlashSaleResponse updateFlashSaleStatus(
             @PathVariable("slotId") Integer slotId,
@@ -69,12 +69,10 @@ public class AdminFlashSaleController {
         return flashSaleService.updateFlashSaleStatus(slotId, request.getStatus());
     }
 
-    // Đổi trạng thái nhanh cho slot
-    @PatchMapping("/flashsale/{slotId}/status")
-    public FlashSaleResponse updateFlashSaleStatus(
-            @PathVariable("slotId") Integer slotId,
-            @RequestBody @Valid UpdateFlashSaleStatusRequest request) {
-        return flashSaleService.updateFlashSaleStatus(slotId, request.getStatus());
+    // Khôi phục flash sale đã bị hủy (CANCELLED -> ACTIVE)
+    @PostMapping("/flashsale/{slotId}/restore")
+    public FlashSaleResponse restoreFlashSale(@PathVariable("slotId") Integer slotId) {
+        return flashSaleService.restoreFlashSale(slotId);
     }
 
     // FE gọi khi admin nhập startDate/endDate để cảnh báo sớm.

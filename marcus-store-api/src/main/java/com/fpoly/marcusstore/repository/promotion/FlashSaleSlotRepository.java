@@ -144,4 +144,21 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
             @Param("newStartDate") LocalDateTime newStartDate,
             @Param("newEndDate") LocalDateTime newEndDate,
             @Param("excludeSlotId") Integer excludeSlotId);
+
+    // Kiểm tra overlap cho việc khôi phục flash sale đã hủy.
+    // Tìm các slot ACTIVE (2) hoặc SCHEDULED (1) trùng với khoảng [restoreStart, restoreEnd].
+    // restoreStart = thời điểm khôi phục (now), restoreEnd = endDate gốc của slot bị hủy.
+    // Logic overlap: startA < endB AND startB < endA (2 khoảng giao nhau)
+    @Query("""
+            SELECT s FROM FlashSaleSlot s
+            WHERE s.slotId <> :excludeSlotId
+              AND s.status IN (1, 2)
+              AND s.startDate < :restoreEnd
+              AND s.endDate > :restoreStart
+            ORDER BY s.startDate ASC
+            """)
+    List<FlashSaleSlot> findOverlappingSlotsForRestore(
+            @Param("restoreStart") LocalDateTime restoreStart,
+            @Param("restoreEnd") LocalDateTime restoreEnd,
+            @Param("excludeSlotId") Integer excludeSlotId);
 }

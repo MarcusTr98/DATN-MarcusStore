@@ -16,7 +16,13 @@
     </section>
 
     <!-- Hero Banner Section -->
-    <section class="flash-hero">
+    <section class="flash-hero" :class="{ 'has-banner': activeSlot?.bannerImageUrl }">
+      <!-- Banner image làm background khi có -->
+      <div v-if="activeSlot?.bannerImageUrl" class="hero-banner-bg">
+        <img :src="activeSlot.bannerImageUrl" alt="Flash Sale Banner" />
+        <div class="hero-banner-overlay"></div>
+      </div>
+
       <div class="hero-bg">
         <!-- Wave shapes -->
         <div class="wave wave-1"></div>
@@ -46,10 +52,11 @@
             <span>FLASH SALE</span>
           </div>
           <h1 class="hero-title">
-            <span class="title-line">{{ slotName }}</span>
             <span class="title-line accent">FLASH SALE</span>
+            <span class="title-line">{{ slotName }}</span>
+
           </h1>
-          <p class="hero-subtitle">Giảm đến <strong>50%++</strong> cho hàng ngàn sản phẩm công nghệ</p>
+
 
           <div class="countdown-wrapper">
             <span class="countdown-label">{{ countdownLabel || 'Kết thúc sau' }}</span>
@@ -81,7 +88,8 @@
           </div>
         </div>
 
-        <div class="hero-right">
+        <!-- Stats chỉ hiện khi không có banner -->
+        <div v-if="!activeSlot?.bannerImageUrl" class="hero-right">
           <div class="hero-stats">
             <div class="stat-item">
               <span class="stat-number">{{ stats.totalProducts || '200+' }}</span>
@@ -306,19 +314,31 @@
         <div v-if="fomoVisible" :key="fomoKey" class="fomo-progress-bar"></div>
       </div>
     </div>
+
+    <!-- Toast thông báo — Teleport ra body để tránh clip bởi overflow/transform -->
+    <Teleport to="body">
+      <Transition name="fsp-toast">
+        <div v-if="toast.show" class="fsp-toast-alert">
+          <strong>{{ toast.title }}</strong>
+          <span>{{ toast.message }}</span>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
+import { useCartStore } from '@/stores/cartStore'
 import '@/assets/css/FlashSalePage.css'
 
 const router = useRouter()
 const flashSaleStore = useFlashSaleStore()
+const cartStore = useCartStore()
 const { clientSlots, clientLoading, displaySlots, bannerStats } = storeToRefs(flashSaleStore)
 const stats = computed(() => bannerStats.value || {})
 
@@ -368,12 +388,13 @@ function mapItemToCard(item, idx) {
   const remaining = Math.max(0, Number(item.remainingQuantity ?? totalQty - soldQty))
   return {
     id: item.skuId ?? `fs-${idx}`,
+    skuId: item.skuId ?? item.id,
     name: item.productName || item.skuCode || `Sản phẩm Flash Sale #${idx + 1}`,
     slug: item.skuCode || `flash-sale-${item.skuId ?? idx}`,
     spec: item.skuCode ? `Mã: ${item.skuCode}` : 'Sản phẩm chính hãng',
     emoji: '🛍️',
     image: item.skuImageUrl || null,
-    price: Number(item.flashSalePrice ?? 0),
+    price: Number(item.flashSalePrice ?? item.originalPrice ?? 0),
     originalPrice: Number(item.originalPrice ?? item.flashSalePrice ?? 0),
     discount: item.discountPercent ?? 0,
     soldPercent,
@@ -384,6 +405,9 @@ function mapItemToCard(item, idx) {
     addingToCart: false,
     variants: deriveVariantsFromSku(item.skuCode),
     promos: derivePromoTags(item),
+    // Thêm thông tin slot để gửi khi thêm vào giỏ
+    slotId: item._slotId || null,
+    slotName: item._slotName || null,
   }
 }
 
@@ -410,7 +434,10 @@ const flashSaleProducts = computed(() => {
   const allItems = []
   for (const slot of clientSlots.value) {
     if (Array.isArray(slot.items)) {
-      for (const it of slot.items) allItems.push(it)
+      for (const it of slot.items) {
+        // Thêm slotId vào mỗi item để biết nó thuộc slot nào
+        allItems.push({ ...it, _slotId: slot.slotId })
+      }
     }
   }
   return allItems.slice(0, 12).map(mapItemToCard)
@@ -420,7 +447,41 @@ const flashSaleProducts = computed(() => {
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
 
+// ==== Toast ====
+const toast = reactive({
+  show: false,
+  type: 'warning',
+  title: '',
+  message: '',
+})
+let toastTimer = null
+function showToast({ type = 'warning', title, message }) {
+  clearTimeout(toastTimer)
+  toast.type = type
+  toast.title = title
+  toast.message = message
+  toast.show = true
+  toastTimer = setTimeout(() => {
+    toast.show = false
+  }, 2800)
+}
+
+// ==== Điều hướng sản phẩm ====
+// Chỉ cho phép click khi có slot ACTIVE (status=2); nếu không thì chặn + hiển thị toast.
+const isFlashSaleActive = computed(() => {
+  if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return false
+  return clientSlots.value.some((s) => Number(s.status) === 2)
+})
+
 const goToProduct = (product) => {
+  if (!isFlashSaleActive.value) {
+    showToast({
+      type: 'warning',
+      title: 'Oops!',
+      message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
+    })
+    return
+  }
   router.push(`/product/${product.slug}`)
 }
 
@@ -469,13 +530,77 @@ const toggleFavorite = (product) => {
   product.favorited = !product.favorited
 }
 
-// Thêm vào giỏ (UI-only — chưa gắn cart API; hiển thị tick xanh ~700ms)
-const addToCart = (product) => {
+// Thêm vào giỏ hàng - kết nối API thật với Flash Sale
+const addToCart = async (product) => {
   if (product.addingToCart) return
   product.addingToCart = true
-  setTimeout(() => {
-    product.addingToCart = false
-  }, 700)
+  
+  try {
+    // Kiểm tra xem Flash Sale có đang active không
+    if (!isFlashSaleActive.value) {
+      showToast({
+        type: 'warning',
+        title: 'Oops!',
+        message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
+      })
+      return
+    }
+
+    // Tìm slot đang active để lấy slotId
+    const activeSlot = clientSlots.value.find(s => Number(s.status) === 2)
+    
+    if (!activeSlot || !product.slotId) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: 'Không tìm thấy thông tin Flash Sale',
+      })
+      return
+    }
+
+    // Kiểm tra số lượng còn lại
+    if (product.left <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Hết hàng!',
+        message: 'Sản phẩm đã hết hàng trong Flash Sale này',
+      })
+      return
+    }
+
+    // Gọi API thêm vào giỏ với thông tin Flash Sale
+    const success = await cartStore.addToCartWithFlashSale(
+      product.skuId,           // skuId
+      1,                      // quantity
+      activeSlot.slotId,      // flashSaleSlotId
+      product.price           // flashSalePrice
+    )
+    
+    if (success) {
+      showToast({
+        type: 'success',
+        title: 'Thành công!',
+        message: 'Đã thêm vào giỏ hàng',
+      })
+    } else {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: cartStore.error || 'Không thể thêm vào giỏ',
+      })
+    }
+  } catch (error) {
+    console.error('Lỗi thêm vào giỏ:', error)
+    showToast({
+      type: 'error',
+      title: 'Lỗi!',
+      message: error.response?.data?.message || 'Không thể thêm vào giỏ hàng',
+    })
+  } finally {
+    setTimeout(() => {
+      product.addingToCart = false
+    }, 700)
+  }
 }
 
 // FOMO popup

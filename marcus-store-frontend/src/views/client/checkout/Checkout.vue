@@ -425,6 +425,10 @@
                   {{ item.variantName }}
                 </div>
                 <div class="order-item__sku">SKU: {{ item.skuCode }}</div>
+                <!-- Badge Flash Sale -->
+                <span v-if="item.isFlashSale" class="order-item__flash-sale-badge">
+                  ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
+                </span>
               </div>
               <div class="order-item__price">{{ item.totalPrice?.toLocaleString('vi-VN') }}₫</div>
             </div>

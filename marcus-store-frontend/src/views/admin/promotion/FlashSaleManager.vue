@@ -162,12 +162,23 @@
                 </button>
                 <!-- Slot SCHEDULED/UPCOMING: nút Hủy chiến dịch (SCHEDULED sẽ chuyển sang CANCELLED, các trạng thái khác sẽ xóa) -->
                 <button
-                  v-else
+                  v-else-if="Number(slot.status) === 1 || Number(slot.status) === 2"
                   class="icon-button danger ms-1"
-                  :title="Number(slot.status) === 1 ? 'Hủy chiến dịch' : 'Xóa'"
+                  :title="Number(slot.status) === 1 ? 'Hủy chiến dịch' : 'Hủy chiến dịch đang chạy'"
                   @click="openDelModal(slot)"
                 >
                   <i class="bi bi-trash3"></i>
+                </button>
+                <!-- Slot CANCELLED: nút Khôi phục -->
+                <button
+                  v-if="Number(slot.status) === 4"
+                  class="icon-button restore ms-1"
+                  :class="{ 'icon-button-disabled': !canRestoreSlot(slot) }"
+                  :title="restoreReason(slot)"
+                  :disabled="!canRestoreSlot(slot)"
+                  @click="openRestoreModal(slot)"
+                >
+                  <i class="bi bi-arrow-counterclockwise"></i>
                 </button>
               </td>
             </tr>
@@ -231,7 +242,6 @@
     <div
       class="modal-backdrop-custom"
       v-if="isModalOpen"
-      @click.self="closeModal"
     >
       <div class="flashsale-modal">
         <div class="modal-head">
@@ -890,23 +900,34 @@
               <i class="bi bi-arrow-counterclockwise"></i>Làm mới
             </button>
 
-            <!-- Ẩn hoàn toàn nút Lưu khi slot bị khóa; chỉ hiện nút Đóng -->
+            <!-- Khi slot ACTIVE đang mở (formLocked=true): hiện nút "Hủy Flash Sale" thay vì "Đóng" -->
             <button
-              v-if="!formLocked"
+              v-if="formLocked && editSlot && Number(editSlot.status) === 2"
+              type="button"
+              class="btn btn-primary-action"
+              style="background:#dc3545"
+              @click="openCancelFromModal"
+            >
+              <i class="bi bi-x-circle-fill"></i> Hủy Flash Sale
+            </button>
+            <!-- Khi slot không phải ACTIVE (formLocked=true): hiện nút Đóng -->
+            <button
+              v-else-if="formLocked"
+              type="button"
+              class="btn btn-primary-action"
+              @click="closeModal"
+            >
+              <i class="bi bi-x-circle"></i> Đóng
+            </button>
+            <!-- Khi slot SCHEDULED: hiện nút Lưu -->
+            <button
+              v-else
               type="submit"
               class="btn btn-primary-action"
               :disabled="saving || bannerUploading"
             >
               <i class="bi bi-check2-circle"></i>
               {{ saving || bannerUploading ? 'Đang xử lý...' : 'Lưu chiến dịch' }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn btn-primary-action"
-              @click="closeModal"
-            >
-              <i class="bi bi-x-circle"></i> Đóng
             </button>
           </div>
 
@@ -931,14 +952,15 @@
     <div
       class="modal-backdrop-custom"
       v-if="showDelModal"
-      @click.self="closeDelModal"
     >
       <div class="flashsale-modal flashsale-modal--sm">
         <div class="modal-head">
           <div>
             <h2>{{ isCancellingSlot ? 'Hủy chiến dịch này?' : 'Xóa chiến dịch này?' }}</h2>
             <p>{{ isCancellingSlot
-              ? 'Chiến dịch sẽ chuyển sang trạng thái "Đã hủy" và được đẩy xuống cuối bảng.'
+              ? (Number(delTarget?.status) === 2
+                ? 'Chiến dịch đang diễn ra sẽ bị hủy và chuyển sang trạng thái "Đã hủy".'
+                : 'Chiến dịch sẽ chuyển sang trạng thái "Đã hủy" và được đẩy xuống cuối bảng.')
               : 'Hành động này không thể hoàn tác.' }}
             </p>
           </div>
@@ -953,7 +975,9 @@
               <div>
                 <h3>{{ delTarget?.name }}</h3>
                 <p>{{ isCancellingSlot
-                  ? 'Chiến dịch sẽ bị hủy và có thể xem lại ở trạng thái "Đã hủy".'
+                  ? (Number(delTarget?.status) === 2
+                    ? 'Chiến dịch đang diễn ra sẽ bị hủy ngay lập tức và có thể khôi phục lại sau.'
+                    : 'Chiến dịch sẽ bị hủy và có thể xem lại ở trạng thái "Đã hủy".')
                   : 'Chiến dịch sẽ bị xóa vĩnh viễn khỏi hệ thống.' }}
                 </p>
               </div>
@@ -1007,6 +1031,49 @@
       :slot-id="detailSlotId"
       @close="closeDetailModal"
     />
+
+    <!-- RESTORE CONFIRM MODAL -->
+    <div
+      class="modal-backdrop-custom"
+      v-if="showRestoreModal"
+    >
+      <div class="flashsale-modal flashsale-modal--sm">
+        <div class="modal-head">
+          <div>
+            <h2>Khôi phục chiến dịch này?</h2>
+            <p>Chiến dịch sẽ tiếp tục chạy cho đến khi kết thúc.</p>
+          </div>
+          <button class="modal-close-btn" @click="closeRestoreModal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="voucher-form">
+          <div class="form-section">
+            <div class="section-title">
+              <span><i class="bi bi-arrow-counterclockwise"></i></span>
+              <div>
+                <h3>{{ restoreTarget?.name }}</h3>
+                <p>Flash Sale sẽ chuyển sang trạng thái "Đang diễn ra" và tiếp tục hoạt động.</p>
+              </div>
+            </div>
+            <div v-if="restoreTarget?.endDate" class="alert alert-info mt-2">
+              <i class="bi bi-info-circle-fill me-2"></i>
+              <strong>Lưu ý:</strong> Flash Sale kết thúc lúc {{ formatDateTime(restoreTarget.endDate) }}.
+              Bạn chỉ có thể khôi phục trước thời điểm này ít nhất 1 tiếng.
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-soft" @click="closeRestoreModal">
+              <i class="bi bi-x-circle"></i>Hủy bỏ
+            </button>
+            <button type="button" class="btn-primary-action" style="background:#198754" @click="confirmRestore">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Khôi phục
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 <script setup>
@@ -1228,6 +1295,29 @@ function isSlotExhausted(slot) {
   const used = slot.usedQuantity ?? 0
   const total = slot.quantityFlashSaleSlot ?? 0
   return total > 0 && used >= total
+}
+
+// Kiểm tra slot có thể khôi phục hay không (chỉ áp dụng cho CANCELLED)
+function canRestoreSlot(slot) {
+  if (Number(slot.status) !== 4) return false
+  if (!slot.endDate) return false
+  const endDate = new Date(slot.endDate)
+  const now = new Date()
+  const deadline = new Date(endDate.getTime() - 60 * 60 * 1000) // endDate - 1 tiếng
+  return now < deadline
+}
+
+// Lý do không thể khôi phục (tooltip)
+function restoreReason(slot) {
+  if (Number(slot.status) !== 4) return 'Slot không ở trạng thái đã hủy'
+  if (!slot.endDate) return 'Slot không có thông tin thời gian kết thúc'
+  const endDate = new Date(slot.endDate)
+  const now = new Date()
+  const deadline = new Date(endDate.getTime() - 60 * 60 * 1000)
+  if (now >= deadline) {
+    return `Đã quá thời hạn khôi phục (phải trước ${deadline.toLocaleString('vi-VN')})`
+  }
+  return 'Có thể khôi phục'
 }
 
 // Tooltip hiển thị thông tin sử dụng
@@ -2006,7 +2096,7 @@ const delTarget = ref(null)
 
 // Slot ở trạng thái SCHEDULED (status = 1) khi bấm Xóa sẽ được hủy (đổi sang CANCELLED = 4)
 // chứ không xóa vĩnh viễn. Cờ này dùng để đổi text/tooltip của modal xác nhận.
-const isCancellingSlot = computed(() => Number(delTarget.value?.status) === 1)
+const isCancellingSlot = computed(() => Number(delTarget.value?.status) === 1 || Number(delTarget.value?.status) === 2)
 
 function openDelModal(slot) {
   delTarget.value = slot
@@ -2018,26 +2108,68 @@ function closeDelModal() {
   delTarget.value = null
 }
 
+// === Khôi phục Flash Sale đã hủy ===
+const showRestoreModal = ref(false)
+const restoreTarget = ref(null)
+
+function openRestoreModal(slot) {
+  restoreTarget.value = slot
+  showRestoreModal.value = true
+}
+
+function closeRestoreModal() {
+  showRestoreModal.value = false
+  restoreTarget.value = null
+}
+
+// Mở modal hủy từ bên trong modal xem chi tiết (khi slot ACTIVE)
+function openCancelFromModal() {
+  if (!editSlot.value) return
+  delTarget.value = { ...editSlot.value }
+  showDelModal.value = true
+}
+
+async function confirmRestore() {
+  if (!restoreTarget.value) return
+  const target = restoreTarget.value
+
+  const ok = await flashSaleStore.restoreFlashSale(target.slotId)
+  if (ok) {
+    await loadSlots()
+    showToast({
+      type: 'success',
+      title: 'Thành công',
+      message: 'Đã khôi phục chiến dịch Flash Sale.',
+    })
+    closeRestoreModal()
+  } else {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: flashSaleStore.error || 'Không thể khôi phục Flash Sale.',
+    })
+    closeRestoreModal()
+  }
+}
+
 async function confirmDel() {
   if (!delTarget.value) return
   const target = delTarget.value
-  const isScheduled = Number(target.status) === 1
+  const currentStatus = Number(target.status)
 
-  // CHỈ những slot ở trạng thái SCHEDULED (status = 1) mới được "Hủy chiến dịch".
-  // Tất cả trạng thái khác (ACTIVE/ENDED/CANCELLED) đều đã khóa (nút Xóa bị ẩn).
-  // Giữ nhánh này để tương thích với logic cũ + defense in depth.
-  if (isScheduled) {
+  // Slot SCHEDULED (1) hoặc ACTIVE (2): hủy bằng cách đổi sang CANCELLED (4)
+  if (currentStatus === 1 || currentStatus === 2) {
     const ok = await flashSaleStore.toggleSlotStatus(target.slotId, 4)
     if (ok) {
-      const idx = slots.value.findIndex((s) => s.slotId === target.slotId)
-      if (idx !== -1) {
-        slots.value[idx] = { ...slots.value[idx], status: 4 }
-      }
+      // Đóng modal xem chi tiết nếu đang mở
+      closeModal()
       await loadSlots()
       showToast({
         type: 'success',
         title: 'Thành công',
-        message: 'Đã hủy chiến dịch Flash Sale.',
+        message: currentStatus === 2
+          ? 'Đã hủy chiến dịch đang diễn ra.'
+          : 'Đã hủy chiến dịch Flash Sale.',
       })
       closeDelModal()
     } else {
@@ -2051,19 +2183,13 @@ async function confirmDel() {
     return
   }
 
-  // Fallback: còn nhánh deleteSlotById cho trường hợp đặc biệt (hiện không dùng).
-  const ok = await flashSaleStore.deleteSlotById(target.slotId)
-  if (ok) {
-    showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
-    closeDelModal()
-  } else {
-    showToast({
-      type: 'error',
-      title: 'Lỗi',
-      message: flashSaleStore.error || 'Không thể xóa Flash Sale.',
-    })
-    closeDelModal()
-  }
+  // Trạng thái khác (ENDED/CANCELLED): không cho xóa
+  showToast({
+    type: 'warning',
+    title: 'Không thể thực hiện',
+    message: 'Flash Sale ở trạng thái này không thể xóa.',
+  })
+  closeDelModal()
 }
 
 

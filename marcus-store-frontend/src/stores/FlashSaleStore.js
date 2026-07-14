@@ -455,6 +455,32 @@ export const useFlashSaleStore = defineStore('flashSale', {
       }
     },
 
+    async restoreFlashSale(slotId) {
+      try {
+        this.loading = true
+        this.error = null
+
+        const res = await flashSaleApi.restoreFlashSale(slotId)
+        const restored = mapSlot(res.data)
+
+        const index = this.slots.findIndex((s) => s.slotId === slotId)
+        if (index !== -1) {
+          this.slots[index] = restored
+        }
+
+        return true
+      } catch (error) {
+        console.error('lỗi restoreFlashSale:', error)
+        this.error =
+          error.response?.data?.message ||
+          error.response?.data?.data ||
+          'Không thể khôi phục flash sale'
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
 
      // Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
 

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.core.ProductItem;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -45,4 +46,26 @@ public class OrderItem {
     @OneToMany(mappedBy = "orderItem")
     @JsonManagedReference
     private List<ProductItem> productItems = new ArrayList<>();
+
+    // ============================================
+    // Các trường mới cho Flash Sale (THÊM MỚI)
+    // ============================================
+    
+    // Đánh dấu sản phẩm có phải Flash Sale không
+    @Column(name = "is_flash_sale")
+    private Boolean isFlashSale = false;
+    
+    // Giá gốc trước khi giảm (để tính % giảm giá)
+    @Column(name = "original_price", precision = 18, scale = 2)
+    private BigDecimal originalPrice;
+    
+    // Tên slot Flash Sale (nếu có)
+    @Column(name = "flash_sale_slot_name", length = 100)
+    private String flashSaleSlotName;
+
+    // Entity reference để hủy đơn có thể truy cập slotId
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "flash_sale_slot_id")
+    @JsonIgnore
+    private FlashSaleSlot flashSaleSlot;
 }

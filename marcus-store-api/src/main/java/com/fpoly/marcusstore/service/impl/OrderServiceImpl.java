@@ -9,8 +9,10 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
@@ -49,6 +51,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
     private final EmailService emailService;
+
+    private final FlashSaleItemRepository flashSaleItemRepository;
+
 
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED");
 
@@ -188,6 +193,22 @@ public class OrderServiceImpl implements OrderService {
                 ProductSku sku = skuMap.get(item.getSku().getSkuId());
                 if (sku != null) {
                     sku.setStockQuantity(sku.getStockQuantity() + item.getQuantity());
+                }
+
+                // Trả lại soldQuantity cho Flash Sale nếu có
+                if (Boolean.TRUE.equals(item.getIsFlashSale())) {
+                    Integer slotId = item.getFlashSaleSlot() != null ? item.getFlashSaleSlot().getSlotId() : null;
+                    if (slotId != null) {
+                        flashSaleItemRepository.findItemsBySlotIdWithSlot(slotId)
+                                .stream()
+                                .filter(fsi -> fsi.getId().getSkuId().equals(item.getSku().getSkuId()))
+                                .findFirst()
+                                .ifPresent(fsi -> {
+                                    int newSoldQty = fsi.getSoldQuantity() - item.getQuantity();
+                                    fsi.setSoldQuantity(Math.max(0, newSoldQty));
+                                    flashSaleItemRepository.save(fsi);
+                                });
+                    }
                 }
             }
 

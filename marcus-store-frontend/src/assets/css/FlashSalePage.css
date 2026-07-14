@@ -14,6 +14,11 @@
   --flame-gold: #f59e0b;
   --neon-yellow: #fbbf24;
   --flame-gradient: linear-gradient(135deg, var(--flame-red), var(--flame-orange));
+  --fs-text-main: #ffffff;
+  --fs-text-accent: #ffc107;
+  --fs-shadow-soft: rgba(0, 0, 0, 0.55);
+  --fs-shadow-mid: rgba(0, 0, 0, 0.75);
+  --fs-shadow-deep: rgba(0, 0, 0, 0.95);
   background: var(--ms-bg);
   min-height: 100vh;
   color: var(--ms-text);
@@ -91,6 +96,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Khi có banner thì overlay gradient nhẹ lên trên ảnh */
+.flash-hero.has-banner {
+  background: none;
+}
+
+/* Background banner image */
+.hero-banner-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+.hero-banner-bg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+.hero-banner-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
 }
 .hero-bg {
   position: absolute;
@@ -193,7 +226,7 @@
 }
 .hero-content {
   position: relative;
-  z-index: 2;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -204,13 +237,16 @@
 }
 .hero-left {
   text-align: left;
-  color: #fff;
+  color: var(--fs-text-main);
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .hero-badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(10px);
   padding: 8px 16px;
   border-radius: 50px;
@@ -219,7 +255,11 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-bottom: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: var(--fs-text-main);
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .badge-icon {
   font-size: 1rem;
@@ -239,21 +279,28 @@
   display: block;
   font-size: clamp(36px, 6vw, 64px);
   text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  color: var(--fs-text-main);
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .title-line.accent {
   font-size: clamp(42px, 8vw, 80px);
-  color: #fbbf24;
-  text-shadow: 0 4px 30px rgba(251, 191, 36, 0.5);
+  color: var(--fs-text-accent);
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 4px 20px rgba(0, 0, 0, 0.3);
 }
 .hero-subtitle {
   font-size: clamp(14px, 2vw, 18px);
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 1);
   margin-bottom: 24px;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .hero-subtitle strong {
-  color: #fbbf24;
+  color: var(--fs-text-accent);
   font-weight: 800;
 }
 .countdown-wrapper {
@@ -264,9 +311,12 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.15em;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--fs-text-main);
   text-transform: uppercase;
   margin-bottom: 10px;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .countdown {
   display: inline-flex;
@@ -293,23 +343,33 @@
   border-radius: 6px;
   padding: 4px 6px;
   box-shadow: none;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .countdown .unit-label {
   font-size: 9px;
   font-weight: 700;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--fs-text-main);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .countdown .colon {
   font-size: clamp(18px, 3vw, 28px);
-  color: #fbbf24;
+  color: var(--fs-text-accent);
   font-weight: 900;
   margin: 0 2px;
+  text-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.5),
+    0 4px 20px rgba(0, 0, 0, 0.3);
 }
 .hero-right {
   text-align: center;
 }
+/* === Hero Stats === */
 .hero-stats {
   display: flex;
   align-items: center;
@@ -330,16 +390,21 @@
   font-family: 'Be Vietnam Pro', sans-serif;
   font-size: clamp(28px, 4vw, 42px);
   font-weight: 900;
-  color: #fff;
+  color: var(--fs-text-main);
   line-height: 1;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .stat-label {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--fs-text-main);
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  text-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.4),
+    0 6px 25px rgba(0, 0, 0, 0.25);
 }
 .stat-divider {
   width: 1px;
@@ -1060,4 +1125,39 @@
     transform: translateY(var(--fall-distance, 400px)) translateX(30px);
     opacity: 0;
   }
+}
+
+/* ==== Toast thông báo (Teleport ra body) ==== */
+.fsp-toast-alert {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 9999;
+  display: grid;
+  gap: 4px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 14px 16px;
+  border: 1px solid #fcd34d;
+  border-radius: 10px;
+  background: #fffbeb;
+  color: #92400e;
+  box-shadow: 0 10px 30px rgba(225, 29, 29, 0.18);
+  font-weight: 500;
+}
+.fsp-toast-alert strong {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+.fsp-toast-alert span {
+  font-size: 0.86rem;
+  color: inherit;
+}
+.fsp-toast-enter-active,
+.fsp-toast-leave-active {
+  transition: transform 0.35s ease, opacity 0.35s ease;
+}
+.fsp-toast-enter-from,
+.fsp-toast-leave-to {
+  transform: translateY(-12px);
+  opacity: 0;
 }

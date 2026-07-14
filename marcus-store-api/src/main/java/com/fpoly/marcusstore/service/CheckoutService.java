@@ -11,8 +11,10 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
@@ -61,6 +63,8 @@ public class CheckoutService {
     private ShippingService shippingService; // NÂNG CẤP: Thêm ShippingService để tính trợ giá
     @Autowired
     private OrderTransactionService orderTransactionService;
+    @Autowired
+    private FlashSaleItemRepository flashSaleItemRepository;
 
     @Transactional(readOnly = true)
     public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -143,15 +147,36 @@ public class CheckoutService {
             }
 
             sku.setStockQuantity(currentStock - buyQuantity);
+            // XỬ LÝ GIÁ FLASH SALE (THÊM MỚI)
+            BigDecimal priceAtPurchase;
+            Boolean isFlashSale = false;
+            BigDecimal originalPrice = null;
+            String flashSaleSlotName = null;
+
+            if (cartItem.getFlashSaleSlot() != null && cartItem.getFlashSalePrice() != null) {
+                // Sản phẩm Flash Sale - dùng giá Flash Sale
+                priceAtPurchase = cartItem.getFlashSalePrice();
+                isFlashSale = true;
+                originalPrice = sku.getPrice();
+                flashSaleSlotName = cartItem.getFlashSaleSlot().getName();
+            } else {
+                // Sản phẩm thường - dùng giá SKU
+                priceAtPurchase = sku.getPrice();
+            }
 
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setSku(sku);
             orderItem.setQuantity(buyQuantity);
-            orderItem.setPriceAtPurchase(sku.getPrice());
+            orderItem.setPriceAtPurchase(priceAtPurchase);
+            // Set thông tin Flash Sale (THÊM MỚI)
+            orderItem.setIsFlashSale(isFlashSale);
+            orderItem.setOriginalPrice(originalPrice);
+            orderItem.setFlashSaleSlotName(flashSaleSlotName);
+            orderItem.setFlashSaleSlot(cartItem.getFlashSaleSlot());
             order.getOrderItems().add(orderItem);
 
-            totalAmount = totalAmount.add(sku.getPrice().multiply(BigDecimal.valueOf(buyQuantity)));
+            totalAmount = totalAmount.add(priceAtPurchase.multiply(BigDecimal.valueOf(buyQuantity)));
             int itemWeight = (sku.getWeightGram() != null ? sku.getWeightGram() : 500) * buyQuantity;
             totalWeightGram += itemWeight;
         }
@@ -207,6 +232,21 @@ public class CheckoutService {
         order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
         Order savedOrder = orderRepository.save(order);
+
+        // Cập nhật soldQuantity cho Flash Sale (chỉ khi thanh toán thành công)
+        for (CartItem cartItem : cartItems) {
+            if (cartItem.getFlashSaleSlot() != null) {
+                flashSaleItemRepository.findItemsBySlotIdWithSlot(cartItem.getFlashSaleSlot().getSlotId())
+                        .stream()
+                        .filter(item -> item.getId().getSkuId().equals(cartItem.getSku().getSkuId()))
+                        .findFirst()
+                        .ifPresent(fsi -> {
+                            fsi.setSoldQuantity(fsi.getSoldQuantity() + cartItem.getQuantity());
+                            flashSaleItemRepository.save(fsi);
+                        });
+            }
+        }
+
         String transactionType = "COD".equalsIgnoreCase(savedOrder.getPaymentMethod())
                 ? "COD_COLLECTION"
                 : savedOrder.getPaymentMethod() + "_PAYMENT";
