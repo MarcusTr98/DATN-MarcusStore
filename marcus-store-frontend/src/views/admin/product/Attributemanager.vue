@@ -1,138 +1,136 @@
 <template>
-  <div class="page-wrapper">
-    <div class="page-header">
-      <div class="header-left">
-        <div class="header-icon-box">
+  <div class="amg-page">
+    <div class="amg-header">
+      <div class="amg-header-left">
+        <div class="amg-header-icon">
           <i class="fa-solid fa-tags"></i>
         </div>
-        <div class="header-text-group">
-          <p class="breadcrumb-text">Sản phẩm</p>
-          <h1 class="page-title">
+        <div>
+          <p class="amg-breadcrumb">Sản phẩm</p>
+          <h1 class="amg-title">
             Quản lý Thuộc tính
-            <span class="header-badge"><span class="badge-dot"></span>Master Data</span>
+            <span class="amg-badge"><span class="amg-badge-dot"></span>Master Data</span>
           </h1>
-          <p class="page-subtitle">
+          <p class="amg-subtitle">
             Quản lý các thuộc tính và giá trị áp dụng cho biến thể sản phẩm
           </p>
         </div>
       </div>
     </div>
 
-    <div class="main-layout">
-      <div class="panel panel-left">
-        <div class="panel-header">
-          <div class="panel-title-row">
-            <h3 class="panel-title">
-              Thuộc tính <span class="count-pill">{{ attributes.length }}</span>
+    <div class="amg-layout">
+      <div class="amg-panel">
+        <div class="amg-panel-header">
+          <div class="amg-panel-title-row">
+            <h3 class="amg-panel-title">
+              Thuộc tính <span class="amg-count-pill">{{ attributes.length }}</span>
             </h3>
-            <button class="btn-icon-add" @click="openAddAttributeModal">Thêm mới</button>
+            <button class="amg-btn-add" @click="openAddAttributeModal">Thêm mới</button>
           </div>
-          <p class="panel-subtitle">Nhấn vào một thuộc tính để xem các giá trị của nó.</p>
+          <p class="amg-panel-subtitle">Nhấn vào một thuộc tính để xem các giá trị của nó.</p>
         </div>
 
-        <div class="attr-list">
+        <div class="amg-attr-list">
           <div
             v-for="attr in attributes"
             :key="attr.attributeId"
-            class="attr-item"
-            :class="{ active: selectedAttribute?.attributeId === attr.attributeId }"
+            class="amg-attr-item"
+            :class="{ 'is-active': selectedAttribute?.attributeId === attr.attributeId }"
             @click="selectAttribute(attr)"
           >
-            <div class="attr-item-content">
-              <div class="attr-icon">A</div>
+            <div class="amg-attr-content">
+              <div class="amg-attr-icon">A</div>
               <div>
-                <p class="attr-name">{{ attr.attributeName }}</p>
-                <p class="attr-meta">{{ getValueCount(attr.attributeId) }} giá trị</p>
+                <p class="amg-attr-name">{{ attr.attributeName }}</p>
+                <p class="amg-attr-meta">{{ getValueCount(attr.attributeId) }} giá trị</p>
               </div>
             </div>
-            <div class="attr-item-actions">
-              <button class="btn-ghost-sm btn-edit" @click.stop="openEditAttributeModal(attr)">
+            <div class="amg-attr-actions">
+              <button class="amg-btn-ghost amg-btn-edit" @click.stop="openEditAttributeModal(attr)">
                 Sửa
               </button>
-              <button class="btn-ghost-sm btn-del" @click.stop="deleteAttribute(attr)">Xóa</button>
+              <button class="amg-btn-ghost amg-btn-del" @click.stop="deleteAttribute(attr)">
+                Xóa
+              </button>
             </div>
           </div>
-          <div v-if="attributes.length === 0" class="empty-state-sm">
+          <div v-if="attributes.length === 0" class="amg-empty-sm">
             <p>Chưa có thuộc tính nào.</p>
           </div>
         </div>
       </div>
 
-      <div class="panel panel-right">
+      <div class="amg-panel">
         <template v-if="selectedAttribute">
-          <div class="panel-header">
-            <div class="panel-title-row">
+          <div class="amg-panel-header">
+            <div class="amg-panel-title-row">
               <div>
-                <h3 class="panel-title">
+                <h3 class="amg-panel-title">
                   Giá trị của:
-                  <span class="highlight-name">{{ selectedAttribute.attributeName }}</span>
-                  <span class="count-pill">{{ currentValues.length }}</span>
+                  <span class="amg-highlight">{{ selectedAttribute.attributeName }}</span>
+                  <span class="amg-count-pill">{{ currentValues.length }}</span>
                 </h3>
-                <p class="panel-subtitle">Thêm, chỉnh sửa hoặc xóa các giá trị cụ thể.</p>
+                <p class="amg-panel-subtitle">Thêm, chỉnh sửa hoặc xóa các giá trị cụ thể.</p>
               </div>
-              <button class="btn-icon-add" @click="openAddValueModal">Thêm giá trị</button>
+              <button class="amg-btn-add" @click="openAddValueModal">Thêm giá trị</button>
             </div>
           </div>
 
-          <div class="values-grid">
-            <div v-for="val in currentValues" :key="val.valueId" class="value-chip-card">
+          <div class="amg-values-grid">
+            <div v-for="val in currentValues" :key="val.valueId" class="amg-value-card">
               <div
                 v-if="val.valueMeta && val.valueMeta.startsWith('#')"
-                class="value-chip-preview"
+                class="amg-value-preview"
                 :style="{ backgroundColor: val.valueMeta }"
               ></div>
-              <div
-                v-else
-                class="value-chip-preview"
-                style="
-                  background: #f1f5f9;
-                  color: #64748b;
-                  font-size: 10px;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                "
-              >
+              <div v-else class="amg-value-preview-fallback">
                 <i class="fa-solid fa-microchip"></i>
               </div>
 
-              <span class="value-chip-name">{{ val.valueString }}</span>
-              <div class="value-chip-actions">
-                <button class="btn-ghost-sm btn-edit" @click="openEditValueModal(val)">Sửa</button>
-                <button class="btn-ghost-sm btn-del" @click="deleteValue(val)">Xóa</button>
+              <span class="amg-value-name">{{ val.valueString }}</span>
+              <div class="amg-value-actions">
+                <button class="amg-btn-ghost amg-btn-edit" @click="openEditValueModal(val)">
+                  Sửa
+                </button>
+                <button class="amg-btn-ghost amg-btn-del" @click="deleteValue(val)">Xóa</button>
               </div>
             </div>
-            <div v-if="currentValues.length === 0" class="empty-state-sm" style="grid-column: 1/-1">
+            <div v-if="currentValues.length === 0" class="amg-empty-sm" style="grid-column: 1/-1">
               <p>Chưa có giá trị nào. Hãy thêm mới!</p>
             </div>
           </div>
         </template>
-        <div v-else class="no-selection-state">
-          <p class="no-selection-text">Chọn một thuộc tính bên trái để quản lý giá trị</p>
+        <div v-else class="amg-empty-panel">
+          <p class="amg-empty-panel-text">Chọn một thuộc tính bên trái để quản lý giá trị</p>
         </div>
       </div>
     </div>
 
+    <!-- MODAL: THÊM / SỬA THUỘC TÍNH -->
     <Transition name="modal">
-      <div class="modal-backdrop" v-if="modalAttr.show" @click.self="modalAttr.show = false">
-        <div class="modal-box">
-          <div class="modal-header">
+      <div class="amg-modal-backdrop" v-if="modalAttr.show" @click.self="modalAttr.show = false">
+        <div class="amg-modal">
+          <div class="amg-modal-header">
             <h4>{{ modalAttr.isEdit ? 'Sửa Thuộc tính' : 'Thêm Thuộc tính mới' }}</h4>
-            <button class="modal-close" @click="modalAttr.show = false">✕</button>
+            <button class="amg-modal-close" @click="modalAttr.show = false">✕</button>
           </div>
-          <div class="modal-body">
-            <label class="form-label">Tên thuộc tính</label>
+          <div class="amg-modal-body">
+            <label class="amg-label">Tên thuộc tính</label>
             <input
               v-model="modalAttr.name"
-              class="form-input"
+              class="amg-input"
               placeholder="VD: Màu sắc, Bộ nhớ..."
               @keyup.enter="saveAttribute"
               autofocus
             />
           </div>
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="modalAttr.show = false">Hủy</button>
-            <button class="btn-primary" @click="saveAttribute" :disabled="!modalAttr.name.trim()">
+          <div class="amg-modal-footer">
+            <button class="amg-btn-cancel" @click="modalAttr.show = false">Hủy</button>
+            <button
+              class="amg-btn-primary"
+              @click="saveAttribute"
+              :disabled="!modalAttr.name.trim()"
+            >
               {{ modalAttr.isEdit ? 'Lưu thay đổi' : 'Tạo thuộc tính' }}
             </button>
           </div>
@@ -140,28 +138,29 @@
       </div>
     </Transition>
 
+    <!-- MODAL: THÊM / SỬA GIÁ TRỊ -->
     <Transition name="modal">
-      <div class="modal-backdrop" v-if="modalVal.show" @click.self="modalVal.show = false">
-        <div class="modal-box">
-          <div class="modal-header">
+      <div class="amg-modal-backdrop" v-if="modalVal.show" @click.self="modalVal.show = false">
+        <div class="amg-modal">
+          <div class="amg-modal-header">
             <h4>{{ modalVal.isEdit ? 'Sửa Giá trị' : 'Thêm Giá trị mới' }}</h4>
-            <button class="modal-close" @click="modalVal.show = false">✕</button>
+            <button class="amg-modal-close" @click="modalVal.show = false">✕</button>
           </div>
 
-          <div class="modal-body">
-            <label class="form-label">
+          <div class="amg-modal-body">
+            <label class="amg-label">
               Giá trị thuộc tính:
-              <strong style="color: #db2777">{{ selectedAttribute?.attributeName }}</strong>
+              <strong class="amg-highlight">{{ selectedAttribute?.attributeName }}</strong>
             </label>
 
-            <div class="input-with-unit">
+            <div class="amg-input-unit-row">
               <input
                 v-model="modalVal.value"
-                class="form-input"
+                class="amg-input"
                 :placeholder="inputPlaceholder"
                 @keyup.enter="saveValue"
               />
-              <select v-model="modalVal.unit" class="form-input select-unit">
+              <select v-model="modalVal.unit" class="amg-input amg-select-unit">
                 <option value="">(Thường)</option>
                 <option value="COLOR">Màu sắc</option>
                 <option value="GB">GB</option>
@@ -171,39 +170,36 @@
               </select>
             </div>
 
-            <div v-if="modalVal.unit === 'COLOR'" class="dynamic-section">
-              <label class="form-label" style="font-size: 11px">Mã màu hiển thị trên Website</label>
-              <div class="color-swatches">
+            <div v-if="modalVal.unit === 'COLOR'" class="amg-dynamic">
+              <label class="amg-label" style="font-size: 11px">Mã màu hiển thị trên Website</label>
+              <div class="amg-color-swatches">
                 <button
                   v-for="(color, idx) in predefinedColors"
                   :key="idx"
-                  class="color-swatch-btn"
-                  :class="{ active: modalVal.colorHex === color.hex }"
+                  class="amg-color-swatch"
+                  :class="{ 'is-active': modalVal.colorHex === color.hex }"
                   :style="{ backgroundColor: color.hex }"
                   :title="color.name"
                   @click="modalVal.colorHex = color.hex"
                 ></button>
 
                 <div
-                  class="color-custom-wrapper"
+                  class="amg-color-custom"
                   :style="{ borderColor: modalVal.colorHex ? modalVal.colorHex : '#d1d5db' }"
                 >
-                  <input type="color" v-model="modalVal.colorHex" class="color-custom-input" />
-                  <span class="color-custom-label">Khác</span>
+                  <input type="color" v-model="modalVal.colorHex" class="amg-color-custom-input" />
+                  <span class="amg-color-custom-label">Khác</span>
                 </div>
               </div>
             </div>
 
-            <div
-              v-else-if="['GB', 'TB', 'mAh', 'W'].includes(modalVal.unit)"
-              class="dynamic-section"
-            >
-              <label class="form-label" style="font-size: 11px">Gợi ý bấm nhanh</label>
-              <div class="quick-suggest-row">
+            <div v-else-if="['GB', 'TB', 'mAh', 'W'].includes(modalVal.unit)" class="amg-dynamic">
+              <label class="amg-label" style="font-size: 11px">Gợi ý bấm nhanh</label>
+              <div class="amg-suggest-row">
                 <button
                   v-for="sug in quickSuggestions[modalVal.unit]"
                   :key="sug"
-                  class="suggest-pill"
+                  class="amg-suggest-pill"
                   @click="modalVal.value = sug"
                 >
                   {{ sug }}
@@ -211,17 +207,17 @@
               </div>
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="modalVal.show = false">Hủy</button>
+          <div class="amg-modal-footer">
+            <button class="amg-btn-cancel" @click="modalVal.show = false">Hủy</button>
             <button
               v-if="!modalVal.isEdit"
-              class="btn-secondary"
+              class="amg-btn-secondary"
               @click="saveValueAndContinue"
               :disabled="!modalVal.value.trim()"
             >
               Lưu & thêm tiếp
             </button>
-            <button class="btn-primary" @click="saveValue" :disabled="!modalVal.value.trim()">
+            <button class="amg-btn-primary" @click="saveValue" :disabled="!modalVal.value.trim()">
               Lưu
             </button>
           </div>
@@ -229,37 +225,44 @@
       </div>
     </Transition>
 
+    <!-- MODAL: ALERT -->
     <Transition name="modal">
-      <div class="modal-backdrop" v-if="alertModal.show" @click.self="alertModal.show = false">
-        <div class="modal-box alert-modal-box">
-          <div class="modal-body text-center">
-            <div class="alert-icon" :class="alertModal.type">
+      <div class="amg-modal-backdrop" v-if="alertModal.show" @click.self="alertModal.show = false">
+        <div class="amg-modal amg-alert-modal">
+          <div class="amg-modal-body amg-text-center">
+            <div
+              class="amg-alert-icon"
+              :class="alertModal.type === 'success' ? 'is-success' : 'is-error'"
+            >
               <span v-if="alertModal.type === 'success'">✓</span><span v-else>✕</span>
             </div>
-            <h4 class="alert-title">
+            <h4 class="amg-alert-title">
               {{ alertModal.type === 'success' ? 'Thành công' : 'Thông báo lỗi' }}
             </h4>
-            <p class="alert-message">{{ alertModal.message }}</p>
+            <p class="amg-alert-message">{{ alertModal.message }}</p>
           </div>
-          <div class="modal-footer justify-center">
-            <button class="btn-primary" @click="alertModal.show = false">Đóng</button>
+          <div class="amg-modal-footer amg-justify-center">
+            <button class="amg-btn-primary" @click="alertModal.show = false">Đóng</button>
           </div>
         </div>
       </div>
     </Transition>
 
+    <!-- MODAL: XÁC NHẬN XÓA -->
     <Transition name="modal">
-      <div class="modal-backdrop" v-if="confirmModal.show" @click.self="confirmModal.show = false">
-        <div class="modal-box alert-modal-box">
-          <div class="modal-body text-center">
-            <h4 class="alert-title">Xác nhận xóa</h4>
-            <p class="alert-message">{{ confirmModal.message }}</p>
+      <div
+        class="amg-modal-backdrop"
+        v-if="confirmModal.show"
+        @click.self="confirmModal.show = false"
+      >
+        <div class="amg-modal amg-alert-modal">
+          <div class="amg-modal-body amg-text-center">
+            <h4 class="amg-alert-title">Xác nhận xóa</h4>
+            <p class="amg-alert-message">{{ confirmModal.message }}</p>
           </div>
-          <div class="modal-footer justify-center">
-            <button class="btn-cancel" @click="confirmModal.show = false">Hủy</button>
-            <button class="btn-primary" style="background: #ef4444" @click="confirmDelete">
-              Xóa
-            </button>
+          <div class="amg-modal-footer amg-justify-center">
+            <button class="amg-btn-cancel" @click="confirmModal.show = false">Hủy</button>
+            <button class="amg-btn-primary amg-btn-danger" @click="confirmDelete">Xóa</button>
           </div>
         </div>
       </div>
@@ -270,7 +273,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import api from '@/utils/api'
-import '@/assets/css/AttributeManager.css'
+import '@/assets/css/attributemanager.css'
 
 // ── CẤU HÌNH GỢI Ý NHANH VÀ BẢNG MÀU ──
 const predefinedColors = [
@@ -492,67 +495,3 @@ const showAlert = (msg, type = 'success') => {
   alertModal.value = { show: true, message: msg, type }
 }
 </script>
-
-<style scoped>
-/* Khối Nhập liệu + Đơn vị */
-.input-with-unit {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.select-unit {
-  width: 110px;
-  flex-shrink: 0;
-  cursor: pointer;
-  background-color: #fff9fc;
-  color: #db2777;
-  font-weight: 700;
-}
-
-/* Khu vực hiển thị Động (Dynamic Section) */
-.dynamic-section {
-  margin-top: 14px;
-  padding: 12px;
-  background: #fdf6f9;
-  border: 1px dashed #fce7f3;
-  border-radius: 12px;
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Gợi ý Bấm nhanh (Quick Suggest Pills) */
-.quick-suggest-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.suggest-pill {
-  background: #fff;
-  border: 1.5px solid #fce7f3;
-  color: #db2777;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: 0.15s;
-}
-
-.suggest-pill:hover {
-  background: #fdf2f8;
-  border-color: #f9a8d4;
-  transform: translateY(-1px);
-}
-</style>
