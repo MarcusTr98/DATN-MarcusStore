@@ -1,0 +1,421 @@
+.cm-page {
+  position: relative;
+  min-height: calc(100vh - 64px);
+  background: #fff7fa;
+  color: #202636;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+.cm-shell {
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ========== Hero ========== */
+.cm-hero,
+.cm-toolbar,
+.cm-table-panel,
+.cm-stat-card {
+  border: 1px solid #f3d6e3;
+  background: #ffffff;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.cm-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 20px 24px;
+  border-radius: 8px;
+}
+
+.cm-hero-title {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.cm-hero-icon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 8px;
+  background: #f55d9b;
+  color: #ffffff;
+  font-size: 1.45rem;
+}
+
+.cm-hero-title h1 {
+  margin: 0;
+  color: #f55d9b;
+  font-size: 1.45rem;
+  font-weight: 800;
+}
+
+.cm-hero-title p {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 576px) {
+  .cm-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 16px;
+  }
+}
+
+/* ========== Stats ========== */
+.cm-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 992px) {
+  .cm-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.cm-stat-card {
+  padding: 20px 18px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100px;
+}
+
+.cm-stat-card span {
+  display: block;
+  color: #6b7280;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.cm-stat-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.cm-text-accent {
+  color: #f55d9b;
+}
+
+/* ========== Toolbar / bộ lọc ========== */
+.cm-toolbar {
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border-radius: 8px;
+}
+
+@media (max-width: 992px) {
+  .cm-toolbar .row > div {
+    margin-bottom: 12px;
+  }
+  .cm-toolbar .row > div:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* Chỉ override input Bootstrap bên trong .cm-page, không rò rỉ ra toàn cục */
+.cm-page .form-label {
+  color: #b4557d;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.cm-page .form-control,
+.cm-page .form-select,
+.cm-page .input-group-text {
+  border-color: #f3d6e3;
+  background-color: #fffafd;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.cm-page .form-control:hover,
+.cm-page .form-select:hover {
+  border-color: #efbdd2;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 0.12rem rgba(245, 93, 155, 0.08);
+}
+
+.cm-page .form-control:focus,
+.cm-page .form-select:focus {
+  border-color: #f55d9b;
+  box-shadow: 0 0 0 0.18rem rgba(245, 93, 155, 0.12);
+}
+
+.cm-btn-soft {
+  border: 1px solid #f3d6e3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #202636;
+  font-weight: 700;
+}
+
+.cm-btn-soft:hover,
+.cm-btn-soft:focus {
+  border-color: #efbdd2;
+  background: #fff0f7;
+}
+
+/* ========== Bảng dữ liệu ========== */
+.cm-table-panel {
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.cm-table {
+  min-width: 1040px;
+}
+
+.cm-table thead th {
+  background: #fff0f7;
+  color: #b4557d;
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.cm-table td {
+  color: #4b5563;
+  font-size: 0.9rem;
+  vertical-align: middle;
+}
+
+.cm-customer-name {
+  color: #202636;
+  font-weight: 800;
+}
+
+.cm-date-line {
+  color: #6b7280;
+  font-size: 0.78rem;
+}
+
+/* ========== Badge vai trò (Thành viên / Khách vãng lai) ========== */
+.cm-role-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  margin-top: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.cm-role-badge.member {
+  background: #ffe4ef;
+  color: #d63384;
+}
+
+.cm-role-badge.guest {
+  background: #fff0d9;
+  color: #9a5b00;
+}
+
+/* ========== Badge trạng thái xử lý ========== */
+.cm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #ffe4ef;
+  color: #d63384;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.cm-status-badge.pending {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+/* ========== User ID chip (mới) — để admin lấy nhanh user_id ========== */
+.cm-uid-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #f3d6e3;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #fffafd;
+  color: #b4557d;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cm-uid-chip:hover,
+.cm-uid-chip:focus {
+  border-color: #f55d9b;
+  background: #ffe4ef;
+  color: #d63384;
+}
+
+.cm-uid-chip.copied {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.cm-uid-chip i {
+  font-size: 0.7rem;
+}
+
+.cm-uid-empty {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+/* ========== Nút icon thao tác ========== */
+.cm-icon-btn {
+  display: inline-grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid #f3d6e3;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #202636;
+}
+
+.cm-icon-btn:hover,
+.cm-icon-btn:focus {
+  background: #fff0f7;
+  color: #d63384;
+}
+
+.cm-icon-btn.success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.cm-icon-btn.success:hover,
+.cm-icon-btn.success:focus {
+  background: #dcfce7;
+}
+
+/* ========== Phân trang ========== */
+.cm-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 18px;
+  border-top: 1px solid #f3d6e3;
+  background: #fffafd;
+}
+
+.cm-pagination-summary {
+  color: #4b5563;
+  font-size: 0.92rem;
+}
+
+.cm-pagination-summary strong,
+.cm-page-indicator strong {
+  color: #111827;
+}
+
+.cm-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cm-page-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: #6b7280;
+  font-size: 0.86rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.cm-page-size .form-select {
+  width: 78px;
+  min-height: 38px;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  font-weight: 700;
+}
+
+.cm-page-btn {
+  min-width: 72px;
+  min-height: 38px;
+  border: 1px solid #d8dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #344054;
+  font-size: 0.9rem;
+  font-weight: 800;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease;
+}
+
+.cm-page-btn:hover:not(:disabled),
+.cm-page-btn:focus:not(:disabled) {
+  border-color: #f55d9b;
+  background: #fff0f7;
+  color: #be3f75;
+}
+
+.cm-page-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.cm-page-indicator {
+  min-width: 96px;
+  color: #344054;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .cm-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cm-pagination-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .cm-shell {
+    padding: 16px;
+  }
+
+  .cm-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

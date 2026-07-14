@@ -1,9 +1,9 @@
 <template>
-  <div class="voucher-page">
-    <div class="voucher-shell">
-      <section class="voucher-hero">
-        <div class="hero-title">
-          <div class="hero-icon">
+  <div class="cm-page">
+    <div class="cm-shell">
+      <section class="cm-hero">
+        <div class="cm-hero-title">
+          <div class="cm-hero-icon">
             <i class="fa-solid fa-headset"></i>
           </div>
           <div>
@@ -13,26 +13,26 @@
         </div>
       </section>
 
-      <section class="stats-grid">
-        <article class="stat-card">
+      <section class="cm-stats-grid">
+        <article class="cm-stat-card">
           <span>Tổng số yêu cầu</span>
           <strong>{{ stats.total }}</strong>
         </article>
-        <article class="stat-card">
+        <article class="cm-stat-card">
           <span>Chờ xử lý</span>
-          <strong class="text-accent">{{ stats.pending }}</strong>
+          <strong class="cm-text-accent">{{ stats.pending }}</strong>
         </article>
-        <article class="stat-card">
+        <article class="cm-stat-card">
           <span>Đã giải quyết</span>
           <strong>{{ stats.resolved }}</strong>
         </article>
-        <article class="stat-card">
+        <article class="cm-stat-card">
           <span>Khách vãng lai</span>
           <strong>{{ stats.guest }}</strong>
         </article>
       </section>
 
-      <section class="toolbar-panel">
+      <section class="cm-toolbar">
         <div class="row g-3 align-items-end">
           <div class="col-12 col-md-5">
             <label class="form-label">Tìm kiếm</label>
@@ -42,7 +42,7 @@
                 v-model.trim="filters.keyword"
                 type="text"
                 class="form-control"
-                placeholder="Tìm theo tên hoặc số điện thoại..."
+                placeholder="Tìm theo tên, SĐT hoặc User ID..."
               />
             </div>
           </div>
@@ -55,20 +55,21 @@
             </select>
           </div>
           <div class="col-12 col-md-3">
-            <button type="button" class="btn btn-soft w-100" @click="resetFilters">
+            <button type="button" class="btn cm-btn-soft w-100" @click="resetFilters">
               <i class="bi bi-arrow-counterclockwise me-2"></i> Đặt lại
             </button>
           </div>
         </div>
       </section>
 
-      <section class="table-panel">
+      <section class="cm-table-panel">
         <div class="table-responsive">
-          <table class="table align-middle voucher-table mb-0">
+          <table class="table align-middle cm-table mb-0">
             <thead>
               <tr>
                 <th>ID</th>
                 <th>Người gửi</th>
+                <th>User ID</th>
                 <th>Liên hệ</th>
                 <th style="max-width: 250px">Nội dung</th>
                 <th>Thời gian</th>
@@ -78,21 +79,31 @@
             </thead>
             <tbody>
               <tr v-if="filteredContacts.length === 0">
-                <td colspan="7" class="text-center py-5 text-muted">Không có dữ liệu.</td>
+                <td colspan="8" class="text-center py-5 text-muted">Không có dữ liệu.</td>
               </tr>
               <tr v-for="(item, index) in filteredContacts" :key="item.contactId">
                 <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
                 <td>
-                  <div class="voucher-code">{{ item.customerName }}</div>
-                  <span
+                  <div class="cm-customer-name">{{ item.customerName }}</div>
+                  <span v-if="item.userId" class="cm-role-badge member">Thành viên</span>
+                  <span v-else class="cm-role-badge guest">Khách vãng lai</span>
+                </td>
+                <td>
+                  <button
                     v-if="item.userId"
-                    class="type-badge percent mt-1"
-                    style="font-size: 0.65rem"
-                    >Thành viên</span
+                    type="button"
+                    class="cm-uid-chip"
+                    :class="{ copied: copiedId === item.userId }"
+                    :title="`Bấm để sao chép User ID #${item.userId}`"
+                    @click="copyUserId(item.userId)"
                   >
-                  <span v-else class="type-badge amount mt-1" style="font-size: 0.65rem"
-                    >Khách vãng lai</span
-                  >
+                    <i
+                      class="fa-solid"
+                      :class="copiedId === item.userId ? 'fa-check' : 'fa-hashtag'"
+                    ></i>
+                    {{ item.userId }}
+                  </button>
+                  <span v-else class="cm-uid-empty">—</span>
                 </td>
                 <td>
                   <div class="fw-semibold text-secondary">
@@ -108,22 +119,21 @@
                   </div>
                 </td>
                 <td>
-                  <div class="date-line">{{ formatDateTime(item.createdAt) }}</div>
+                  <div class="cm-date-line">{{ formatDateTime(item.createdAt) }}</div>
                 </td>
                 <td>
-                  <span class="status-badge" :class="{ inactive: item.status === 'PENDING' }">
+                  <span class="cm-status-badge" :class="{ pending: item.status === 'PENDING' }">
                     {{ item.status === 'PENDING' ? 'Chờ xử lý' : 'Đã giải quyết' }}
                   </span>
                 </td>
                 <td>
                   <div class="d-flex justify-content-end gap-2">
-                    <button class="icon-button" title="Xem chi tiết" @click="viewDetail(item)">
+                    <button class="cm-icon-btn" title="Xem chi tiết" @click="viewDetail(item)">
                       <i class="fa-regular fa-eye"></i>
                     </button>
                     <button
                       v-if="item.status === 'PENDING'"
-                      class="icon-button"
-                      style="color: #15803d; border-color: #bbf7d0; background: #f0fdf4"
+                      class="cm-icon-btn success"
                       title="Đánh dấu đã xử lý"
                       @click="confirmResolve(item.contactId)"
                     >
@@ -136,12 +146,12 @@
           </table>
         </div>
 
-        <div v-if="totalPages > 0" class="voucher-pagination mt-4">
-          <div class="pagination-summary">
+        <div v-if="totalPages > 0" class="cm-pagination mt-4">
+          <div class="cm-pagination-summary">
             Tổng <strong>{{ totalElements }}</strong> yêu cầu
           </div>
-          <div class="pagination-controls">
-            <label class="page-size-control">
+          <div class="cm-pagination-controls">
+            <label class="cm-page-size">
               <span>Hiển thị</span>
               <select v-model.number="pageSize" class="form-select form-select-sm">
                 <option :value="5">5</option>
@@ -151,17 +161,17 @@
               </select>
             </label>
             <button
-              class="pagination-button"
+              class="cm-page-btn"
               :disabled="currentPage === 0"
               @click="goToPage(currentPage - 1)"
             >
               Trước
             </button>
-            <span class="page-indicator"
+            <span class="cm-page-indicator"
               >Trang <strong>{{ currentPage + 1 }}</strong> / {{ totalPages }}</span
             >
             <button
-              class="pagination-button"
+              class="cm-page-btn"
               :disabled="currentPage + 1 >= totalPages"
               @click="goToPage(currentPage + 1)"
             >
@@ -191,6 +201,31 @@
           <i class="fa-solid fa-envelope text-primary"></i>
           <span>{{ detailModal.data.email }}</span>
         </div>
+
+        <!-- User ID: để admin lấy nhanh mã khách hàng, phục vụ tặng voucher / đánh giá tài khoản -->
+        <div class="detail-row" v-if="detailModal.data.userId">
+          <i class="fa-solid fa-id-badge text-primary"></i>
+          <span
+            >User ID: <strong>#{{ detailModal.data.userId }}</strong></span
+          >
+          <button
+            type="button"
+            class="detail-copy-btn"
+            :class="{ copied: copiedId === detailModal.data.userId }"
+            @click="copyUserId(detailModal.data.userId)"
+          >
+            <i
+              class="fa-solid"
+              :class="copiedId === detailModal.data.userId ? 'fa-check' : 'fa-copy'"
+            ></i>
+            {{ copiedId === detailModal.data.userId ? 'Đã sao chép' : 'Sao chép' }}
+          </button>
+        </div>
+        <div class="detail-row" v-else>
+          <i class="fa-solid fa-user-slash text-secondary"></i>
+          <span>Khách vãng lai (chưa đăng nhập)</span>
+        </div>
+
         <div class="detail-message-box">
           <div class="msg-title">Nội dung khiếu nại/tư vấn:</div>
           <p class="msg-content">"{{ detailModal.data.message }}"</p>
@@ -213,7 +248,8 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
-import '@/assets/css/Voucher.css'
+import '@/assets/css/ContactManagement.css'
+
 const contacts = ref([])
 const loading = ref(false)
 
@@ -224,6 +260,10 @@ const totalElements = ref(0)
 const totalPages = ref(0)
 const filters = reactive({ keyword: '', status: 'ALL' })
 const stats = reactive({ total: 0, pending: 0, resolved: 0, guest: 0 })
+
+// Trạng thái "vừa sao chép User ID" (dùng chung cho bảng + modal chi tiết)
+const copiedId = ref(null)
+let copiedTimer = null
 
 // State Modals
 const detailModal = reactive({ visible: false, data: null })
@@ -245,10 +285,12 @@ const showActionModal = (type, title, message, targetId = null) => {
 }
 
 const filteredContacts = computed(() => {
+  const keyword = filters.keyword.toLowerCase()
   return contacts.value.filter((item) => {
     const matchKey =
-      item.customerName.toLowerCase().includes(filters.keyword.toLowerCase()) ||
-      item.phoneNumber.includes(filters.keyword)
+      item.customerName.toLowerCase().includes(keyword) ||
+      item.phoneNumber.includes(filters.keyword) ||
+      String(item.userId ?? '').includes(filters.keyword)
     const matchStatus = filters.status === 'ALL' || item.status === filters.status
     return matchKey && matchStatus
   })
@@ -266,6 +308,8 @@ const fetchContacts = async () => {
   try {
     const res = await api.get(`/admin/contacts?page=${currentPage.value}&size=${pageSize.value}`)
     const payload = res.data?.data
+    // Backend (ContactRequest) đã có userId (null nếu là khách vãng lai) -> chỉ cần
+    // hiển thị nó ra giao diện, không cần gọi thêm API nào khác.
     contacts.value = payload?.content || []
     totalElements.value = payload?.totalElements || contacts.value.length
     totalPages.value = payload?.totalPages || 1
@@ -315,6 +359,25 @@ const executeAction = async () => {
   }
 }
 
+// Sao chép User ID vào clipboard để admin dán nhanh khi tặng voucher / tra cứu tài khoản
+const copyUserId = async (userId) => {
+  if (!userId) return
+  try {
+    await navigator.clipboard.writeText(String(userId))
+    copiedId.value = userId
+    clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => {
+      if (copiedId.value === userId) copiedId.value = null
+    }, 1500)
+  } catch {
+    showActionModal(
+      'error',
+      'Không thể sao chép',
+      'Trình duyệt không hỗ trợ sao chép tự động, vui lòng chọn và copy thủ công.',
+    )
+  }
+}
+
 const resetFilters = () => {
   filters.keyword = ''
   filters.status = 'ALL'
@@ -352,6 +415,32 @@ onMounted(fetchContacts)
   width: 20px;
   text-align: center;
   font-size: 16px;
+}
+
+.detail-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 5px 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.detail-copy-btn:hover {
+  background: #dbeafe;
+}
+
+.detail-copy-btn.copied {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
 }
 
 .detail-message-box {
