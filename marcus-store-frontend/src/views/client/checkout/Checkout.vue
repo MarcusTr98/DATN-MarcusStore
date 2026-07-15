@@ -422,14 +422,17 @@
 
           <div class="order-items">
             <div v-for="item in cartData.items" :key="item.cartItemId" class="order-item">
+              <!-- Cột trái: Ảnh + Badge số lượng -->
               <div class="order-item__img-wrap">
                 <img :src="item.imageUrl" :alt="item.productName" class="order-item__img" />
                 <span class="order-item__qty">{{ item.quantity }}</span>
               </div>
+
+              <!-- Cột giữa: Thông tin sản phẩm -->
               <div class="order-item__info">
                 <div class="order-item__name">{{ item.productName }}</div>
                 <div class="order-item__variant" v-if="item.variantName">
-                  {{ item.variantName }}
+                  {{ expandColorName(item.variantName) }}
                 </div>
                 <div class="order-item__sku">SKU: {{ item.skuCode }}</div>
                 <!-- Badge Flash Sale -->
@@ -437,7 +440,16 @@
                   ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
                 </span>
               </div>
-              <div class="order-item__price">{{ item.totalPrice?.toLocaleString('vi-VN') }}₫</div>
+
+              <!-- Cột phải: Giá tiền -->
+              <div class="order-item__price-col">
+                <div class="order-item__current-price">
+                  {{ item.totalPrice?.toLocaleString('vi-VN') }}₫
+                </div>
+                <s v-if="item.originalPrice && item.originalPrice > item.price" class="order-item__original-price">
+                  {{ item.originalPrice?.toLocaleString('vi-VN') }}₫
+                </s>
+              </div>
             </div>
           </div>
 
@@ -580,11 +592,14 @@ import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import VoucherModal from '@/components/VoucherModal.vue'
+import { expandColorName } from '@/utils/colorUtils'
 
 import { useCartStore } from '@/stores/cartStore'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 const cartStore = useCartStore()
 const flashSaleStore = useFlashSaleStore()
+
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 
 import addressApi from '@/api/addressApi'
 import userApi from '@/api/userApi'

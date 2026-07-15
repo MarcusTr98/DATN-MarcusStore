@@ -61,7 +61,7 @@
                 </div>
                 <div class="item-details">
                   <div class="item-name">{{ item.name }}</div>
-                  <div class="item-variant">{{ item.variant }}</div>
+                  <div class="item-variant">{{ expandColorName(item.variant) }}</div>
                   <!-- Badge Flash Sale cho sản phẩm FS -->
                   <span v-if="item.isFlashSale" class="item-badge flash-sale-badge">
                     ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
@@ -470,6 +470,14 @@
       @confirm="handleCancelledConfirm"
     />
 
+    <!-- Modal yêu cầu đăng nhập -->
+    <LoginRequiredModal
+      :visible="showLoginRequiredModal"
+      :title="loginRequiredTitle"
+      :message="loginRequiredMessage"
+      @close="showLoginRequiredModal = false"
+    />
+
     <!-- Modal thông báo áp dụng voucher thành công -->
     <div
       class="v-modal-overlay"
@@ -556,6 +564,8 @@ import { useRouter } from 'vue-router'
 import { useCartStore } from '@/stores/cartStore'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
+import { expandColorName } from '@/utils/colorUtils'
 import '@/assets/css/cart.css'
 import voucherApiClient from '@/api/voucherApiClient.js'
 const router = useRouter()
@@ -570,6 +580,11 @@ const showCancelledModal = ref(false)
 // Cờ chặn vòng lặp modal bật liên tục: khi user đã xác nhận xử lý FS bị hủy,
 // không tự động mở lại modal trong cùng 1 phiên trang. Reset khi F5 hoặc đổi route.
 const hasHandledCancelled = ref(false)
+
+// ==== Modal yêu cầu đăng nhập (khi guest nhận 401) ====
+const showLoginRequiredModal = ref(false)
+const loginRequiredTitle = ref('Đăng nhập để tiếp tục')
+const loginRequiredMessage = ref('Vui lòng đăng nhập để truy cập giỏ hàng và thanh toán.')
 
 function findCancelledFlashSaleItem() {
   const slots = flashSaleStore.clientSlots
@@ -629,6 +644,9 @@ onMounted(async () => {
   localStorage.removeItem('selectedSubtotal')
   // Giữ lại selectedVoucherCode để user vẫn thấy voucher đã chọn
 
+  // Lắng nghe event auth-required (khi guest nhận 401 từ API)
+  window.addEventListener('auth-required', handleAuthRequired)
+
   // Tải song song cả cart và danh sách slot FS để check slot CANCELLED sớm nhất có thể.
   await Promise.all([cartStore.fetchCart(), flashSaleStore.fetchClientSlots(20)])
   await fetchAvailableVouchers()
@@ -663,7 +681,16 @@ watch(
 // quay lại /cart mà vẫn còn SP CANCELLED thì modal có thể hiện lại.
 onBeforeUnmount(() => {
   hasHandledCancelled.value = false
+  // Cleanup event listener
+  window.removeEventListener('auth-required', handleAuthRequired)
 })
+
+// ==== Event listener cho auth-required (từ api interceptor khi guest nhận 401) ====
+function handleAuthRequired(event) {
+  loginRequiredTitle.value = event.detail?.title || 'Đăng nhập để tiếp tục'
+  loginRequiredMessage.value = event.detail?.message || 'Vui lòng đăng nhập để truy cập giỏ hàng và thanh toán.'
+  showLoginRequiredModal.value = true
+}
 
 // Khôi phục trạng thái checkbox từ localStorage
 function restoreSelectedItems() {
@@ -1121,7 +1148,8 @@ function handleCheckout() {
     imageUrl: item.imageUrl,
     quantity: item.quantity,
     price: item.price,
-    totalPrice: item.price * item.quantity,
+    originalPrice: item.originalPrice,
+    totalPrice: (item.isFlashSale ? item.flashSalePrice : item.price) * item.quantity,
     // Thông tin Flash Sale
     isFlashSale: item.isFlashSale || false,
     flashSaleSlotId: item.flashSaleSlotId || null,

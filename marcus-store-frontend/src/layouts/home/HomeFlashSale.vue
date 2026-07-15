@@ -167,6 +167,14 @@
       @close="handleCancelledClose"
       @confirm="handleCancelledConfirm"
     />
+
+    <!-- Modal yêu cầu đăng nhập (khi guest nhận 401) -->
+    <LoginRequiredModal
+      :visible="showLoginRequiredModal"
+      :title="loginRequiredTitle"
+      :message="loginRequiredMessage"
+      @close="showLoginRequiredModal = false"
+    />
   </section>
 </template>
 
@@ -178,6 +186,7 @@ import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import { useCartStore } from '@/stores/cartStore'
 import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 import '@/assets/css/HomeFlashSale.css'
 
 const router = useRouter()
@@ -376,6 +385,11 @@ function showToast({ type = 'warning', title, message }) {
 const showCancelledModal = ref(false)
 const hasHandledCancelled = ref(false)
 
+// ==== Modal yêu cầu đăng nhập (khi guest nhận 401) ====
+const showLoginRequiredModal = ref(false)
+const loginRequiredTitle = ref('Đăng nhập để tiếp tục')
+const loginRequiredMessage = ref('Vui lòng đăng nhập để mua sản phẩm Flash Sale.')
+
 function openCancelledModal() {
   if (hasHandledCancelled.value) return
   showCancelledModal.value = true
@@ -396,8 +410,17 @@ async function handleCancelledConfirm() {
   }
 }
 
+// ==== Event listener cho auth-required (từ api interceptor khi guest nhận 401) ====
+function handleAuthRequired(event) {
+  loginRequiredTitle.value = event.detail?.title || 'Đăng nhập để tiếp tục'
+  loginRequiredMessage.value = event.detail?.message || 'Vui lòng đăng nhập để mua sản phẩm Flash Sale.'
+  showLoginRequiredModal.value = true
+}
+
 onBeforeUnmount(() => {
   hasHandledCancelled.value = false
+  // Cleanup event listener
+  window.removeEventListener('auth-required', handleAuthRequired)
 })
 
 // ==== Điều hướng sản phẩm ====
@@ -579,6 +602,9 @@ watch(
 )
 
 onMounted(async () => {
+  // Lắng nghe event auth-required (khi guest nhận 401 từ API)
+  window.addEventListener('auth-required', handleAuthRequired)
+
   updateVisibleCount()
   await nextTick()
   measureCardWidth()

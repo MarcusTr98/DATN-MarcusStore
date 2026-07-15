@@ -19,4 +19,5 @@ public class FlashSaleItemId implements Serializable {
 
     @Column(name = "sku_id")
     private Integer skuId;
+
 }

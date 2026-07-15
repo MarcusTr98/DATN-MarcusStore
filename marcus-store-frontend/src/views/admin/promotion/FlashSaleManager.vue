@@ -482,6 +482,7 @@
           <!-- TABS -->
           <div class="fs-tabs">
             <button
+              type="button"
               class="fs-tab-btn"
               :class="{ active: activeTab === 0 }"
               :disabled="formLocked"
@@ -490,6 +491,7 @@
               <i class="bi bi-box-seam"></i> Chọn sản phẩm
             </button>
             <button
+              type="button"
               class="fs-tab-btn"
               :class="{ active: activeTab === 1 }"
               :disabled="formLocked"
@@ -678,18 +680,33 @@
                 <thead>
                 <tr>
                   <th>Sản phẩm</th>
-                  <th>Giá gốc</th>
-                  <th>Giá Flash Sale</th>
-                  <th>Chiết khấu (%)</th>
-                  <th>Số lượng</th>
+                  <th class="text-end">Giá gốc</th>
+                  <th class="text-center">Giá Flash Sale</th>
+                  <th class="text-center">Chiết khấu (%)</th>
+                  <th class="text-center">Số lượng</th>
                   <th></th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr v-for="pid in selectedItemPids" :key="pid">
-                  <td><strong>{{ getProductName(pid) }}</strong></td>
-                  <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div class="fs-sel-thumb">
+                        <img
+                          v-if="getSku(pid)?.skuImageUrl"
+                          :src="getSku(pid).skuImageUrl"
+                          :alt="getSku(pid)?.productName"
+                        />
+                        <i v-else class="bi bi-image"></i>
+                      </div>
+                      <div class="fs-sel-name-wrap">
+                        <div class="fs-sel-name">{{ getSku(pid)?.productName || `Sản phẩm #${pid}` }}</div>
+                        <div class="fs-sel-sku">SKU: {{ getSku(pid)?.skuCode || pid }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-end">{{ formatVND(getProductPrice(pid)) }}</td>
+                  <td class="text-center">
                     <input
                       type="text"
                       inputmode="numeric"
@@ -704,7 +721,7 @@
                       {{ errors[`item_${pid}_price`] }}
                     </div>
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"
@@ -715,7 +732,7 @@
                       max="100"
                     />
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"
@@ -816,18 +833,33 @@
                 <thead>
                 <tr>
                   <th>Sản phẩm</th>
-                  <th>Giá gốc</th>
-                  <th>Giá Flash Sale</th>
-                  <th>Chiết khấu (%)</th>
-                  <th>Số lượng</th>
+                  <th class="text-end">Giá gốc</th>
+                  <th class="text-center">Giá Flash Sale</th>
+                  <th class="text-center">Chiết khấu (%)</th>
+                  <th class="text-center">Số lượng</th>
                   <th></th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr v-for="pid in selectedItemPids" :key="pid">
-                  <td><strong>{{ getProductName(pid) }}</strong></td>
-                  <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div class="fs-sel-thumb">
+                        <img
+                          v-if="getSku(pid)?.skuImageUrl"
+                          :src="getSku(pid).skuImageUrl"
+                          :alt="getSku(pid)?.productName"
+                        />
+                        <i v-else class="bi bi-image"></i>
+                      </div>
+                      <div class="fs-sel-name-wrap">
+                        <div class="fs-sel-name">{{ getSku(pid)?.productName || `Sản phẩm #${pid}` }}</div>
+                        <div class="fs-sel-sku">SKU: {{ getSku(pid)?.skuCode || pid }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-end">{{ formatVND(getProductPrice(pid)) }}</td>
+                  <td class="text-center">
                     <input
                       type="text"
                       inputmode="numeric"
@@ -842,7 +874,7 @@
                       {{ errors[`item_${pid}_price`] }}
                     </div>
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"
@@ -853,7 +885,7 @@
                       max="100"
                     />
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"

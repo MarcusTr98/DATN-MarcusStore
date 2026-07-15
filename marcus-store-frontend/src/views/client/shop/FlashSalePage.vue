@@ -118,7 +118,7 @@
       <router-link to="/" class="see-all">← Quay lại trang chủ</router-link>
     </div>
 
-     <section class="product-grid">
+    <section class="product-grid">
       <article
         v-for="(product, index) in flashSaleProducts"
         :key="product.id"
@@ -260,6 +260,40 @@
       </article>
     </section>
 
+    <!-- Pagination -->
+    <div class="fsp-pagination" v-if="totalPages > 1">
+      <button
+        class="fsp-page-btn fsp-page-prev"
+        :disabled="currentPage === 1"
+        @click="goToPage(currentPage - 1)"
+      >
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <button
+        v-for="page in visiblePages"
+        :key="page"
+        class="fsp-page-btn"
+        :class="{ active: page === currentPage }"
+        @click="goToPage(page)"
+      >
+        {{ page }}
+      </button>
+
+      <button
+        class="fsp-page-btn fsp-page-next"
+        :disabled="currentPage === totalPages"
+        @click="goToPage(currentPage + 1)"
+      >
+        <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+
+    <!-- Pagination Info -->
+    <div class="fsp-pagination-info" v-if="totalProducts > 0">
+      Hiển thị {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, totalProducts) }} của {{ totalProducts }} sản phẩm
+    </div>
+
     <!-- Promo Banners -->
     <section class="promo-grid">
       <div class="promo promo-b">
@@ -333,17 +367,27 @@
       @close="showCancelledModal = false"
       @confirm="handleCancelledConfirm"
     />
+
+    <!-- Modal yêu cầu đăng nhập (khi guest nhận 401) -->
+    <LoginRequiredModal
+      :visible="showLoginRequiredModal"
+      :title="loginRequiredTitle"
+      :message="loginRequiredMessage"
+      @close="showLoginRequiredModal = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onBeforeUnmount, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onBeforeUnmount, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
 import { useCartStore } from '@/stores/cartStore'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
+import { expandVariantColorNames } from '@/utils/colorUtils'
 import '@/assets/css/FlashSalePage.css'
 
 const router = useRouter()
@@ -358,14 +402,9 @@ async function fetchFlashSales() {
 }
 
 // Tên slot Flash Sale đang hiển thị (ưu tiên ACTIVE=2, rồi SCHEDULED=1).
-// Lưu ý: KHÔNG fallback về clientSlots[0] vì slot[0] có thể là CANCELLED (4) hoặc
-// ENDED (3) → sẽ làm banner của slot đã chết vẫn hiển thị.
-// Trả null khi không có slot hợp lệ → template render empty state.
 const activeSlot = computed(() => {
   if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return null
 
-  // Lọc chỉ giữ slot ACTIVE/SCHEDULED, loại bỏ CANCELLED/ENDED để banner không
-  // "chết" hiển thị khi admin vừa hủy nhưng call BE chưa kịp cập nhật status.
   const validStatuses = [1, 2]
   const validSlots = clientSlots.value.filter((s) => validStatuses.includes(Number(s.status)))
 
@@ -377,52 +416,38 @@ const activeSlot = computed(() => {
 })
 const slotName = computed(() => activeSlot.value?.name || '')
 
-// Guard quyết định có hiển thị banner hay không. Bắt buộc phải có vì:
-//   - bannerImageUrl có thể tới từ slot đã CANCELLED (activeSlot đã được lọc ở trên,
-//     nhưng thêm 1 lớp phòng vệ theo status + thời gian thực tế là rất tốt).
-//   - Scheduler có thể chưa kịp chuyển status=2→3 sau endDate nhưng banner vẫn load OK.
-//   - Cũng phòng trường hợp clientSlots còn cũ trong cache Pinia trước khi refresh.
 const showBanner = computed(() => {
   const slot = activeSlot.value
   if (!slot) return false
   if (!slot.bannerImageUrl) return false
 
   const status = Number(slot.status)
-  // Chỉ ACTIVE (2) hoặc SCHEDULED (1) mới được phép hiển thị banner
   if (status !== 1 && status !== 2) return false
 
-  // Check thời gian thực tế - phòng trường hợp scheduler chưa kịp chuyển status
-  // hoặc data load từ cache bị stale.
-  //   • ACTIVE: phải đang trong [startDate, endDate)
-  //   • SCHEDULED: startDate có thể chưa tới (banner hẹn giờ), endDate có thể null
   const now = Date.now()
   const startMs = slot.startDate ? new Date(slot.startDate).getTime() : null
   const endMs = slot.endDate ? new Date(slot.endDate).getTime() : null
 
   if (status === 2) {
-    // ACTIVE: bắt buộc trong khung giờ
     if (startMs && now < startMs) return false
     if (endMs && now >= endMs) return false
     return true
   }
 
-  // SCHEDULED: đảm bảo slot chưa kết thúc (slot.scheduled có thể hiển thị trước giờ)
   if (status === 1 && endMs && now >= endMs) return false
   return true
 })
 
 // ==== Bộ đếm ngược động (chạy mỗi giây) ====
-// Hết giờ -> tự gọi lại API để cập nhật danh sách mà không cần F5.
 const { label: countdownLabel, timer } = useFlashSaleCountdown(
   () => flashSaleStore.clientSlots,
   () => fetchFlashSales(),
 )
 
-// Timeline: lấy từ store getter (đã chuẩn hoá ở store), fallback hiển thị placeholder
+// Timeline
 const flashSlots = computed(() => {
   const list = displaySlots.value
   if (Array.isArray(list) && list.length > 0) return list
-  // Fallback tĩnh khi BE chưa có dữ liệu để UI không bị trống
   return [
     { time: 'Đang diễn ra · 09:00–12:00', isLive: true },
     { time: '12:00 SA', isLive: false },
@@ -431,9 +456,8 @@ const flashSlots = computed(() => {
   ]
 })
 
-// ==== Sản phẩm hiển thị: lấy từ tất cả items của các slot trong clientSlots ====
-// BE trả về nhiều slot; gộp items[] của tất cả slot, lấy tối đa 12 SP đầu tiên.
-function mapItemToCard(item, idx) {
+// ==== Chuẩn hoá dữ liệu thô từ BE (KHÔNG chứa state UI) ====
+function buildRawItem(item, idx) {
   const totalQty = Number(item.flashSaleQuantity ?? 0)
   const soldQty = Number(item.soldQuantity ?? 0)
   const soldPercent = totalQty > 0 ? Math.min(100, Math.round((soldQty / totalQty) * 100)) : 0
@@ -451,13 +475,8 @@ function mapItemToCard(item, idx) {
     discount: item.discountPercent ?? 0,
     soldPercent,
     left: remaining,
-    displayPrice: 0,
-    ripples: [],
-    favorited: false,
-    addingToCart: false,
     variants: deriveVariantsFromSku(item.skuCode),
     promos: derivePromoTags(item),
-    // Thêm thông tin slot để gửi khi thêm vào giỏ
     slotId: item._slotId || null,
     slotName: item._slotName || null,
   }
@@ -467,7 +486,7 @@ function deriveVariantsFromSku(skuCode) {
   if (!skuCode) return []
   const parts = String(skuCode).split('-').filter(Boolean)
   const tail = parts.slice(-2)
-  return tail.map((p) => p.replace(/_/g, ' ').trim()).filter((p) => p.length > 0)
+  return tail.map((p) => expandVariantColorNames(p.replace(/_/g, ' ').trim())).filter((p) => p.length > 0)
 }
 
 function derivePromoTags(item) {
@@ -480,22 +499,151 @@ function derivePromoTags(item) {
   return tags
 }
 
-// Tổng hợp sản phẩm từ mọi slot đang/sắp diễn ra
-const flashSaleProducts = computed(() => {
+// Gộp item thô từ mọi slot ACTIVE/SCHEDULED trong clientSlots
+const rawFlashSaleItems = computed(() => {
   if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return []
   const allItems = []
   for (const slot of clientSlots.value) {
     if (Array.isArray(slot.items)) {
       for (const it of slot.items) {
-        // Thêm slotId vào mỗi item để biết nó thuộc slot nào
-        allItems.push({ ...it, _slotId: slot.slotId })
+        allItems.push({ ...it, _slotId: slot.slotId, _slotName: slot.name })
       }
     }
   }
-  return allItems.slice(0, 12).map(mapItemToCard)
+  return allItems.map(buildRawItem)
 })
 
-// formatPrice, goToProduct, animateCountUp, ripple, favorite, add-to-cart, FOMO
+// ==== Phân trang sản phẩm ====
+const currentPage = ref(1)
+const pageSize = 12
+
+const totalProducts = computed(() => rawFlashSaleItems.value.length)
+const totalPages = computed(() => Math.ceil(totalProducts.value / pageSize) || 1)
+
+// Reset về trang 1 khi tổng sản phẩm thay đổi (slot mới, xóa sp...)
+watch(totalProducts, (newTotal) => {
+  if (currentPage.value > totalPages.value) {
+    currentPage.value = totalPages.value
+  }
+  if (newTotal === 0) currentPage.value = 1
+})
+
+// Items của trang hiện tại
+const paginatedRawItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  const end = start + pageSize
+  return rawFlashSaleItems.value.slice(start, end)
+})
+
+function goToPage(page) {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// Hiển thị tối đa 5 nút trang, có "..." nếu cần
+const visiblePages = computed(() => {
+  const total = totalPages.value
+  const cur = currentPage.value
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1)
+
+  const pages = []
+  if (cur <= 3) {
+    pages.push(1, 2, 3, 4, '...', total)
+  } else if (cur >= total - 2) {
+    pages.push(1, '...', total - 3, total - 2, total - 1, total)
+  } else {
+    pages.push(1, '...', cur - 1, cur, cur + 1, '...', total)
+  }
+  return pages
+})
+
+// --- Hiệu ứng "đếm số" cho giá khi card xuất hiện ---
+// LƯU Ý: khai báo TRƯỚC syncFlashSaleProducts/watch bên dưới, vì watch chạy
+// { immediate: true } ngay lúc setup() — nếu store đã có sẵn dữ liệu (cache từ
+// lần ghé trang trước), watcher sẽ gọi animateCountUp ngay lập tức. Nếu hàm này
+// khai báo bằng const ở PHÍA DƯỚI, sẽ dính lỗi TDZ (Cannot access before initialization).
+const animateCountUp = (product, delayMs = 0) => {
+  const duration = 900
+  const to = product.price
+  let startTs = null
+
+  const step = (now) => {
+    if (startTs === null) startTs = now + delayMs
+    if (now < startTs) {
+      requestAnimationFrame(step)
+      return
+    }
+    const elapsed = now - startTs
+    const t = Math.min(elapsed / duration, 1)
+    const eased = 1 - Math.pow(1 - t, 3)
+    product.displayPrice = Math.round(to * eased)
+    if (t < 1) requestAnimationFrame(step)
+    else product.displayPrice = to
+  }
+  requestAnimationFrame(step)
+}
+
+// ==== Danh sách sản phẩm hiển thị thật (reactive, giữ state UI qua các lần refetch) ====
+// Đây KHÔNG phải computed nữa. Mỗi khi rawFlashSaleItems đổi, ta merge thủ công vào
+// mảng này: sản phẩm cũ giữ nguyên displayPrice/ripples/favorited/addingToCart,
+// chỉ cập nhật field đến từ BE (giá, tồn kho, discount...). Sản phẩm mới thì thêm vào
+// với displayPrice=0 rồi animate count-up. Sản phẩm không còn trong raw thì bị loại bỏ.
+const flashSaleProducts = ref([])
+
+function syncFlashSaleProducts() {
+  const rawList = paginatedRawItems.value
+  const rawIds = new Set(rawList.map((r) => r.id))
+  const existingMap = new Map(flashSaleProducts.value.map((p) => [p.id, p]))
+
+  const newlyAdded = []
+
+  const merged = rawList.map((raw) => {
+    const existing = existingMap.get(raw.id)
+    if (existing) {
+      // Sản phẩm đã có từ trước -> cập nhật field từ BE, giữ nguyên state UI
+      Object.assign(existing, {
+        name: raw.name,
+        slug: raw.slug,
+        spec: raw.spec,
+        image: raw.image,
+        price: raw.price,
+        originalPrice: raw.originalPrice,
+        discount: raw.discount,
+        soldPercent: raw.soldPercent,
+        left: raw.left,
+        variants: raw.variants,
+        promos: raw.promos,
+        slotId: raw.slotId,
+        slotName: raw.slotName,
+      })
+      return existing
+    }
+
+    // Sản phẩm mới -> khởi tạo state UI mặc định
+    const created = reactive({
+      ...raw,
+      displayPrice: 0,
+      ripples: [],
+      favorited: false,
+      addingToCart: false,
+    })
+    newlyAdded.push(created)
+    return created
+  })
+
+  flashSaleProducts.value = merged
+
+  // Chỉ animate count-up cho sản phẩm mới xuất hiện (lần đầu load, hoặc slot mới)
+  newlyAdded.forEach((product, idx) => {
+    animateCountUp(product, 100 + idx * 80)
+  })
+}
+
+// Chạy sync mỗi khi dữ liệu slot đổi HOẶC khi người dùng chuyển trang (kể cả lần đầu)
+watch([rawFlashSaleItems, currentPage], syncFlashSaleProducts, { immediate: true })
+
+// formatPrice
 const formatPrice = (price) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
 
@@ -519,33 +667,16 @@ function showToast({ type = 'warning', title, message }) {
 }
 
 // ==== Điều hướng sản phẩm ====
-// Chỉ cho phép click khi có slot ACTIVE (status=2); nếu không thì chặn + hiển thị toast.
 const isFlashSaleActive = computed(() => {
   if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return false
   return clientSlots.value.some((s) => Number(s.status) === 2)
 })
 
-/**
- * Kiểm tra slot của sản phẩm có hợp lệ để thực hiện hành động (mua ngay / thêm giỏ / click xem).
- * Thứ tự ưu tiên:
- *   1. Slot bị admin hủy (isCancelled=true) → bật modal cancelled.
- *   2. Slot của sản phẩm không ACTIVE (status≠2 hoặc ngoài khung giờ) → toast warning + chặn.
- *      Phân biệt rõ message cho từng trạng thái: SCHEDULED / ENDED / CANCELLED.
- *   3. Không có slot nào đang ACTIVE (fallback) → toast "FS chưa bắt đầu".
- *
- * Trả về: true nếu sản phẩm có thể tiếp tục, false nếu đã hiển thị feedback cho user.
- *
- * Lưu ý: Check SLOT CỦA SẢN PHẨM (dựa trên product.slotId), không phải slot ACTIVE đầu tiên
- * trong clientSlots. Tránh bug: sản phẩm thuộc slot B (status≠2) nhưng nhầm dùng slot A (đang active)
- * để truyền cho API add-to-cart.
- */
 function ensureProductSlotIsBuyable(product) {
-  // 1. Đã bị admin hủy → modal cancelled
   if (product.slotId && flashSaleStore.isSlotCancelled(product.slotId)) {
     openCancelledModal()
     return false
   }
-  // 2. Slot của sản phẩm không ACTIVE
   if (product.slotId && !flashSaleStore.isSlotActive(product.slotId)) {
     const ownSlot = flashSaleStore.getSlotById(product.slotId)
     let msg = 'Sản phẩm này không nằm trong Flash Sale đang diễn ra'
@@ -558,7 +689,6 @@ function ensureProductSlotIsBuyable(product) {
     showToast({ type: 'warning', title: 'Oops!', message: msg })
     return false
   }
-  // 3. Không có FS nào đang diễn ra → fallback
   if (!isFlashSaleActive.value) {
     showToast({
       type: 'warning',
@@ -574,6 +704,14 @@ function ensureProductSlotIsBuyable(product) {
 const showCancelledModal = ref(false)
 const hasHandledCancelled = ref(false)
 
+// ==== Modal yêu cầu đăng nhập (khi guest nhận 401) ====
+const showLoginRequiredModal = ref(false)
+const loginRequiredTitle = ref('Đăng nhập để tiếp tục')
+const loginRequiredMessage = ref('Vui lòng đăng nhập để mua sản phẩm Flash Sale.')
+// true khi vừa nhận sự kiện auth-required (401) — dùng để chặn toast lỗi trùng lặp
+// với modal yêu cầu đăng nhập đã hiển thị.
+const suppressErrorToast = ref(false)
+
 function openCancelledModal() {
   if (hasHandledCancelled.value) return
   showCancelledModal.value = true
@@ -584,45 +722,28 @@ async function handleCancelledConfirm() {
   hasHandledCancelled.value = true
 
   showCancelledModal.value = false
-  // Điều hướng về trang chủ thay vì reload trang FS.
-  // reload() sẽ tải lại clientSlots → vẫn còn slot CANCELLED → modal có thể mở lại
-  // nếu user back về /khuyen-mai. Điều hướng về home là đủ vì user đã rời context FS.
   await router.replace({ path: '/' }).catch(() => {
     window.location.href = '/'
   })
 }
 
+// ==== Event listener cho auth-required (từ api interceptor khi guest nhận 401) ====
+function handleAuthRequired(event) {
+  loginRequiredTitle.value = event.detail?.title || 'Đăng nhập để tiếp tục'
+  loginRequiredMessage.value = event.detail?.message || 'Vui lòng đăng nhập để mua sản phẩm Flash Sale.'
+  showLoginRequiredModal.value = true
+  suppressErrorToast.value = true
+}
+
 onBeforeUnmount(() => {
   hasHandledCancelled.value = false
+  // Cleanup event listener
+  window.removeEventListener('auth-required', handleAuthRequired)
 })
 
 const goToProduct = (product) => {
-  // Check slot của sản phẩm (không phải slot ACTIVE global).
-  // Helper sẽ tự bật modal cancelled / toast warning tương ứng nếu không hợp lệ.
   if (!ensureProductSlotIsBuyable(product)) return
   router.push(`/product/${product.slug}`)
-}
-
-// --- Hiệu ứng "đếm số" cho giá khi card xuất hiện ---
-const animateCountUp = (product, delayMs = 0) => {
-  const duration = 900
-  const to = product.price
-  let startTs = null
-
-  const step = (now) => {
-    if (startTs === null) startTs = now + delayMs
-    if (now < startTs) {
-      requestAnimationFrame(step)
-      return
-    }
-    const elapsed = now - startTs
-    const t = Math.min(elapsed / duration, 1)
-    const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
-    product.displayPrice = Math.round(to * eased)
-    if (t < 1) requestAnimationFrame(step)
-    else product.displayPrice = to
-  }
-  requestAnimationFrame(step)
 }
 
 // --- Hiệu ứng ripple khi bấm "Mua ngay" ---
@@ -639,14 +760,9 @@ const handleBuyClick = (event, product) => {
     product.ripples = product.ripples.filter((r) => r.id !== ripple.id)
   }, 650)
 
-  // "Mua ngay" = thêm vào giỏ + chuyển thẳng sang trang Checkout
   buyNow(product)
 }
 
-// Chuẩn bị dữ liệu `selectedCartItems` từ cartItem vừa thêm vào localStorage
-// để Checkout.vue có thể đọc lại ngay khi mount (xem Checkout.vue -> getInitialCartData).
-// Chỉ chọn đúng cartItem vừa được thêm (skuId trùng + là Flash Sale + cùng slotId nếu có).
-// 'ownSlot' là slot của sản phẩm (luôn được verify ACTIVE trước khi truyền vào).
 function prepareCheckoutSelection(cartItem, product, ownSlot) {
   const item = {
     cartItemId: cartItem.cartItemId,
@@ -659,7 +775,6 @@ function prepareCheckoutSelection(cartItem, product, ownSlot) {
     price: cartItem.price ?? product.price,
     totalPrice:
       cartItem.totalPrice ?? (cartItem.price ?? product.price) * (cartItem.quantity ?? 1),
-    // Thông tin Flash Sale để Checkout.vue hiển thị badge + áp dụng giá FS
     isFlashSale: true,
     flashSaleSlotId: ownSlot?.slotId ?? product.slotId ?? null,
     flashSaleSlotName:
@@ -670,22 +785,13 @@ function prepareCheckoutSelection(cartItem, product, ownSlot) {
   localStorage.setItem('selectedSubtotal', String(item.totalPrice))
 }
 
-// Thêm sản phẩm Flash Sale vào giỏ rồi chuyển thẳng sang Checkout.
-// Nếu SP đã có trong giỏ thì KHÔNG add thêm (tránh lỗi vượt tồn kho của FS),
-// chỉ điều hướng thẳng tới Checkout với cartItem hiện có — đúng yêu cầu:
-// "click Mua ngay → sang checkout → sau khi mua SP sẽ mất khỏi giỏ".
 const buyNow = async (product) => {
   if (product.addingToCart) return
   product.addingToCart = true
 
   try {
-    // Check slot của sản phẩm (không phải slot ACTIVE global).
-    // Helper sẽ tự bật modal cancelled / toast warning nếu không hợp lệ.
     if (!ensureProductSlotIsBuyable(product)) return
 
-    // Dùng slot CỦA SẢN PHẨM (product.slotId), không phải slot ACTIVE đầu tiên
-    // trong clientSlots. Tránh nhầm: nếu sản phẩm thuộc slot B (status≠2) mà
-    // clientSlots có slot A (status=2) → truyền nhầm slot A cho API.
     const ownSlot = flashSaleStore.getSlotById(product.slotId)
     if (!ownSlot || Number(ownSlot.status) !== 2) {
       showToast({
@@ -705,8 +811,6 @@ const buyNow = async (product) => {
       return
     }
 
-    // Đảm bảo cartStore có dữ liệu mới nhất trước khi kiểm tra SP đã có trong giỏ chưa.
-    // Nếu cartStore.items chưa có gì (vd: vào thẳng FlashSalePage không qua header), fetch trước.
     if (!Array.isArray(cartStore.items) || cartStore.items.length === 0) {
       try {
         await cartStore.fetchCart()
@@ -715,8 +819,6 @@ const buyNow = async (product) => {
       }
     }
 
-    // Tìm cartItem hiện có (nếu SP đã được thêm vào giỏ trước đó).
-    // Ưu tiên cartItem đang ở Flash Sale (isFlashSale=true) để giữ giá FS.
     const existingItem =
       (cartStore.items || []).find(
         (ci) => ci.skuId === product.skuId && ci.isFlashSale === true,
@@ -726,22 +828,25 @@ const buyNow = async (product) => {
 
     let matchedItem = existingItem
 
-    // Chỉ addToCart khi SP chưa có trong giỏ. Nếu đã có thì dùng luôn cartItem hiện tại
-    // để đi tiếp — không cần gọi backend lần nữa (tránh vượt tồn kho FS).
     if (!matchedItem) {
       const success = await cartStore.addToCartWithFlashSale(
         product.skuId,
         1,
-        ownSlot.slotId,    // ← slot CỦA SẢN PHẨM (không phải slot ACTIVE đầu tiên)
+        ownSlot.slotId,
         product.price,
       )
 
       if (!success) {
-        showToast({
-          type: 'error',
-          title: 'Lỗi!',
-          message: cartStore.error || 'Không thể thêm vào giỏ',
-        })
+        // Nếu lỗi này đến từ 401 (guest chưa đăng nhập), modal LoginRequiredModal
+        // đã hiển thị thông báo rồi -> không cần show thêm toast lỗi trùng lặp.
+        if (!suppressErrorToast.value) {
+          showToast({
+            type: 'error',
+            title: 'Lỗi!',
+            message: cartStore.error || 'Không thể thêm vào giỏ',
+          })
+        }
+        suppressErrorToast.value = false
         return
       }
 
@@ -764,16 +869,18 @@ const buyNow = async (product) => {
 
     prepareCheckoutSelection(matchedItem, product, ownSlot)
 
-    // Nếu chưa đăng nhập, router.beforeEach sẽ redirect sang /auth/login
-    // (do route /checkout có meta.requiresAuth = true) và quay lại /checkout sau đăng nhập.
     router.push('/checkout')
   } catch (error) {
     console.error('Lỗi mua ngay:', error)
-    showToast({
-      type: 'error',
-      title: 'Lỗi!',
-      message: error.response?.data?.message || 'Không thể mua ngay',
-    })
+    // Tương tự: nếu là lỗi 401 đã được xử lý bằng modal đăng nhập, không show toast lỗi nữa.
+    if (!suppressErrorToast.value) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: error.response?.data?.message || 'Không thể mua ngay',
+      })
+    }
+    suppressErrorToast.value = false
   } finally {
     setTimeout(() => {
       product.addingToCart = false
@@ -781,23 +888,17 @@ const buyNow = async (product) => {
   }
 }
 
-// Toggle yêu thích (UI-only — chưa gắn API wishlist)
 const toggleFavorite = (product) => {
   product.favorited = !product.favorited
 }
 
-// Thêm vào giỏ hàng - kết nối API thật với Flash Sale
 const addToCart = async (product) => {
   if (product.addingToCart) return
   product.addingToCart = true
 
   try {
-    // Check slot của sản phẩm (không phải slot ACTIVE global).
-    // Helper sẽ tự bật modal cancelled / toast warning nếu không hợp lệ.
     if (!ensureProductSlotIsBuyable(product)) return
 
-    // Dùng slot CỦA SẢN PHẨM (product.slotId), không phải slot ACTIVE đầu tiên
-    // trong clientSlots. Tránh nhầm slot khi sản phẩm không thuộc slot ACTIVE đầu tiên.
     const ownSlot = flashSaleStore.getSlotById(product.slotId)
     if (!ownSlot || Number(ownSlot.status) !== 2) {
       showToast({
@@ -808,7 +909,6 @@ const addToCart = async (product) => {
       return
     }
 
-    // Kiểm tra số lượng còn lại
     if (product.left <= 0) {
       showToast({
         type: 'error',
@@ -818,12 +918,11 @@ const addToCart = async (product) => {
       return
     }
 
-    // Gọi API thêm vào giỏ với thông tin Flash Sale
     const success = await cartStore.addToCartWithFlashSale(
-      product.skuId,           // skuId
-      1,                      // quantity
-      ownSlot.slotId,         // flashSaleSlotId (của sản phẩm)
-      product.price           // flashSalePrice
+      product.skuId,
+      1,
+      ownSlot.slotId,
+      product.price
     )
 
     if (success) {
@@ -833,19 +932,28 @@ const addToCart = async (product) => {
         message: 'Đã thêm vào giỏ hàng',
       })
     } else {
-      showToast({
-        type: 'error',
-        title: 'Lỗi!',
-        message: cartStore.error || 'Không thể thêm vào giỏ',
-      })
+      // Nếu lỗi này đến từ 401 (guest chưa đăng nhập), modal LoginRequiredModal
+      // đã hiển thị thông báo rồi -> không cần show thêm toast lỗi trùng lặp.
+      if (!suppressErrorToast.value) {
+        showToast({
+          type: 'error',
+          title: 'Lỗi!',
+          message: cartStore.error || 'Không thể thêm vào giỏ',
+        })
+      }
+      suppressErrorToast.value = false
     }
   } catch (error) {
     console.error('Lỗi thêm vào giỏ:', error)
-    showToast({
-      type: 'error',
-      title: 'Lỗi!',
-      message: error.response?.data?.message || 'Không thể thêm vào giỏ hàng',
-    })
+    // Tương tự: nếu là lỗi 401 đã được xử lý bằng modal đăng nhập, không show toast lỗi nữa.
+    if (!suppressErrorToast.value) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: error.response?.data?.message || 'Không thể thêm vào giỏ hàng',
+      })
+    }
+    suppressErrorToast.value = false
   } finally {
     setTimeout(() => {
       product.addingToCart = false
@@ -873,7 +981,7 @@ const showNextFomo = () => {
   fomoMessage.value = msg
   fomoSub.value = sub
   fomoVisible.value = true
-  fomoKey.value++ // ép progress-bar remount để chạy lại animation từ đầu
+  fomoKey.value++
   fomoIdx++
   setTimeout(() => { fomoVisible.value = false }, 4200)
 }
@@ -895,27 +1003,23 @@ const createFallingDots = () => {
 
   const isMobile = window.innerWidth < 640
   const count = isMobile ? 60 : 120
-
-  // Quãng đường rơi = đúng chiều cao thật của banner (thay vì số cứng 400px)
   const fallDistance = container.offsetHeight || 340
 
-  container.innerHTML = '' // Clear existing
+  container.innerHTML = ''
 
   for (let i = 0; i < count; i++) {
     const dot = document.createElement('div')
     dot.classList.add('falling-dot')
 
-    // Random properties với distribution đều
-    const x = Math.random() * 100 // 0% - 100% spread evenly
+    const x = Math.random() * 100
     const size = 3 + Math.random() * 8
-    const duration = 2.5 + Math.random() * 4 // 2.5s - 6.5s
-    const delay = Math.random() * 6 // 0s - 6s spread
+    const duration = 2.5 + Math.random() * 4
+    const delay = Math.random() * 6
     const isWhite = Math.random() > 0.4
 
-    // Gán trực tiếp từng style property
     dot.style.position = 'absolute'
     dot.style.left = `${x}%`
-    dot.style.top = '-20px' // Fixed start position above
+    dot.style.top = '-20px'
     dot.style.width = `${size}px`
     dot.style.height = `${size}px`
     dot.style.background = isWhite ? '#fff' : '#fbbf24'
@@ -927,7 +1031,7 @@ const createFallingDots = () => {
     dot.style.animationTimingFunction = 'linear'
     dot.style.animationIterationCount = 'infinite'
     dot.style.boxShadow = `0 0 ${size}px ${isWhite ? 'rgba(255,255,255,0.9)' : 'rgba(251,191,36,0.9)'}`
-    dot.style.opacity = '0' // Start invisible
+    dot.style.opacity = '0'
 
     container.appendChild(dot)
   }
@@ -938,26 +1042,21 @@ let resizeHandler = null
 let refreshTimer = null
 
 onMounted(async () => {
+  // Lắng nghe event auth-required (khi guest nhận 401 từ API)
+  window.addEventListener('auth-required', handleAuthRequired)
+
   // Tải dữ liệu Flash Sale ACTIVE + sắp diễn ra từ BE
+  // (watch(rawFlashSaleItems, ..., { immediate: true }) sẽ tự lo phần merge + animate)
   await fetchFlashSales(false)
   createFallingDots()
 
-  // Tạo lại các chấm khi resize để quãng rơi luôn khớp chiều cao banner
   resizeHandler = () => createFallingDots()
   window.addEventListener('resize', resizeHandler)
-
-  // Đếm số giá tăng dần, chạy sau khi card entrance animation gần xong, so le từng card
-  flashSaleProducts.value.forEach((product, index) => {
-    animateCountUp(product, 300 + index * 80)
-  })
 
   setTimeout(showNextFomo, 1800)
   fomoTimer = setInterval(showNextFomo, 6000)
 
   // Refresh dữ liệu mỗi 30s để cập nhật status slot (cancel/restore từ admin).
-  // Trước đây trang này KHÔNG có interval refetch → dẫn đến `clientSlots` bị stale,
-  // user click sản phẩm vẫn thấy modal cancelled dù admin đã restore slot.
-  // Có interval 60s trên HomeFlashSale.vue, trang này nên có tương tự để đồng bộ.
   refreshTimer = setInterval(() => {
     flashSaleStore.fetchClientSlots(20).catch(() => {})
   }, 30000)
@@ -969,5 +1068,3 @@ onUnmounted(() => {
   if (resizeHandler) window.removeEventListener('resize', resizeHandler)
 })
 </script>
-
-

@@ -1161,3 +1161,62 @@
   transform: translateY(-12px);
   opacity: 0;
 }
+
+/* ==== Phân trang sản phẩm Flash Sale ==== */
+.fsp-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin: 28px auto 8px;
+  flex-wrap: wrap;
+}
+
+.fsp-page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 6px;
+  border: 1.5px solid #e5e7eb;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.fsp-page-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.fsp-page-btn:hover:not(:disabled):not(.active) {
+  background: #fffbeb;
+  border-color: #f59e0b;
+  color: #d97706;
+}
+
+.fsp-page-btn.active {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border-color: #f59e0b;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.35);
+}
+
+.fsp-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.fsp-pagination-info {
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 24px;
+  font-weight: 500;
+}

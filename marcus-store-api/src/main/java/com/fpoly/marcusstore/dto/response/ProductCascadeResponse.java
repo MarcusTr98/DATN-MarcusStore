@@ -33,6 +33,7 @@ public class ProductCascadeResponse {
     public static class SkuNode {
         private Integer skuId;
         private String productName;     // Tên sản phẩm : iphong 15 promax
+        private String skuCode;        // Mã SKU: IP15PM-BLK-1TB
         private BigDecimal originalPrice;
         private Integer stockQuantity;
         private String attributes;     //256GB, Đen - gộp các biến thể của một sku lại
