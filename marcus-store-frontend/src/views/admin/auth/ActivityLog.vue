@@ -1,178 +1,358 @@
 <template>
   <div class="al-page">
 
-    <div class="page-header">
-      <div class="page-header-left">
-        <div class="page-icon">
-          <i class="bi bi-clock-history"></i>
+    <!-- Hero Banner - Đồng bộ style Đối soát -->
+    <div class="al-hero">
+      <div class="hero-bg"></div>
+      <div class="hero-content">
+        <div class="hero-title">
+          <div class="hero-icon"><i class="bi bi-clock-history"></i></div>
+          <div>
+            <h1>Nhật ký hoạt động</h1>
+            <p>Theo dõi toàn bộ thao tác tạo/sửa/xoá dữ liệu trong hệ thống.</p>
+          </div>
         </div>
-        <div>
-          <h2 class="page-title">Nhật ký hoạt động</h2>
-          <p class="page-sub">Theo dõi toàn bộ thao tác tạo/sửa/xoá dữ liệu trong hệ thống.</p>
+        <div class="d-flex align-items-center gap-3">
+          <div class="dynamic-total" v-if="filteredLogs.length > 0">
+            Tổng log lọc: <strong>{{ filteredLogs.length }}</strong>
+          </div>
+          <button class="btn-export-excel" :disabled="exporting" @click="handleExport">
+            <i class="bi" :class="exporting ? 'bi-arrow-repeat spin' : 'bi-download'"></i>
+            {{ exporting ? 'Đang xuất...' : 'Xuất CSV' }}
+          </button>
         </div>
       </div>
-      <button class="btn-add" :disabled="exporting" @click="handleExport">
-        <i class="bi" :class="exporting ? 'bi-arrow-repeat spin' : 'bi-download'"></i>
-        {{ exporting ? 'Đang xuất...' : 'Xuất CSV' }}
-      </button>
     </div>
 
-    <section class="stats-grid">
-      <article class="stat-card">
-        <span>Tổng số log</span>
-        <strong>{{ stats.total }}</strong>
-      </article>
-      <article class="stat-card">
-        <span>Tạo mới (Create)</span>
-        <strong class="text-success">{{ stats.create }}</strong>
-      </article>
-      <article class="stat-card">
-        <span>Cập nhật (Update)</span>
-        <strong class="text-warning">{{ stats.update }}</strong>
-      </article>
-      <article class="stat-card">
-        <span>Xoá (Delete)</span>
-        <strong class="text-danger">{{ stats.delete }}</strong>
-      </article>
-    </section>
+    <div v-if="loading" class="state-box">
+      <i class="bi bi-arrow-repeat spin"></i> Đang tải dữ liệu...
+    </div>
 
-    <div class="page-card">
-      <div v-if="loading" class="state-box">
-        <i class="bi bi-arrow-repeat spin"></i> Đang tải dữ liệu...
-      </div>
+    <div v-else-if="loadError" class="state-box state-error">
+      <i class="bi bi-exclamation-circle"></i> {{ loadError }}
+      <button class="btn-retry" @click="loadAll">Thử lại</button>
+    </div>
 
-      <div v-else-if="loadError" class="state-box state-error">
-        <i class="bi bi-exclamation-circle"></i> {{ loadError }}
-        <button class="btn-retry" @click="loadAll">Thử lại</button>
-      </div>
-
-      <template v-else>
-        <!-- Bộ lọc -->
-        <div class="filter-wrap">
-          <div class="filter-group">
-            <label class="filter-label">TÌM KIẾM</label>
-            <div class="search-box">
-              <i class="bi bi-search search-icon"></i>
-              <input class="filter-input" type="text" v-model="filters.search"
-                placeholder="Tìm theo mô tả, username, IP..." />
-            </div>
+    <template v-else>
+      <!-- Stats Grid - 4 card đồng bộ -->
+      <section class="stats-grid">
+        <article class="stat-card">
+          <div class="stat-icon stat-icon-blue"><i class="bi bi-collection"></i></div>
+          <div class="stat-body">
+            <span>Tổng số log</span>
+            <strong>{{ stats.total }}</strong>
           </div>
-          <div class="filter-group">
-            <label class="filter-label">HÀNH ĐỘNG</label>
-            <div class="select-wrap">
-              <select class="filter-select" v-model="filters.actionType">
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon stat-icon-green"><i class="bi bi-plus-circle"></i></div>
+          <div class="stat-body">
+            <span>Tạo mới (Create)</span>
+            <strong class="fin-accent">{{ stats.create }}</strong>
+          </div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon stat-icon-amber"><i class="bi bi-pencil"></i></div>
+          <div class="stat-body">
+            <span>Cập nhật (Update)</span>
+            <strong>{{ stats.update }}</strong>
+          </div>
+        </article>
+        <article class="stat-card">
+          <div class="stat-icon stat-icon-red"><i class="bi bi-trash"></i></div>
+          <div class="stat-body">
+            <span>Xoá (Delete)</span>
+            <strong>{{ stats.delete }}</strong>
+          </div>
+        </article>
+      </section>
+
+      <!-- Chart Panel - Biểu đồ cột -->
+      <section class="chart-panel" v-if="chartDays.length > 0">
+        <div class="chart-header">
+          <i class="bi bi-bar-chart-fill"></i> Phân bổ hoạt động theo ngày
+          <span class="chart-subnote">(theo khoảng ngày đang lọc)</span>
+        </div>
+        <div class="chart-bars">
+          <div class="chart-col" v-for="d in chartDays" :key="d.date">
+            <div class="chart-bar" :title="`${d.date}: ${d.total} log`">
+              <div class="seg seg-red" :style="{ height: pct(d.delete, chartMax) }"></div>
+              <div class="seg seg-amber" :style="{ height: pct(d.update, chartMax) }"></div>
+              <div class="seg seg-green" :style="{ height: pct(d.create, chartMax) }"></div>
+            </div>
+            <span class="chart-label">{{ d.date }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Filters & Table Container -->
+      <div class="table-panel">
+        <!-- Bộ lọc -->
+        <div class="toolbar-panel">
+          <div class="toolbar-row">
+            <div class="field field-keyword">
+              <label class="form-label">Tìm kiếm (Mô tả, Username, IP)</label>
+              <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input
+                  v-model="filters.search"
+                  type="text"
+                  class="form-control"
+                  placeholder="Nhập từ khóa..."
+                />
+              </div>
+            </div>
+
+            <div class="field">
+              <label class="form-label">Hành động</label>
+              <select v-model="filters.actionType" class="form-select">
                 <option value="">Tất cả</option>
                 <option v-for="a in actionOptions" :key="a" :value="a">{{ actionLabel(a) }}</option>
               </select>
-              <i class="bi bi-chevron-down select-arrow"></i>
             </div>
-          </div>
-          <div class="filter-group">
-            <label class="filter-label">BẢNG DỮ LIỆU</label>
-            <div class="select-wrap">
-              <select class="filter-select" v-model="filters.tableName">
+
+            <div class="field">
+              <label class="form-label">Bảng dữ liệu</label>
+              <select v-model="filters.tableName" class="form-select">
                 <option value="">Tất cả</option>
                 <option v-for="t in tableOptions" :key="t" :value="t">{{ tableLabel(t) }}</option>
               </select>
-              <i class="bi bi-chevron-down select-arrow"></i>
+            </div>
+
+            <div class="field field-dates">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label mb-0">Thời gian</label>
+                <div class="quick-dates">
+                  <button @click="setPeriod('today')" :class="{ active: activePeriod === 'today' }" class="btn-quick-date">Hôm nay</button>
+                  <button @click="setPeriod('7d')" :class="{ active: activePeriod === '7d' }" class="btn-quick-date">7 Ngày</button>
+                  <button @click="setPeriod('month')" :class="{ active: activePeriod === 'month' }" class="btn-quick-date">Tháng này</button>
+                  <button @click="setPeriod('lastMonth')" :class="{ active: activePeriod === 'lastMonth' }" class="btn-quick-date">Tháng trước</button>
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <input
+                  v-model="filters.fromDate"
+                  type="date"
+                  class="form-control"
+                  title="Từ ngày"
+                />
+                <input
+                  v-model="filters.toDate"
+                  type="date"
+                  class="form-control"
+                  title="Đến ngày"
+                />
+                <button class="btn-soft" @click="resetFilters" title="Đặt lại bộ lọc">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+              </div>
             </div>
           </div>
-          <button class="btn-reset" title="Đặt lại" @click="resetFilters">
-            <i class="bi bi-arrow-clockwise"></i>
-          </button>
         </div>
 
         <!-- Bảng -->
-        <div class="table-section">
-          <table class="tbl">
+        <div class="table-wrapper">
+          <table class="financial-table">
             <thead>
               <tr>
-                <th style="width:56px">#</th>
-                <th style="width:100px">HÀNH ĐỘNG</th>
-                <th style="width:150px">BẢNG</th>
+                <th style="width: 56px">STT</th>
+                <th style="width: 100px">HÀNH ĐỘNG</th>
+                <th style="width: 150px">BẢNG</th>
                 <th>MÔ TẢ</th>
-                <th style="width:170px">NGƯỜI THỰC HIỆN</th>
-                <th style="width:120px">IP</th>
-                <th style="width:150px">THỜI GIAN</th>
+                <th style="width: 170px">NGƯỜI THỰC HIỆN</th>
+                <th style="width: 120px">IP</th>
+                <th style="width: 150px">THỜI GIAN</th>
+                <th style="width: 70px" class="text-center">THAO TÁC</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-if="!paged.length">
-                <td colspan="7" class="empty-row">
-                  <i class="bi bi-inbox empty-icon"></i>
-                  <span>Không có log nào khớp bộ lọc</span>
+              <tr v-if="loading">
+                <td colspan="8" class="text-center py-4">
+                  <i class="bi bi-arrow-repeat spin"></i> Đang tải dữ liệu...
                 </td>
               </tr>
-              <tr v-for="(log, i) in paged" :key="log.logId" :class="i % 2 === 1 ? 'row-alt' : ''">
+              <tr v-else-if="paged.length === 0">
+                <td colspan="8" class="text-center py-4">
+                  <i class="bi bi-inbox" style="font-size: 1.6rem; color: #9db8de"></i>
+                  <div class="mt-2" style="color: #6b7280">Không có log nào phù hợp.</div>
+                </td>
+              </tr>
+              <tr v-else v-for="(log, index) in paged" :key="log.logId">
                 <td class="td-id">#{{ log.logId }}</td>
                 <td>
-                  <span class="action-badge" :class="actionClass(log.actionType)">{{ actionLabel(log.actionType) }}</span>
+                  <span class="badge" :class="getActionClass(log.actionType)">
+                    {{ actionLabel(log.actionType) }}
+                  </span>
                 </td>
-                <td class="table-cell" :title="log.tableName">{{ tableLabel(log.tableName) }}</td>
-                <td class="desc-cell" :title="log.description">{{ log.description || '—' }}</td>
-                <td class="user-cell">
+                <td class="fw-bold">{{ tableLabel(log.tableName) }}</td>
+                <td class="desc-cell" :title="translateDescription(log.description)">{{ translateDescription(log.description) || '—' }}</td>
+                <td>
                   <template v-if="log.userId">
                     <div class="user-name">{{ log.fullName || log.username }}</div>
                     <div class="user-sub">@{{ log.username }}</div>
                   </template>
-                  <span v-else class="text-deleted">Người dùng đã xoá</span>
+                  <span v-else class="text-muted">Người dùng đã xoá</span>
                 </td>
-                <td class="ip-cell mono">{{ log.ipAddress || '—' }}</td>
-                <td class="date-cell">{{ log.createdAt }}</td>
+                <td class="mono">{{ log.ipAddress || '—' }}</td>
+                <td>{{ formatDate(log.createdAt) }}</td>
+                <td class="text-center">
+                  <button class="btn-icon" @click="openDetail(log.logId)" title="Xem chi tiết">
+                    <i class="bi bi-eye"></i>
+                  </button>
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
 
-          <div v-if="filteredLogs.length > 0" class="voucher-pagination">
-            <div class="pagination-summary">
-              Tổng <strong>{{ filteredLogs.length }}</strong> log
+        <!-- Pagination -->
+        <div class="fin-pagination">
+          <div class="pagination-summary">
+            Tổng <strong>{{ filteredLogs.length }}</strong> log
+          </div>
+
+          <div class="pagination-controls">
+            <div class="page-size-group">
+              <span class="page-size-label">Hiển thị</span>
+              <select v-model.number="pageSize" class="form-select page-size-select" @change="page = 1">
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+                <option :value="100">100</option>
+              </select>
+              <span class="page-size-label page-size-suffix">/ trang</span>
             </div>
-            <div class="pagination-controls">
-              <label class="page-size-control">
-                <span>Hiển thị</span>
-                <select v-model.number="pageSize" class="form-select form-select-sm">
-                  <option :value="10">10</option>
-                  <option :value="20">20</option>
-                  <option :value="50">50</option>
-                  <option :value="100">100</option>
-                </select>
-              </label>
-              <button type="button" class="pagination-button" :disabled="page === 1" @click="page--">Trước</button>
-              <span class="page-indicator">Trang <strong>{{ page }}</strong> / {{ totalPages }}</span>
-              <button type="button" class="pagination-button" :disabled="page === totalPages" @click="page++">Sau</button>
-            </div>
+
+            <nav class="pager" aria-label="Phân trang">
+              <button class="pager-arrow" :disabled="page === 1" @click="page = 1">
+                <i class="bi bi-chevron-bar-left"></i>
+              </button>
+              <button class="pager-arrow" :disabled="page === 1" @click="page--">
+                <i class="bi bi-chevron-left"></i>
+              </button>
+              <ul class="pager-list">
+                <li v-for="(p, i) in pageItems" :key="i">
+                  <span v-if="p === '...'" class="pager-ellipsis">…</span>
+                  <button
+                    v-else
+                    class="pager-num"
+                    :class="{ active: p === page }"
+                    @click="page = p"
+                  >
+                    {{ p }}
+                  </button>
+                </li>
+              </ul>
+              <button class="pager-arrow" :disabled="page === totalPages" @click="page++">
+                <i class="bi bi-chevron-right"></i>
+              </button>
+              <button class="pager-arrow" :disabled="page === totalPages" @click="page = totalPages">
+                <i class="bi bi-chevron-bar-right"></i>
+              </button>
+            </nav>
           </div>
         </div>
-      </template>
+      </div>
+    </template>
+
+    <!-- Modal Chi tiết -->
+    <div v-if="detailLog" class="modal-overlay" @click.self="detailLog = null">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div class="modal-header-title">
+            <span class="modal-header-icon"><i class="bi bi-file-earmark-text"></i></span>
+            <h5 class="mb-0">Chi tiết Log #{{ detailLog.logId }}</h5>
+          </div>
+          <button class="btn-close-modal" @click="detailLog = null" title="Đóng">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="id-row">
+            <div class="id-block">
+              <span class="detail-label">Log ID</span>
+              <strong class="font-monospace">{{ detailLog.logId }}</strong>
+            </div>
+          </div>
+
+          <div class="badge-row">
+            <div class="detail-group">
+              <span class="detail-label">Hành động</span>
+              <span :class="['badge', 'badge-lg', getActionClass(detailLog.actionType)]">
+                {{ actionLabel(detailLog.actionType) }}
+              </span>
+            </div>
+            <div class="detail-group">
+              <span class="detail-label">Bảng dữ liệu</span>
+              <strong>{{ tableLabel(detailLog.tableName) }}</strong>
+            </div>
+          </div>
+
+          <div class="note-box">
+            <span class="detail-label"><i class="bi bi-info-circle"></i> Mô tả</span>
+            <p class="note-text">{{ translateDescription(detailLog.description) || 'Không có mô tả' }}</p>
+          </div>
+
+          <div class="recipient-box">
+            <h6 class="recipient-title">
+              <i class="bi bi-person-lines-fill"></i> Thông tin người thực hiện
+            </h6>
+            <div class="detail-group mb-2">
+              <span class="detail-label">Tên & Username</span>
+              <strong>{{ detailLog.fullName || '---' }} · @{{ detailLog.username || '---' }}</strong>
+            </div>
+            <div class="detail-group mb-0">
+              <span class="detail-label">Địa chỉ IP</span>
+              <span class="text-muted address-text mono">{{ detailLog.ipAddress || '---' }}</span>
+            </div>
+          </div>
+
+          <div class="modal-footer-note">
+            <i class="bi bi-clock-history"></i>
+            Thời gian: {{ formatDate(detailLog.createdAt) }}
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="toast-wrap">
-      <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.message }}</div>
-    </div>
+    <!-- Toast -->
+    <transition name="fade">
+      <div v-if="toast.show" class="toast-alert" :class="{ error: toast.type === 'error' }">
+        <i class="bi" :class="toast.type === 'error' ? 'bi-x-circle-fill' : 'bi-check-circle-fill'"></i>
+        <div>
+          <strong>{{ toast.title }}</strong>
+          <span>{{ toast.message }}</span>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
 import { reactive, ref, computed, watch, onMounted } from 'vue';
-import { auditLogApi } from '@/api/Auditlogapi';
+import { auditLogApi } from '@/api/AuditLogApi';
 
 const logs = ref([]);
 const loading = ref(true);
 const loadError = ref('');
 const exporting = ref(false);
+const detailLog = ref(null);
 
-const toasts = ref([]);
-function pushToast(type, message) {
-  const id = Date.now() + Math.random();
-  toasts.value.push({ id, type, message });
-  setTimeout(() => { toasts.value = toasts.value.filter((t) => t.id !== id); }, 3200);
-}
+// Toast
+const toast = reactive({ show: false, type: 'success', title: '', message: '' });
+let toastTimer = null;
+const showToast = (type, title, message) => {
+  toast.show = true;
+  toast.type = type;
+  toast.title = title;
+  toast.message = message;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (toast.show = false), 3000);
+};
 
-const filters = reactive({ search: '', actionType: '', tableName: '' });
+const filters = reactive({ search: '', actionType: '', tableName: '', fromDate: '', toDate: '' });
+const activePeriod = ref(null);
 
-// Luôn hiện đủ 3 hành động chuẩn (đúng theo comment trong entity AuditLog:
-// "CREATE, UPDATE, DELETE"), kể cả khi dữ liệu hiện tại chưa có action đó.
-// Nếu sau này phát sinh action lạ khác ngoài 3 loại này, vẫn tự động thêm vào cuối.
+// ---- Label maps ----
 const STANDARD_ACTIONS = ['CREATE', 'UPDATE', 'DELETE'];
 const actionOptions = computed(() => {
   const found = new Set(logs.value.map((l) => l.actionType).filter(Boolean));
@@ -181,48 +361,81 @@ const actionOptions = computed(() => {
 });
 const tableOptions = computed(() => [...new Set(logs.value.map((l) => l.tableName).filter(Boolean))].sort());
 
-// Map tên bảng thô trong DB sang tên tiếng Việt thân thiện hơn khi hiển thị.
-// Bảng nào chưa có trong map thì tự fallback: thay "_" bằng khoảng trắng.
+const ACTION_LABELS = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xoá' };
+function actionLabel(a) { return a ? (ACTION_LABELS[a.toUpperCase()] || a) : '—'; }
+function getActionClass(a) {
+  const v = (a || '').toUpperCase();
+  if (v === 'CREATE') return 'bg-success';
+  if (v === 'UPDATE') return 'bg-warning';
+  if (v === 'DELETE') return 'bg-danger';
+  return 'bg-secondary';
+}
+
 const TABLE_LABELS = {
-  Users: 'Người dùng',
-  Roles: 'Vai trò',
-  Permissions: 'Quyền hạn',
-  Categories: 'Danh mục sản phẩm',
-  Products: 'Sản phẩm',
-  Product_Images: 'Ảnh sản phẩm',
-  Product_Skus: 'Biến thể sản phẩm (SKU)',
-  Product_Items: 'Kho IMEI',
-  Attributes: 'Thuộc tính',
-  Attribute_Values: 'Giá trị thuộc tính',
-  Carts: 'Giỏ hàng',
-  Cart_Items: 'Mục giỏ hàng',
-  Wishlists: 'Yêu thích',
-  Vouchers: 'Voucher',
-  User_Vouchers: 'Voucher người dùng',
-  Flash_Sale_Slots: 'Khung giờ Flash Sale',
-  Flash_Sale_Items: 'Sản phẩm Flash Sale',
-  Orders: 'Đơn hàng',
-  Order_Items: 'Chi tiết đơn hàng',
-  Order_Status_History: 'Lịch sử trạng thái đơn',
-  Order_Transactions: 'Giao dịch đơn hàng',
-  Post_Categories: 'Danh mục bài viết',
-  Posts: 'Bài viết',
-  Banner_Positions: 'Vị trí banner',
-  Banners: 'Banner',
-  Comments_Evaluations: 'Đánh giá sản phẩm',
-  Contact_Requests: 'Yêu cầu liên hệ',
-  Admin_Notifications: 'Thông báo admin',
-  System_Settings: 'Cấu hình hệ thống',
-  Shipping_Config: 'Cấu hình vận chuyển',
-  User_Addresses: 'Địa chỉ người dùng',
-  Provinces: 'Tỉnh/Thành phố',
-  Districts: 'Quận/Huyện',
-  Wards: 'Phường/Xã',
-  Audit_Logs: 'Nhật ký hoạt động',
+  Users: 'Người dùng', Roles: 'Vai trò', Permissions: 'Quyền hạn', User_Permissions: 'Phân quyền nhân viên',
+  Categories: 'Danh mục sản phẩm', Products: 'Sản phẩm', Product_Images: 'Ảnh sản phẩm',
+  Product_Skus: 'Biến thể sản phẩm (SKU)', Product_Items: 'Kho IMEI', Attributes: 'Thuộc tính',
+  Attribute_Values: 'Giá trị thuộc tính', Vouchers: 'Voucher', User_Vouchers: 'Voucher người dùng',
+  Flash_Sale_Slots: 'Khung giờ Flash Sale', Flash_Sale_Items: 'Sản phẩm Flash Sale', Orders: 'Đơn hàng',
+  Order_Items: 'Chi tiết đơn hàng', Order_Transactions: 'Giao dịch đơn hàng', Post_Categories: 'Danh mục bài viết',
+  Posts: 'Bài viết', Banners: 'Banner', Contact_Requests: 'Yêu cầu liên hệ',
+  System_Settings: 'Cấu hình hệ thống', Shipping_Config: 'Cấu hình vận chuyển', Admin_Notifications: 'Thông báo admin',
+  User_Addresses: 'Địa chỉ người dùng', Audit_Logs: 'Nhật ký hoạt động',
 };
-function tableLabel(name) {
-  if (!name) return '—';
-  return TABLE_LABELS[name] || name.replace(/_/g, ' ');
+function tableLabel(name) { return name ? (TABLE_LABELS[name] || name.replace(/_/g, ' ')) : '—'; }
+
+// ---- Dịch mô tả sang tiếng Việt ----
+// Thay tên bảng raw (vd: System_Settings, Attribute_Values) bằng nhãn tiếng Việt trong TABLE_LABELS.
+// Các từ khoá kỹ thuật như SKU, IMEI được giữ nguyên, không dịch.
+const SKIP_TRANSLATE_KEYS = new Set(['Product_Skus', 'Product_Items']); // SKU, IMEI -> giữ nguyên
+const TABLE_KEYS_SORTED = Object.keys(TABLE_LABELS)
+  .filter((k) => !SKIP_TRANSLATE_KEYS.has(k))
+  .sort((a, b) => b.length - a.length); // dài trước để tránh thay nhầm chuỗi con
+function translateDescription(desc) {
+  if (!desc) return desc;
+  let result = desc;
+  TABLE_KEYS_SORTED.forEach((key) => {
+    const regex = new RegExp(`\\b${key}\\b`, 'g');
+    result = result.replace(regex, TABLE_LABELS[key]);
+  });
+  return result;
+}
+
+// ---- Date parsing ----
+function parseVnDateTime(str) {
+  if (!str) return null;
+  const [datePart, timePart] = str.split(' ');
+  const [d, m, y] = datePart.split('/').map(Number);
+  const [hh, mm, ss] = (timePart || '00:00:00').split(':').map(Number);
+  return new Date(y, m - 1, d, hh || 0, mm || 0, ss || 0);
+}
+function toDateOnly(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function fmtInputDate(d) {
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function formatDate(str) {
+  return str ? new Date(parseVnDateTime(str)).toLocaleString('vi-VN') : '';
+}
+
+function setPeriod(period) {
+  activePeriod.value = period;
+  const today = new Date();
+  if (period === 'today') {
+    filters.fromDate = fmtInputDate(today);
+    filters.toDate = fmtInputDate(today);
+  } else if (period === '7d') {
+    const from = new Date(today);
+    from.setDate(from.getDate() - 6);
+    filters.fromDate = fmtInputDate(from);
+    filters.toDate = fmtInputDate(today);
+  } else if (period === 'month') {
+    filters.fromDate = fmtInputDate(new Date(today.getFullYear(), today.getMonth(), 1));
+    filters.toDate = fmtInputDate(today);
+  } else if (period === 'lastMonth') {
+    filters.fromDate = fmtInputDate(new Date(today.getFullYear(), today.getMonth() - 1, 1));
+    filters.toDate = fmtInputDate(new Date(today.getFullYear(), today.getMonth(), 0));
+  }
 }
 
 const stats = computed(() => {
@@ -249,39 +462,71 @@ const filteredLogs = computed(() => {
   }
   if (filters.actionType) list = list.filter((l) => l.actionType === filters.actionType);
   if (filters.tableName) list = list.filter((l) => l.tableName === filters.tableName);
-  return list; // BE đã trả sẵn theo thứ tự createdAt desc
+  if (filters.fromDate) {
+    const from = new Date(filters.fromDate + 'T00:00:00');
+    list = list.filter((l) => { const d = parseVnDateTime(l.createdAt); return d && d >= from; });
+  }
+  if (filters.toDate) {
+    const to = new Date(filters.toDate + 'T23:59:59');
+    list = list.filter((l) => { const d = parseVnDateTime(l.createdAt); return d && d <= to; });
+  }
+  return list;
 });
 
-function actionClass(action) {
-  const a = (action || '').toUpperCase();
-  if (a === 'CREATE') return 'act-create';
-  if (a === 'UPDATE') return 'act-update';
-  if (a === 'DELETE') return 'act-delete';
-  return 'act-other';
-}
+// ---- Chart data ----
+const chartDays = computed(() => {
+  const byDate = new Map();
+  filteredLogs.value.forEach((l) => {
+    const d = parseVnDateTime(l.createdAt);
+    if (!d) return;
+    const key = fmtInputDate(toDateOnly(d));
+    if (!byDate.has(key)) byDate.set(key, { create: 0, update: 0, delete: 0 });
+    const bucket = byDate.get(key);
+    const a = (l.actionType || '').toUpperCase();
+    if (a === 'CREATE') bucket.create++;
+    else if (a === 'UPDATE') bucket.update++;
+    else if (a === 'DELETE') bucket.delete++;
+  });
+  return [...byDate.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-14)
+    .map(([key, v]) => {
+      const [y, m, d] = key.split('-');
+      return { date: `${d}/${m}`, create: v.create, update: v.update, delete: v.delete, total: v.create + v.update + v.delete };
+    });
+});
+const chartMax = computed(() => Math.max(1, ...chartDays.value.map((d) => d.total)));
+function pct(value, max) { return max ? `${(value / max) * 100}%` : '0%'; }
 
-const ACTION_LABELS = {
-  CREATE: 'Tạo mới',
-  UPDATE: 'Cập nhật',
-  DELETE: 'Xoá',
-};
-function actionLabel(action) {
-  if (!action) return '—';
-  return ACTION_LABELS[action.toUpperCase()] || action;
-}
-
-// Phân trang client
+// ---- Pagination ----
 const page = ref(1);
-const pageSize = ref(20);
+const pageSize = ref(10);
 watch(filteredLogs, () => { page.value = 1; });
-watch(pageSize, () => { page.value = 1; });
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredLogs.value.length / pageSize.value)));
 const paged = computed(() => filteredLogs.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value));
+
+const pageItems = computed(() => {
+  const total = totalPages.value;
+  const current = page.value;
+  const delta = 1;
+  const items = [];
+  const range = [];
+  for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) range.push(i);
+  items.push(1);
+  if (range.length && range[0] > 2) items.push('...');
+  items.push(...range);
+  if (range.length && range[range.length - 1] < total - 1) items.push('...');
+  if (total > 1) items.push(total);
+  return items;
+});
 
 function resetFilters() {
   filters.search = '';
   filters.actionType = '';
   filters.tableName = '';
+  filters.fromDate = '';
+  filters.toDate = '';
+  activePeriod.value = null;
 }
 
 async function loadAll() {
@@ -297,20 +542,34 @@ async function loadAll() {
 }
 onMounted(loadAll);
 
+async function openDetail(id) {
+  try {
+    detailLog.value = await auditLogApi.getOne(id);
+  } catch {
+    showToast('error', 'Lỗi', 'Không tải được chi tiết log.');
+  }
+}
+
 async function handleExport() {
   exporting.value = true;
   try {
+    if (filteredLogs.value.length === 0) {
+      showToast('error', 'Lỗi', 'Không có dữ liệu để xuất!');
+      exporting.value = false;
+      return;
+    }
     const blob = await auditLogApi.exportCsv();
     const url = window.URL.createObjectURL(new Blob([blob]));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'audit-logs.csv');
+    link.setAttribute('download', `AuditLog_${new Date().getTime()}.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
     window.URL.revokeObjectURL(url);
+    showToast('success', 'Thành công', 'Xuất log hoàn tất!');
   } catch {
-    pushToast('error', 'Xuất file CSV thất bại. Vui lòng thử lại.');
+    showToast('error', 'Lỗi', 'Xuất file CSV thất bại. Vui lòng thử lại.');
   } finally {
     exporting.value = false;
   }
@@ -318,143 +577,855 @@ async function handleExport() {
 </script>
 
 <style scoped>
-.al-page { padding: 24px; background: #f9fafb; min-height: 100%; }
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&display=swap');
 
-.page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-.page-header-left { display: flex; align-items: center; gap: 16px; }
-.page-icon {
-  width: 48px; height: 48px; border-radius: 12px;
-  background: linear-gradient(135deg, #f55d9b, #ec4d8d);
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 22px; flex-shrink: 0;
+.al-page {
+  min-height: 100%;
+  padding: 28px;
+  background: #eef3fb;
+  font-family: 'Be Vietnam Pro', sans-serif;
 }
-.page-title { font-size: 22px; font-weight: 700; color: #f55d9b; margin: 0; }
-.page-sub { font-size: 13px; color: #6b7280; margin: 2px 0 0; }
-.btn-add {
-  display: flex; align-items: center; gap: 6px;
-  background: #f55d9b; color: #fff; border: none; border-radius: 10px;
-  padding: 10px 20px; font-size: 14px; font-weight: 500; cursor: pointer;
-  transition: background 0.15s;
+
+/* Hero - Đồng bộ với Đối soát */
+.al-hero {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(120deg, #0b3d91 0%, #1c64d6 55%, #2f80ed 100%);
+  box-shadow: 0 14px 32px -12px rgba(15, 64, 152, 0.45);
+  margin-bottom: 22px;
 }
-.btn-add:hover:not(:disabled) { background: #ec4d8d; }
-.btn-add:disabled { background: #f3d6e3; color: #b4557d; cursor: not-allowed; }
-
-.page-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
-
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
-@media (max-width: 992px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
-.stat-card {
-  border: 1px solid #f3d6e3; background: #ffffff; box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
-  padding: 20px 18px; border-radius: 8px; display: flex; flex-direction: column;
-  justify-content: space-between; min-height: 100px;
+.hero-bg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 88% -10%, rgba(255, 255, 255, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 8% 120%, rgba(255, 255, 255, 0.12) 0%, transparent 50%);
+  pointer-events: none;
 }
-.stat-card span { display: block; color: #6b7280; font-size: 0.86rem; font-weight: 700; }
-.stat-card strong { display: block; margin-top: 6px; font-size: 1.65rem; line-height: 1; }
-.text-success { color: #15803d; }
-.text-warning { color: #c2410c; }
-.text-danger { color: #dc2626; }
+.hero-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 28px 32px;
+}
+.hero-title {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+.hero-icon {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
+  font-size: 1.5rem;
+  backdrop-filter: blur(4px);
+}
+.hero-title h1 {
+  margin: 0 0 4px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+.hero-title p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.92rem;
+}
+.dynamic-total {
+  background: rgba(0, 0, 0, 0.15);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.btn-export-excel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0b3d91;
+  font-weight: 700;
+  padding: 12px 20px;
+  font-size: 0.92rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  transition: all 0.18s ease;
+  cursor: pointer;
+}
+.btn-export-excel:hover:not(:disabled) {
+  background: #f0f6ff;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+.btn-export-excel:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 
-.state-box { padding: 48px; text-align: center; color: #9ca3af; font-size: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.state-error { color: #dc2626; }
-.spin { animation: spin 1s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+/* State messages */
+.state-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 48px;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.state-error {
+  color: #dc2626;
+}
 .btn-retry {
-  margin-top: 8px; background: #f55d9b; color: #fff; border: none; border-radius: 8px;
-  padding: 7px 18px; font-size: 13px; cursor: pointer;
+  margin-top: 8px;
+  background: #0b3d91;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 20px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 600;
 }
-.btn-retry:hover { background: #ec4d8d; }
 
-/* Filter */
-.filter-wrap {
-  display: flex; align-items: flex-end; gap: 16px; flex-wrap: wrap;
-  padding: 20px 24px; border-bottom: 1px solid #f3e8ee;
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 22px;
 }
-.filter-group { display: flex; flex-direction: column; gap: 6px; min-width: 180px; flex: 1; }
-.filter-label { font-size: 11px; font-weight: 600; color: #f55d9b; letter-spacing: 0.06em; }
-.search-box { position: relative; }
-.search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 15px; pointer-events: none; }
-.filter-input {
-  width: 100%; padding: 9px 12px 9px 34px; border: 1px solid #e5e7eb; border-radius: 8px;
-  font-size: 13px; color: #111827; background: #fff; outline: none; transition: border 0.15s;
+@media (max-width: 992px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
-.filter-input:focus { border-color: #f55d9b; box-shadow: 0 0 0 3px rgba(245,93,155,0.08); }
-.select-wrap { position: relative; }
-.filter-select {
-  width: 100%; padding: 9px 32px 9px 12px; border: 1px solid #e5e7eb; border-radius: 8px;
-  font-size: 13px; color: #111827; background: #fff; outline: none; appearance: none; cursor: pointer; transition: border 0.15s;
+@media (max-width: 576px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
 }
-.filter-select:focus { border-color: #f55d9b; box-shadow: 0 0 0 3px rgba(245,93,155,0.08); }
-.select-arrow { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: 14px; pointer-events: none; }
-.btn-reset {
-  padding: 9px 14px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; color: #6b7280;
-  cursor: pointer; font-size: 16px; transition: all 0.15s; flex-shrink: 0; margin-bottom: 0;
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #ffffff;
+  border: 1px solid #dce8f9;
+  border-radius: 14px;
+  padding: 18px 20px;
+  box-shadow: 0 4px 14px -8px rgba(28, 100, 214, 0.18);
+  transition: all 0.16s ease;
 }
-.btn-reset:hover { border-color: #f55d9b; color: #f55d9b; background: #fff0f7; }
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -8px rgba(28, 100, 214, 0.3);
+}
+.stat-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: #ffffff;
+}
+.stat-icon-blue {
+  background: linear-gradient(135deg, #2f80ed, #1c64d6);
+}
+.stat-icon-green {
+  background: linear-gradient(135deg, #34c77b, #1f9d5e);
+}
+.stat-icon-amber {
+  background: linear-gradient(135deg, #ffb547, #f29c1f);
+}
+.stat-icon-red {
+  background: linear-gradient(135deg, #f5625a, #e0445c);
+}
+.stat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-body span {
+  font-size: 0.8rem;
+  color: #6b7c93;
+  font-weight: 600;
+}
+.stat-body strong {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f2c5c;
+}
+.fin-accent {
+  color: #1c64d6;
+}
+
+/* Chart Panel */
+.chart-panel {
+  background: #fff;
+  border: 1px solid #dce8f9;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 4px 14px -10px rgba(28, 100, 214, 0.16);
+  margin-bottom: 22px;
+}
+.chart-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+  color: #1f3a63;
+  margin-bottom: 10px;
+  font-size: 0.95rem;
+}
+.chart-subnote {
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: #8ba0c2;
+}
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  height: 160px;
+  overflow-x: auto;
+  padding-top: 6px;
+}
+.chart-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 34px;
+}
+.chart-bar {
+  width: 22px;
+  height: 130px;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+.seg {
+  width: 100%;
+}
+.seg-green {
+  background: #1f9d5e;
+}
+.seg-amber {
+  background: #f29c1f;
+}
+.seg-red {
+  background: #e0445c;
+}
+.chart-label {
+  font-size: 10px;
+  color: #9ca3af;
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
+/* Filter Toolbar */
+.table-panel {
+  background: #ffffff;
+  border: 1px solid #dce8f9;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px -12px rgba(28, 100, 214, 0.22);
+}
+.toolbar-panel {
+  padding: 20px 22px;
+  border-bottom: 1px solid #e9f1fb;
+}
+.toolbar-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 2fr;
+  gap: 20px;
+  align-items: end;
+}
+@media (max-width: 992px) {
+  .toolbar-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-keyword {
+  grid-column: 1 / 3;
+}
+.field-dates {
+  grid-column: 3 / 5;
+}
+.form-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #2f6fc4;
+  text-transform: uppercase;
+  margin: 0;
+}
+.form-control,
+.form-select {
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #d6e6fb;
+  border-radius: 9px;
+  background-color: #f7fbff;
+  font-size: 0.88rem;
+  outline: none;
+  transition: all 0.15s ease;
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: #2f80ed;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 0.18rem rgba(47, 128, 237, 0.16);
+}
+.input-group {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #d6e6fb;
+  border-radius: 9px;
+  background-color: #f7fbff;
+}
+.input-group-text {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  color: #5d8fd9;
+  border-right: 1px solid #d6e6fb;
+}
+.input-group .form-control {
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.quick-dates {
+  display: flex;
+  gap: 6px;
+}
+.btn-quick-date {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #d6e6fb;
+  background: #fff;
+  color: #2f80ed;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-quick-date:hover,
+.btn-quick-date.active {
+  background: #2f80ed;
+  color: #ffffff;
+}
+.btn-soft {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid #d6e6fb;
+  border-radius: 9px;
+  background: #f7fbff;
+  color: #1c64d6;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-soft:hover {
+  background: #e3effd;
+  transform: rotate(-25deg);
+}
+.d-flex {
+  display: flex;
+}
+.gap-2 {
+  gap: 8px;
+}
+.gap-3 {
+  gap: 12px;
+}
+.align-items-center {
+  align-items: center;
+}
+.justify-content-between {
+  justify-content: space-between;
+}
+.mb-1 {
+  margin-bottom: 4px;
+}
+.mb-0 {
+  margin-bottom: 0;
+}
 
 /* Table */
-.table-section { overflow-x: auto; }
-.tbl { width: 100%; min-width: 960px; border-collapse: collapse; font-size: 13px; }
-.tbl thead tr { border-bottom: 2px solid #f3e8ee; }
-.tbl th {
-  padding: 12px 14px; text-align: left; font-size: 11px; font-weight: 700; color: #f55d9b;
-  letter-spacing: 0.07em; white-space: nowrap;
+.table-wrapper {
+  overflow-x: auto;
 }
-.tbl td { padding: 10px 14px; color: #111827; border-bottom: 1px solid #f9f0f5; vertical-align: middle; }
-.row-alt td { background: #fdf8fb; }
-.tbl tr:hover td { background: #fff0f7; transition: background 0.1s; }
-.td-id { color: #9ca3af; font-size: 11px; font-weight: 600; }
-.mono { font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; }
-
-.action-badge {
-  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+.financial-table {
+  width: 100%;
+  border-collapse: collapse;
 }
-.act-create { background: #f0fdf4; color: #15803d; }
-.act-update { background: #fff7ed; color: #c2410c; }
-.act-delete { background: #fef2f2; color: #dc2626; }
-.act-other { background: #f1f5f9; color: #64748b; }
-
-.table-cell { color: #4b5563; }
+.financial-table th,
+.financial-table td {
+  padding: 14px 18px;
+  text-align: left;
+  border-bottom: 1px solid #e9f1fb;
+  font-size: 0.9rem;
+  color: #1f3a63;
+  white-space: nowrap;
+}
+.financial-table thead th {
+  background: linear-gradient(180deg, #eef6ff, #e3effd);
+  color: #1c64d6;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  border-bottom: 1px solid #d6e6fb;
+}
+.financial-table tbody tr {
+  transition: background-color 0.12s ease;
+}
+.financial-table tbody tr:hover {
+  background: #f5faff;
+}
+.badge {
+  display: inline-block;
+  padding: 5px 13px;
+  border-radius: 20px;
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.bg-success {
+  background-color: #1f9d5e;
+}
+.bg-warning {
+  background-color: #f29c1f;
+  color: #ffffff;
+}
+.bg-danger {
+  background-color: #e0445c;
+}
+.td-id {
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 600;
+}
 .desc-cell {
-  max-width: 340px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 320px;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.user-cell { min-width: 130px; }
-.user-name { font-weight: 500; color: #111827; }
-.user-sub { font-size: 11px; color: #9ca3af; }
-.text-deleted { font-size: 12px; color: #adb5bd; font-style: italic; }
-.ip-cell { color: #6b7280; }
-.date-cell { color: #4b5563; white-space: nowrap; }
+.user-name {
+  font-weight: 500;
+  color: #111827;
+}
+.user-sub {
+  font-size: 11px;
+  color: #9ca3af;
+}
+.mono {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+  font-size: 12px;
+}
+.text-muted {
+  color: #6b7280;
+}
+.text-center {
+  text-align: center;
+}
+.fw-bold {
+  font-weight: 700;
+}
+.btn-icon {
+  background: none;
+  border: none;
+  color: #2f80ed;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
+.btn-icon:hover {
+  background: #eef6ff;
+}
+.py-4 {
+  padding: 24px 0;
+}
+.mt-2 {
+  margin-top: 8px;
+}
 
-.voucher-pagination {
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
-  padding: 14px 18px; border-top: 1px solid #f3d6e3; background: #fffafd;
+/* Pagination */
+.fin-pagination {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 24px;
+  border-top: 1px solid #e9f1fb;
+  background: #ffffff;
+  overflow-x: auto;
 }
-.pagination-summary { color: #4b5563; font-size: 0.92rem; }
-.pagination-summary strong, .page-indicator strong { color: #111827; }
-.pagination-controls { display: flex; align-items: center; gap: 10px; }
-.page-size-control { display: flex; align-items: center; gap: 8px; margin: 0; color: #6b7280; font-size: 0.86rem; font-weight: 700; white-space: nowrap; }
-.page-size-control .form-select { width: 78px; min-height: 38px; padding-top: 0.35rem; padding-bottom: 0.35rem; font-weight: 700; }
-.pagination-button {
-  min-width: 72px; min-height: 38px; border: 1px solid #d8dee8; border-radius: 8px;
-  background: #ffffff; color: #344054; font-size: 0.9rem; font-weight: 800;
-  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+.pagination-summary {
+  flex-shrink: 0;
+  color: #6b7c93;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
-.pagination-button:hover:not(:disabled), .pagination-button:focus:not(:disabled) {
-  border-color: #f55d9b; background: #fff0f7; color: #be3f75;
+.pagination-controls {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 28px;
 }
-.pagination-button:disabled { cursor: not-allowed; opacity: 0.55; }
-.page-indicator { min-width: 96px; color: #344054; font-size: 0.92rem; font-weight: 700; text-align: center; white-space: nowrap; }
+.page-size-group {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.page-size-label {
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+.page-size-select {
+  width: 70px;
+}
+.pager {
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+.pager-arrow,
+.pager-num {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: #4a5d80;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pager-arrow:hover:not(:disabled),
+.pager-num:hover {
+  background: #eef6ff;
+  color: #1c64d6;
+}
+.pager-num.active {
+  background: #0b3d91;
+  color: #ffffff;
+}
+.pager-list {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.pager-ellipsis {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+}
 
-@media (max-width: 768px) {
-  .voucher-pagination { align-items: flex-start; flex-direction: column; }
-  .pagination-controls { width: 100%; flex-wrap: wrap; }
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 44, 92, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  backdrop-filter: blur(3px);
+  padding: 20px;
+}
+.modal-content {
+  background: #fff;
+  width: 480px;
+  max-width: 100%;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(11, 61, 145, 0.28);
+  overflow: hidden;
+  animation: modalPop 0.18s ease-out;
+}
+.modal-header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 22px;
+  background: linear-gradient(120deg, #0b3d91 0%, #1c64d6 65%, #2f80ed 100%);
+  color: #ffffff;
+}
+.modal-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.modal-header-title h5 {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+.modal-header-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-size: 1.05rem;
+}
+.btn-close-modal {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  border-radius: 9px;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #ffffff;
+  transition: all 0.15s ease;
+}
+.btn-close-modal:hover {
+  background: rgba(224, 68, 92, 0.85);
+  transform: rotate(90deg);
+}
+.modal-body {
+  padding: 22px;
+  overflow-y: auto;
+}
+.detail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.detail-label {
+  font-size: 0.72rem;
+  color: #6b7c93;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 700;
+}
+.id-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: #f7fbff;
+  border: 1px solid #e3effd;
+  border-radius: 12px;
+}
+.id-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.id-block strong {
+  font-size: 0.95rem;
+  color: #0f2c5c;
+}
+.font-monospace {
+  font-family: 'JetBrains Mono', 'Courier New', monospace;
+}
+.badge-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.badge-lg {
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  width: fit-content;
+}
+.note-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: #f7fbff;
+  border: 1px solid #e3effd;
+  border-radius: 12px;
+}
+.note-text {
+  margin: 0;
+  color: #46587a;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.recipient-box {
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border: 1px dashed #d6e6fb;
+  border-radius: 12px;
+}
+.recipient-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #1c64d6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.address-text {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.modal-footer-note {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  color: #9aa8bf;
+  font-size: 0.78rem;
+  margin-top: 10px;
+}
+.mb-2 {
+  margin-bottom: 8px;
+}
+@keyframes modalPop {
+  from {
+    transform: translateY(-12px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
-.empty-row { text-align: center; padding: 48px 20px; color: #9ca3af; }
-.empty-icon { font-size: 32px; display: block; margin: 0 auto 8px; color: #e0b8cc; }
+/* Toast */
+.toast-alert {
+  position: fixed;
+  top: 80px;
+  right: 24px;
+  z-index: 1100;
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: #ffffff;
+  border-left: 4px solid #1f9d5e;
+  box-shadow: 0 14px 32px rgba(15, 64, 152, 0.2);
+  align-items: center;
+}
+.toast-alert div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.toast-alert strong {
+  font-size: 13px;
+  color: #111827;
+}
+.toast-alert span {
+  font-size: 12px;
+  color: #6b7280;
+}
+.toast-alert.error {
+  border-left-color: #e0445c;
+}
+.toast-alert i {
+  font-size: 1.2rem;
+  color: #1f9d5e;
+  flex-shrink: 0;
+}
+.toast-alert.error i {
+  color: #e0445c;
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 
-.toast-wrap { position: fixed; right: 24px; bottom: 24px; z-index: 10000; display: flex; flex-direction: column; gap: 10px; }
-.toast { min-width: 260px; max-width: 360px; padding: 13px 16px; border-radius: 12px; box-shadow: 0 10px 30px rgba(15,23,42,0.18); font-size: 13.5px; font-weight: 500; }
-.toast.success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf0cc; }
-.toast.error { background: #fef2f2; color: #b91c1c; border: 1px solid #f5c2c7; }
+/* Animations */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@media (max-width: 576px) {
+  .toolbar-row {
+    grid-template-columns: 1fr;
+  }
+  .field-keyword,
+  .field-dates {
+    grid-column: 1;
+  }
+}
 </style>
