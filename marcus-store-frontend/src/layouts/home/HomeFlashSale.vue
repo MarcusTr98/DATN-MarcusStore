@@ -280,7 +280,7 @@ function mapItemToCard(item, idx) {
     slug: item.skuCode || `flash-sale-${item.skuId ?? idx}`,
     spec: item.skuCode ? `Mã: ${item.skuCode}` : 'Sản phẩm chính hãng',
     emoji: '🛍️',
-    image: item.skuImageUrl || null,
+    image: item.thumbnailUrl || null,
     price: price,
     originalPrice: origPrice,
     discount,
@@ -464,11 +464,18 @@ function prepareCheckoutSelection(cartItem, product, ownSlot) {
     variantName: cartItem.variant || '',
     skuCode: cartItem.skuCode || product.spec?.replace('Mã: ', '') || '',
     skuId: cartItem.skuId ?? product.skuId,
-    imageUrl: cartItem.imageUrl || product.image || '',
+    thumbnailUrl: cartItem.thumbnailUrl || product.image || '',
     quantity: cartItem.quantity ?? 1,
-    price: cartItem.price ?? product.price,
+    price:
+      (cartItem.price || 0) > 0 ? cartItem.price : product.price,
+    originalPrice: cartItem.originalPrice ?? product.originalPrice ?? null,
+    // Nếu cartItem.totalPrice = 0/null/undefined thì TÍNH LẠI từ price * quantity.
+    // Lưu ý: dùng || thay vì ?? vì backend có thể trả totalPrice = 0 do round/lỗi serialize.
     totalPrice:
-      cartItem.totalPrice ?? (cartItem.price ?? product.price) * (cartItem.quantity ?? 1),
+      (cartItem.totalPrice || 0) > 0
+        ? cartItem.totalPrice
+        : ((cartItem.price || 0) > 0 ? cartItem.price : product.price) *
+          (cartItem.quantity ?? 1),
     isFlashSale: true,
     flashSaleSlotId: ownSlot?.slotId ?? product.slotId ?? null,
     flashSaleSlotName:

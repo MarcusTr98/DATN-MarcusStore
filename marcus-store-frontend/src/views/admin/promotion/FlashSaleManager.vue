@@ -693,8 +693,8 @@
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <div class="fs-sel-thumb">
                         <img
-                          v-if="getSku(pid)?.skuImageUrl"
-                          :src="getSku(pid).skuImageUrl"
+                          v-if="getSku(pid)?.thumbnailUrl"
+                          :src="getSku(pid).thumbnailUrl"
                           :alt="getSku(pid)?.productName"
                         />
                         <i v-else class="bi bi-image"></i>
@@ -846,8 +846,8 @@
                     <div style="display: flex; align-items: center; gap: 10px;">
                       <div class="fs-sel-thumb">
                         <img
-                          v-if="getSku(pid)?.skuImageUrl"
-                          :src="getSku(pid).skuImageUrl"
+                          v-if="getSku(pid)?.thumbnailUrl"
+                          :src="getSku(pid).thumbnailUrl"
                           :alt="getSku(pid)?.productName"
                         />
                         <i v-else class="bi bi-image"></i>

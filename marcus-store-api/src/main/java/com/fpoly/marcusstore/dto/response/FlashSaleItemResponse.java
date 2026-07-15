@@ -15,7 +15,7 @@ public class FlashSaleItemResponse {
     private Integer productId;
     private String productName;
     private String skuCode;
-    private String skuImageUrl;
+    private String thumbnailUrl;
     private BigDecimal originalPrice;
     private BigDecimal flashSalePrice;
     private Integer flashSaleQuantity;

@@ -217,8 +217,8 @@
                         <div class="fs-product-cell">
                           <div class="fs-product-img">
                             <img
-                              v-if="item.skuImageUrl"
-                              :src="item.skuImageUrl"
+                              v-if="item.thumbnailUrl"
+                              :src="item.thumbnailUrl"
                               :alt="item.productName"
                             />
                             <i v-else class="bi bi-image"></i>

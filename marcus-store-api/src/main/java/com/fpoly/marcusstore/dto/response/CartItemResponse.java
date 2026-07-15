@@ -15,7 +15,7 @@ public class CartItemResponse {
     private Integer skuId;
     private String skuCode;
     private String productName;
-    private String imageUrl;
+    private String thumbnailUrl;
     private BigDecimal price;
     private Integer quantity;
     private BigDecimal totalPrice;

@@ -424,7 +424,7 @@
             <div v-for="item in cartData.items" :key="item.cartItemId" class="order-item">
               <!-- Cột trái: Ảnh + Badge số lượng -->
               <div class="order-item__img-wrap">
-                <img :src="item.imageUrl" :alt="item.productName" class="order-item__img" />
+                <img :src="item.thumbnailUrl" :alt="item.productName" class="order-item__img" />
                 <span class="order-item__qty">{{ item.quantity }}</span>
               </div>
 
@@ -678,10 +678,22 @@ const getInitialCartData = () => {
     try {
       const items = JSON.parse(savedItems)
       if (Array.isArray(items) && items.length > 0) {
+        // Đảm bảo mỗi item có price/totalPrice hợp lệ — nếu không thì TÍNH LẠI.
+        // Trường hợp totalPrice = 0 (do bug "Mua ngay" từ Flash Sale) → fallback về price * quantity.
+        const safeItems = items.map((i) => {
+          const safePrice = (i.price || 0) > 0 ? i.price : 0
+          const computedTotal =
+            (i.totalPrice || 0) > 0 ? i.totalPrice : safePrice * (i.quantity || 1)
+          return {
+            ...i,
+            price: safePrice,
+            totalPrice: computedTotal,
+          }
+        })
         return {
-          items,
-          totalQuantity: items.reduce((sum, i) => sum + (i.quantity || 0), 0),
-          totalAmount: items.reduce((sum, i) => sum + (i.totalPrice || 0), 0),
+          items: safeItems,
+          totalQuantity: safeItems.reduce((sum, i) => sum + (i.quantity || 0), 0),
+          totalAmount: safeItems.reduce((sum, i) => sum + (i.totalPrice || 0), 0),
         }
       }
     } catch (e) {

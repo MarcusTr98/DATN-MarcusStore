@@ -90,7 +90,7 @@ function mapClientSlot(slot) {
       productId: it.productId,
       productName: it.productName,
       skuCode: it.skuCode,
-      skuImageUrl: resolveImageUrl(it.skuImageUrl),
+      thumbnailUrl: resolveImageUrl(it.thumbnailUrl),
       originalPrice: Number(it.originalPrice ?? 0),
       flashSalePrice: Number(it.flashSalePrice ?? 0),
       flashSaleQuantity: Number(it.flashSaleQuantity ?? 0),
@@ -557,7 +557,7 @@ export const useFlashSaleStore = defineStore('flashSale', {
           const firstItem = list[0]?.items?.[0]
           console.log(
             `[FlashSaleStore] fetchClientSlots: ${list.length} slot(s). Featured items: ${list[0]?.items?.length || 0}. First item image URL =`,
-            firstItem?.skuImageUrl || '(empty)',
+            firstItem?.thumbnailUrl || '(empty)',
           )
         } else {
           console.warn('[FlashSaleStore] fetchClientSlots: 0 slot(s) returned')

@@ -275,7 +275,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productName(sku != null && sku.getProduct() != null
                             ? sku.getProduct().getProductName() : null)
                     .skuCode(sku != null ? sku.getSkuCode() : null)
-                    .skuImageUrl(resolveSkuImageUrl(sku))
+                    .thumbnailUrl(resolveSkuImageUrl(sku))
                     .originalPrice(item.getOriginalPrice())
                     .flashSalePrice(item.getFlashSalePrice())
                     .flashSaleQuantity(item.getFlashSaleQuantity())
@@ -371,7 +371,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productId(sku.getProduct() != null ? sku.getProduct().getProductId() : null)
                     .productName(sku.getProduct() != null ? sku.getProduct().getProductName() : null)
                     .skuCode(sku.getSkuCode())
-                    .skuImageUrl(resolveSkuImageUrl(sku))
+                    .thumbnailUrl(resolveSkuImageUrl(sku))
                     .originalPrice(saved.getOriginalPrice())
                     .flashSalePrice(saved.getFlashSalePrice())
                     .flashSaleQuantity(saved.getFlashSaleQuantity())
@@ -620,7 +620,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productName(sku != null && sku.getProduct() != null
                             ? sku.getProduct().getProductName() : null)
                     .skuCode(sku != null ? sku.getSkuCode() : null)
-                    .skuImageUrl(resolveSkuImageUrl(sku))
+                    .thumbnailUrl(resolveSkuImageUrl(sku))
                     .originalPrice(savedItem.getOriginalPrice())
                     .flashSalePrice(savedItem.getFlashSalePrice())
                     .flashSaleQuantity(savedItem.getFlashSaleQuantity())
@@ -900,19 +900,12 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     }
 
     /**
-     * Lấy ảnh đại diện cho SKU:
-     *  - Ưu tiên sku.skuImageUrl nếu có giá trị hợp lệ
-     *  - Fallback sang product.thumbnailUrl (ảnh sản phẩm cha, thường là Cloudinary URL)
-     *  - Cuối cùng trả null nếu cả 2 đều rỗng
+     * Lấy ảnh đại diện cho SKU từ Product cha (product.thumbnailUrl).
+     * Giữ nguyên sku.skuImageUrl trong DB, không xóa.
      */
     private String resolveSkuImageUrl(ProductSku sku) {
-        if (sku == null) return null;
-        String skuImg = sku.getSkuImageUrl();
-        if (skuImg != null && !skuImg.isBlank()) return skuImg;
-        if (sku.getProduct() != null) {
-            String thumb = sku.getProduct().getThumbnailUrl();
-            if (thumb != null && !thumb.isBlank()) return thumb;
-        }
-        return null;
+        if (sku == null || sku.getProduct() == null) return null;
+        String thumb = sku.getProduct().getThumbnailUrl();
+        return (thumb != null && !thumb.isBlank()) ? thumb : null;
     }
 }

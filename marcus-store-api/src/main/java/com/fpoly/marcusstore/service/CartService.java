@@ -87,17 +87,19 @@ public class CartService {
 
             Integer quantity = item.getQuantity();
             BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
-            String imageUrl = item.getSku().getSkuImageUrl();
-            if (imageUrl == null || imageUrl.isBlank()) {
-                imageUrl = item.getSku().getProduct().getThumbnailUrl();
-            }
+            // Ưu tiên lấy Product.thumbnailUrl (ảnh sản phẩm cha).
+            // sku.skuImageUrl trong DB vẫn giữ nguyên, không xóa.
+            String thumbnailUrl = item.getSku().getProduct() != null
+                    ? item.getSku().getProduct().getThumbnailUrl()
+                    : null;
+            if (thumbnailUrl != null && thumbnailUrl.isBlank()) thumbnailUrl = null;
 
             return CartItemResponse.builder()
                     .cartItemId(item.getCartItemId())
                     .skuId(item.getSku().getSkuId())
                     .skuCode(item.getSku().getSkuCode())
                     .productName(item.getSku().getProduct().getProductName())
-                    .imageUrl(imageUrl)
+                    .thumbnailUrl(thumbnailUrl)
                     .color(color)
                     .storage(storage)
                     .variantText(variantText)

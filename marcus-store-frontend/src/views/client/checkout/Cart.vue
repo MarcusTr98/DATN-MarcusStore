@@ -50,8 +50,8 @@
               <div class="item-info">
                 <div class="item-img">
                   <img
-                    v-if="item.imageUrl"
-                    :src="item.imageUrl"
+                    v-if="item.thumbnailUrl"
+                    :src="item.thumbnailUrl"
                     :alt="item.name"
                     class="cart-product-img"
                   />
@@ -1145,7 +1145,7 @@ function handleCheckout() {
     productName: item.name,
     variantName: item.variant,
     skuCode: item.skuCode,
-    imageUrl: item.imageUrl,
+    thumbnailUrl: item.thumbnailUrl,
     quantity: item.quantity,
     price: item.price,
     originalPrice: item.originalPrice,
