@@ -72,6 +72,14 @@
             @change="onVariantChange"
           />
 
+          <!-- Notification nhỏ khi tổ hợp SKU không tồn tại -->
+          <Transition name="fade">
+            <div v-if="skuUnavailable" class="pd-variants__unavailable">
+              <i class="ti ti-alert-circle" />
+              <span>Sản phẩm hiện hết hàng. Vui lòng chọn sản phẩm khác</span>
+            </div>
+          </Transition>
+
           <Voucher />
 
           <!-- Buy actions -->
@@ -153,10 +161,14 @@ const product = ref(null)
 const loading = ref(false)
 const error = ref(null)
 
-// Bộ chọn variant hiện tại: { attributeId -> valueId }
-const selectedVariant = ref({})
+// Bộ chọn variant hiện tại
+const currentSku = ref(null)
 const isAddingToCart = ref(false)
 const isBuying = ref(false)
+
+// Notification nhỏ khi tổ hợp SKU không tồn tại
+const skuUnavailable = ref(false)
+let skuUnavailableTimer = null
 
 const notifyModal = ref({ visible: false, type: 'info', title: '', message: '' })
 
@@ -164,25 +176,19 @@ function showNotify(type, title, message) {
   notifyModal.value = { visible: true, type, title, message }
 }
 
-// ===== Tìm SKU khớp với selectedVariant =====
-const currentSku = computed(() => {
+function showSkuUnavailable() {
+  skuUnavailable.value = true
+  if (skuUnavailableTimer) clearTimeout(skuUnavailableTimer)
+  skuUnavailableTimer = setTimeout(() => {
+    skuUnavailable.value = false
+  }, 2500)
+}
+
+// ===== Tìm SKU đầu tiên =====
+const firstSku = computed(() => {
   if (!product.value?.skus?.length) return null
   const skus = product.value.skus
-
-  // Nếu user chưa chọn gì -> lấy SKU đầu tiên còn hàng, fallback SKU đầu
-  const hasSelection = Object.keys(selectedVariant.value).length > 0
-  if (!hasSelection) {
-    return skus.find((s) => s.inStock) || skus[0] || null
-  }
-
-  // Tìm SKU có đủ attributeValues khớp selectedVariant
-  const match = skus.find((sku) =>
-    (sku.attributeValues || []).every((av) => selectedVariant.value[av.attributeId] === av.valueId),
-  )
-  if (match) return match
-
-  // Không khớp -> fallback SKU đầu
-  return skus.find((s) => s.inStock) || skus[0] || null
+  return skus.find((s) => s.isActive && s.inStock) || skus.find((s) => s.isActive) || skus[0] || null
 })
 
 // ===== Fetch =====
@@ -193,7 +199,7 @@ async function fetchProduct() {
   loading.value = true
   error.value = null
   product.value = null
-  selectedVariant.value = {}
+  currentSku.value = null
 
   // Đảm bảo share state đã có wishlist ids (nếu user đã đăng nhập) trước khi bind UI
   if (localStorage.getItem('ACCESS_TOKEN')) {
@@ -203,6 +209,9 @@ async function fetchProduct() {
   try {
     const res = await api.get(`/client/products/${slug}`)
     product.value = res.data?.data ?? null
+
+    // Set SKU mặc định
+    currentSku.value = firstSku.value
 
     // Đồng bộ isWished từ BE vào share state
     if (product.value?.productId != null && product.value.isWished === true) {
@@ -221,7 +230,55 @@ async function fetchProduct() {
 
 // ===== Variants =====
 function onVariantChange({ attributeId, valueId }) {
-  selectedVariant.value = { ...selectedVariant.value, [attributeId]: valueId }
+  if (!product.value?.skus?.length || !currentSku.value) return
+
+  // Lấy tất cả attributeIds của SKU hiện tại
+  const currentAttrIds = (currentSku.value.attributeValues || []).map((av) => av.attributeId)
+
+  // Nếu user click vào attribute đã có trong SKU hiện tại → thay đổi trực tiếp
+  const existingAttr = (currentSku.value.attributeValues || []).find((av) => av.attributeId === attributeId)
+
+  if (existingAttr) {
+    // Tạo bản đồ attributeValue mới
+    const newAttrValues = currentSku.value.attributeValues.map((av) =>
+      av.attributeId === attributeId ? { ...av, valueId, valueString: existingAttr.valueString } : av,
+    )
+    // Tìm SKU khớp với attributeValues mới
+    const match = product.value.skus.find((sku) =>
+      sku.isActive && (sku.attributeValues || []).length === newAttrValues.length &&
+      newAttrValues.every((nav) =>
+        sku.attributeValues.some((sav) => sav.attributeId === nav.attributeId && sav.valueId === nav.valueId),
+      ),
+    )
+
+    if (match) {
+      currentSku.value = match
+    } else {
+      showSkuUnavailable()
+    }
+  } else {
+    // User click attribute mới (chưa có trong SKU hiện tại)
+    // Tạo attributeValues mới bao gồm attribute cũ + attribute mới
+    const newAttrValues = [
+      ...(currentSku.value.attributeValues || []).map((av) => ({ attributeId: av.attributeId, valueId: av.valueId })),
+      { attributeId, valueId },
+    ]
+
+    // Tìm SKU khớp với TẤT CẢ attributeValues mới
+    const match = product.value.skus.find((sku) => {
+      if (!sku.isActive) return false
+      if ((sku.attributeValues || []).length !== newAttrValues.length) return false
+      return newAttrValues.every((nav) =>
+        sku.attributeValues.some((sav) => sav.attributeId === nav.attributeId && sav.valueId === nav.valueId),
+      )
+    })
+
+    if (match) {
+      currentSku.value = match
+    } else {
+      showSkuUnavailable()
+    }
+  }
 }
 
 // ===== Wishlist =====
@@ -437,5 +494,33 @@ watch(() => route.params.slug, fetchProduct)
   .pd-bottom {
     grid-template-columns: 1fr;
   }
+}
+
+/* Notification nhỏ khi tổ hợp SKU không tồn tại */
+.pd-variants__unavailable {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #856404;
+  margin-top: -8px;
+}
+.pd-variants__unavailable i {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
