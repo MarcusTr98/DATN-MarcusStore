@@ -76,7 +76,11 @@
             </div>
 
             <div class="hfs-name">{{ product.name }}</div>
-            <div class="hfs-spec">{{ product.spec }}</div>
+            <div class="hfs-spec">
+              <span v-if="product.spec">{{ product.spec }}</span>
+              <span v-if="product.spec && product.variant"><br/></span>
+              <span v-if="product.variant">{{ product.variant }}</span>
+            </div>
 
             <div class="hfs-stock">
               <div class="hfs-stock-row">
@@ -93,12 +97,20 @@
               <span class="hfs-price-old">{{ formatPrice(product.originalPrice) }}</span>
             </div>
 
-            <button type="button" class="hfs-buy-btn" @click.stop="goToProduct(product)">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            <button
+              type="button"
+              class="hfs-buy-btn"
+              :class="{ 'hfs-buy-btn--disabled': product.left <= 0 }"
+              :disabled="product.left <= 0"
+              @click.stop="product.left > 0 && goToProduct(product)"
+            >
+              <svg v-if="product.left > 0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2"
                    stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/>
+                <path
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/>
               </svg>
-              <span>Mua ngay</span>
+              <span>{{ product.left > 0 ? 'Mua ngay' : 'Hết hàng' }}</span>
             </button>
           </article>
 
@@ -117,9 +129,11 @@
             </span>
             <span class="more-title">Xem thêm</span>
             <span class="more-sub">
-              {{ remainingCount > 0
-                ? `Còn ${remainingCount} sản phẩm đang giảm giá`
-                : 'Khám phá toàn bộ Flash Sale hôm nay' }}
+              {{
+                remainingCount > 0
+                  ? `Còn ${remainingCount} sản phẩm đang giảm giá`
+                  : 'Khám phá toàn bộ Flash Sale hôm nay'
+              }}
             </span>
             <span class="more-arrow">
               SANG TRANG
@@ -179,20 +193,38 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onBeforeUnmount, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { useFlashSaleStore } from '@/stores/FlashSaleStore'
-import { useCartStore } from '@/stores/cartStore'
-import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
+import {ref, reactive, computed, onMounted, onUnmounted, nextTick, watch} from 'vue'
+import {useRouter} from 'vue-router'
+import {storeToRefs} from 'pinia'
+import {useFlashSaleStore} from '@/stores/FlashSaleStore'
+import {useCartStore} from '@/stores/cartStore'
+import {useFlashSaleCountdown} from '@/composables/useFlashSaleCountdown'
+import {useFlashSaleModals} from '@/composables/useFlashSaleModals'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
+import {expandVariantColorNames} from '@/utils/colorUtils'
 import '@/assets/css/HomeFlashSale.css'
 
 const router = useRouter()
 const flashSaleStore = useFlashSaleStore()
 const cartStore = useCartStore()
-const { clientSlots, clientLoading } = storeToRefs(flashSaleStore)
+const {clientSlots, clientLoading} = storeToRefs(flashSaleStore)
+
+// ==== Modal state — dùng chung composable với FlashSalePage.vue ====
+const {
+  showCancelledModal,
+  showLoginRequiredModal,
+  loginRequiredTitle,
+  loginRequiredMessage,
+  openCancelledModal,
+  handleCancelledClose,
+  handleCancelledConfirm,
+  handleAuthRequired,
+} = useFlashSaleModals({
+  onCancelledConfirm: async () => {
+    await flashSaleStore.fetchClientSlots(20)
+  },
+})
 
 const MAX_PRODUCTS = 10
 const VISIBLE_DEFAULT = 5
@@ -202,7 +234,7 @@ const featuredSlotName = computed(() => nearestSlot.value?.name || '')
 
 // ==== Bộ đếm ngược: dùng chung composable với FlashSalePage.vue ====
 // Khi timer chạm 00:00:00 sẽ tự gọi lại fetchClientSlots để cập nhật slot mới.
-const { label: miniLabel, timer: miniTimer } = useFlashSaleCountdown(
+const {label: miniLabel, timer: miniTimer} = useFlashSaleCountdown(
   () => flashSaleStore.clientSlots,
   () => flashSaleStore.fetchClientSlots(8),
 )
@@ -216,17 +248,6 @@ function safeDate(v) {
 
 const nearestSlot = computed(() => {
   const slots = Array.isArray(clientSlots.value) ? clientSlots.value : []
-  if (slots.length > 0) {
-    console.log('[HomeFlashSale] clientSlots count:', slots.length)
-    console.log('[HomeFlashSale] slot statuses:', slots.map((s) => ({
-      id: s.slotId,
-      status: s.status,
-      startDate: s.startDate,
-      endDate: s.endDate,
-      itemsCount: Array.isArray(s.items) ? s.items.length : 0,
-    })))
-  }
-
   if (slots.length === 0) return null
 
   // 1. Ưu tiên ACTIVE (status=2)
@@ -259,6 +280,13 @@ const nearestSlot = computed(() => {
 })
 
 // ==== Dữ liệu sản phẩm ====
+function deriveVariantsFromSku(skuCode) {
+  if (!skuCode) return []
+  const parts = String(skuCode).split('-').filter(Boolean)
+  const tail = parts.slice(-2)
+  return tail.map((p) => expandVariantColorNames(p.replace(/_/g, ' ').trim())).filter((p) => p.length > 0)
+}
+
 function mapItemToCard(item, idx) {
   const totalQty = Number(item.flashSaleQuantity ?? 0)
   const soldQty = Number(item.soldQuantity ?? 0)
@@ -278,7 +306,9 @@ function mapItemToCard(item, idx) {
     skuId: item.skuId ?? item.id,
     name: item.productName || item.skuCode || `Sản phẩm Flash Sale #${idx + 1}`,
     slug: item.skuCode || `flash-sale-${item.skuId ?? idx}`,
-    spec: item.skuCode ? `Mã: ${item.skuCode}` : 'Sản phẩm chính hãng',
+    variant: deriveVariantsFromSku(item.skuCode).join(' / ') || '',
+    spec: item.skuCode ? `Mã: ${item.skuCode}` : '',
+    variants: deriveVariantsFromSku(item.skuCode),
     emoji: '🛍️',
     image: item.thumbnailUrl || null,
     price: price,
@@ -294,12 +324,8 @@ function mapItemToCard(item, idx) {
 const allProducts = computed(() => {
   const slot = nearestSlot.value
   if (!slot || !Array.isArray(slot.items) || slot.items.length === 0) return []
-  const itemsWithSlot = slot.items.map((it) => ({ ...it, _slotId: slot.slotId }))
+  const itemsWithSlot = slot.items.map((it) => ({...it, _slotId: slot.slotId}))
   const mapped = itemsWithSlot.map(mapItemToCard)
-  console.log(
-    `[HomeFlashSale] Slot #${slot.slotId} "${slot.name}" status=${slot.status}: ` +
-    `${slot.items.length} items render carousel.`,
-  )
   return mapped.slice(0, MAX_PRODUCTS)
 })
 
@@ -344,6 +370,7 @@ let refreshTimer = null
 
 // ==== Auto-scroll nhẹ nhàng (chỉ chạy khi không hover) ====
 let autoTimer = null
+
 function startAutoScroll() {
   stopAutoScroll()
   autoTimer = setInterval(() => {
@@ -353,6 +380,7 @@ function startAutoScroll() {
     else currentIndex.value += 1
   }, 5000)
 }
+
 function stopAutoScroll() {
   if (autoTimer) clearInterval(autoTimer)
   autoTimer = null
@@ -360,7 +388,7 @@ function stopAutoScroll() {
 
 // ==== Helpers ====
 const formatPrice = (price) =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
+  new Intl.NumberFormat('vi-VN', {style: 'currency', currency: 'VND'}).format(price)
 
 // ==== Toast ====
 const toast = reactive({
@@ -370,7 +398,8 @@ const toast = reactive({
   message: '',
 })
 let toastTimer = null
-function showToast({ type = 'warning', title, message }) {
+
+function showToast({type = 'warning', title, message}) {
   clearTimeout(toastTimer)
   toast.type = type
   toast.title = title
@@ -380,48 +409,6 @@ function showToast({ type = 'warning', title, message }) {
     toast.show = false
   }, 2800)
 }
-
-// ==== Modal thông báo Flash Sale bị admin hủy ====
-const showCancelledModal = ref(false)
-const hasHandledCancelled = ref(false)
-
-// ==== Modal yêu cầu đăng nhập (khi guest nhận 401) ====
-const showLoginRequiredModal = ref(false)
-const loginRequiredTitle = ref('Đăng nhập để tiếp tục')
-const loginRequiredMessage = ref('Vui lòng đăng nhập để mua sản phẩm Flash Sale.')
-
-function openCancelledModal() {
-  if (hasHandledCancelled.value) return
-  showCancelledModal.value = true
-}
-
-function handleCancelledClose() {
-  showCancelledModal.value = false
-}
-
-async function handleCancelledConfirm() {
-  if (hasHandledCancelled.value) return
-  hasHandledCancelled.value = true
-  showCancelledModal.value = false
-  try {
-    await flashSaleStore.fetchClientSlots(20)
-  } catch (e) {
-    console.warn('Refetch slots failed:', e)
-  }
-}
-
-// ==== Event listener cho auth-required (từ api interceptor khi guest nhận 401) ====
-function handleAuthRequired(event) {
-  loginRequiredTitle.value = event.detail?.title || 'Đăng nhập để tiếp tục'
-  loginRequiredMessage.value = event.detail?.message || 'Vui lòng đăng nhập để mua sản phẩm Flash Sale.'
-  showLoginRequiredModal.value = true
-}
-
-onBeforeUnmount(() => {
-  hasHandledCancelled.value = false
-  // Cleanup event listener
-  window.removeEventListener('auth-required', handleAuthRequired)
-})
 
 // ==== Điều hướng sản phẩm ====
 const isFlashSaleActive = computed(() => {
@@ -443,7 +430,7 @@ function ensureProductSlotIsBuyable(product) {
       else if (status === 3) msg = 'Flash Sale này đã kết thúc'
       else if (status === 4) msg = 'Flash Sale này đã bị admin hủy'
     }
-    showToast({ type: 'warning', title: 'Oops!', message: msg })
+    showToast({type: 'warning', title: 'Oops!', message: msg})
     return false
   }
   if (!isFlashSaleActive.value) {
@@ -462,7 +449,7 @@ function prepareCheckoutSelection(cartItem, product, ownSlot) {
     cartItemId: cartItem.cartItemId,
     productName: cartItem.name || product.name,
     variantName: cartItem.variant || '',
-    skuCode: cartItem.skuCode || product.spec?.replace('Mã: ', '') || '',
+    skuCode: cartItem.skuCode || product.variant || product.skuCode || '',
     skuId: cartItem.skuId ?? product.skuId,
     thumbnailUrl: cartItem.thumbnailUrl || product.image || '',
     quantity: cartItem.quantity ?? 1,
@@ -475,7 +462,7 @@ function prepareCheckoutSelection(cartItem, product, ownSlot) {
       (cartItem.totalPrice || 0) > 0
         ? cartItem.totalPrice
         : ((cartItem.price || 0) > 0 ? cartItem.price : product.price) *
-          (cartItem.quantity ?? 1),
+        (cartItem.quantity ?? 1),
     isFlashSale: true,
     flashSaleSlotId: ownSlot?.slotId ?? product.slotId ?? null,
     flashSaleSlotName:
@@ -535,11 +522,13 @@ const buyNow = async (product) => {
       )
 
       if (!success) {
-        showToast({
-          type: 'error',
-          title: 'Lỗi!',
-          message: cartStore.error || 'Không thể thêm vào giỏ',
-        })
+        if (!isUnauthorizedError(cartStore.error)) {
+          showToast({
+            type: 'error',
+            title: 'Lỗi!',
+            message: cartStore.error || 'Không thể thêm vào giỏ',
+          })
+        }
         return
       }
 
@@ -564,17 +553,30 @@ const buyNow = async (product) => {
     router.push('/checkout')
   } catch (error) {
     console.error('Lỗi mua ngay:', error)
-    showToast({
-      type: 'error',
-      title: 'Lỗi!',
-      message: error.response?.data?.message || 'Không thể mua ngay',
-    })
+    if (!isUnauthorizedError(error)) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: error.response?.data?.message || 'Không thể mua ngay',
+      })
+    }
   }
 }
 
 function goToProduct(product) {
   if (!ensureProductSlotIsBuyable(product)) return
   buyNow(product)
+}
+
+// Helper: phát hiện lỗi 401/Unauthorized để bỏ qua toast
+// (modal LoginRequiredModal đã hiển thị thông báo rồi, không cần toast trùng)
+function isUnauthorizedError(errOrMessage) {
+  if (!errOrMessage) return false
+  const status = errOrMessage?.response?.status
+  if (status === 401) return true
+  const msg = typeof errOrMessage === 'string' ? errOrMessage : errOrMessage?.message
+  if (typeof msg === 'string' && /unauthor/i.test(msg)) return true
+  return false
 }
 
 // Animate count up cho giá
@@ -584,7 +586,10 @@ const animateCountUp = (product, delayMs = 0) => {
   let startTs = null
   const step = (now) => {
     if (startTs === null) startTs = now + delayMs
-    if (now < startTs) { requestAnimationFrame(step); return }
+    if (now < startTs) {
+      requestAnimationFrame(step);
+      return
+    }
     const t = Math.min((now - startTs) / duration, 1)
     const eased = 1 - Math.pow(1 - t, 3)
     product.displayPrice = Math.round(to * eased)
@@ -594,18 +599,12 @@ const animateCountUp = (product, delayMs = 0) => {
   requestAnimationFrame(step)
 }
 
-// FIX: Watch displayedProducts thay vì chỉ gọi animateCountUp 1 lần trong onMounted.
-// Trước đây: mỗi lần refreshTimer (60s) fetch lại dữ liệu → allProducts computed
-// chạy lại → mapItemToCard tạo object MỚI với displayPrice=0, nhưng không có gì
-// gọi lại animateCountUp cho các object mới này → giá bị "đứng" ở 0đ cho tới khi F5.
-// Giờ dùng watch({ immediate: true }) để tự động chạy animation mỗi khi
-// displayedProducts thay đổi (bao gồm cả lần đầu mount và mỗi lần refetch sau này).
 watch(
   displayedProducts,
   (products) => {
     products.forEach((p, i) => animateCountUp(p, i * 50))
   },
-  { immediate: true },
+  {immediate: true},
 )
 
 onMounted(async () => {
@@ -630,7 +629,8 @@ onMounted(async () => {
 
   // Refresh dữ liệu mỗi 60s để cập nhật giá/sold realtime (không spam BE)
   refreshTimer = setInterval(() => {
-    flashSaleStore.fetchClientSlots(20).catch(() => {})
+    flashSaleStore.fetchClientSlots(20).catch(() => {
+    })
   }, 60000)
 
   resizeHandler = () => {

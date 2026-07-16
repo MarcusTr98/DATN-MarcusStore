@@ -553,15 +553,6 @@ export const useFlashSaleStore = defineStore('flashSale', {
           ? raw.map(mapClientSlot).filter(Boolean)
           : []
         this.clientSlots = list
-        if (list.length > 0) {
-          const firstItem = list[0]?.items?.[0]
-          console.log(
-            `[FlashSaleStore] fetchClientSlots: ${list.length} slot(s). Featured items: ${list[0]?.items?.length || 0}. First item image URL =`,
-            firstItem?.thumbnailUrl || '(empty)',
-          )
-        } else {
-          console.warn('[FlashSaleStore] fetchClientSlots: 0 slot(s) returned')
-        }
         return this.clientSlots
       } catch (error) {
         console.error('[FlashSaleStore] lỗi fetchClientSlots:', error)

@@ -1,54 +1,56 @@
 <template>
-  <transition name="fade">
-    <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
-      <div class="login-modal">
-        <!-- Close -->
-        <button class="close-btn" @click="$emit('close')">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+  <Teleport to="body">
+    <Transition name="fade">
+      <div v-if="visible" class="modal-overlay" @click.self="$emit('close')">
+        <div class="login-modal">
+          <!-- Close -->
+          <button class="close-btn" @click="$emit('close')">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
 
-        <!-- Logo -->
-        <div class="logo-box">
-          <div class="logo-icon">
-            <i class="fa-solid fa-mobile-screen-button"></i>
+          <!-- Logo -->
+          <div class="logo-box">
+            <div class="logo-icon">
+              <i class="fa-solid fa-mobile-screen-button"></i>
+            </div>
+
+            <div class="logo-text">
+              <div class="brand">Marcus</div>
+              <div class="store">STORE</div>
+            </div>
           </div>
 
-          <div class="logo-text">
-            <div class="brand">Marcus</div>
-            <div class="store">STORE</div>
-          </div>
-        </div>
+          <!-- Title -->
+          <h3>{{ title }}</h3>
 
-        <!-- Title -->
-        <h3>{{ title }}</h3>
+          <!-- Message -->
+          <p>
+            {{ message }}
+          </p>
 
-        <!-- Message -->
-        <p>
-          {{ message }}
-        </p>
-
-        <!-- Login -->
-        <router-link
-          to="/auth/login"
-          class="login-btn"
-          @click="$emit('close')"
-        >
-          Đăng nhập ngay
-        </router-link>
-
-        <!-- Register -->
-        <div class="register">
-          Chưa có tài khoản?
+          <!-- Login -->
           <router-link
-            to="/auth/register"
+            to="/auth/login"
+            class="login-btn"
             @click="$emit('close')"
           >
-            Đăng ký
+            Đăng nhập ngay
           </router-link>
+
+          <!-- Register -->
+          <div class="register">
+            Chưa có tài khoản?
+            <router-link
+              to="/auth/register"
+              @click="$emit('close')"
+            >
+              Đăng ký
+            </router-link>
+          </div>
         </div>
       </div>
-    </div>
-  </transition>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
@@ -133,20 +135,27 @@ defineEmits(['close'])
 
 .logo-text {
   text-align: left;
+  line-height: 1.1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .brand {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 800;
   color: #d70018;
   line-height: 1;
+  margin: 0;
 }
 
 .store {
-  font-size: 14px;
-  letter-spacing: 3px;
+  font-size: 13px;
+  letter-spacing: 2.5px;
   font-weight: 700;
   color: #d70018;
+  line-height: 1;
+  margin: 0;
 }
 
 h3 {
@@ -232,7 +241,12 @@ p {
   }
 
   .brand {
-    font-size: 18px;
+    font-size: 20px;
+  }
+
+  .store {
+    font-size: 12px;
+    letter-spacing: 2px;
   }
 }
 </style>

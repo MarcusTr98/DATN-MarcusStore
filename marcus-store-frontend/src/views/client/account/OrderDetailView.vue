@@ -141,9 +141,12 @@
                           <span
                             >Số lượng: <strong>{{ item.quantity }}</strong></span
                           >
-                          <span
-                            >Đơn giá: <strong>{{ formatMoney(item.priceAtPurchase) }}</strong></span
-                          >
+                          <span v-if="item.isFlashSale && item.originalPrice">
+                            <span class="price-original">{{ formatMoney(item.originalPrice) }}</span>
+                            <span class="price-flashsale">{{ formatMoney(item.priceAtPurchase) }}</span>
+                            <span v-if="item.flashSaleSlotName" class="flash-badge">{{ item.flashSaleSlotName }}</span>
+                          </span>
+                          <span v-else>Đơn giá: <strong>{{ formatMoney(item.priceAtPurchase) }}</strong></span>
                         </div>
                       </div>
                       <strong class="product-total">{{ formatMoney(item.lineTotal) }}</strong>
@@ -670,9 +673,45 @@ function getPaymentMethodLabel(method) {
   text-decoration: none;
 }
 
+.product-thumb {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #ccc;
+}
+
 .product-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.price-original {
+  text-decoration: line-through;
+  color: #9ca3af;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.price-flashsale {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.flash-badge {
+  font-size: 10px;
+  background: #fee2e2;
+  color: #ef4444;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-left: 4px;
 }
 </style>

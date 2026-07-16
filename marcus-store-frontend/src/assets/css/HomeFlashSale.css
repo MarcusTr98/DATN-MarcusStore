@@ -298,9 +298,10 @@
 .hfs-spec {
   font-size: 11px;
   color: var(--fs-home-text-muted);
-  white-space: nowrap;
+  white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-top: 3px;
 }
 
 /* Thanh tiến trình kho */
@@ -415,6 +416,15 @@
 .hfs-buy-btn.adding {
   opacity: 0.7;
   pointer-events: none;
+}
+.hfs-buy-btn--disabled {
+  background: #ccc !important;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.hfs-buy-btn--disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* ==== Nút điều hướng mũi tên ==== */
@@ -641,4 +651,47 @@
 .hfs-toast-leave-to {
   transform: translateY(-12px);
   opacity: 0;
+}
+
+/* ==== Nút Wishlist trên card Flash Sale ==== */
+.hfs-wishlist-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid #e5e7eb;
+  border-radius: 50%;
+  cursor: pointer;
+  color: #9ca3af;
+  transition: all 0.2s ease;
+  z-index: 3;
+  backdrop-filter: blur(4px);
+}
+.hfs-wishlist-btn:hover {
+  background: #fff;
+  border-color: #e11d1d;
+  color: #e11d1d;
+  transform: scale(1.1);
+}
+.hfs-wishlist-btn.is-wished {
+  background: #e11d1d;
+  border-color: #e11d1d;
+  color: #fff;
+}
+.hfs-wishlist-btn.is-wished:hover {
+  background: #b80e17;
+  border-color: #b80e17;
+}
+.hfs-wishlist-btn svg {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.2s ease;
+}
+.hfs-wishlist-btn:active svg {
+  transform: scale(0.85);
 }

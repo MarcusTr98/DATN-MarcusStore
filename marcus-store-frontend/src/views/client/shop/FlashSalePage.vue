@@ -136,26 +136,8 @@
           <span class="card-discount">Giảm {{ product.discount }}%</span>
         </div>
 
-        <!-- Nút góc trên phải: tim + giỏ hàng -->
+        <!-- Nút góc trên phải: giỏ hàng -->
         <div class="card-actions" @click.stop>
-          <button
-            type="button"
-            class="icon-btn"
-            :class="{ active: product.favorited }"
-            :title="product.favorited ? 'Đã yêu thích' : 'Yêu thích'"
-            @click="toggleFavorite(product)"
-          >
-            <svg viewBox="0 0 24 24" class="icon-svg">
-              <path
-                :fill="product.favorited ? 'currentColor' : 'none'"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-              />
-            </svg>
-          </button>
           <button
             type="button"
             class="icon-btn"
@@ -241,9 +223,15 @@
         </ul>
 
         <!-- CTA lớn: MUA NGAY -->
-        <button type="button" class="cta" @click.stop="handleBuyClick($event, product)">
-          <span class="cta-text">MUA NGAY</span>
-          <span class="cta-icon">
+        <button
+          type="button"
+          class="cta"
+          :class="{ 'cta--disabled': product.left <= 0 }"
+          :disabled="product.left <= 0"
+          @click.stop="product.left > 0 && handleBuyClick($event, product)"
+        >
+          <span class="cta-text">{{ product.left > 0 ? 'MUA NGAY' : 'HẾT HÀNG' }}</span>
+          <span v-if="product.left > 0" class="cta-icon">
             <svg viewBox="0 0 24 24"><path
               fill="none" stroke="currentColor" stroke-width="2.5"
               stroke-linecap="round" stroke-linejoin="round"
@@ -364,7 +352,7 @@
     <!-- Modal thông báo Flash Sale đã bị admin hủy -->
     <CancelledFlashSaleModal
       :visible="showCancelledModal"
-      @close="showCancelledModal = false"
+      @close="handleCancelledClose"
       @confirm="handleCancelledConfirm"
     />
 
@@ -373,18 +361,19 @@
       :visible="showLoginRequiredModal"
       :title="loginRequiredTitle"
       :message="loginRequiredMessage"
-      @close="showLoginRequiredModal = false"
+      @close="showLoginRequiredModal = false; suppressErrorToast = false"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onBeforeUnmount, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
 import { useCartStore } from '@/stores/cartStore'
+import { useFlashSaleModals } from '@/composables/useFlashSaleModals'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 import { expandVariantColorNames } from '@/utils/colorUtils'
@@ -395,6 +384,32 @@ const flashSaleStore = useFlashSaleStore()
 const cartStore = useCartStore()
 const { clientSlots, displaySlots, bannerStats } = storeToRefs(flashSaleStore)
 const stats = computed(() => bannerStats.value || {})
+
+// ==== Modal state — dùng chung composable với HomeFlashSale.vue ====
+// suppressErrorToast: true khi vừa nhận auth-required (401) — chặn toast lỗi trùng lặp với modal login.
+const suppressErrorToast = ref(false)
+const {
+  showCancelledModal,
+  showLoginRequiredModal,
+  loginRequiredTitle,
+  loginRequiredMessage,
+  openCancelledModal,
+  handleCancelledClose,
+  handleCancelledConfirm,
+  handleAuthRequired,
+} = useFlashSaleModals({
+  onCancelledConfirm: async () => {
+    await router.replace({ path: '/' }).catch(() => {
+      window.location.href = '/'
+    })
+  },
+})
+
+// Override handleAuthRequired để set suppressErrorToast
+function handleAuthRequiredPage(event) {
+  handleAuthRequired(event)
+  suppressErrorToast.value = true
+}
 
 // ==== Lấy dữ liệu Flash Sale từ BE ====
 async function fetchFlashSales() {
@@ -586,14 +601,13 @@ const animateCountUp = (product, delayMs = 0) => {
 
 // ==== Danh sách sản phẩm hiển thị thật (reactive, giữ state UI qua các lần refetch) ====
 // Đây KHÔNG phải computed nữa. Mỗi khi rawFlashSaleItems đổi, ta merge thủ công vào
-// mảng này: sản phẩm cũ giữ nguyên displayPrice/ripples/favorited/addingToCart,
+// mảng này: sản phẩm cũ giữ nguyên displayPrice/ripples/addingToCart,
 // chỉ cập nhật field đến từ BE (giá, tồn kho, discount...). Sản phẩm mới thì thêm vào
 // với displayPrice=0 rồi animate count-up. Sản phẩm không còn trong raw thì bị loại bỏ.
 const flashSaleProducts = ref([])
 
 function syncFlashSaleProducts() {
   const rawList = paginatedRawItems.value
-  const rawIds = new Set(rawList.map((r) => r.id))
   const existingMap = new Map(flashSaleProducts.value.map((p) => [p.id, p]))
 
   const newlyAdded = []
@@ -625,7 +639,6 @@ function syncFlashSaleProducts() {
       ...raw,
       displayPrice: 0,
       ripples: [],
-      favorited: false,
       addingToCart: false,
     })
     newlyAdded.push(created)
@@ -700,47 +713,6 @@ function ensureProductSlotIsBuyable(product) {
   return true
 }
 
-// ==== Modal thông báo Flash Sale bị admin hủy ====
-const showCancelledModal = ref(false)
-const hasHandledCancelled = ref(false)
-
-// ==== Modal yêu cầu đăng nhập (khi guest nhận 401) ====
-const showLoginRequiredModal = ref(false)
-const loginRequiredTitle = ref('Đăng nhập để tiếp tục')
-const loginRequiredMessage = ref('Vui lòng đăng nhập để mua sản phẩm Flash Sale.')
-// true khi vừa nhận sự kiện auth-required (401) — dùng để chặn toast lỗi trùng lặp
-// với modal yêu cầu đăng nhập đã hiển thị.
-const suppressErrorToast = ref(false)
-
-function openCancelledModal() {
-  if (hasHandledCancelled.value) return
-  showCancelledModal.value = true
-}
-
-async function handleCancelledConfirm() {
-  if (hasHandledCancelled.value) return
-  hasHandledCancelled.value = true
-
-  showCancelledModal.value = false
-  await router.replace({ path: '/' }).catch(() => {
-    window.location.href = '/'
-  })
-}
-
-// ==== Event listener cho auth-required (từ api interceptor khi guest nhận 401) ====
-function handleAuthRequired(event) {
-  loginRequiredTitle.value = event.detail?.title || 'Đăng nhập để tiếp tục'
-  loginRequiredMessage.value = event.detail?.message || 'Vui lòng đăng nhập để mua sản phẩm Flash Sale.'
-  showLoginRequiredModal.value = true
-  suppressErrorToast.value = true
-}
-
-onBeforeUnmount(() => {
-  hasHandledCancelled.value = false
-  // Cleanup event listener
-  window.removeEventListener('auth-required', handleAuthRequired)
-})
-
 const goToProduct = (product) => {
   if (!ensureProductSlotIsBuyable(product)) return
   router.push(`/product/${product.slug}`)
@@ -748,6 +720,7 @@ const goToProduct = (product) => {
 
 // --- Hiệu ứng ripple khi bấm "Mua ngay" ---
 const handleBuyClick = (event, product) => {
+  if (product.left <= 0) return
   const btn = event.currentTarget
   const rect = btn.getBoundingClientRect()
   const ripple = {
@@ -846,7 +819,7 @@ const buyNow = async (product) => {
       if (!success) {
         // Nếu lỗi này đến từ 401 (guest chưa đăng nhập), modal LoginRequiredModal
         // đã hiển thị thông báo rồi -> không cần show thêm toast lỗi trùng lặp.
-        if (!suppressErrorToast.value) {
+        if (!suppressErrorToast.value && !isUnauthorizedError(cartStore.error)) {
           showToast({
             type: 'error',
             title: 'Lỗi!',
@@ -880,7 +853,7 @@ const buyNow = async (product) => {
   } catch (error) {
     console.error('Lỗi mua ngay:', error)
     // Tương tự: nếu là lỗi 401 đã được xử lý bằng modal đăng nhập, không show toast lỗi nữa.
-    if (!suppressErrorToast.value) {
+    if (!suppressErrorToast.value && !isUnauthorizedError(error)) {
       showToast({
         type: 'error',
         title: 'Lỗi!',
@@ -895,8 +868,15 @@ const buyNow = async (product) => {
   }
 }
 
-const toggleFavorite = (product) => {
-  product.favorited = !product.favorited
+// Helper: phát hiện lỗi 401/Unauthorized để bỏ qua toast
+// (modal LoginRequiredModal đã hiển thị thông báo rồi, không cần toast trùng)
+function isUnauthorizedError(errOrMessage) {
+  if (!errOrMessage) return false
+  const status = errOrMessage?.response?.status
+  if (status === 401) return true
+  const msg = typeof errOrMessage === 'string' ? errOrMessage : errOrMessage?.message
+  if (typeof msg === 'string' && /unauthor/i.test(msg)) return true
+  return false
 }
 
 const addToCart = async (product) => {
@@ -941,7 +921,7 @@ const addToCart = async (product) => {
     } else {
       // Nếu lỗi này đến từ 401 (guest chưa đăng nhập), modal LoginRequiredModal
       // đã hiển thị thông báo rồi -> không cần show thêm toast lỗi trùng lặp.
-      if (!suppressErrorToast.value) {
+      if (!suppressErrorToast.value && !isUnauthorizedError(cartStore.error)) {
         showToast({
           type: 'error',
           title: 'Lỗi!',
@@ -953,7 +933,7 @@ const addToCart = async (product) => {
   } catch (error) {
     console.error('Lỗi thêm vào giỏ:', error)
     // Tương tự: nếu là lỗi 401 đã được xử lý bằng modal đăng nhập, không show toast lỗi nữa.
-    if (!suppressErrorToast.value) {
+    if (!suppressErrorToast.value && !isUnauthorizedError(error)) {
       showToast({
         type: 'error',
         title: 'Lỗi!',
@@ -1050,7 +1030,7 @@ let refreshTimer = null
 
 onMounted(async () => {
   // Lắng nghe event auth-required (khi guest nhận 401 từ API)
-  window.addEventListener('auth-required', handleAuthRequired)
+  window.addEventListener('auth-required', handleAuthRequiredPage)
 
   // Tải dữ liệu Flash Sale ACTIVE + sắp diễn ra từ BE
   // (watch(rawFlashSaleItems, ..., { immediate: true }) sẽ tự lo phần merge + animate)

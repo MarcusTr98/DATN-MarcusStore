@@ -119,7 +119,16 @@
                       <td>{{ item.skuCode }}</td>
                       <td>{{ item.quantity }}</td>
                       <td>
-                        <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
+                        <div class="price-cell">
+                          <template v-if="item.isFlashSale && item.originalPrice">
+                            <span class="money original-price">{{ formatCurrency(item.originalPrice) }}</span>
+                            <span class="money flash-price">{{ formatCurrency(item.priceAtPurchase) }}</span>
+                            <span v-if="item.flashSaleSlotName" class="flash-badge">{{ item.flashSaleSlotName }}</span>
+                          </template>
+                          <template v-else>
+                            <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
+                          </template>
+                        </div>
                       </td>
                       <td>
                         <span class="money">{{ formatCurrency(item.lineTotal) }}</span>
@@ -655,4 +664,31 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+.price-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.price-cell .original-price {
+  text-decoration: line-through;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.price-cell .flash-price {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.price-cell .flash-badge {
+  font-size: 10px;
+  background: #fee2e2;
+  color: #ef4444;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+</style>
