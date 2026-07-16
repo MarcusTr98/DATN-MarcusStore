@@ -25,6 +25,9 @@ public class EmailService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final NumberFormat CURRENCY_FORMAT = NumberFormat.getInstance(new Locale("vi", "VN"));
 
+    // Link trang chủ (tạm để localhost, khi deploy đổi sang domain thật)
+    private static final String HOME_URL = "http://localhost:5173/";
+
     // Thứ tự các bước trong vòng đời đơn hàng (dùng để vẽ timeline)
     private static final String[] STATUS_FLOW =
             {"PENDING", "CONFIRMED", "PROCESSING", "PACKED", "SHIPPING", "DELIVERED", "COMPLETED"};
@@ -57,7 +60,7 @@ public class EmailService {
               <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#eef0f4;padding:40px 0;">
                 <tr>
                   <td align="center">
-                    <table width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
+                    <table width="720" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
 
                       <!-- Header -->
                       <tr>
@@ -80,7 +83,7 @@ public class EmailService {
                           <p style="font-size:15px;color:#333333;margin:0 0 6px 0;">
                             Xin chào,
                           </p>
-                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto;max-width:360px;">
+                          <p style="font-size:14px;color:#555555;line-height:1.6;margin:0 auto;max-width:480px;">
                             Cảm ơn bạn đã sử dụng MarcusStore. Vui lòng dùng mã xác thực bên dưới để hoàn tất yêu cầu của bạn.
                           </p>
                         </td>
@@ -113,9 +116,18 @@ public class EmailService {
                         </td>
                       </tr>
 
+                      <!-- Home link -->
                       <tr>
-                        <td style="padding:12px 40px 32px 40px;text-align:center;">
-                          <p style="font-size:12.5px;color:#aaaaaa;margin:0;">
+                        <td style="padding:8px 40px 28px 40px;text-align:center;">
+                          <a href="%s" style="display:inline-block;background-color:#ffffff;color:#d70018;font-size:13px;font-weight:700;letter-spacing:0.3px;padding:11px 26px;border-radius:8px;border:1.5px solid #d70018;text-decoration:none;">
+                            Truy cập MarcusStore
+                          </a>
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="padding:0 40px 32px 40px;text-align:center;">
+                          <p style="font-size:12.5px;color:#888888;margin:0;">
                             Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.
                           </p>
                         </td>
@@ -124,7 +136,7 @@ public class EmailService {
                       <!-- Footer -->
                       <tr>
                         <td style="background-color:#fff5f5;padding:22px 40px;text-align:center;border-top:1px solid #f5d9d9;">
-                          <p style="font-size:11.5px;color:#b3a3a3;margin:0;line-height:1.6;">
+                          <p style="font-size:11.5px;color:#8a7a7a;margin:0;line-height:1.6;">
                             Đây là email tự động, vui lòng không trả lời trực tiếp.<br/>
                             © 2026 MarcusStore. Trân trọng cảm ơn bạn đã đồng hành cùng chúng tôi.
                           </p>
@@ -137,7 +149,7 @@ public class EmailService {
               </table>
             </body>
             </html>
-            """.formatted(otp);
+            """.formatted(otp, HOME_URL);
     }
 
     // ============================================================
@@ -186,7 +198,7 @@ public class EmailService {
               <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:40px 0;">
                 <tr>
                   <td align="center">
-                    <table width="520" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
+                    <table width="780" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
 
                       <!-- Header -->
                       <tr>
@@ -209,13 +221,13 @@ public class EmailService {
                           <p style="font-size:15px;color:#333333;margin:0 0 6px 0;">
                             Xin chào <b>%s</b>,
                           </p>
-                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto 14px auto;max-width:400px;">
+                          <p style="font-size:14px;color:#555555;line-height:1.6;margin:0 auto 14px auto;max-width:520px;">
                             Cảm ơn bạn đã luôn tin tưởng và đồng hành cùng MarcusStore. Sự ủng hộ của bạn chính là động lực để chúng tôi không ngừng hoàn thiện.
                           </p>
-                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto 14px auto;max-width:380px;">
+                          <p style="font-size:14px;color:#555555;line-height:1.6;margin:0 auto 14px auto;max-width:500px;">
                             Đây là một phần quà nhỏ dành riêng cho bạn.
                           </p>
-                          <p style="font-size:14px;color:#d70018;line-height:1.6;margin:0 auto;max-width:400px;font-weight:600;">
+                          <p style="font-size:14px;color:#d70018;line-height:1.6;margin:0 auto;max-width:520px;font-weight:600;">
                             Chúng tôi đã thêm mã này vào kho voucher của bạn, hãy kiểm tra và sử dụng ngay tại trang thanh toán nhé!
                           </p>
                         </td>
@@ -223,7 +235,7 @@ public class EmailService {
 
                       <!-- Voucher code block -->
                       <tr>
-                        <td style="padding:24px 40px 40px 40px;">
+                        <td style="padding:24px 40px 12px 40px;">
                           <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#fff5f5;border-radius:12px;border:1px solid #f5d9d9;">
                             <tr>
                               <td style="padding:28px;text-align:center;">
@@ -247,16 +259,25 @@ public class EmailService {
                             </tr>
                           </table>
 
-                          <p style="font-size:12.5px;color:#aaaaaa;margin:20px 0 0 0;text-align:center;">
-                            Hiệu lực từ <b style="color:#777777;">%s</b> đến <b style="color:#777777;">%s</b>
+                          <p style="font-size:12.5px;color:#888888;margin:20px 0 0 0;text-align:center;">
+                            Hiệu lực từ <b style="color:#555555;">%s</b> đến <b style="color:#555555;">%s</b>
                           </p>
+                        </td>
+                      </tr>
+
+                      <!-- Home link -->
+                      <tr>
+                        <td style="padding:8px 40px 30px 40px;text-align:center;">
+                          <a href="%s" style="display:inline-block;background-color:#d70018;color:#ffffff;font-size:14px;font-weight:700;letter-spacing:0.3px;padding:13px 34px;border-radius:8px;text-decoration:none;">
+                            Dùng voucher ngay tại MarcusStore
+                          </a>
                         </td>
                       </tr>
 
                       <!-- Footer -->
                       <tr>
                         <td style="background-color:#fff5f5;padding:22px 40px;text-align:center;border-top:1px solid #f5d9d9;">
-                          <p style="font-size:11.5px;color:#b3a3a3;margin:0;line-height:1.6;">
+                          <p style="font-size:11.5px;color:#8a7a7a;margin:0;line-height:1.6;">
                             Đây là email tự động, vui lòng không trả lời trực tiếp.<br/>
                             © 2026 MarcusStore. Trân trọng cảm ơn bạn đã đồng hành cùng chúng tôi.
                           </p>
@@ -276,14 +297,15 @@ public class EmailService {
                 maxDiscountRow,
                 minOrderRow,
                 voucher.getStartDate().format(DATE_FORMAT),
-                voucher.getEndDate().format(DATE_FORMAT)
+                voucher.getEndDate().format(DATE_FORMAT),
+                HOME_URL
             );
     }
 
     private String metaRow(String label, String value) {
         return """
             <tr>
-              <td style="padding:5px 0;text-align:center;font-size:13.5px;color:#888888;">
+              <td style="padding:5px 0;text-align:center;font-size:13.5px;color:#666666;">
                 %s: <b style="color:#d70018;">%s</b>
               </td>
             </tr>
@@ -347,12 +369,12 @@ public class EmailService {
         BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
 
         String trackingRow = (order.getTrackingCode() != null && !order.getTrackingCode().isBlank())
-                ? "<tr><td style=\"font-size:13.5px;color:#555555;padding:3px 0;\">Mã vận đơn: <b style=\"color:#222222;\">"
+                ? "<tr><td style=\"font-size:13.5px;color:#444444;padding:3px 0;\">Mã vận đơn: <b style=\"color:#222222;\">"
                         + order.getTrackingCode() + "</b></td></tr>"
                 : "";
 
         String discountRow = discountAmount.signum() > 0
-                ? "<tr><td style=\"font-size:13px;color:#888888;padding:3px 0;\">Giảm giá</td>"
+                ? "<tr><td style=\"font-size:13px;color:#666666;padding:3px 0;\">Giảm giá</td>"
                         + "<td style=\"font-size:13px;color:#d70018;text-align:right;\">-"
                         + CURRENCY_FORMAT.format(discountAmount) + " đ</td></tr>"
                 : "";
@@ -368,7 +390,7 @@ public class EmailService {
               <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#eef0f4;padding:40px 0;">
                 <tr>
                   <td align="center">
-                    <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
+                    <table width="840" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
 
                       <!-- Header -->
                       <tr>
@@ -391,7 +413,7 @@ public class EmailService {
                           <p style="font-size:15px;color:#333333;margin:0 0 6px 0;">
                             Xin chào <b>%s</b>,
                           </p>
-                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto;max-width:380px;">
+                          <p style="font-size:14px;color:#555555;line-height:1.6;margin:0 auto;max-width:520px;">
                             %s
                           </p>
                         </td>
@@ -421,14 +443,14 @@ public class EmailService {
                           <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:12px;border:1px solid #ececec;">
                             <tr>
                               <td style="padding:20px 24px;">
-                                <div style="font-size:11px;color:#999999;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">
+                                <div style="font-size:11px;color:#777777;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">
                                   Thông tin giao hàng
                                 </div>
                                 <table width="100%%" cellpadding="0" cellspacing="0">
-                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Người nhận: <b style="color:#222222;">%s</b></td></tr>
-                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Điện thoại: <b style="color:#222222;">%s</b></td></tr>
-                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Địa chỉ: <b style="color:#222222;">%s</b></td></tr>
-                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Thanh toán: <b style="color:#222222;">%s</b></td></tr>
+                                  <tr><td style="font-size:13.5px;color:#444444;padding:3px 0;">Người nhận: <b style="color:#222222;">%s</b></td></tr>
+                                  <tr><td style="font-size:13.5px;color:#444444;padding:3px 0;">Điện thoại: <b style="color:#222222;">%s</b></td></tr>
+                                  <tr><td style="font-size:13.5px;color:#444444;padding:3px 0;">Địa chỉ: <b style="color:#222222;">%s</b></td></tr>
+                                  <tr><td style="font-size:13.5px;color:#444444;padding:3px 0;">Thanh toán: <b style="color:#222222;">%s</b></td></tr>
                                   %s
                                 </table>
                               </td>
@@ -443,7 +465,7 @@ public class EmailService {
                           <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border:1px solid #ececec;border-radius:12px;">
                             <tr>
                               <td style="padding:18px 24px 6px 24px;">
-                                <div style="font-size:11px;color:#999999;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">
+                                <div style="font-size:11px;color:#777777;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">
                                   Sản phẩm (%d)
                                 </div>
                               </td>
@@ -454,12 +476,12 @@ public class EmailService {
                               <td style="padding:4px 24px 18px 24px;">
                                 <table width="100%%" cellpadding="0" cellspacing="0">
                                   <tr>
-                                    <td style="font-size:13px;color:#888888;padding:3px 0;">Tạm tính</td>
+                                    <td style="font-size:13px;color:#666666;padding:3px 0;">Tạm tính</td>
                                     <td style="font-size:13px;color:#333333;text-align:right;">%s đ</td>
                                   </tr>
                                   %s
                                   <tr>
-                                    <td style="font-size:13px;color:#888888;padding:3px 0;">Phí vận chuyển</td>
+                                    <td style="font-size:13px;color:#666666;padding:3px 0;">Phí vận chuyển</td>
                                     <td style="font-size:13px;color:#333333;text-align:right;">%s đ</td>
                                   </tr>
                                   <tr>
@@ -473,12 +495,21 @@ public class EmailService {
                         </td>
                       </tr>
 
-                      <tr><td style="height:32px;"></td></tr>
+                      <!-- Home link -->
+                      <tr>
+                        <td style="padding:26px 40px 8px 40px;text-align:center;">
+                          <a href="%s" style="display:inline-block;background-color:#d70018;color:#ffffff;font-size:14px;font-weight:700;letter-spacing:0.3px;padding:13px 34px;border-radius:8px;text-decoration:none;">
+                            Xem đơn hàng tại MarcusStore
+                          </a>
+                        </td>
+                      </tr>
+
+                      <tr><td style="height:16px;"></td></tr>
 
                       <!-- Footer -->
                       <tr>
                         <td style="background-color:#fff5f5;padding:22px 40px;text-align:center;border-top:1px solid #f5d9d9;">
-                          <p style="font-size:11.5px;color:#b3a3a3;margin:0;line-height:1.6;">
+                          <p style="font-size:11.5px;color:#8a7a7a;margin:0;line-height:1.6;">
                             Đây là email tự động, vui lòng không trả lời trực tiếp.<br/>
                             © 2026 MarcusStore. Trân trọng cảm ơn bạn đã đồng hành cùng chúng tôi.
                           </p>
@@ -497,7 +528,7 @@ public class EmailService {
                 statusMessage(status),
                 timelineHtml,
                 isNegative ? "#f0f0f0" : "#fff5f5",
-                isNegative ? "#666666" : "#d70018",
+                isNegative ? "#555555" : "#d70018",
                 statusLabel(status),
                 order.getRecipientName(),
                 order.getRecipientPhone(),
@@ -509,7 +540,8 @@ public class EmailService {
                 CURRENCY_FORMAT.format(order.getTotalAmount()),
                 discountRow,
                 CURRENCY_FORMAT.format(shippingFee),
-                CURRENCY_FORMAT.format(order.getFinalAmount())
+                CURRENCY_FORMAT.format(order.getFinalAmount()),
+                HOME_URL
             );
     }
 
@@ -529,8 +561,8 @@ public class EmailService {
                     <table width="100%%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td style="font-size:13.5px;color:#333333;">
-                          %s <span style="color:#999999;">x%d</span>
-                          <div style="font-size:11.5px;color:#aaaaaa;">%s</div>
+                          %s <span style="color:#777777;">x%d</span>
+                          <div style="font-size:11.5px;color:#888888;">%s</div>
                         </td>
                         <td style="font-size:13.5px;color:#333333;text-align:right;vertical-align:top;">%s đ</td>
                       </tr>
@@ -554,7 +586,7 @@ public class EmailService {
         for (int i = 0; i < STATUS_FLOW.length; i++) {
             boolean done = i <= currentIndex;
             String dotColor = done ? "#d70018" : "#e0e0e0";
-            String textColor = done ? "#1f1f2e" : "#bbbbbb";
+            String textColor = done ? "#1f1f2e" : "#999999";
             String lineColor = i < currentIndex ? "#d70018" : "#e0e0e0";
 
             sb.append("<td style=\"text-align:center;\">");
