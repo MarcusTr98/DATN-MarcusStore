@@ -1,9 +1,20 @@
 package com.fpoly.marcusstore.service;
-import org.springframework.mail.SimpleMailMessage;
+
+import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderItem;
+import com.fpoly.marcusstore.entity.shopping.Voucher;
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import lombok.RequiredArgsConstructor;
+import java.math.BigDecimal;
+import java.text.NumberFormat;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -11,28 +22,566 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final NumberFormat CURRENCY_FORMAT = NumberFormat.getInstance(new Locale("vi", "VN"));
+
+    // Thứ tự các bước trong vòng đời đơn hàng (dùng để vẽ timeline)
+    private static final String[] STATUS_FLOW =
+            {"PENDING", "CONFIRMED", "PROCESSING", "PACKED", "SHIPPING", "DELIVERED", "COMPLETED"};
+
+    // ============================================================
+    // 1. GỬI OTP
+    // ============================================================
+
     public void sendOtp(String email, String otp) {
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
 
-        SimpleMailMessage message =
-                new SimpleMailMessage();
+            helper.setTo(email);
+            helper.setSubject("MarcusStore - Mã xác thực OTP của bạn");
+            helper.setText(buildOtpHtml(otp), true);
 
-        message.setTo(email);
+            mailSender.send(mimeMessage);
+        } catch (Exception e) {
+            throw new RuntimeException("Gửi email OTP thất bại: " + e.getMessage(), e);
+        }
+    }
 
-        message.setSubject(
-                "MarcusStore - OTP xác thực"
-        );
+    private String buildOtpHtml(String otp) {
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0;padding:0;background-color:#eef0f4;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+              <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#eef0f4;padding:40px 0;">
+                <tr>
+                  <td align="center">
+                    <table width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
 
-        message.setText(
-            "Xin chào,\n\n" +
-            "Cảm ơn bạn đã sử dụng MarcusStore.\n\n" +
-            "Mã xác thực (OTP) của bạn là: " + otp + "\n\n" +
-            "Mã OTP này có hiệu lực trong vòng 5 phút.\n" +
-            "Vui lòng không chia sẻ mã này với bất kỳ ai để đảm bảo an toàn cho tài khoản của bạn.\n\n" +
-            "Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.\n\n" +
-            "Trân trọng,\n" +
-            "Đội ngũ MarcusStore"
-        );
+                      <!-- Header -->
+                      <tr>
+                        <td style="background-color:#d70018;padding:36px 40px 26px 40px;text-align:center;">
+                          <div style="display:inline-block;width:52px;height:52px;line-height:52px;background-color:#ffffff;border-radius:50%%;font-size:24px;margin-bottom:14px;">
+                            🔐
+                          </div>
+                          <div style="color:#ffffff;font-size:19px;font-weight:600;">
+                            Xác thực tài khoản
+                          </div>
+                          <div style="color:#ffd4d4;font-size:12.5px;margin-top:6px;letter-spacing:0.5px;">
+                            MARCUSSTORE SECURITY
+                          </div>
+                        </td>
+                      </tr>
 
-        mailSender.send(message);
+                      <!-- Body -->
+                      <tr>
+                        <td style="padding:34px 40px 8px 40px;text-align:center;">
+                          <p style="font-size:15px;color:#333333;margin:0 0 6px 0;">
+                            Xin chào,
+                          </p>
+                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto;max-width:360px;">
+                            Cảm ơn bạn đã sử dụng MarcusStore. Vui lòng dùng mã xác thực bên dưới để hoàn tất yêu cầu của bạn.
+                          </p>
+                        </td>
+                      </tr>
+
+                      <!-- OTP block -->
+                      <tr>
+                        <td style="padding:22px 40px 8px 40px;">
+                          <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#fff5f5;border-radius:12px;border:1px solid #f5d9d9;">
+                            <tr>
+                              <td style="padding:26px;text-align:center;">
+                                <div style="font-size:11px;color:#b3554f;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:12px;">
+                                  Mã xác thực
+                                </div>
+                                <div style="display:inline-block;background-color:#d70018;color:#ffffff;font-size:28px;font-weight:700;letter-spacing:8px;padding:14px 26px;border-radius:8px;font-family:'Courier New',monospace;">
+                                  %s
+                                </div>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+
+                      <!-- Warning -->
+                      <tr>
+                        <td style="padding:20px 40px 8px 40px;text-align:center;">
+                          <p style="font-size:13px;color:#d70018;background-color:#fff5f5;border-radius:8px;padding:12px 16px;margin:0;">
+                            ⏳ Mã có hiệu lực trong <b>5 phút</b>. Vui lòng không chia sẻ mã này với bất kỳ ai.
+                          </p>
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="padding:12px 40px 32px 40px;text-align:center;">
+                          <p style="font-size:12.5px;color:#aaaaaa;margin:0;">
+                            Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.
+                          </p>
+                        </td>
+                      </tr>
+
+                      <!-- Footer -->
+                      <tr>
+                        <td style="background-color:#fff5f5;padding:22px 40px;text-align:center;border-top:1px solid #f5d9d9;">
+                          <p style="font-size:11.5px;color:#b3a3a3;margin:0;line-height:1.6;">
+                            Đây là email tự động, vui lòng không trả lời trực tiếp.<br/>
+                            © 2026 MarcusStore. Trân trọng cảm ơn bạn đã đồng hành cùng chúng tôi.
+                          </p>
+                        </td>
+                      </tr>
+
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """.formatted(otp);
+    }
+
+    // ============================================================
+    // 2. GỬI VOUCHER RIÊNG CHO KHÁCH (tông đỏ)
+    // ============================================================
+
+    public void sendVoucherAssigned(String email, String customerName, Voucher voucher) {
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("🎁 Bạn vừa nhận được voucher ưu đãi từ MarcusStore!");
+            helper.setText(buildVoucherHtml(customerName, voucher), true);
+
+            mailSender.send(mimeMessage);
+        } catch (Exception e) {
+            throw new RuntimeException("Gửi email voucher thất bại: " + e.getMessage(), e);
+        }
+    }
+
+    private String discountLabel(Voucher voucher) {
+        return switch (voucher.getDiscountType()) {
+            case "PERCENT" -> "Giảm " + voucher.getDiscountValue().stripTrailingZeros().toPlainString() + "%";
+            case "AMOUNT" -> "Giảm " + CURRENCY_FORMAT.format(voucher.getDiscountValue()) + "đ";
+            case "FREESHIP" -> "Miễn phí vận chuyển";
+            case "GIFT" -> "Tặng quà kèm đơn hàng";
+            default -> "Ưu đãi đặc biệt";
+        };
+    }
+
+    private String buildVoucherHtml(String customerName, Voucher voucher) {
+        String maxDiscountRow = voucher.getMaxDiscountAmount() != null
+                ? metaRow("Giảm tối đa", CURRENCY_FORMAT.format(voucher.getMaxDiscountAmount()) + "đ")
+                : "";
+
+        String minOrderRow = (voucher.getMinOrderValue() != null && voucher.getMinOrderValue().signum() > 0)
+                ? metaRow("Đơn hàng từ", CURRENCY_FORMAT.format(voucher.getMinOrderValue()) + "đ")
+                : "";
+
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0;padding:0;background-color:#f4f4f7;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+              <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f7;padding:40px 0;">
+                <tr>
+                  <td align="center">
+                    <table width="520" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
+
+                      <!-- Header -->
+                      <tr>
+                        <td style="background-color:#d70018;padding:40px 40px 30px 40px;text-align:center;">
+                          <div style="display:inline-block;width:56px;height:56px;line-height:56px;background-color:#ffffff;border-radius:50%%;font-size:26px;margin-bottom:16px;">
+                            🎁
+                          </div>
+                          <div style="color:#ffffff;font-size:20px;font-weight:600;letter-spacing:0.3px;">
+                            Voucher ưu đãi dành riêng cho bạn
+                          </div>
+                          <div style="color:#ffd4d4;font-size:13px;margin-top:6px;letter-spacing:0.5px;">
+                            MARCUSSTORE MEMBERSHIP REWARD
+                          </div>
+                        </td>
+                      </tr>
+
+                      <!-- Body -->
+                      <tr>
+                        <td style="padding:36px 40px 8px 40px;text-align:center;">
+                          <p style="font-size:15px;color:#333333;margin:0 0 6px 0;">
+                            Xin chào <b>%s</b>,
+                          </p>
+                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto 14px auto;max-width:400px;">
+                            Cảm ơn bạn đã luôn tin tưởng và đồng hành cùng MarcusStore. Sự ủng hộ của bạn chính là động lực để chúng tôi không ngừng hoàn thiện.
+                          </p>
+                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto 14px auto;max-width:380px;">
+                            Đây là một phần quà nhỏ dành riêng cho bạn.
+                          </p>
+                          <p style="font-size:14px;color:#d70018;line-height:1.6;margin:0 auto;max-width:400px;font-weight:600;">
+                            Chúng tôi đã thêm mã này vào kho voucher của bạn, hãy kiểm tra và sử dụng ngay tại trang thanh toán nhé!
+                          </p>
+                        </td>
+                      </tr>
+
+                      <!-- Voucher code block -->
+                      <tr>
+                        <td style="padding:24px 40px 40px 40px;">
+                          <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#fff5f5;border-radius:12px;border:1px solid #f5d9d9;">
+                            <tr>
+                              <td style="padding:28px;text-align:center;">
+                                <div style="font-size:11px;color:#b3554f;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;">
+                                  Mã ưu đãi
+                                </div>
+                                <div style="display:inline-block;background-color:#d70018;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:3px;padding:12px 28px;border-radius:8px;font-family:'Courier New',monospace;">
+                                  %s
+                                </div>
+
+                                <table width="100%%" cellpadding="0" cellspacing="0" style="margin-top:22px;border-top:1px dashed #e0b3b3;">
+                                  <tr><td style="height:22px;"></td></tr>
+                                </table>
+
+                                <table width="100%%" cellpadding="0" cellspacing="0">
+                                  %s
+                                  %s
+                                  %s
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+
+                          <p style="font-size:12.5px;color:#aaaaaa;margin:20px 0 0 0;text-align:center;">
+                            Hiệu lực từ <b style="color:#777777;">%s</b> đến <b style="color:#777777;">%s</b>
+                          </p>
+                        </td>
+                      </tr>
+
+                      <!-- Footer -->
+                      <tr>
+                        <td style="background-color:#fff5f5;padding:22px 40px;text-align:center;border-top:1px solid #f5d9d9;">
+                          <p style="font-size:11.5px;color:#b3a3a3;margin:0;line-height:1.6;">
+                            Đây là email tự động, vui lòng không trả lời trực tiếp.<br/>
+                            © 2026 MarcusStore. Trân trọng cảm ơn bạn đã đồng hành cùng chúng tôi.
+                          </p>
+                        </td>
+                      </tr>
+
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """.formatted(
+                customerName,
+                voucher.getVoucherCode(),
+                metaRow("Ưu đãi", discountLabel(voucher)),
+                maxDiscountRow,
+                minOrderRow,
+                voucher.getStartDate().format(DATE_FORMAT),
+                voucher.getEndDate().format(DATE_FORMAT)
+            );
+    }
+
+    private String metaRow(String label, String value) {
+        return """
+            <tr>
+              <td style="padding:5px 0;text-align:center;font-size:13.5px;color:#888888;">
+                %s: <b style="color:#d70018;">%s</b>
+              </td>
+            </tr>
+            """.formatted(label, value);
+    }
+
+    // ============================================================
+    // 3. GỬI CẬP NHẬT TRẠNG THÁI ĐƠN HÀNG (kèm chi tiết đơn hàng)
+    // ============================================================
+
+    public void sendOrderStatusUpdate(String email, String customerName, Order order, String status) {
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+            helper.setTo(email);
+            helper.setSubject("MarcusStore - Cập nhật đơn hàng #" + order.getOrderCode());
+            helper.setText(buildOrderStatusHtml(customerName, order, status), true);
+
+            mailSender.send(mimeMessage);
+        } catch (Exception e) {
+            throw new RuntimeException("Gửi email cập nhật đơn hàng thất bại: " + e.getMessage(), e);
+        }
+    }
+
+    private String statusLabel(String status) {
+        return switch (status) {
+            case "PENDING" -> "Chờ xác nhận";
+            case "CONFIRMED" -> "Đã xác nhận";
+            case "PROCESSING" -> "Đang chuẩn bị hàng";
+            case "PACKED" -> "Đã đóng gói";
+            case "SHIPPING" -> "Đang giao hàng";
+            case "DELIVERED" -> "Giao hàng thành công";
+            case "COMPLETED" -> "Đơn hàng hoàn thành";
+            case "FAILED" -> "Giao hàng không thành công";
+            case "CANCELLED" -> "Đơn hàng đã hủy";
+            default -> status;
+        };
+    }
+
+    private String statusMessage(String status) {
+        return switch (status) {
+            case "PENDING" -> "Đơn hàng của bạn đã được ghi nhận và đang chờ MarcusStore xác nhận.";
+            case "CONFIRMED" -> "Đơn hàng của bạn đã được xác nhận và đang được chuẩn bị.";
+            case "PROCESSING" -> "MarcusStore đang chuẩn bị hàng cho đơn của bạn.";
+            case "PACKED" -> "Đơn hàng đã được đóng gói và sẵn sàng để giao đi.";
+            case "SHIPPING" -> "Đơn hàng đang trên đường đến với bạn. Vui lòng để ý điện thoại nhé!";
+            case "DELIVERED" -> "Đơn hàng đã được giao thành công. Cảm ơn bạn đã mua sắm cùng MarcusStore!";
+            case "COMPLETED" -> "Đơn hàng đã hoàn tất. Cảm ơn bạn đã tin tưởng và đồng hành cùng MarcusStore!";
+            case "FAILED" -> "Rất tiếc, đơn hàng giao không thành công. MarcusStore sẽ liên hệ lại với bạn sớm nhất.";
+            case "CANCELLED" -> "Đơn hàng của bạn đã được hủy. Nếu có thắc mắc, vui lòng liên hệ hỗ trợ.";
+            default -> "Trạng thái đơn hàng của bạn vừa được cập nhật.";
+        };
+    }
+
+    private String buildOrderStatusHtml(String customerName, Order order, String status) {
+        boolean isNegative = "CANCELLED".equals(status) || "FAILED".equals(status);
+        String timelineHtml = isNegative ? buildNegativeTimeline(status) : buildTimeline(status);
+
+        BigDecimal shippingFee = order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO;
+        BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+
+        String trackingRow = (order.getTrackingCode() != null && !order.getTrackingCode().isBlank())
+                ? "<tr><td style=\"font-size:13.5px;color:#555555;padding:3px 0;\">Mã vận đơn: <b style=\"color:#222222;\">"
+                        + order.getTrackingCode() + "</b></td></tr>"
+                : "";
+
+        String discountRow = discountAmount.signum() > 0
+                ? "<tr><td style=\"font-size:13px;color:#888888;padding:3px 0;\">Giảm giá</td>"
+                        + "<td style=\"font-size:13px;color:#d70018;text-align:right;\">-"
+                        + CURRENCY_FORMAT.format(discountAmount) + " đ</td></tr>"
+                : "";
+
+        List<OrderItem> items = order.getOrderItems();
+        int itemCount = items != null ? items.size() : 0;
+
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="UTF-8"></head>
+            <body style="margin:0;padding:0;background-color:#eef0f4;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+              <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#eef0f4;padding:40px 0;">
+                <tr>
+                  <td align="center">
+                    <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);border:1px solid #f5d9d9;">
+
+                      <!-- Header -->
+                      <tr>
+                        <td style="background-color:#d70018;padding:36px 40px 26px 40px;text-align:center;">
+                          <div style="display:inline-block;width:52px;height:52px;line-height:52px;background-color:#ffffff;border-radius:50%%;font-size:24px;margin-bottom:14px;">
+                            📦
+                          </div>
+                          <div style="color:#ffffff;font-size:19px;font-weight:600;">
+                            Cập nhật đơn hàng của bạn
+                          </div>
+                          <div style="color:#ffd4d4;font-size:12.5px;margin-top:6px;letter-spacing:0.5px;">
+                            MÃ ĐƠN HÀNG: %s
+                          </div>
+                        </td>
+                      </tr>
+
+                      <!-- Body -->
+                      <tr>
+                        <td style="padding:34px 40px 8px 40px;text-align:center;">
+                          <p style="font-size:15px;color:#333333;margin:0 0 6px 0;">
+                            Xin chào <b>%s</b>,
+                          </p>
+                          <p style="font-size:14px;color:#777777;line-height:1.6;margin:0 auto;max-width:380px;">
+                            %s
+                          </p>
+                        </td>
+                      </tr>
+
+                      <!-- Timeline -->
+                      <tr>
+                        <td style="padding:28px 40px 8px 40px;">
+                          <table width="100%%" cellpadding="0" cellspacing="0">
+                            %s
+                          </table>
+                        </td>
+                      </tr>
+
+                      <!-- Current status badge -->
+                      <tr>
+                        <td style="padding:24px 40px 8px 40px;text-align:center;">
+                          <span style="display:inline-block;background-color:%s;color:%s;font-size:13px;font-weight:700;letter-spacing:0.5px;padding:9px 22px;border-radius:20px;">
+                            %s
+                          </span>
+                        </td>
+                      </tr>
+
+                      <!-- Recipient info -->
+                      <tr>
+                        <td style="padding:28px 40px 0 40px;">
+                          <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#fafafa;border-radius:12px;border:1px solid #ececec;">
+                            <tr>
+                              <td style="padding:20px 24px;">
+                                <div style="font-size:11px;color:#999999;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px;">
+                                  Thông tin giao hàng
+                                </div>
+                                <table width="100%%" cellpadding="0" cellspacing="0">
+                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Người nhận: <b style="color:#222222;">%s</b></td></tr>
+                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Điện thoại: <b style="color:#222222;">%s</b></td></tr>
+                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Địa chỉ: <b style="color:#222222;">%s</b></td></tr>
+                                  <tr><td style="font-size:13.5px;color:#555555;padding:3px 0;">Thanh toán: <b style="color:#222222;">%s</b></td></tr>
+                                  %s
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+
+                      <!-- Order items -->
+                      <tr>
+                        <td style="padding:20px 40px 0 40px;">
+                          <table width="100%%" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border:1px solid #ececec;border-radius:12px;">
+                            <tr>
+                              <td style="padding:18px 24px 6px 24px;">
+                                <div style="font-size:11px;color:#999999;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">
+                                  Sản phẩm (%d)
+                                </div>
+                              </td>
+                            </tr>
+                            %s
+                            <tr><td style="padding:8px 24px;"><div style="border-top:1px dashed #dddddd;"></div></td></tr>
+                            <tr>
+                              <td style="padding:4px 24px 18px 24px;">
+                                <table width="100%%" cellpadding="0" cellspacing="0">
+                                  <tr>
+                                    <td style="font-size:13px;color:#888888;padding:3px 0;">Tạm tính</td>
+                                    <td style="font-size:13px;color:#333333;text-align:right;">%s đ</td>
+                                  </tr>
+                                  %s
+                                  <tr>
+                                    <td style="font-size:13px;color:#888888;padding:3px 0;">Phí vận chuyển</td>
+                                    <td style="font-size:13px;color:#333333;text-align:right;">%s đ</td>
+                                  </tr>
+                                  <tr>
+                                    <td style="font-size:14.5px;color:#1f1f2e;font-weight:700;padding:8px 0 0 0;">Tổng thanh toán</td>
+                                    <td style="font-size:16px;color:#d70018;font-weight:700;text-align:right;padding:8px 0 0 0;">%s đ</td>
+                                  </tr>
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+
+                      <tr><td style="height:32px;"></td></tr>
+
+                      <!-- Footer -->
+                      <tr>
+                        <td style="background-color:#fff5f5;padding:22px 40px;text-align:center;border-top:1px solid #f5d9d9;">
+                          <p style="font-size:11.5px;color:#b3a3a3;margin:0;line-height:1.6;">
+                            Đây là email tự động, vui lòng không trả lời trực tiếp.<br/>
+                            © 2026 MarcusStore. Trân trọng cảm ơn bạn đã đồng hành cùng chúng tôi.
+                          </p>
+                        </td>
+                      </tr>
+
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+            """.formatted(
+                order.getOrderCode(),
+                customerName,
+                statusMessage(status),
+                timelineHtml,
+                isNegative ? "#f0f0f0" : "#fff5f5",
+                isNegative ? "#666666" : "#d70018",
+                statusLabel(status),
+                order.getRecipientName(),
+                order.getRecipientPhone(),
+                order.getShippingAddress(),
+                order.getPaymentMethod(),
+                trackingRow,
+                itemCount,
+                buildItemRows(items),
+                CURRENCY_FORMAT.format(order.getTotalAmount()),
+                discountRow,
+                CURRENCY_FORMAT.format(shippingFee),
+                CURRENCY_FORMAT.format(order.getFinalAmount())
+            );
+    }
+
+    private String buildItemRows(List<OrderItem> items) {
+        if (items == null || items.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (OrderItem item : items) {
+            String productName = item.getSku().getProduct().getProductName();
+            String skuInfo = item.getSku().getSkuCode();
+            BigDecimal lineTotal = item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity()));
+
+            sb.append("""
+                <tr>
+                  <td style="padding:6px 24px;">
+                    <table width="100%%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="font-size:13.5px;color:#333333;">
+                          %s <span style="color:#999999;">x%d</span>
+                          <div style="font-size:11.5px;color:#aaaaaa;">%s</div>
+                        </td>
+                        <td style="font-size:13.5px;color:#333333;text-align:right;vertical-align:top;">%s đ</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                """.formatted(productName, item.getQuantity(), skuInfo, CURRENCY_FORMAT.format(lineTotal)));
+        }
+        return sb.toString();
+    }
+
+    private String buildTimeline(String currentStatus) {
+        String[] labels = {"Đặt hàng", "Xác nhận", "Chuẩn bị", "Đóng gói", "Vận chuyển", "Đã giao", "Hoàn tất"};
+        int currentIndex = Arrays.asList(STATUS_FLOW).indexOf(currentStatus);
+        // Nếu trạng thái không nằm trong flow chính (VD trạng thái lạ), coi như bước 0
+        if (currentIndex < 0) {
+            currentIndex = 0;
+        }
+
+        StringBuilder sb = new StringBuilder("<tr>");
+        for (int i = 0; i < STATUS_FLOW.length; i++) {
+            boolean done = i <= currentIndex;
+            String dotColor = done ? "#d70018" : "#e0e0e0";
+            String textColor = done ? "#1f1f2e" : "#bbbbbb";
+            String lineColor = i < currentIndex ? "#d70018" : "#e0e0e0";
+
+            sb.append("<td style=\"text-align:center;\">");
+            sb.append("<div style=\"width:12px;height:12px;border-radius:50%;background-color:")
+              .append(dotColor).append(";margin:0 auto 6px auto;\"></div>");
+            sb.append("<div style=\"font-size:10.5px;color:").append(textColor).append(";\">")
+              .append(labels[i]).append("</div>");
+            sb.append("</td>");
+
+            if (i < STATUS_FLOW.length - 1) {
+                sb.append("<td style=\"width:14px;\"><div style=\"height:2px;background-color:")
+                  .append(lineColor).append(";margin-bottom:18px;\"></div></td>");
+            }
+        }
+        sb.append("</tr>");
+        return sb.toString();
+    }
+
+    private String buildNegativeTimeline(String status) {
+        String label = "FAILED".equals(status) ? "Giao hàng không thành công" : "Đơn hàng đã bị hủy";
+        return """
+            <tr>
+              <td style="text-align:center;padding:12px 0;">
+                <div style="width:14px;height:14px;border-radius:50%%;background-color:#c0392b;margin:0 auto 8px auto;"></div>
+                <div style="font-size:12.5px;color:#c0392b;">%s</div>
+              </td>
+            </tr>
+            """.formatted(label);
     }
 }

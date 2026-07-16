@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.service.EmailService;
 import com.fpoly.marcusstore.service.UserVoucherService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class UserVoucherServiceImpl implements UserVoucherService {
     private final UserVoucherRepository userVoucherRepository;
     private final VoucherRepository voucherRepository;
     private final UserRepository userRepository;
-
+    private final EmailService emailService; 
     // lấy voucher có thể sử dụng cho user
     @Override
     public List<VoucherResponse> getAvailableVouchersForUser() {
@@ -72,7 +73,7 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy voucher với id: " + voucherId));
 
         List<UserVoucher> userVouchers = new ArrayList<>();
-
+         List<User> usersToNotify = new ArrayList<>();
         for (Integer userId : userIds) {
             if (!userVoucherRepository.existsByVoucherVoucherIdAndUserUserId(voucherId, userId)) {
                 User user = userRepository.findById(userId)
@@ -86,11 +87,23 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                         .build();
 
                 userVouchers.add(userVoucher);
+                usersToNotify.add(user); 
             }
         }
 
         if (!userVouchers.isEmpty()) {
             userVoucherRepository.saveAll(userVouchers);
+
+                    // gửi mail sau khi save thành công
+        for (User user : usersToNotify) {
+            try {
+                emailService.sendVoucherAssigned(user.getEmail(), user.getFullName(), voucher);
+            } catch (Exception e) {
+                // không để lỗi gửi mail làm rollback cả transaction gán voucher
+                // có thể log lại để theo dõi
+                // log.error("Gửi mail voucher thất bại cho user {}: {}", user.getUserId(), e.getMessage());
+            }
+        }
         }
     }
 
