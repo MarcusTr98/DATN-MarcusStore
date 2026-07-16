@@ -1,7 +1,7 @@
 <template>
   <div class="al-page">
 
-    <!-- Hero Banner - Đồng bộ style Đối soát -->
+    <!-- Hero Banner -->
     <div class="al-hero">
       <div class="hero-bg"></div>
       <div class="hero-content">
@@ -34,7 +34,7 @@
     </div>
 
     <template v-else>
-      <!-- Stats Grid - 4 card đồng bộ -->
+      <!-- Stats Grid -->
       <section class="stats-grid">
         <article class="stat-card">
           <div class="stat-icon stat-icon-blue"><i class="bi bi-collection"></i></div>
@@ -66,7 +66,7 @@
         </article>
       </section>
 
-      <!-- Chart Panel - Biểu đồ cột -->
+      <!-- Chart Panel -->
       <section class="chart-panel" v-if="chartDays.length > 0">
         <div class="chart-header">
           <i class="bi bi-bar-chart-fill"></i> Phân bổ hoạt động theo ngày
@@ -84,7 +84,7 @@
         </div>
       </section>
 
-      <!-- Filters & Table Container -->
+      <!-- Filters & Table -->
       <div class="table-panel">
         <!-- Bộ lọc -->
         <div class="toolbar-panel">
@@ -129,18 +129,8 @@
                 </div>
               </div>
               <div class="d-flex gap-2">
-                <input
-                  v-model="filters.fromDate"
-                  type="date"
-                  class="form-control"
-                  title="Từ ngày"
-                />
-                <input
-                  v-model="filters.toDate"
-                  type="date"
-                  class="form-control"
-                  title="Đến ngày"
-                />
+                <input v-model="filters.fromDate" type="date" class="form-control" title="Từ ngày" />
+                <input v-model="filters.toDate" type="date" class="form-control" title="Đến ngày" />
                 <button class="btn-soft" @click="resetFilters" title="Đặt lại bộ lọc">
                   <i class="bi bi-arrow-counterclockwise"></i>
                 </button>
@@ -149,29 +139,27 @@
           </div>
         </div>
 
-        <!-- Bảng -->
+        <!-- Bảng — bỏ cột Mô tả & IP, colspan xuống 6 -->
         <div class="table-wrapper">
           <table class="financial-table">
             <thead>
               <tr>
                 <th style="width: 56px">STT</th>
-                <th style="width: 100px">HÀNH ĐỘNG</th>
-                <th style="width: 150px">BẢNG</th>
-                <th>MÔ TẢ</th>
-                <th style="width: 170px">NGƯỜI THỰC HIỆN</th>
-                <th style="width: 120px">IP</th>
-                <th style="width: 150px">THỜI GIAN</th>
+                <th style="width: 110px">HÀNH ĐỘNG</th>
+                <th style="width: 180px">BẢNG DỮ LIỆU</th>
+                <th style="width: 200px">NGƯỜI THỰC HIỆN</th>
+                <th style="width: 160px">THỜI GIAN</th>
                 <th style="width: 70px" class="text-center">THAO TÁC</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="8" class="text-center py-4">
+                <td colspan="6" class="text-center py-4">
                   <i class="bi bi-arrow-repeat spin"></i> Đang tải dữ liệu...
                 </td>
               </tr>
               <tr v-else-if="paged.length === 0">
-                <td colspan="8" class="text-center py-4">
+                <td colspan="6" class="text-center py-4">
                   <i class="bi bi-inbox" style="font-size: 1.6rem; color: #9db8de"></i>
                   <div class="mt-2" style="color: #6b7280">Không có log nào phù hợp.</div>
                 </td>
@@ -184,15 +172,13 @@
                   </span>
                 </td>
                 <td class="fw-bold">{{ tableLabel(log.tableName) }}</td>
-                <td class="desc-cell" :title="translateDescription(log.description)">{{ translateDescription(log.description) || '—' }}</td>
                 <td>
                   <template v-if="log.userId">
                     <div class="user-name">{{ log.fullName || log.username }}</div>
                     <div class="user-sub">@{{ log.username }}</div>
                   </template>
-                  <span v-else class="text-muted">Người dùng đã xoá</span>
+                  <span v-else class="text-muted fst-italic">Người dùng đã xoá</span>
                 </td>
-                <td class="mono">{{ log.ipAddress || '—' }}</td>
                 <td>{{ formatDate(log.createdAt) }}</td>
                 <td class="text-center">
                   <button class="btn-icon" @click="openDetail(log.logId)" title="Xem chi tiết">
@@ -209,7 +195,6 @@
           <div class="pagination-summary">
             Tổng <strong>{{ filteredLogs.length }}</strong> log
           </div>
-
           <div class="pagination-controls">
             <div class="page-size-group">
               <span class="page-size-label">Hiển thị</span>
@@ -221,7 +206,6 @@
               </select>
               <span class="page-size-label page-size-suffix">/ trang</span>
             </div>
-
             <nav class="pager" aria-label="Phân trang">
               <button class="pager-arrow" :disabled="page === 1" @click="page = 1">
                 <i class="bi bi-chevron-bar-left"></i>
@@ -232,12 +216,7 @@
               <ul class="pager-list">
                 <li v-for="(p, i) in pageItems" :key="i">
                   <span v-if="p === '...'" class="pager-ellipsis">…</span>
-                  <button
-                    v-else
-                    class="pager-num"
-                    :class="{ active: p === page }"
-                    @click="page = p"
-                  >
+                  <button v-else class="pager-num" :class="{ active: p === page }" @click="page = p">
                     {{ p }}
                   </button>
                 </li>
@@ -254,61 +233,72 @@
       </div>
     </template>
 
-    <!-- Modal Chi tiết -->
+    <!-- Modal Chi tiết — cải thiện layout -->
     <div v-if="detailLog" class="modal-overlay" @click.self="detailLog = null">
       <div class="modal-content">
         <div class="modal-header">
           <div class="modal-header-title">
             <span class="modal-header-icon"><i class="bi bi-file-earmark-text"></i></span>
-            <h5 class="mb-0">Chi tiết Log #{{ detailLog.logId }}</h5>
+            <h5 class="mb-0">Chi tiết thao tác #{{ detailLog.logId }}</h5>
           </div>
           <button class="btn-close-modal" @click="detailLog = null" title="Đóng">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
         <div class="modal-body">
-          <div class="id-row">
-            <div class="id-block">
-              <span class="detail-label">Log ID</span>
-              <strong class="font-monospace">{{ detailLog.logId }}</strong>
+
+          <!-- Hành động + Bảng -->
+          <div class="detail-section">
+            <div class="detail-section-row">
+              <div class="detail-item">
+                <span class="detail-label">Hành động</span>
+                <span :class="['badge', 'badge-lg', getActionClass(detailLog.actionType)]">
+                  {{ actionLabel(detailLog.actionType) }}
+                </span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">Bảng dữ liệu</span>
+                <strong class="detail-value">{{ tableLabel(detailLog.tableName) }}</strong>
+              </div>
             </div>
           </div>
 
-          <div class="badge-row">
-            <div class="detail-group">
-              <span class="detail-label">Hành động</span>
-              <span :class="['badge', 'badge-lg', getActionClass(detailLog.actionType)]">
-                {{ actionLabel(detailLog.actionType) }}
-              </span>
+          <!-- Mô tả chi tiết thao tác -->
+          <div class="desc-section">
+            <div class="desc-section-header">
+              <i class="bi bi-pencil-square"></i> Nội dung thao tác
             </div>
-            <div class="detail-group">
-              <span class="detail-label">Bảng dữ liệu</span>
-              <strong>{{ tableLabel(detailLog.tableName) }}</strong>
+            <p class="desc-text">{{ translateDescription(detailLog.description) || 'Không có mô tả' }}</p>
+          </div>
+
+          <!-- Người thực hiện -->
+          <div class="person-section">
+            <div class="person-section-header">
+              <i class="bi bi-person-fill-check"></i> Người thực hiện
+            </div>
+            <div class="person-grid">
+              <div class="person-item">
+                <span class="detail-label">Họ tên</span>
+                <strong class="detail-value">{{ detailLog.fullName || '---' }}</strong>
+              </div>
+              <div class="person-item">
+                <span class="detail-label">Tài khoản</span>
+                <span class="mono-tag">@{{ detailLog.username || '---' }}</span>
+              </div>
+              <div class="person-item person-item-full">
+                <span class="detail-label">Địa chỉ IP</span>
+                <span class="ip-tag">
+                  <i class="bi bi-hdd-network"></i>
+                  {{ detailLog.ipAddress || '---' }}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div class="note-box">
-            <span class="detail-label"><i class="bi bi-info-circle"></i> Mô tả</span>
-            <p class="note-text">{{ translateDescription(detailLog.description) || 'Không có mô tả' }}</p>
-          </div>
-
-          <div class="recipient-box">
-            <h6 class="recipient-title">
-              <i class="bi bi-person-lines-fill"></i> Thông tin người thực hiện
-            </h6>
-            <div class="detail-group mb-2">
-              <span class="detail-label">Tên & Username</span>
-              <strong>{{ detailLog.fullName || '---' }} · @{{ detailLog.username || '---' }}</strong>
-            </div>
-            <div class="detail-group mb-0">
-              <span class="detail-label">Địa chỉ IP</span>
-              <span class="text-muted address-text mono">{{ detailLog.ipAddress || '---' }}</span>
-            </div>
-          </div>
-
+          <!-- Footer thời gian -->
           <div class="modal-footer-note">
             <i class="bi bi-clock-history"></i>
-            Thời gian: {{ formatDate(detailLog.createdAt) }}
+            Thực hiện lúc: <strong>{{ formatDate(detailLog.createdAt) }}</strong>
           </div>
         </div>
       </div>
@@ -341,10 +331,7 @@ const detailLog = ref(null);
 const toast = reactive({ show: false, type: 'success', title: '', message: '' });
 let toastTimer = null;
 const showToast = (type, title, message) => {
-  toast.show = true;
-  toast.type = type;
-  toast.title = title;
-  toast.message = message;
+  toast.show = true; toast.type = type; toast.title = title; toast.message = message;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => (toast.show = false), 3000);
 };
@@ -359,7 +346,9 @@ const actionOptions = computed(() => {
   const extra = [...found].filter((a) => !STANDARD_ACTIONS.includes(a)).sort();
   return [...STANDARD_ACTIONS, ...extra];
 });
-const tableOptions = computed(() => [...new Set(logs.value.map((l) => l.tableName).filter(Boolean))].sort());
+const tableOptions = computed(() =>
+  [...new Set(logs.value.map((l) => l.tableName).filter(Boolean))].sort()
+);
 
 const ACTION_LABELS = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xoá' };
 function actionLabel(a) { return a ? (ACTION_LABELS[a.toUpperCase()] || a) : '—'; }
@@ -372,36 +361,36 @@ function getActionClass(a) {
 }
 
 const TABLE_LABELS = {
-  Users: 'Người dùng', Roles: 'Vai trò', Permissions: 'Quyền hạn', User_Permissions: 'Phân quyền nhân viên',
-  Categories: 'Danh mục sản phẩm', Products: 'Sản phẩm', Product_Images: 'Ảnh sản phẩm',
-  Product_Skus: 'Biến thể sản phẩm (SKU)', Product_Items: 'Kho IMEI', Attributes: 'Thuộc tính',
-  Attribute_Values: 'Giá trị thuộc tính', Vouchers: 'Voucher', User_Vouchers: 'Voucher người dùng',
-  Flash_Sale_Slots: 'Khung giờ Flash Sale', Flash_Sale_Items: 'Sản phẩm Flash Sale', Orders: 'Đơn hàng',
-  Order_Items: 'Chi tiết đơn hàng', Order_Transactions: 'Giao dịch đơn hàng', Post_Categories: 'Danh mục bài viết',
+  Users: 'Người dùng', Roles: 'Vai trò', Permissions: 'Quyền hạn',
+  User_Permissions: 'Phân quyền nhân viên', Categories: 'Danh mục sản phẩm',
+  Products: 'Sản phẩm', Product_Images: 'Ảnh sản phẩm',
+  Product_Skus: 'Biến thể sản phẩm (SKU)', Product_Items: 'Kho IMEI',
+  Attributes: 'Thuộc tính', Attribute_Values: 'Giá trị thuộc tính',
+  Vouchers: 'Voucher', User_Vouchers: 'Voucher người dùng',
+  Flash_Sale_Slots: 'Khung giờ Flash Sale', Flash_Sale_Items: 'Sản phẩm Flash Sale',
+  Orders: 'Đơn hàng', Order_Items: 'Chi tiết đơn hàng',
+  Order_Transactions: 'Giao dịch đơn hàng', Post_Categories: 'Danh mục bài viết',
   Posts: 'Bài viết', Banners: 'Banner', Contact_Requests: 'Yêu cầu liên hệ',
-  System_Settings: 'Cấu hình hệ thống', Shipping_Config: 'Cấu hình vận chuyển', Admin_Notifications: 'Thông báo admin',
-  User_Addresses: 'Địa chỉ người dùng', Audit_Logs: 'Nhật ký hoạt động',
+  System_Settings: 'Cấu hình hệ thống', Shipping_Config: 'Cấu hình vận chuyển',
+  Admin_Notifications: 'Thông báo admin', User_Addresses: 'Địa chỉ người dùng',
+  Audit_Logs: 'Nhật ký hoạt động',
 };
 function tableLabel(name) { return name ? (TABLE_LABELS[name] || name.replace(/_/g, ' ')) : '—'; }
 
-// ---- Dịch mô tả sang tiếng Việt ----
-// Thay tên bảng raw (vd: System_Settings, Attribute_Values) bằng nhãn tiếng Việt trong TABLE_LABELS.
-// Các từ khoá kỹ thuật như SKU, IMEI được giữ nguyên, không dịch.
-const SKIP_TRANSLATE_KEYS = new Set(['Product_Skus', 'Product_Items']); // SKU, IMEI -> giữ nguyên
+const SKIP_TRANSLATE_KEYS = new Set(['Product_Skus', 'Product_Items']);
 const TABLE_KEYS_SORTED = Object.keys(TABLE_LABELS)
   .filter((k) => !SKIP_TRANSLATE_KEYS.has(k))
-  .sort((a, b) => b.length - a.length); // dài trước để tránh thay nhầm chuỗi con
+  .sort((a, b) => b.length - a.length);
 function translateDescription(desc) {
   if (!desc) return desc;
   let result = desc;
   TABLE_KEYS_SORTED.forEach((key) => {
-    const regex = new RegExp(`\\b${key}\\b`, 'g');
-    result = result.replace(regex, TABLE_LABELS[key]);
+    result = result.replace(new RegExp(`\\b${key}\\b`, 'g'), TABLE_LABELS[key]);
   });
   return result;
 }
 
-// ---- Date parsing ----
+// ---- Date helpers ----
 function parseVnDateTime(str) {
   if (!str) return null;
   const [datePart, timePart] = str.split(' ');
@@ -415,20 +404,19 @@ function fmtInputDate(d) {
   return `${y}-${m}-${day}`;
 }
 function formatDate(str) {
-  return str ? new Date(parseVnDateTime(str)).toLocaleString('vi-VN') : '';
+  if (!str) return '';
+  const d = parseVnDateTime(str);
+  return d ? d.toLocaleString('vi-VN') : str;
 }
 
 function setPeriod(period) {
   activePeriod.value = period;
   const today = new Date();
   if (period === 'today') {
-    filters.fromDate = fmtInputDate(today);
-    filters.toDate = fmtInputDate(today);
+    filters.fromDate = fmtInputDate(today); filters.toDate = fmtInputDate(today);
   } else if (period === '7d') {
-    const from = new Date(today);
-    from.setDate(from.getDate() - 6);
-    filters.fromDate = fmtInputDate(from);
-    filters.toDate = fmtInputDate(today);
+    const from = new Date(today); from.setDate(from.getDate() - 6);
+    filters.fromDate = fmtInputDate(from); filters.toDate = fmtInputDate(today);
   } else if (period === 'month') {
     filters.fromDate = fmtInputDate(new Date(today.getFullYear(), today.getMonth(), 1));
     filters.toDate = fmtInputDate(today);
@@ -438,6 +426,7 @@ function setPeriod(period) {
   }
 }
 
+// ---- Stats ----
 const stats = computed(() => {
   let create = 0, update = 0, del = 0;
   logs.value.forEach((l) => {
@@ -449,6 +438,7 @@ const stats = computed(() => {
   return { total: logs.value.length, create, update, delete: del };
 });
 
+// ---- Filter ----
 const filteredLogs = computed(() => {
   let list = [...logs.value];
   if (filters.search.trim()) {
@@ -473,7 +463,7 @@ const filteredLogs = computed(() => {
   return list;
 });
 
-// ---- Chart data ----
+// ---- Chart ----
 const chartDays = computed(() => {
   const byDate = new Map();
   filteredLogs.value.forEach((l) => {
@@ -504,13 +494,9 @@ const pageSize = ref(10);
 watch(filteredLogs, () => { page.value = 1; });
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredLogs.value.length / pageSize.value)));
 const paged = computed(() => filteredLogs.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value));
-
 const pageItems = computed(() => {
-  const total = totalPages.value;
-  const current = page.value;
-  const delta = 1;
-  const items = [];
-  const range = [];
+  const total = totalPages.value, current = page.value, delta = 1;
+  const items = [], range = [];
   for (let i = Math.max(2, current - delta); i <= Math.min(total - 1, current + delta); i++) range.push(i);
   items.push(1);
   if (range.length && range[0] > 2) items.push('...');
@@ -521,58 +507,36 @@ const pageItems = computed(() => {
 });
 
 function resetFilters() {
-  filters.search = '';
-  filters.actionType = '';
-  filters.tableName = '';
-  filters.fromDate = '';
-  filters.toDate = '';
-  activePeriod.value = null;
+  filters.search = ''; filters.actionType = ''; filters.tableName = '';
+  filters.fromDate = ''; filters.toDate = ''; activePeriod.value = null;
 }
 
 async function loadAll() {
-  loading.value = true;
-  loadError.value = '';
-  try {
-    logs.value = await auditLogApi.getAll();
-  } catch {
-    loadError.value = 'Không tải được nhật ký hoạt động. Vui lòng thử lại.';
-  } finally {
-    loading.value = false;
-  }
+  loading.value = true; loadError.value = '';
+  try { logs.value = await auditLogApi.getAll(); }
+  catch { loadError.value = 'Không tải được nhật ký hoạt động. Vui lòng thử lại.'; }
+  finally { loading.value = false; }
 }
 onMounted(loadAll);
 
 async function openDetail(id) {
-  try {
-    detailLog.value = await auditLogApi.getOne(id);
-  } catch {
-    showToast('error', 'Lỗi', 'Không tải được chi tiết log.');
-  }
+  try { detailLog.value = await auditLogApi.getOne(id); }
+  catch { showToast('error', 'Lỗi', 'Không tải được chi tiết log.'); }
 }
 
 async function handleExport() {
   exporting.value = true;
   try {
-    if (filteredLogs.value.length === 0) {
-      showToast('error', 'Lỗi', 'Không có dữ liệu để xuất!');
-      exporting.value = false;
-      return;
-    }
+    if (filteredLogs.value.length === 0) { showToast('error', 'Lỗi', 'Không có dữ liệu để xuất!'); return; }
     const blob = await auditLogApi.exportCsv();
     const url = window.URL.createObjectURL(new Blob([blob]));
     const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `AuditLog_${new Date().getTime()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    link.href = url; link.setAttribute('download', `AuditLog_${new Date().getTime()}.csv`);
+    document.body.appendChild(link); link.click(); link.remove();
     window.URL.revokeObjectURL(url);
     showToast('success', 'Thành công', 'Xuất log hoàn tất!');
-  } catch {
-    showToast('error', 'Lỗi', 'Xuất file CSV thất bại. Vui lòng thử lại.');
-  } finally {
-    exporting.value = false;
-  }
+  } catch { showToast('error', 'Lỗi', 'Xuất file CSV thất bại.'); }
+  finally { exporting.value = false; }
 }
 </script>
 
@@ -586,7 +550,7 @@ async function handleExport() {
   font-family: 'Be Vietnam Pro', sans-serif;
 }
 
-/* Hero - Đồng bộ với Đối soát */
+/* Hero */
 .al-hero {
   position: relative;
   border-radius: 18px;
@@ -599,8 +563,8 @@ async function handleExport() {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 88% -10%, rgba(255, 255, 255, 0.22) 0%, transparent 45%),
-    radial-gradient(circle at 8% 120%, rgba(255, 255, 255, 0.12) 0%, transparent 50%);
+    radial-gradient(circle at 88% -10%, rgba(255,255,255,0.22) 0%, transparent 45%),
+    radial-gradient(circle at 8% 120%, rgba(255,255,255,0.12) 0%, transparent 50%);
   pointer-events: none;
 }
 .hero-content {
@@ -612,820 +576,195 @@ async function handleExport() {
   gap: 18px;
   padding: 28px 32px;
 }
-.hero-title {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
+.hero-title { display: flex; align-items: center; gap: 18px; }
 .hero-icon {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-shrink: 0; width: 56px; height: 56px;
+  display: flex; align-items: center; justify-content: center;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-  font-size: 1.5rem;
-  backdrop-filter: blur(4px);
+  background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28);
+  color: #fff; font-size: 1.5rem; backdrop-filter: blur(4px);
 }
-.hero-title h1 {
-  margin: 0 0 4px;
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.01em;
-}
-.hero-title p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.92rem;
-}
-.dynamic-total {
-  background: rgba(0, 0, 0, 0.15);
-  color: #fff;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-}
+.hero-title h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.01em; }
+.hero-title p { margin: 0; color: rgba(255,255,255,0.85); font-size: 0.92rem; }
+.dynamic-total { background: rgba(0,0,0,0.15); color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; }
 .btn-export-excel {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 10px;
-  background: #ffffff;
-  color: #0b3d91;
-  font-weight: 700;
-  padding: 12px 20px;
-  font-size: 0.92rem;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-  transition: all 0.18s ease;
-  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid rgba(255,255,255,0.35); border-radius: 10px;
+  background: #fff; color: #0b3d91; font-weight: 700; padding: 12px 20px; font-size: 0.92rem;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18); transition: all 0.18s ease; cursor: pointer;
 }
-.btn-export-excel:hover:not(:disabled) {
-  background: #f0f6ff;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22);
-}
-.btn-export-excel:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
+.btn-export-excel:hover:not(:disabled) { background: #f0f6ff; transform: translateY(-1px); }
+.btn-export-excel:disabled { opacity: 0.7; cursor: not-allowed; }
 
-/* State messages */
+/* State */
 .state-box {
-  background: #fff;
-  border-radius: 12px;
-  padding: 48px;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 14px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
+  background: #fff; border-radius: 12px; padding: 48px;
+  text-align: center; color: #9ca3af; font-size: 14px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
-.state-error {
-  color: #dc2626;
-}
-.btn-retry {
-  margin-top: 8px;
-  background: #0b3d91;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 20px;
-  font-size: 13px;
-  cursor: pointer;
-  font-weight: 600;
-}
+.state-error { color: #dc2626; }
+.btn-retry { margin-top: 8px; background: #0b3d91; color: #fff; border: none; border-radius: 8px; padding: 8px 20px; font-size: 13px; cursor: pointer; font-weight: 600; }
 
-/* Stats Grid */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 18px;
-  margin-bottom: 22px;
-}
-@media (max-width: 992px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-@media (max-width: 576px) {
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
-}
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 22px; }
+@media (max-width: 992px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 576px) { .stats-grid { grid-template-columns: 1fr; } }
 .stat-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: #ffffff;
-  border: 1px solid #dce8f9;
-  border-radius: 14px;
-  padding: 18px 20px;
-  box-shadow: 0 4px 14px -8px rgba(28, 100, 214, 0.18);
-  transition: all 0.16s ease;
+  display: flex; align-items: center; gap: 14px;
+  background: #fff; border: 1px solid #dce8f9; border-radius: 14px; padding: 18px 20px;
+  box-shadow: 0 4px 14px -8px rgba(28,100,214,0.18); transition: all 0.16s ease;
 }
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px -8px rgba(28, 100, 214, 0.3);
-}
-.stat-icon {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  color: #ffffff;
-}
-.stat-icon-blue {
-  background: linear-gradient(135deg, #2f80ed, #1c64d6);
-}
-.stat-icon-green {
-  background: linear-gradient(135deg, #34c77b, #1f9d5e);
-}
-.stat-icon-amber {
-  background: linear-gradient(135deg, #ffb547, #f29c1f);
-}
-.stat-icon-red {
-  background: linear-gradient(135deg, #f5625a, #e0445c);
-}
-.stat-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stat-body span {
-  font-size: 0.8rem;
-  color: #6b7c93;
-  font-weight: 600;
-}
-.stat-body strong {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: #0f2c5c;
-}
-.fin-accent {
-  color: #1c64d6;
-}
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px -8px rgba(28,100,214,0.3); }
+.stat-icon { flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #fff; }
+.stat-icon-blue  { background: linear-gradient(135deg, #2f80ed, #1c64d6); }
+.stat-icon-green { background: linear-gradient(135deg, #34c77b, #1f9d5e); }
+.stat-icon-amber { background: linear-gradient(135deg, #ffb547, #f29c1f); }
+.stat-icon-red   { background: linear-gradient(135deg, #f5625a, #e0445c); }
+.stat-body { display: flex; flex-direction: column; gap: 4px; }
+.stat-body span { font-size: 0.8rem; color: #6b7c93; font-weight: 600; }
+.stat-body strong { font-size: 1.4rem; font-weight: 800; color: #0f2c5c; }
+.fin-accent { color: #1c64d6; }
 
-/* Chart Panel */
-.chart-panel {
-  background: #fff;
-  border: 1px solid #dce8f9;
-  border-radius: 14px;
-  padding: 18px;
-  box-shadow: 0 4px 14px -10px rgba(28, 100, 214, 0.16);
-  margin-bottom: 22px;
-}
-.chart-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-weight: 700;
-  color: #1f3a63;
-  margin-bottom: 10px;
-  font-size: 0.95rem;
-}
-.chart-subnote {
-  font-weight: 500;
-  font-size: 0.78rem;
-  color: #8ba0c2;
-}
-.chart-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  height: 160px;
-  overflow-x: auto;
-  padding-top: 6px;
-}
-.chart-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  width: 34px;
-}
-.chart-bar {
-  width: 22px;
-  height: 130px;
-  display: flex;
-  flex-direction: column-reverse;
-  justify-content: flex-start;
-  border-radius: 4px;
-  overflow: hidden;
-  background: #f3f4f6;
-}
-.seg {
-  width: 100%;
-}
-.seg-green {
-  background: #1f9d5e;
-}
-.seg-amber {
-  background: #f29c1f;
-}
-.seg-red {
-  background: #e0445c;
-}
-.chart-label {
-  font-size: 10px;
-  color: #9ca3af;
-  margin-top: 6px;
-  white-space: nowrap;
-}
+/* Chart */
+.chart-panel { background: #fff; border: 1px solid #dce8f9; border-radius: 14px; padding: 18px; box-shadow: 0 4px 14px -10px rgba(28,100,214,0.16); margin-bottom: 22px; }
+.chart-header { display: flex; align-items: baseline; gap: 8px; font-weight: 700; color: #1f3a63; margin-bottom: 10px; font-size: 0.95rem; }
+.chart-subnote { font-weight: 500; font-size: 0.78rem; color: #8ba0c2; }
+.chart-bars { display: flex; align-items: flex-end; gap: 10px; height: 160px; overflow-x: auto; padding-top: 6px; }
+.chart-col { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 34px; }
+.chart-bar { width: 22px; height: 130px; display: flex; flex-direction: column-reverse; justify-content: flex-start; border-radius: 4px; overflow: hidden; background: #f3f4f6; }
+.seg { width: 100%; }
+.seg-green { background: #1f9d5e; }
+.seg-amber { background: #f29c1f; }
+.seg-red   { background: #e0445c; }
+.chart-label { font-size: 10px; color: #9ca3af; margin-top: 6px; white-space: nowrap; }
 
-/* Filter Toolbar */
-.table-panel {
-  background: #ffffff;
-  border: 1px solid #dce8f9;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 6px 20px -12px rgba(28, 100, 214, 0.22);
+/* Table panel */
+.table-panel { background: #fff; border: 1px solid #dce8f9; border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px -12px rgba(28,100,214,0.22); }
+.toolbar-panel { padding: 20px 22px; border-bottom: 1px solid #e9f1fb; }
+.toolbar-row { display: grid; grid-template-columns: 2fr 1fr 1fr 2fr; gap: 20px; align-items: end; }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field-keyword { grid-column: 1/3; }
+.field-dates { grid-column: 3/5; gap: 8px; }
+.form-label { font-size: 0.78rem; font-weight: 700; color: #2f6fc4; text-transform: uppercase; margin: 0; }
+.form-control, .form-select {
+  height: 42px; padding: 0 12px; border: 1px solid #d6e6fb; border-radius: 9px;
+  background-color: #f7fbff; font-size: 0.88rem; outline: none; transition: all 0.15s ease;
 }
-.toolbar-panel {
-  padding: 20px 22px;
-  border-bottom: 1px solid #e9f1fb;
-}
-.toolbar-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr 2fr;
-  gap: 20px;
-  align-items: end;
-}
-@media (max-width: 992px) {
-  .toolbar-row {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.field-keyword {
-  grid-column: 1 / 3;
-}
-.field-dates {
-  grid-column: 3 / 5;
-}
-.form-label {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: #2f6fc4;
-  text-transform: uppercase;
-  margin: 0;
-}
-.form-control,
-.form-select {
-  height: 42px;
-  padding: 0 12px;
-  border: 1px solid #d6e6fb;
-  border-radius: 9px;
-  background-color: #f7fbff;
-  font-size: 0.88rem;
-  outline: none;
-  transition: all 0.15s ease;
-}
-.form-control:focus,
-.form-select:focus {
-  border-color: #2f80ed;
-  background-color: #ffffff;
-  box-shadow: 0 0 0 0.18rem rgba(47, 128, 237, 0.16);
-}
-.input-group {
-  display: flex;
-  align-items: stretch;
-  border: 1px solid #d6e6fb;
-  border-radius: 9px;
-  background-color: #f7fbff;
-}
-.input-group-text {
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  color: #5d8fd9;
-  border-right: 1px solid #d6e6fb;
-}
-.input-group .form-control {
-  width: 100%;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-}
-.quick-dates {
-  display: flex;
-  gap: 6px;
-}
-.btn-quick-date {
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid #d6e6fb;
-  background: #fff;
-  color: #2f80ed;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.btn-quick-date:hover,
-.btn-quick-date.active {
-  background: #2f80ed;
-  color: #ffffff;
-}
-.btn-soft {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 42px;
-  padding: 0 14px;
-  border: 1px solid #d6e6fb;
-  border-radius: 9px;
-  background: #f7fbff;
-  color: #1c64d6;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.btn-soft:hover {
-  background: #e3effd;
-  transform: rotate(-25deg);
-}
-.d-flex {
-  display: flex;
-}
-.gap-2 {
-  gap: 8px;
-}
-.gap-3 {
-  gap: 12px;
-}
-.align-items-center {
-  align-items: center;
-}
-.justify-content-between {
-  justify-content: space-between;
-}
-.mb-1 {
-  margin-bottom: 4px;
-}
-.mb-0 {
-  margin-bottom: 0;
-}
+.form-control:focus, .form-select:focus { border-color: #2f80ed; background-color: #fff; box-shadow: 0 0 0 0.18rem rgba(47,128,237,0.16); }
+.input-group { display: flex; align-items: stretch; border: 1px solid #d6e6fb; border-radius: 9px; background-color: #f7fbff; }
+.input-group-text { display: flex; align-items: center; padding: 0 12px; color: #5d8fd9; border-right: 1px solid #d6e6fb; }
+.input-group .form-control { width: 100%; border: none; border-radius: 0; background: transparent; }
+.quick-dates { display: flex; gap: 6px; }
+.btn-quick-date { font-size: 0.75rem; padding: 4px 10px; border-radius: 6px; border: 1px solid #d6e6fb; background: #fff; color: #2f80ed; cursor: pointer; transition: all 0.15s ease; }
+.btn-quick-date:hover, .btn-quick-date.active { background: #2f80ed; color: #fff; }
+.btn-soft { display: inline-flex; align-items: center; justify-content: center; height: 42px; padding: 0 14px; border: 1px solid #d6e6fb; border-radius: 9px; background: #f7fbff; color: #1c64d6; cursor: pointer; transition: all 0.15s ease; }
+.btn-soft:hover { background: #e3effd; transform: rotate(-25deg); }
+.d-flex { display: flex; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.align-items-center { align-items: center; }
+.justify-content-between { justify-content: space-between; }
+.mb-1 { margin-bottom: 4px; }
+.mb-0 { margin-bottom: 0; }
 
 /* Table */
-.table-wrapper {
-  overflow-x: auto;
-}
-.financial-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.financial-table th,
-.financial-table td {
-  padding: 14px 18px;
-  text-align: left;
-  border-bottom: 1px solid #e9f1fb;
-  font-size: 0.9rem;
-  color: #1f3a63;
-  white-space: nowrap;
-}
-.financial-table thead th {
-  background: linear-gradient(180deg, #eef6ff, #e3effd);
-  color: #1c64d6;
-  font-size: 0.76rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  border-bottom: 1px solid #d6e6fb;
-}
-.financial-table tbody tr {
-  transition: background-color 0.12s ease;
-}
-.financial-table tbody tr:hover {
-  background: #f5faff;
-}
-.badge {
-  display: inline-block;
-  padding: 5px 13px;
-  border-radius: 20px;
-  color: white;
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-}
-.bg-success {
-  background-color: #1f9d5e;
-}
-.bg-warning {
-  background-color: #f29c1f;
-  color: #ffffff;
-}
-.bg-danger {
-  background-color: #e0445c;
-}
-.td-id {
-  color: #9ca3af;
-  font-size: 11px;
-  font-weight: 600;
-}
-.desc-cell {
-  max-width: 320px;
-  color: #4b5563;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.user-name {
-  font-weight: 500;
-  color: #111827;
-}
-.user-sub {
-  font-size: 11px;
-  color: #9ca3af;
-}
-.mono {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  font-size: 12px;
-}
-.text-muted {
-  color: #6b7280;
-}
-.text-center {
-  text-align: center;
-}
-.fw-bold {
-  font-weight: 700;
-}
-.btn-icon {
-  background: none;
-  border: none;
-  color: #2f80ed;
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
-  transition: background-color 0.15s ease;
-}
-.btn-icon:hover {
-  background: #eef6ff;
-}
-.py-4 {
-  padding: 24px 0;
-}
-.mt-2 {
-  margin-top: 8px;
-}
+.table-wrapper { overflow-x: auto; }
+.financial-table { width: 100%; border-collapse: collapse; }
+.financial-table th, .financial-table td { padding: 14px 18px; text-align: left; border-bottom: 1px solid #e9f1fb; font-size: 0.9rem; color: #1f3a63; white-space: nowrap; }
+.financial-table thead th { background: linear-gradient(180deg, #eef6ff, #e3effd); color: #1c64d6; font-size: 0.76rem; font-weight: 800; text-transform: uppercase; border-bottom: 1px solid #d6e6fb; }
+.financial-table tbody tr { transition: background-color 0.12s ease; }
+.financial-table tbody tr:hover { background: #f5faff; }
+.badge { display: inline-block; padding: 5px 13px; border-radius: 20px; color: white; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.01em; }
+.bg-success { background-color: #1f9d5e; }
+.bg-warning { background-color: #f29c1f; }
+.bg-danger  { background-color: #e0445c; }
+.bg-secondary { background-color: #6b7c93; }
+.td-id { color: #9ca3af; font-size: 11px; font-weight: 600; }
+.user-name { font-weight: 600; color: #111827; }
+.user-sub { font-size: 11px; color: #9ca3af; }
+.text-muted { color: #6b7280; }
+.fst-italic { font-style: italic; }
+.text-center { text-align: center; }
+.fw-bold { font-weight: 700; }
+.btn-icon { background: none; border: none; color: #2f80ed; font-size: 1.1rem; cursor: pointer; padding: 4px; border-radius: 6px; transition: background-color 0.15s ease; }
+.btn-icon:hover { background: #eef6ff; }
+.py-4 { padding: 24px 0; }
+.mt-2 { margin-top: 8px; }
 
 /* Pagination */
-.fin-pagination {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px 24px;
-  border-top: 1px solid #e9f1fb;
-  background: #ffffff;
-  overflow-x: auto;
-}
-.pagination-summary {
-  flex-shrink: 0;
-  color: #6b7c93;
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-.pagination-controls {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 28px;
-}
-.page-size-group {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-.page-size-label {
-  white-space: nowrap;
-  font-size: 0.9rem;
-}
-.page-size-select {
-  width: 70px;
-}
-.pager {
-  display: flex;
-  flex-shrink: 0;
-  gap: 6px;
-  padding: 4px;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-}
-.pager-arrow,
-.pager-num {
-  width: 34px;
-  height: 34px;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: #4a5d80;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.pager-arrow:hover:not(:disabled),
-.pager-num:hover {
-  background: #eef6ff;
-  color: #1c64d6;
-}
-.pager-num.active {
-  background: #0b3d91;
-  color: #ffffff;
-}
-.pager-list {
-  display: flex;
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.pager-ellipsis {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #9ca3af;
-}
+.fin-pagination { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 16px; padding: 20px 24px; border-top: 1px solid #e9f1fb; background: #fff; overflow-x: auto; }
+.pagination-summary { flex-shrink: 0; color: #6b7c93; font-size: 0.9rem; white-space: nowrap; }
+.pagination-controls { display: flex; flex-shrink: 0; align-items: center; gap: 28px; }
+.page-size-group { display: flex; flex-shrink: 0; align-items: center; gap: 8px; white-space: nowrap; }
+.page-size-label { white-space: nowrap; font-size: 0.9rem; }
+.page-size-select { width: 70px; }
+.pager { display: flex; flex-shrink: 0; gap: 6px; padding: 4px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+.pager-arrow, .pager-num { width: 34px; height: 34px; border: none; border-radius: 9px; background: transparent; color: #4a5d80; font-weight: 700; cursor: pointer; transition: all 0.15s ease; }
+.pager-arrow:hover:not(:disabled), .pager-num:hover { background: #eef6ff; color: #1c64d6; }
+.pager-num.active { background: #0b3d91; color: #fff; }
+.pager-list { display: flex; list-style: none; margin: 0; padding: 0; }
+.pager-ellipsis { display: flex; align-items: center; justify-content: center; color: #9ca3af; }
 
 /* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(15, 44, 92, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1050;
-  backdrop-filter: blur(3px);
-  padding: 20px;
-}
-.modal-content {
-  background: #fff;
-  width: 480px;
-  max-width: 100%;
-  max-height: calc(100vh - 40px);
-  display: flex;
-  flex-direction: column;
-  border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(11, 61, 145, 0.28);
-  overflow: hidden;
-  animation: modalPop 0.18s ease-out;
-}
-.modal-header {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 18px 22px;
-  background: linear-gradient(120deg, #0b3d91 0%, #1c64d6 65%, #2f80ed 100%);
-  color: #ffffff;
-}
-.modal-header-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.modal-header-title h5 {
-  font-size: 1.02rem;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.01em;
-  margin: 0;
-}
-.modal-header-icon {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  font-size: 1.05rem;
-}
-.btn-close-modal {
-  flex-shrink: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.14);
-  border: none;
-  border-radius: 9px;
-  font-size: 1rem;
-  cursor: pointer;
-  color: #ffffff;
-  transition: all 0.15s ease;
-}
-.btn-close-modal:hover {
-  background: rgba(224, 68, 92, 0.85);
-  transform: rotate(90deg);
-}
-.modal-body {
-  padding: 22px;
-  overflow-y: auto;
-}
-.detail-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 10px;
-}
-.detail-label {
-  font-size: 0.72rem;
-  color: #6b7c93;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-weight: 700;
-}
-.id-row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  background: #f7fbff;
-  border: 1px solid #e3effd;
-  border-radius: 12px;
-}
-.id-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-.id-block strong {
-  font-size: 0.95rem;
-  color: #0f2c5c;
-}
-.font-monospace {
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-}
-.badge-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-.badge-lg {
-  padding: 8px 16px;
-  font-size: 0.82rem;
-  width: fit-content;
-}
-.note-box {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  background: #f7fbff;
-  border: 1px solid #e3effd;
-  border-radius: 12px;
-}
-.note-text {
-  margin: 0;
-  color: #46587a;
-  font-size: 0.88rem;
-  line-height: 1.5;
-}
-.recipient-box {
-  padding: 16px;
-  margin-bottom: 16px;
-  background: #ffffff;
-  border: 1px dashed #d6e6fb;
-  border-radius: 12px;
-}
-.recipient-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 12px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  color: #1c64d6;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-.address-text {
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-.modal-footer-note {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  color: #9aa8bf;
-  font-size: 0.78rem;
-  margin-top: 10px;
-}
-.mb-2 {
-  margin-bottom: 8px;
-}
-@keyframes modalPop {
-  from {
-    transform: translateY(-12px) scale(0.98);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-}
+.modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,44,92,0.45); display: flex; align-items: center; justify-content: center; z-index: 1050; backdrop-filter: blur(3px); padding: 20px; }
+.modal-content { background: #fff; width: 520px; max-width: 100%; max-height: calc(100vh - 40px); display: flex; flex-direction: column; border-radius: 16px; box-shadow: 0 24px 60px rgba(11,61,145,0.28); overflow: hidden; animation: modalPop 0.18s ease-out; }
+.modal-header { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 22px; background: linear-gradient(120deg, #0b3d91 0%, #1c64d6 65%, #2f80ed 100%); }
+.modal-header-title { display: flex; align-items: center; gap: 12px; }
+.modal-header-title h5 { font-size: 1.02rem; font-weight: 800; color: #fff; letter-spacing: -0.01em; margin: 0; }
+.modal-header-icon { flex-shrink: 0; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28); font-size: 1.05rem; color: #fff; }
+.btn-close-modal { flex-shrink: 0; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.14); border: none; border-radius: 9px; font-size: 1rem; cursor: pointer; color: #fff; transition: all 0.15s ease; }
+.btn-close-modal:hover { background: rgba(224,68,92,0.85); transform: rotate(90deg); }
+.modal-body { padding: 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+
+/* Modal — detail sections */
+.detail-section { background: #f7fbff; border: 1px solid #e3effd; border-radius: 12px; padding: 16px; }
+.detail-section-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.detail-item { display: flex; flex-direction: column; gap: 6px; }
+.detail-label { font-size: 0.72rem; color: #6b7c93; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; }
+.detail-value { font-size: 0.95rem; font-weight: 700; color: #0f2c5c; }
+.badge-lg { padding: 7px 16px; font-size: 0.82rem; width: fit-content; }
+
+/* Mô tả section */
+.desc-section { background: #f7fbff; border: 1px solid #e3effd; border-radius: 12px; padding: 16px; }
+.desc-section-header { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 800; color: #1c64d6; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 10px; }
+.desc-text { margin: 0; color: #1f3a63; font-size: 0.92rem; line-height: 1.65; font-weight: 500; word-break: break-word; white-space: pre-wrap; }
+
+/* Người thực hiện section */
+.person-section { background: #fff; border: 1px dashed #c5d9f6; border-radius: 12px; padding: 16px; }
+.person-section-header { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; font-weight: 800; color: #1c64d6; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 14px; }
+.person-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.person-item { display: flex; flex-direction: column; gap: 5px; }
+.person-item-full { grid-column: 1 / -1; }
+.mono-tag { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #1c64d6; background: #eef6ff; padding: 4px 10px; border-radius: 6px; font-weight: 600; width: fit-content; }
+.ip-tag { display: inline-flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #4a5d80; background: #f1f5fb; padding: 6px 12px; border-radius: 8px; border: 1px solid #dce8f9; font-weight: 600; width: fit-content; }
+
+.modal-footer-note { display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: #9aa8bf; font-size: 0.78rem; padding-top: 4px; }
+.modal-footer-note strong { color: #4a5d80; }
 
 /* Toast */
-.toast-alert {
-  position: fixed;
-  top: 80px;
-  right: 24px;
-  z-index: 1100;
-  display: flex;
-  gap: 12px;
-  padding: 16px 20px;
-  border-radius: 12px;
-  background: #ffffff;
-  border-left: 4px solid #1f9d5e;
-  box-shadow: 0 14px 32px rgba(15, 64, 152, 0.2);
-  align-items: center;
-}
-.toast-alert div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.toast-alert strong {
-  font-size: 13px;
-  color: #111827;
-}
-.toast-alert span {
-  font-size: 12px;
-  color: #6b7280;
-}
-.toast-alert.error {
-  border-left-color: #e0445c;
-}
-.toast-alert i {
-  font-size: 1.2rem;
-  color: #1f9d5e;
-  flex-shrink: 0;
-}
-.toast-alert.error i {
-  color: #e0445c;
-}
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+.toast-alert { position: fixed; top: 80px; right: 24px; z-index: 1100; display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-radius: 12px; background: #fff; border-left: 4px solid #1f9d5e; box-shadow: 0 14px 32px rgba(15,64,152,0.2); }
+.toast-alert div { display: flex; flex-direction: column; gap: 2px; }
+.toast-alert strong { font-size: 13px; color: #111827; }
+.toast-alert span { font-size: 12px; color: #6b7280; }
+.toast-alert.error { border-left-color: #e0445c; }
+.toast-alert i { font-size: 1.2rem; color: #1f9d5e; flex-shrink: 0; }
+.toast-alert.error i { color: #e0445c; }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 
 /* Animations */
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-.spin {
-  animation: spin 1s linear infinite;
-  display: inline-block;
-}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes modalPop { from { transform: translateY(-12px) scale(0.98); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 
+@media (max-width: 992px) {
+  .toolbar-row { grid-template-columns: 1fr 1fr; }
+  .field-keyword { grid-column: 1/-1; }
+  .field-dates { grid-column: 1/-1; }
+}
 @media (max-width: 576px) {
-  .toolbar-row {
-    grid-template-columns: 1fr;
-  }
-  .field-keyword,
-  .field-dates {
-    grid-column: 1;
-  }
+  .toolbar-row { grid-template-columns: 1fr; }
+  .detail-section-row, .person-grid { grid-template-columns: 1fr; }
+  .person-item-full { grid-column: 1; }
 }
 </style>

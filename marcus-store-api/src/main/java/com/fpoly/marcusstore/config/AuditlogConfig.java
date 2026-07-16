@@ -31,6 +31,7 @@ public class AuditlogConfig {
 
     @Autowired
     private UserRepository userRepository;
+
     private static final Map<String, String> AUDITED_SERVICES = Map.ofEntries(
             // Sản phẩm & kho
             Map.entry("CategoriesService", "Categories"),
@@ -38,6 +39,7 @@ public class AuditlogConfig {
             Map.entry("ProductImgService", "Product_Images"),
             Map.entry("AttributeService", "Attributes"),
             Map.entry("AttributeValueService", "Attribute_Values"),
+            Map.entry("ProductConfigService", "Product_Skus"), // ← FIX: thêm SKU service
 
             // Kênh bán hàng
             Map.entry("OrderService", "Orders"),
@@ -60,13 +62,18 @@ public class AuditlogConfig {
             Map.entry("AdminNotificationService", "Admin_Notifications")
     );
 
-    @Pointcut("execution(public * com.fpoly.marcusstore.service..*Service.*(..))")
+    // FIX: bỏ "*Service" ở cuối để bắt được cả *ServiceImpl
+    @Pointcut("execution(public * com.fpoly.marcusstore.service..*(..))")
     public void anyServiceMethod() {}
 
     @AfterReturning(pointcut = "anyServiceMethod()", returning = "result")
     public void logAfterSuccess(JoinPoint joinPoint, Object result) {
         try {
-            String className = joinPoint.getSignature().getDeclaringType().getSimpleName();
+            String rawName = joinPoint.getSignature().getDeclaringType().getSimpleName();
+            String className = rawName.endsWith("Impl")
+                    ? rawName.substring(0, rawName.length() - 4)
+                    : rawName;
+
             String tableName = AUDITED_SERVICES.get(className);
             if (tableName == null) return; // Service này chưa đăng ký theo dõi -> bỏ qua
 
@@ -91,15 +98,14 @@ public class AuditlogConfig {
         }
     }
 
-    // Nhận diện hành động dựa trên tiền tố tên method. Mở rộng thêm các tiền tố phổ biến
-    // ngoài add/update/remove — nhiều Service dùng tên method riêng theo nghiệp vụ
-    // (lock/unlock tài khoản, process liên hệ, hide sản phẩm, publish bài viết...).
+    // Nhận diện hành động dựa trên tiền tố tên method.
+    // FIX: thêm "batch" (batchCreateSkus) vào CREATE, thêm "bulk" (bulkUpdateSkus) vào UPDATE
     private String resolveAction(String methodName) {
         String m = methodName.toLowerCase();
 
         // TẠO MỚI
         if (m.startsWith("add") || m.startsWith("create") || m.startsWith("insert")
-                || m.startsWith("import")) return "CREATE";
+                || m.startsWith("import") || m.startsWith("batch")) return "CREATE";
 
         // XOÁ (kể cả xoá mềm/ẩn — hiddenCategory, hiddenProduct)
         if (m.startsWith("remove") || m.startsWith("delete") || m.startsWith("destroy")
@@ -110,9 +116,8 @@ public class AuditlogConfig {
                 || m.startsWith("process") || m.startsWith("approve") || m.startsWith("reject")
                 || m.startsWith("lock") || m.startsWith("unlock") || m.startsWith("toggle")
                 || m.startsWith("publish") || m.startsWith("changestatus") || m.startsWith("resolve")
-                || m.startsWith("cancel") || m.startsWith("verify")) {
-            return "UPDATE";
-        }
+                || m.startsWith("cancel") || m.startsWith("verify")
+                || m.startsWith("bulk")) return "UPDATE";
 
         return null;
     }
