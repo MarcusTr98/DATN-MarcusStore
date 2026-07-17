@@ -1405,7 +1405,7 @@ async function saveVoucher() {
 
   showSuccessModal({
     title: 'Thêm voucher thành công',
-    message: `Voucher ${voucherData.voucherCode} đã được thêm. Mỗi tài khoản chỉ dùng được 1 lần.`,
+    message: `Voucher ${voucherData.voucherCode} đã được thêm.`,
   })
 }
 
