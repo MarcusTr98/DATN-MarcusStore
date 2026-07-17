@@ -158,15 +158,25 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import api from '@/utils/api' // Bổ sung import API trực tiếp
 import HeroBanner from '@/layouts/home/HomeBanner.vue'
 import FlashSaleSection from '@/layouts/home/HomeFlashSale.vue'
 import NewsAndInfoSection from '@/layouts/home/HomeNewAndInfo.vue'
 import HomeHotProducts from '@/layouts/home/HomeHotProducts.vue'
 import ProductCard from '@/components/client/ProductCard.vue'
 import ClientSlider from '@/components/client/ClientSlider.vue'
-import { useSettings } from '@/composables/useSettings'
 
-const { sysSettings, fetchSettings } = useSettings()
+// Khởi tạo state nội bộ để reactivity 100%
+const sysSettings = ref({})
+
+const fetchSettings = async () => {
+  try {
+    const res = await api.get('/public/settings')
+    sysSettings.value = res.data
+  } catch (error) {
+    console.error('Lỗi khi tải cấu hình trang chủ:', error)
+  }
+}
 
 // Data mượn từ Landing Page
 const categories = ref([
@@ -178,8 +188,6 @@ const categories = ref([
   { name: 'Ốp lưng', icon: 'fas fa-shield-alt', to: '/category/op-lung' },
 ])
 
-// Danh sách slide gốc, dùng làm fallback khi chưa cấu hình HOME_HERO_SLIDES
-// hoặc dữ liệu JSON trong DB bị lỗi định dạng
 const defaultHeroSlides = [
   {
     kicker: 'FLAGSHIP 2026',
@@ -193,20 +201,14 @@ const defaultHeroSlides = [
     price: '32.990.000đ',
     tag: 'Thu cũ trợ giá 5.000.000đ',
   },
-  {
-    kicker: 'ĐÁNG MUA',
-    name: 'iPad Air M3',
-    price: '16.990.000đ',
-    tag: 'Tặng bút Apple Pencil',
-  },
+  { kicker: 'ĐÁNG MUA', name: 'iPad Air M3', price: '16.990.000đ', tag: 'Tặng bút Apple Pencil' },
 ]
 
-// heroSlides lấy từ System_Settings (key HOME_HERO_SLIDES, lưu dạng JSON array),
-// admin chỉnh trong trang "Cấu hình hệ thống Website"
 const heroSlides = computed(() => {
-  if (!sysSettings.HOME_HERO_SLIDES) return defaultHeroSlides
+  const slidesData = sysSettings.value.HOME_HERO_SLIDES
+  if (!slidesData) return defaultHeroSlides
   try {
-    const parsed = JSON.parse(sysSettings.HOME_HERO_SLIDES)
+    const parsed = JSON.parse(slidesData)
     return Array.isArray(parsed) && parsed.length ? parsed : defaultHeroSlides
   } catch {
     return defaultHeroSlides
@@ -216,24 +218,26 @@ const heroSlides = computed(() => {
 const activeHeroSlide = ref(0)
 let heroSliderTimer = null
 
-// Slide đang active, chặn lỗi truy cập index nếu số slide vừa đổi ít hơn index hiện tại
-const currentSlide = computed(
-  () => heroSlides.value[activeHeroSlide.value % heroSlides.value.length] || heroSlides.value[0],
-)
+const currentSlide = computed(() => {
+  const slides = heroSlides.value
+  return slides[activeHeroSlide.value % slides.length] || slides[0]
+})
 
 onMounted(() => {
-  heroSliderTimer = setInterval(() => {
-    activeHeroSlide.value = (activeHeroSlide.value + 1) % heroSlides.value.length
-  }, 4000)
+  fetchSettings() // Gọi API ngay khi mount component
 
-  fetchSettings()
+  heroSliderTimer = setInterval(() => {
+    if (heroSlides.value.length > 0) {
+      activeHeroSlide.value = (activeHeroSlide.value + 1) % heroSlides.value.length
+    }
+  }, 4000)
 })
 
 onUnmounted(() => {
   clearInterval(heroSliderTimer)
 })
 
-/* ---------- Đồng hồ hiện tại trên màn hình điện thoại ---------- */
+/*  Đồng hồ hiện tại trên màn hình điện thoại  */
 const now = ref(new Date())
 let clockTimer = null
 
@@ -261,7 +265,7 @@ onUnmounted(() => {
   clearInterval(clockTimer)
 })
 
-/* ---------- Banner thương hiệu ---------- */
+/*  Banner thương hiệu  */
 const brandBanners = ref([
   {
     name: 'iPhone chính hãng',
