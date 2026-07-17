@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -19,27 +20,66 @@ import java.util.stream.Collectors;
 public class FinancialService {
         private final OrderTransactionRepository transactionRepository;
 
-        public List<TransactionResponse> getAllTransactions() {
-                return transactionRepository.findAllTransactionsWithOrder()
-                                .stream()
-                                .map(t -> TransactionResponse.builder()
-                                                .transactionId(t.getTransactionId())
-                                                .orderCode(t.getOrder().getOrderCode())
-                                                .amount(t.getAmount())
-                                                .type(t.getType())
-                                                .status(t.getStatus())
-                                                .note(t.getNote())
-                                                .createdAt(t.getCreatedAt())
-                                                .isReconciled(t.getIsReconciled())
-                                                .build())
+        /**
+         * HÀM LÕI: Lọc và kiểm định tính toàn vẹn của dữ liệu đối soát
+         */
+        private List<TransactionResponse> getProcessedTransactions() {
+                List<OrderTransaction> rawTransactions = transactionRepository.findAllTransactionsWithOrder();
+
+                return rawTransactions.stream()
+                                // 1. ĐIỀU KIỆN XUẤT HIỆN: Chỉ xử lý giao dịch có đơn hàng tồn tại
+                                .filter(t -> t.getOrder() != null)
+                                // Phải là đơn Đã thanh toán (Ví dụ: VNPay) HOẶC Đã hoàn thành/Đã giao (Ví dụ:
+                                // COD)
+                                .filter(t -> "PAID".equals(t.getOrder().getPaymentStatus())
+                                                || "COMPLETED".equals(t.getOrder().getOrderStatus())
+                                                || "DELIVERED".equals(t.getOrder().getOrderStatus()))
+                                .map(t -> {
+                                        String actualStatus = t.getStatus();
+                                        String note = t.getNote() != null ? t.getNote() : "";
+
+                                        BigDecimal orderFinalAmount = t.getOrder().getFinalAmount();
+
+                                        // 2. ĐỐI CHIẾU: Cảnh báo ngay nếu số tiền giao dịch lệch với hóa đơn
+                                        if (orderFinalAmount != null
+                                                        && t.getAmount().compareTo(orderFinalAmount) != 0) {
+                                                actualStatus = "FAILED";
+                                                note = note.isEmpty() ? "Lệch số tiền (Gốc: " + orderFinalAmount + ")"
+                                                                : note + " | Lệch tiền (Gốc: " + orderFinalAmount + ")";
+                                        }
+                                        // 3. TỰ ĐỘNG GỠ LỖI: Đơn đã trả tiền, khớp giá, nhưng Transaction bị kẹt
+                                        // PENDING
+                                        else if ("PENDING".equals(actualStatus)) {
+                                                actualStatus = "SUCCESS";
+                                        }
+
+                                        return TransactionResponse.builder()
+                                                        .transactionId(t.getTransactionId())
+                                                        .orderCode(t.getOrder().getOrderCode())
+                                                        .amount(t.getAmount())
+                                                        .type(t.getType())
+                                                        .status(actualStatus)
+                                                        .note(note)
+                                                        .createdAt(t.getCreatedAt())
+                                                        .recipientName(t.getOrder().getRecipientName())
+                                                        .recipientPhone(t.getOrder().getRecipientPhone())
+                                                        .shippingAddress(t.getOrder().getShippingAddress())
+                                                        .isReconciled(t.getIsReconciled())
+                                                        .build();
+                                })
                                 .collect(Collectors.toList());
         }
 
+        public List<TransactionResponse> getAllTransactions() {
+                return getProcessedTransactions();
+        }
+
         public byte[] exportTransactionsToExcel() throws IOException {
-                var transactions = transactionRepository.findAllTransactionsWithOrder();
+                // Sử dụng danh sách đã qua kiểm định để xuất Excel thay vì query DB thô
+                List<TransactionResponse> transactions = getProcessedTransactions();
+
                 try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                         Sheet sheet = workbook.createSheet("Transactions");
-                        // Tạo Header
                         Row header = sheet.createRow(0);
                         header.createCell(0).setCellValue("Mã đơn");
                         header.createCell(1).setCellValue("Loại giao dịch");
@@ -50,7 +90,7 @@ public class FinancialService {
                         int rowIdx = 1;
                         for (var t : transactions) {
                                 Row row = sheet.createRow(rowIdx++);
-                                row.createCell(0).setCellValue(t.getOrder().getOrderCode());
+                                row.createCell(0).setCellValue(t.getOrderCode());
                                 row.createCell(1).setCellValue(t.getType());
                                 row.createCell(2).setCellValue(t.getAmount().doubleValue());
                                 row.createCell(3).setCellValue(t.getStatus());
@@ -62,39 +102,25 @@ public class FinancialService {
         }
 
         public FinancialReportResponse getFinancialReport() {
-                var all = transactionRepository.findAllTransactionsWithOrder();
+                // Đồng bộ toàn bộ thống kê dựa trên dữ liệu ĐÃ LỌC và ĐÃ CHUẨN HOÁ
+                List<TransactionResponse> dtoList = getProcessedTransactions();
 
-                var dtoList = all.stream()
-                                .map(t -> TransactionResponse.builder()
-                                                .transactionId(t.getTransactionId())
-                                                .orderCode(t.getOrder().getOrderCode())
-                                                .amount(t.getAmount())
-                                                .type(t.getType())
-                                                .status(t.getStatus())
-                                                .note(t.getNote())
-                                                .createdAt(t.getCreatedAt())
-                                                .recipientName(t.getOrder().getRecipientName())
-                                                .recipientPhone(t.getOrder().getRecipientPhone())
-                                                .shippingAddress(t.getOrder().getShippingAddress())
-                                                // THÊM DÒNG NÀY VÀO:
-                                                .isReconciled(t.getIsReconciled())
-                                                .build())
-                                .collect(Collectors.toList());
-
-                BigDecimal success = all.stream().filter(t -> "SUCCESS".equals(t.getStatus()))
-                                .map(OrderTransaction::getAmount)
-                                .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal pending = all.stream().filter(t -> "PENDING".equals(t.getStatus()))
-                                .map(OrderTransaction::getAmount)
-                                .reduce(BigDecimal.ZERO, BigDecimal::add);
-                BigDecimal failed = all.stream().filter(t -> "FAILED".equals(t.getStatus()))
-                                .map(OrderTransaction::getAmount)
+                BigDecimal success = dtoList.stream().filter(t -> "SUCCESS".equals(t.getStatus()))
+                                .map(TransactionResponse::getAmount)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                long successCount = all.stream().filter(t -> "SUCCESS".equals(t.getStatus())).count();
-                double rate = all.isEmpty() ? 0 : (double) successCount / all.size() * 100;
+                BigDecimal pending = dtoList.stream().filter(t -> "PENDING".equals(t.getStatus()))
+                                .map(TransactionResponse::getAmount)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                return new FinancialReportResponse(dtoList, all.size(), success, pending, failed, rate);
+                BigDecimal failed = dtoList.stream().filter(t -> "FAILED".equals(t.getStatus()))
+                                .map(TransactionResponse::getAmount)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                long successCount = dtoList.stream().filter(t -> "SUCCESS".equals(t.getStatus())).count();
+                double rate = dtoList.isEmpty() ? 0 : (double) successCount / dtoList.size() * 100;
+
+                return new FinancialReportResponse(dtoList, dtoList.size(), success, pending, failed, rate);
         }
 
         public void updateReconciliationStatus(Integer transactionId, boolean status) {
