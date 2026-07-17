@@ -134,6 +134,10 @@
                       </div>
                       <div>
                         <h4 class="product-name">{{ item.productName }}</h4>
+                        <div v-if="getVariantText(item)" class="product-variants">
+                          <i class="fa-solid fa-tags"></i>
+                          <span>{{ getVariantText(item) }}</span>
+                        </div>
                         <div class="product-meta">
                           <span
                             >SKU: <strong>{{ item.skuCode }}</strong></span
@@ -657,6 +661,17 @@ function getPaymentMethodLabel(method) {
   if (method === 'BankTransfer') return 'Chuyển khoản'
   return method || '---'
 }
+
+function getVariantText(item) {
+  if (!item || !Array.isArray(item.variants) || item.variants.length === 0) return ''
+  return item.variants
+    .filter((v) => v && v.valueString)
+    .map((v) => {
+      if (v.attributeName) return `${v.attributeName}: ${v.valueString}`
+      return v.valueString
+    })
+    .join(' | ')
+}
 </script>
 
 <style scoped>
@@ -698,6 +713,25 @@ function getPaymentMethodLabel(method) {
   color: #9ca3af;
   font-size: 12px;
   margin-right: 4px;
+}
+
+.product-variants {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.product-variants i {
+  color: #e60012;
+  font-size: 11px;
 }
 
 .price-flashsale {

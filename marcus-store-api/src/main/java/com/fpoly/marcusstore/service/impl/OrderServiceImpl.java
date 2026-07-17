@@ -299,6 +299,15 @@ public class OrderServiceImpl implements OrderService {
         List<OrderStatusHistory> histories = orderStatusHistoryRepository
                 .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
 
+        // Fetch tất cả SKU với variants trong 1 query để tránh N+1
+        List<Integer> skuIds = order.getOrderItems().stream()
+                .map(item -> item.getSku().getSkuId())
+                .toList();
+        Map<Integer, ProductSku> skuVariantMap = skuIds.isEmpty()
+                ? Map.of()
+                : productSkuRepository.findBySkuIdIn(skuIds).stream()
+                        .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
+
         List<OrderStatusHistoryResponse> historyResponses = histories.stream()
                 .map(history -> OrderStatusHistoryResponse.builder()
                         .status(history.getStatus())
@@ -340,6 +349,19 @@ public class OrderServiceImpl implements OrderService {
                         order.getOrderItems().stream().map(orderItem -> {
                             ProductSku sku = orderItem.getSku();
                             Product product = sku.getProduct();
+                            // Lấy SKU có fetch variants từ map (tránh N+1 và LazyInit)
+                            ProductSku skuWithVariants = skuVariantMap.getOrDefault(sku.getSkuId(), sku);
+                            List<ClientSkuAttributeValueResponse> variants = skuWithVariants.getAttributeValues() == null
+                                    ? List.of()
+                                    : skuWithVariants.getAttributeValues().stream()
+                                            .map(av -> ClientSkuAttributeValueResponse.builder()
+                                                    .valueId(av.getValueId())
+                                                    .attributeId(av.getAttribute() != null ? av.getAttribute().getAttributeId() : null)
+                                                    .attributeName(av.getAttribute() != null ? av.getAttribute().getAttributeName() : null)
+                                                    .valueString(av.getValueString())
+                                                    .valueMeta(av.getValueMeta())
+                                                    .build())
+                                            .toList();
                             return OrderItemDetailResponse.builder()
                                     .skuId(sku.getSkuId())
                                     .skuCode(sku.getSkuCode())
@@ -353,6 +375,7 @@ public class OrderServiceImpl implements OrderService {
                                     .isFlashSale(orderItem.getIsFlashSale())
                                     .originalPrice(orderItem.getOriginalPrice())
                                     .flashSaleSlotName(orderItem.getFlashSaleSlotName())
+                                    .variants(variants)
                                     .imeis(orderItem.getProductItems().stream()
                                             .map(item -> ImeiResponse.builder().imeiCode(item.getImeiCode()).build())
                                             .toList())

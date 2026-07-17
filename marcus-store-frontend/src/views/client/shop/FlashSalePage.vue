@@ -715,7 +715,7 @@ function ensureProductSlotIsBuyable(product) {
 
 const goToProduct = (product) => {
   if (!ensureProductSlotIsBuyable(product)) return
-  router.push(`/product/${product.slug}`)
+  addToCart(product)
 }
 
 // --- Hiệu ứng ripple khi bấm "Mua ngay" ---

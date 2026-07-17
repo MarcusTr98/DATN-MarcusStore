@@ -27,4 +27,5 @@ public class OrderItemDetailResponse {
     private Boolean isFlashSale;
     private BigDecimal originalPrice;
     private String flashSaleSlotName;
+    private List<ClientSkuAttributeValueResponse> variants;
 }

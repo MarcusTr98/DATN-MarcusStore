@@ -100,9 +100,9 @@
             <button
               type="button"
               class="hfs-buy-btn"
-              :class="{ 'hfs-buy-btn--disabled': product.left <= 0 }"
-              :disabled="product.left <= 0"
-              @click.stop="product.left > 0 && goToProduct(product)"
+              :class="{ 'hfs-buy-btn--disabled': product.left <= 0 || product.addingToCart }"
+              :disabled="product.left <= 0 || product.addingToCart"
+              @click.stop="product.left > 0 && !product.addingToCart && buyNow(product)"
             >
               <svg v-if="product.left > 0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    stroke-width="2"
@@ -317,6 +317,7 @@ function mapItemToCard(item, idx) {
     soldPercent,
     left: remaining,
     displayPrice: 0,
+    addingToCart: false,
     slotId: item._slotId || null,
   }
 }
@@ -563,9 +564,70 @@ const buyNow = async (product) => {
   }
 }
 
+function addToCartProduct(product) {
+  if (product.addingToCart) return
+  product.addingToCart = true
+
+  const ownSlot = flashSaleStore.getSlotById(product.slotId)
+  if (!ownSlot || Number(ownSlot.status) !== 2) {
+    showToast({
+      type: 'warning',
+      title: 'Oops!',
+      message: 'Sản phẩm này không nằm trong Flash Sale đang diễn ra',
+    })
+    product.addingToCart = false
+    return
+  }
+
+  if (product.left <= 0) {
+    showToast({
+      type: 'error',
+      title: 'Hết hàng!',
+      message: 'Sản phẩm đã hết hàng trong Flash Sale này',
+    })
+    product.addingToCart = false
+    return
+  }
+
+  cartStore.addToCartWithFlashSale(
+    product.skuId,
+    1,
+    ownSlot.slotId,
+    product.price,
+  ).then((success) => {
+    if (success) {
+      showToast({
+        type: 'success',
+        title: 'Thành công!',
+        message: 'Đã thêm vào giỏ hàng',
+      })
+    } else {
+      if (!isUnauthorizedError(cartStore.error)) {
+        showToast({
+          type: 'error',
+          title: 'Lỗi!',
+          message: cartStore.error || 'Không thể thêm vào giỏ',
+        })
+      }
+    }
+  }).catch((error) => {
+    if (!isUnauthorizedError(error)) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: error.response?.data?.message || 'Không thể thêm vào giỏ hàng',
+      })
+    }
+  }).finally(() => {
+    setTimeout(() => {
+      product.addingToCart = false
+    }, 700)
+  })
+}
+
 function goToProduct(product) {
   if (!ensureProductSlotIsBuyable(product)) return
-  buyNow(product)
+  addToCartProduct(product)
 }
 
 // Helper: phát hiện lỗi 401/Unauthorized để bỏ qua toast

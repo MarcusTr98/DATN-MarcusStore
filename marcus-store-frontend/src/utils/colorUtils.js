@@ -25,7 +25,6 @@ const COLOR_MAP = {
   'XANHLA': 'Xanh Lá',
   'Xanh la': 'Xanh Lá',
   'xanh la': 'Xanh Lá',
-  'XANHLA': 'Xanh Lá',
   'Vàng': 'Vàng',
   'vàng': 'Vàng',
   'VANG': 'Vàng',
@@ -97,7 +96,6 @@ const COLOR_MAP = {
   'RED.': 'Đỏ',
   'BLU': 'Xanh Lam',
   'BLU.': 'Xanh Lam',
-  'BLU.': 'Xanh Lam',
   'GRN': 'Xanh Lá',
   'GRN.': 'Xanh Lá',
   'YEL': 'Vàng',
@@ -117,30 +115,21 @@ const COLOR_MAP = {
 
   // Mixed case abbreviations
   'Blk': 'Đen',
-  'Blk.': 'Đen',
   'Wht': 'Trắng',
-  'Wht.': 'Trắng',
-  'Pnk': 'Hồng',
-  'Pnk.': 'Hồng',
-  'Blu': 'Xanh Lam',
-  'Blu.': 'Xanh Lam',
-  'Grn': 'Xanh Lá',
-  'Grn.': 'Xanh Lá',
-  'Yel': 'Vàng',
-  'Yel.': 'Vàng',
-  'Gld': 'Vàng Gold',
-  'Gld.': 'Vàng Gold',
-  'Prp': 'Tím',
-  'Prp.': 'Tím',
-  'Gry': 'Xám',
-  'Gry.': 'Xám',
-  'Slv': 'Bạc',
-  'Slv.': 'Bạc',
-  'Brn': 'Nâu',
-  'Brn.': 'Nâu',
-  'Org': 'Cam',
-  'Org.': 'Cam',
 
+  'Pnk': 'Hồng',
+
+  'Blu': 'Xanh Lam',
+  'Grn': 'Xanh Lá',
+  'Yel': 'Vàng',
+  'Gld': 'Vàng Gold',
+  'Prp': 'Tím',
+  'Gry': 'Xám',
+
+  'Slv': 'Bạc',
+  'Brn': 'Nâu',
+  'Org': 'Cam',
+  'NAT':'Titan Tự Nhiên',
   // Title case abbreviations
   'Blk.': 'Đen',
   'Wht.': 'Trắng',
@@ -156,11 +145,7 @@ const COLOR_MAP = {
   'Org.': 'Cam',
 }
 
-/**
- * Expands abbreviated color names to full names
- * @param {string} colorName - The color name or abbreviation
- * @returns {string} The expanded color name
- */
+
 export function expandColorName(colorName) {
   if (!colorName || typeof colorName !== 'string') return colorName || ''
 
