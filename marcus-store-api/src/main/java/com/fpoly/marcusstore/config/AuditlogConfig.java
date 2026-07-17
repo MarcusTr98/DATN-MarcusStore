@@ -108,7 +108,7 @@ public class AuditlogConfig {
         String m = methodName.toLowerCase();
 
         if (m.startsWith("add") || m.startsWith("create") || m.startsWith("insert")
-                || m.startsWith("import") || m.startsWith("batch") || m.startsWith("submit"))
+                || m.startsWith("import") || m.startsWith("batch"))
             return "CREATE";
 
         if (m.startsWith("remove") || m.startsWith("delete") || m.startsWith("destroy")

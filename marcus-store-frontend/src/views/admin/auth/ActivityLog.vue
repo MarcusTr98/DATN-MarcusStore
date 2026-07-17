@@ -177,7 +177,7 @@
                     <div class="user-name">{{ log.fullName || log.username }}</div>
                     <div class="user-sub">@{{ log.username }}</div>
                   </template>
-                  <span v-else class="text-muted fst-italic">Người dùng đã xoá</span>
+                  <span v-else class="text-muted fst-italic">Khách hàng</span>
                 </td>
                 <td>{{ formatDate(log.createdAt) }}</td>
                 <td class="text-center">
@@ -276,7 +276,15 @@
             <div class="person-section-header">
               <i class="bi bi-person-fill-check"></i> Người thực hiện
             </div>
-            <div class="person-grid">
+
+            <!-- Khách hàng gửi — không có tài khoản admin -->
+            <div v-if="!detailLog.userId" class="guest-note">
+              <i class="bi bi-person-walking"></i>
+              Thao tác thực hiện bởi khách hàng (không đăng nhập hệ thống admin)
+            </div>
+
+            <!-- Admin / nhân viên thực hiện -->
+            <div v-else class="person-grid">
               <div class="person-item">
                 <span class="detail-label">Họ tên</span>
                 <strong class="detail-value">{{ detailLog.fullName || '---' }}</strong>
@@ -738,6 +746,19 @@ async function handleExport() {
 .mono-tag { display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #1c64d6; background: #eef6ff; padding: 4px 10px; border-radius: 6px; font-weight: 600; width: fit-content; }
 .ip-tag { display: inline-flex; align-items: center; gap: 7px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; color: #4a5d80; background: #f1f5fb; padding: 6px 12px; border-radius: 8px; border: 1px solid #dce8f9; font-weight: 600; width: fit-content; }
 
+.guest-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #f7fbff;
+  border: 1px solid #e3effd;
+  border-radius: 10px;
+  color: #6b7c93;
+  font-size: 0.88rem;
+  font-style: italic;
+}
+.guest-note i { font-size: 1rem; color: #9db8de; flex-shrink: 0; }
 .modal-footer-note { display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: #9aa8bf; font-size: 0.78rem; padding-top: 4px; }
 .modal-footer-note strong { color: #4a5d80; }
 
