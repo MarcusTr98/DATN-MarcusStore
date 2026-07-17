@@ -2,12 +2,18 @@
   <div class="about-page">
     <!-- ============ HERO ============ -->
     <section class="hero">
+      <div class="hero-grid" aria-hidden="true"></div>
       <div class="hero-glow"></div>
+      <div class="hero-orb hero-orb-one" aria-hidden="true"></div>
+      <div class="hero-orb hero-orb-two" aria-hidden="true"></div>
       <div class="container hero-inner py-5">
         <div class="row align-items-center gy-5">
           <!-- Copy -->
           <div class="col-lg-6">
-            <span class="badge-eyebrow"> Định hình tương lai bán lẻ công nghệ </span>
+            <span class="badge-eyebrow">
+              <span class="badge-pulse" aria-hidden="true"></span>
+              Định hình tương lai bán lẻ công nghệ
+            </span>
             <h1 class="hero-title">Về <span class="text-accent-red">Marcus</span> Store</h1>
             <p class="hero-lead">
               Chuyên điện thoại, iPad và phụ kiện chính hãng — được vận hành bởi một nền tảng công
@@ -19,6 +25,13 @@
                 Khám phá gian hàng <i class="fas fa-arrow-right ms-2"></i>
               </router-link>
               <a href="#story" class="btn btn-ghost-light"> Câu chuyện của chúng tôi </a>
+            </div>
+
+            <div class="trust-row" aria-label="Cam kết của Marcus Store">
+              <div v-for="item in trustItems" :key="item.label" class="trust-item">
+                <strong>{{ item.value }}</strong>
+                <span>{{ item.label }}</span>
+              </div>
             </div>
 
             <!-- Brand strip: thương hiệu đang phân phối -->
@@ -39,6 +52,8 @@
           <!-- Signature visual: phone lockscreen với thông báo hệ thống -->
           <div class="col-lg-6">
             <div class="phone-stage">
+              <div class="stage-ring stage-ring-one" aria-hidden="true"></div>
+              <div class="stage-ring stage-ring-two" aria-hidden="true"></div>
               <div class="tablet-echo">
                 <div class="tablet-cam"></div>
               </div>
@@ -288,6 +303,12 @@ const categories = ref([
   { name: 'Ốp lưng & Bảo vệ', icon: 'fas fa-shield-alt' },
 ])
 
+const trustItems = [
+  { value: '100%', label: 'Chính hãng' },
+  { value: '2H', label: 'Giao hàng nhanh' },
+  { value: '1 đổi 1', label: 'Bảo hành minh bạch' },
+]
+
 // Dữ liệu đội ngũ — giữ nguyên theo yêu cầu
 const teamMembers = ref([
   {
@@ -362,10 +383,37 @@ const teamMembers = ref([
 /* ============ HERO ============ */
 .hero {
   position: relative;
-  background: var(--clr-bg);
+  min-height: 690px;
+  display: flex;
+  align-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 78% 42%, rgba(225, 18, 28, 0.14), transparent 28%),
+    linear-gradient(135deg, #08080c 0%, #101018 55%, #09090e 100%);
   color: #fff;
   overflow: hidden;
   padding-top: 3rem;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 110px;
+  background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.3));
+  pointer-events: none;
+}
+
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.9), transparent 82%);
+  animation: grid-drift 18s linear infinite;
+  pointer-events: none;
 }
 
 .hero-glow {
@@ -377,6 +425,33 @@ const teamMembers = ref([
   background: radial-gradient(circle at center, rgba(225, 18, 28, 0.45) 0%, transparent 70%);
   filter: blur(10px);
   pointer-events: none;
+  animation: glow-breathe 6s ease-in-out infinite;
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: orb-float 7s ease-in-out infinite;
+}
+
+.hero-orb-one {
+  width: 8px;
+  height: 8px;
+  top: 18%;
+  left: 7%;
+  background: var(--clr-red);
+  box-shadow: 0 0 24px 8px rgba(225, 18, 28, 0.32);
+}
+
+.hero-orb-two {
+  width: 5px;
+  height: 5px;
+  right: 9%;
+  bottom: 17%;
+  background: var(--clr-amber);
+  box-shadow: 0 0 20px 6px rgba(255, 182, 39, 0.25);
+  animation-delay: 1s;
 }
 
 .hero-inner {
@@ -399,6 +474,15 @@ const teamMembers = ref([
   margin-bottom: 1.5rem;
 }
 
+.badge-pulse {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--clr-amber);
+  animation: badge-pulse 2s ease-out infinite;
+}
+
 .badge-eyebrow .dot {
   width: 7px;
   height: 7px;
@@ -412,6 +496,9 @@ const teamMembers = ref([
   font-weight: 700;
   line-height: 1.1;
   margin-bottom: 1.25rem;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  animation: hero-reveal 0.75s 0.1s both;
 }
 
 .hero-lead {
@@ -419,6 +506,12 @@ const teamMembers = ref([
   color: rgba(255, 255, 255, 0.72);
   max-width: 32rem;
   margin-bottom: 2rem;
+  line-height: 1.75;
+  animation: hero-reveal 0.75s 0.2s both;
+}
+
+.hero-cta {
+  animation: hero-reveal 0.75s 0.3s both;
 }
 
 .btn-primary-red {
@@ -458,6 +551,38 @@ const teamMembers = ref([
   border-color: #fff;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.trust-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  margin-top: 2rem;
+  animation: hero-reveal 0.75s 0.4s both;
+}
+
+.trust-item {
+  display: flex;
+  flex-direction: column;
+  padding: 0 1.25rem;
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.trust-item:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.trust-item strong {
+  color: #fff;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.05rem;
+}
+
+.trust-item span {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 /* Brand marquee */
@@ -501,6 +626,33 @@ const teamMembers = ref([
   display: flex;
   justify-content: center;
   position: relative;
+  min-height: 550px;
+  align-items: center;
+  perspective: 1200px;
+}
+
+.stage-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotateX(68deg);
+  pointer-events: none;
+}
+
+.stage-ring-one {
+  width: 480px;
+  height: 480px;
+  animation: ring-spin 18s linear infinite;
+}
+
+.stage-ring-two {
+  width: 390px;
+  height: 390px;
+  border-style: dashed;
+  border-color: rgba(225, 18, 28, 0.3);
+  animation: ring-spin 13s linear infinite reverse;
 }
 
 /* iPad mờ phía sau, gợi ý dải sản phẩm rộng hơn (điện thoại + tablet) */
@@ -541,6 +693,8 @@ const teamMembers = ref([
   position: relative;
   z-index: 1;
   padding: 22px 16px;
+  transform: rotateY(-7deg) rotateX(2deg);
+  animation: phone-float 6s ease-in-out infinite;
 }
 
 .phone-notch {
@@ -613,6 +767,15 @@ const teamMembers = ref([
   align-items: center;
   justify-content: center;
   font-size: 0.85rem;
+  animation: notif-ting 7s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+}
+
+.notif-2 i {
+  animation-delay: 1.2s;
+}
+
+.notif-3 i {
+  animation-delay: 2.4s;
 }
 
 .notif-card div {
@@ -643,6 +806,91 @@ const teamMembers = ref([
   }
 }
 
+@keyframes notif-ting {
+  0%,
+  65%,
+  100% {
+    box-shadow: none;
+  }
+  70% {
+    transform: translateY(-4px) rotate(-10deg) scale(1.18);
+    box-shadow: 0 0 18px rgba(255, 182, 39, 0.32);
+  }
+  74% {
+    transform: translateY(1px) rotate(9deg) scale(0.98);
+  }
+  79% {
+    transform: translateY(0) rotate(0) scale(1);
+  }
+}
+
+@keyframes hero-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grid-drift {
+  to {
+    background-position: 64px 64px;
+  }
+}
+
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes badge-pulse {
+  70% {
+    box-shadow: 0 0 0 7px rgba(255, 182, 39, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 182, 39, 0);
+  }
+}
+
+@keyframes phone-float {
+  0%,
+  100% {
+    transform: rotateY(-7deg) rotateX(2deg) translateY(0);
+  }
+  50% {
+    transform: rotateY(-4deg) rotateX(1deg) translateY(-12px);
+  }
+}
+
+@keyframes ring-spin {
+  from {
+    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(0);
+  }
+  to {
+    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(360deg);
+  }
+}
+
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(28px, -20px);
+  }
+}
+
 .phone-reflection {
   position: absolute;
   bottom: -30px;
@@ -655,9 +903,14 @@ const teamMembers = ref([
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .brand-track,
+  .hero *,
+  .hero *::before,
+  .hero *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
   .notif-card {
-    animation: none !important;
     opacity: 1;
   }
 }
@@ -701,12 +954,31 @@ const teamMembers = ref([
   padding: 2rem 1.5rem;
   text-align: center;
   transition: all 0.3s ease;
+  border: 1px solid transparent;
+  overflow: hidden;
+  position: relative;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--clr-red);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.3s ease;
 }
 
 .feature-card:hover {
   transform: translateY(-6px);
   background: #fff;
   box-shadow: 0 16px 32px rgba(20, 21, 26, 0.08);
+  border-color: rgba(225, 18, 28, 0.08);
+}
+
+.feature-card:hover::before {
+  transform: scaleY(1);
 }
 
 .feature-icon {
@@ -838,7 +1110,10 @@ const teamMembers = ref([
 }
 
 .story-panel {
-  background: var(--clr-bg);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(225, 18, 28, 0.28), transparent 32%), var(--clr-bg);
   border-radius: 24px;
   padding: 3rem 2rem;
   display: flex;
@@ -917,7 +1192,10 @@ const teamMembers = ref([
 
 /* ============ CTA ============ */
 .cta-section {
-  background: var(--clr-bg);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 120%, rgba(225, 18, 28, 0.5), transparent 38%), var(--clr-bg);
   color: #fff;
 }
 
@@ -934,6 +1212,9 @@ const teamMembers = ref([
 
 /* ============ RESPONSIVE ============ */
 @media (max-width: 992px) {
+  .hero {
+    min-height: auto;
+  }
   .phone-shell {
     width: 220px;
     height: 460px;
@@ -947,6 +1228,22 @@ const teamMembers = ref([
 @media (max-width: 576px) {
   .tablet-echo {
     display: none;
+  }
+
+  .stage-ring {
+    display: none;
+  }
+
+  .trust-row {
+    justify-content: space-between;
+  }
+
+  .trust-item {
+    padding: 0 0.65rem;
+  }
+
+  .trust-item span {
+    white-space: normal;
   }
 }
 

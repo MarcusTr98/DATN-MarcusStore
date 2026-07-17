@@ -13,13 +13,17 @@
   <main class="home-page-upgraded">
     <!-- ============ HERO SLIDER ============ -->
     <section class="hero">
+      <div class="hero-grid" aria-hidden="true"></div>
       <div class="hero-glow"></div>
+      <div class="hero-orb hero-orb-one" aria-hidden="true"></div>
+      <div class="hero-orb hero-orb-two" aria-hidden="true"></div>
       <div class="container hero-inner py-5">
         <div class="row align-items-center gy-5">
           <div class="col-lg-6">
-            <span class="badge-eyebrow">{{
-              sysSettings.HOME_HERO_BADGE || 'Cập nhật máy hot nhất 07/2026'
-            }}</span>
+            <span class="badge-eyebrow"
+              ><span class="badge-pulse"></span
+              >{{ sysSettings.HOME_HERO_BADGE || 'Cập nhật máy hot nhất 07/2026' }}</span
+            >
             <h1 class="hero-title">
               {{ sysSettings.HOME_HERO_TITLE || 'Đổi mới.' }}
               <span class="text-accent-red">{{
@@ -55,6 +59,19 @@
           <!-- Signature-->
           <div class="col-lg-6">
             <div class="phone-stage">
+              <div class="stage-ring stage-ring-one" aria-hidden="true"></div>
+              <div class="stage-ring stage-ring-two" aria-hidden="true"></div>
+              <div
+                v-for="(benefit, index) in heroBenefits"
+                :key="benefit.text"
+                class="floating-chip"
+                :class="benefit.position"
+                :style="{ '--chip-delay': `${index * 0.18}s`, '--sparkle-delay': `${index * 0.7}s` }"
+              >
+                <span class="chip-icon"><i :class="benefit.icon"></i></span>
+                <span>{{ benefit.text }}</span>
+                <span class="chip-sparkle" aria-hidden="true">✦</span>
+              </div>
               <!-- iPad mờ phía sau, gợi ý dải sản phẩm rộng hơn (điện thoại + tablet) -->
               <div class="tablet-echo">
                 <div class="tablet-cam"></div>
@@ -218,6 +235,13 @@ const heroSlides = computed(() => {
 const activeHeroSlide = ref(0)
 let heroSliderTimer = null
 
+const heroBenefits = [
+  { text: 'Giao nhanh 2h', icon: 'fas fa-bolt', position: 'chip-top-right' },
+  { text: 'Chính hãng 100%', icon: 'fas fa-shield-alt', position: 'chip-bottom-left' },
+  { text: 'Bảo hành uy tín', icon: 'fas fa-award', position: 'chip-top-left' },
+  { text: 'Đổi trả dễ dàng', icon: 'fas fa-sync-alt', position: 'chip-bottom-right' },
+]
+
 const currentSlide = computed(() => {
   const slides = heroSlides.value
   return slides[activeHeroSlide.value % slides.length] || slides[0]
@@ -321,9 +345,36 @@ const brandBanners = ref([
 
 .hero {
   position: relative;
-  background: var(--clr-bg);
+  min-height: 650px;
+  display: flex;
+  align-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 78% 42%, rgba(225, 18, 28, 0.14), transparent 28%),
+    linear-gradient(135deg, #08080c 0%, #101018 55%, #09090e 100%);
   color: #fff;
   overflow: hidden;
+}
+
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 120px;
+  background: linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.28));
+  pointer-events: none;
+}
+
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to right, rgba(0, 0, 0, 0.85), transparent 78%);
+  animation: grid-drift 18s linear infinite;
+  pointer-events: none;
 }
 
 .hero-glow {
@@ -333,13 +384,41 @@ const brandBanners = ref([
   width: 55%;
   height: 160%;
   background: radial-gradient(circle at center, rgba(225, 18, 28, 0.45) 0%, transparent 70%);
-  filter: blur(10px);
+  filter: blur(18px);
+  animation: glow-breathe 6s ease-in-out infinite;
   pointer-events: none;
+}
+
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(1px);
+  pointer-events: none;
+}
+
+.hero-orb-one {
+  width: 9px;
+  height: 9px;
+  top: 18%;
+  left: 7%;
+  background: var(--clr-red);
+  box-shadow: 0 0 24px 8px rgba(225, 18, 28, 0.32);
+  animation: orb-float 7s ease-in-out infinite;
+}
+
+.hero-orb-two {
+  width: 5px;
+  height: 5px;
+  right: 10%;
+  bottom: 18%;
+  background: var(--clr-amber);
+  box-shadow: 0 0 20px 6px rgba(255, 182, 39, 0.24);
+  animation: orb-float 9s ease-in-out 1s infinite reverse;
 }
 
 .hero-inner {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .badge-eyebrow {
@@ -358,6 +437,16 @@ const brandBanners = ref([
   font-family: 'Space Grotesk', 'Be Vietnam Pro', sans-serif;
 }
 
+.badge-pulse {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--clr-amber);
+  box-shadow: 0 0 0 0 rgba(255, 182, 39, 0.5);
+  animation: badge-pulse 2s ease-out infinite;
+}
+
 .badge-eyebrow .dot {
   width: 7px;
   height: 7px;
@@ -372,6 +461,9 @@ const brandBanners = ref([
   font-weight: 700;
   line-height: 1.1;
   margin-bottom: 1.25rem;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+  animation: hero-reveal 0.75s 0.1s both;
 }
 
 .hero-lead {
@@ -379,6 +471,12 @@ const brandBanners = ref([
   color: rgba(255, 255, 255, 0.72);
   max-width: 32rem;
   margin-bottom: 2rem;
+  line-height: 1.75;
+  animation: hero-reveal 0.75s 0.2s both;
+}
+
+.hero-cta {
+  animation: hero-reveal 0.75s 0.3s both;
 }
 
 .btn-primary-red {
@@ -446,6 +544,100 @@ const brandBanners = ref([
   display: flex;
   justify-content: center;
   position: relative;
+  min-height: 520px;
+  align-items: center;
+  perspective: 1200px;
+}
+
+.stage-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotateX(68deg);
+  pointer-events: none;
+}
+
+.stage-ring-one {
+  width: 480px;
+  height: 480px;
+  animation: ring-spin 18s linear infinite;
+}
+
+.stage-ring-two {
+  width: 390px;
+  height: 390px;
+  border-style: dashed;
+  border-color: rgba(225, 18, 28, 0.28);
+  animation: ring-spin 13s linear infinite reverse;
+}
+
+.floating-chip {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(18, 18, 26, 0.68);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(14px);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.74rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  animation:
+    chip-pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) var(--chip-delay) forwards,
+    chip-glow 3.2s ease-in-out var(--sparkle-delay) infinite;
+}
+
+.chip-icon {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 9px;
+  background: rgba(255, 182, 39, 0.12);
+}
+
+.chip-icon i {
+  color: var(--clr-amber);
+  animation: icon-ting 3.2s ease-in-out var(--sparkle-delay) infinite;
+}
+
+.chip-sparkle {
+  position: absolute;
+  top: -9px;
+  right: -5px;
+  color: #fff3b0;
+  font-size: 0.85rem;
+  opacity: 0;
+  filter: drop-shadow(0 0 5px rgba(255, 182, 39, 0.9));
+  animation: sparkle-ting 3.2s ease-out var(--sparkle-delay) infinite;
+}
+
+.chip-top-right {
+  top: 12%;
+  right: 1%;
+}
+
+.chip-bottom-left {
+  left: 0;
+  bottom: 14%;
+}
+
+.chip-top-left {
+  left: 2%;
+  top: 28%;
+}
+
+.chip-bottom-right {
+  right: -1%;
+  bottom: 29%;
 }
 
 /* iPad mờ phía sau, gợi ý dải sản phẩm rộng hơn (điện thoại + tablet) */
@@ -486,6 +678,13 @@ const brandBanners = ref([
   position: relative;
   z-index: 1;
   padding: 22px 18px;
+  transform: rotateY(-7deg) rotateX(2deg);
+  animation: phone-float 6s ease-in-out infinite;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.phone-stage:hover .phone-shell {
+  transform: rotateY(0) rotateX(0) translateY(-6px);
 }
 
 .phone-notch {
@@ -505,6 +704,26 @@ const brandBanners = ref([
   flex-direction: column;
   align-items: center;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+  min-height: 360px;
+  border-radius: 25px;
+  background:
+    radial-gradient(circle at 50% 85%, rgba(225, 18, 28, 0.18), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent);
+}
+
+.phone-screen::after {
+  content: '';
+  position: absolute;
+  top: -35%;
+  left: -70%;
+  width: 45%;
+  height: 180%;
+  transform: rotate(18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: screen-shine 6s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .phone-time {
@@ -578,6 +797,140 @@ const brandBanners = ref([
   filter: blur(8px);
 }
 
+@keyframes hero-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes grid-drift {
+  to {
+    background-position: 64px 64px;
+  }
+}
+
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes badge-pulse {
+  70% {
+    box-shadow: 0 0 0 7px rgba(255, 182, 39, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 182, 39, 0);
+  }
+}
+
+@keyframes phone-float {
+  0%,
+  100% {
+    transform: rotateY(-7deg) rotateX(2deg) translateY(0);
+  }
+  50% {
+    transform: rotateY(-4deg) rotateX(1deg) translateY(-12px);
+  }
+}
+
+@keyframes chip-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes chip-glow {
+  0%, 60%, 100% {
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 14px 35px rgba(0, 0, 0, 0.3);
+  }
+  70% {
+    border-color: rgba(255, 182, 39, 0.48);
+    box-shadow:
+      0 14px 35px rgba(0, 0, 0, 0.3),
+      0 0 20px rgba(255, 182, 39, 0.28);
+  }
+}
+
+@keyframes icon-ting {
+  0%,
+  60%,
+  84%,
+  100% {
+    transform: rotate(0) scale(1);
+  }
+  68% {
+    transform: rotate(-14deg) scale(1.28);
+  }
+  75% {
+    transform: rotate(12deg) scale(1.1);
+  }
+}
+
+@keyframes sparkle-ting {
+  0%,
+  62%,
+  100% {
+    opacity: 0;
+    transform: scale(0.2) rotate(0);
+  }
+  68% {
+    opacity: 1;
+    transform: scale(1.35) rotate(90deg);
+  }
+  78% {
+    opacity: 0;
+    transform: scale(0.6) rotate(160deg) translateY(-5px);
+  }
+}
+
+@keyframes orb-float {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(28px, -20px);
+  }
+}
+
+@keyframes ring-spin {
+  from {
+    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(0);
+  }
+  to {
+    transform: translate(-50%, -50%) rotateX(68deg) rotateZ(360deg);
+  }
+}
+
+@keyframes screen-shine {
+  0%,
+  55% {
+    left: -70%;
+  }
+  80%,
+  100% {
+    left: 135%;
+  }
+}
+
 /* Style cho Danh mục nhanh */
 .quick-cats {
   background: var(--clr-surface);
@@ -621,6 +974,9 @@ const brandBanners = ref([
 
 /* ============ RESPONSIVE (Hero Slider) ============ */
 @media (max-width: 992px) {
+  .hero {
+    min-height: auto;
+  }
   .phone-shell {
     width: 220px;
     height: 440px;
@@ -635,12 +991,43 @@ const brandBanners = ref([
   .tablet-echo {
     display: none;
   }
+
+  .stage-ring {
+    display: none;
+  }
+
+  .floating-chip {
+    padding: 7px 9px;
+    gap: 6px;
+    border-radius: 11px;
+    font-size: 0.64rem;
+  }
+
+  .chip-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .phone-stage {
+    min-height: 460px;
+  }
 }
 
 @media (max-width: 768px) {
   .hero-title {
     font-size: 2.1rem;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero *,
+  .hero *::before,
+  .hero *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
 }
 
 /* ============ BRAND BANNERS ============ */
