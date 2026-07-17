@@ -1,9 +1,11 @@
 package com.fpoly.marcusstore.config;
 
 import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.entity.contact.ContactRequest;
 import com.fpoly.marcusstore.entity.interaction.AuditLog;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.cms.AuditLogRepository;
+import com.fpoly.marcusstore.repository.contact.ContactRequestRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.JoinPoint;
@@ -32,6 +34,9 @@ public class AuditlogConfig {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ContactRequestRepository contactRequestRepository;
+
     private static final Map<String, String> AUDITED_SERVICES = Map.ofEntries(
             // Sản phẩm & kho
             Map.entry("CategoriesService", "Categories"),
@@ -39,7 +44,7 @@ public class AuditlogConfig {
             Map.entry("ProductImgService", "Product_Images"),
             Map.entry("AttributeService", "Attributes"),
             Map.entry("AttributeValueService", "Attribute_Values"),
-            Map.entry("ProductConfigService", "Product_Skus"), // ← FIX: thêm SKU service
+            Map.entry("ProductConfigService", "Product_Skus"),
 
             // Kênh bán hàng
             Map.entry("OrderService", "Orders"),
@@ -53,16 +58,17 @@ public class AuditlogConfig {
             Map.entry("PostCategoryService", "Post_Categories"),
             Map.entry("BannerService", "Banners"),
 
+            // Liên hệ
+            Map.entry("ContactService", "Contact_Requests"),
+
             // Hệ thống & tài khoản
             Map.entry("UserService", "Users"),
             Map.entry("UserAddressService", "User_Addresses"),
             Map.entry("PermissionService", "User_Permissions"),
             Map.entry("SystemSettingService", "System_Settings"),
-            Map.entry("ShippingService", "Shipping_Config"),
-            Map.entry("AdminNotificationService", "Admin_Notifications")
+            Map.entry("ShippingService", "Shipping_Config")
     );
 
-    // FIX: bỏ "*Service" ở cuối để bắt được cả *ServiceImpl
     @Pointcut("execution(public * com.fpoly.marcusstore.service..*(..))")
     public void anyServiceMethod() {}
 
@@ -75,16 +81,16 @@ public class AuditlogConfig {
                     : rawName;
 
             String tableName = AUDITED_SERVICES.get(className);
-            if (tableName == null) return; // Service này chưa đăng ký theo dõi -> bỏ qua
+            if (tableName == null) return;
 
             String methodName = joinPoint.getSignature().getName();
             String action = resolveAction(methodName);
-            if (action == null) return; // không phải thao tác ghi dữ liệu -> bỏ qua (getAll, getOne...)
+            if (action == null) return;
 
             AuditLog log = new AuditLog();
             log.setActionType(action);
             log.setTableName(tableName);
-            log.setDescription(buildDescription(action, tableName, joinPoint, result));
+            log.setDescription(buildDescription(action, tableName, methodName, joinPoint, result));
             log.setIpAddress(resolveClientIp());
 
             Integer currentUserId = safeGetCurrentUserId();
@@ -98,31 +104,43 @@ public class AuditlogConfig {
         }
     }
 
-    // Nhận diện hành động dựa trên tiền tố tên method.
-    // FIX: thêm "batch" (batchCreateSkus) vào CREATE, thêm "bulk" (bulkUpdateSkus) vào UPDATE
     private String resolveAction(String methodName) {
         String m = methodName.toLowerCase();
 
-        // TẠO MỚI
         if (m.startsWith("add") || m.startsWith("create") || m.startsWith("insert")
-                || m.startsWith("import") || m.startsWith("batch")) return "CREATE";
+                || m.startsWith("import") || m.startsWith("batch") || m.startsWith("submit"))
+            return "CREATE";
 
-        // XOÁ (kể cả xoá mềm/ẩn — hiddenCategory, hiddenProduct)
         if (m.startsWith("remove") || m.startsWith("delete") || m.startsWith("destroy")
-                || m.startsWith("hidden") || m.startsWith("hide")) return "DELETE";
+                || m.startsWith("hidden") || m.startsWith("hide"))
+            return "DELETE";
 
-        // CẬP NHẬT (mọi thao tác thay đổi trạng thái khác đều gộp vào UPDATE)
         if (m.startsWith("update") || m.startsWith("edit") || m.startsWith("modify")
                 || m.startsWith("process") || m.startsWith("approve") || m.startsWith("reject")
                 || m.startsWith("lock") || m.startsWith("unlock") || m.startsWith("toggle")
                 || m.startsWith("publish") || m.startsWith("changestatus") || m.startsWith("resolve")
-                || m.startsWith("cancel") || m.startsWith("verify")
-                || m.startsWith("bulk")) return "UPDATE";
+                || m.startsWith("cancel") || m.startsWith("verify") || m.startsWith("bulk"))
+            return "UPDATE";
 
         return null;
     }
 
-    private String buildDescription(String action, String tableName, JoinPoint joinPoint, Object result) {
+    private String buildDescription(String action, String tableName, String methodName,
+                                    JoinPoint joinPoint, Object result) {
+        // Lấy tên người thực hiện để đưa vào đầu câu
+        String actorName = resolveActorName();
+
+        // Xử lý đặc biệt cho resolveContact
+        if ("resolveContact".equals(methodName)) {
+            return buildResolveContactDescription(joinPoint, actorName);
+        }
+
+        // Xử lý đặc biệt cho submitContact
+        if ("submitContact".equals(methodName)) {
+            return buildSubmitContactDescription(joinPoint, actorName);
+        }
+
+        // Xử lý chung — format: "[Tên] đã [hành động] [bảng]: [label]"
         String actionText = switch (action) {
             case "CREATE" -> "đã tạo mới";
             case "UPDATE" -> "đã cập nhật";
@@ -137,12 +155,72 @@ public class AuditlogConfig {
                 if (label != null) break;
             }
         }
-        return label != null ? actionText + " " + tableName + ": " + label : actionText + " " + tableName;
+
+        String base = label != null
+                ? actorName + " " + actionText + " " + tableName + ": " + label
+                : actorName + " " + actionText + " " + tableName;
+        return base;
+    }
+
+    private String buildResolveContactDescription(JoinPoint joinPoint, String actorName) {
+        try {
+            Object arg0 = joinPoint.getArgs().length > 0 ? joinPoint.getArgs()[0] : null;
+            if (!(arg0 instanceof Integer contactId)) {
+                return actorName + " đã xác nhận liên hệ/khiếu nại";
+            }
+
+            ContactRequest contact = contactRequestRepository.findById(contactId).orElse(null);
+            if (contact == null) {
+                return actorName + " đã xác nhận liên hệ/khiếu nại #" + contactId;
+            }
+
+            String customerName = contact.getCustomerName() != null
+                    ? contact.getCustomerName() : "Khách vãng lai";
+            String phone = contact.getPhoneNumber() != null
+                    ? " (" + contact.getPhoneNumber() + ")" : "";
+
+            return actorName + " đã xác nhận liên hệ/khiếu nại của khách: "
+                    + customerName + phone;
+
+        } catch (Exception e) {
+            logger.warn("Không build được description cho resolveContact: {}", e.getMessage());
+            return actorName + " đã xác nhận liên hệ/khiếu nại";
+        }
+    }
+
+    private String buildSubmitContactDescription(JoinPoint joinPoint, String actorName) {
+        try {
+            // Lấy tên khách từ request arg
+            for (Object arg : joinPoint.getArgs()) {
+                String label = extractLabel(arg);
+                if (label != null) {
+                    return label + " đã gửi yêu cầu liên hệ/khiếu nại";
+                }
+            }
+            return actorName + " đã gửi yêu cầu liên hệ/khiếu nại";
+        } catch (Exception e) {
+            return "Khách hàng đã gửi yêu cầu liên hệ/khiếu nại";
+        }
+    }
+
+    private String resolveActorName() {
+        try {
+            Integer userId = SecurityUtils.getCurrentUserId();
+            if (userId == null) return "Hệ thống";
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null) return "Hệ thống";
+            return user.getFullName() != null && !user.getFullName().isBlank()
+                    ? user.getFullName()
+                    : user.getUsername();
+        } catch (Exception e) {
+            return "Hệ thống";
+        }
     }
 
     private static final String[] LABEL_GETTERS = {
             "getTitle", "getName", "getProductName", "getFullName",
-            "getVoucherCode", "getOrderCode", "getUsername", "getSlug"
+            "getVoucherCode", "getOrderCode", "getUsername", "getSlug",
+            "getCustomerName", "getPhoneNumber", "getEmail", "getMessage"
     };
 
     private String extractLabel(Object obj) {
@@ -157,9 +235,7 @@ public class AuditlogConfig {
                 if (value != null && !value.toString().isBlank()) {
                     return value.toString();
                 }
-            } catch (Exception ignored) {
-                // Không có getter này -> thử getter tiếp theo
-            }
+            } catch (Exception ignored) {}
         }
         return null;
     }
