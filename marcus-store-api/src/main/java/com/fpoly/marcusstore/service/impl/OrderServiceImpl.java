@@ -17,6 +17,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.service.EmailService;
 import com.fpoly.marcusstore.service.OrderPaymentService;
 import com.fpoly.marcusstore.service.OrderService;
 import com.fpoly.marcusstore.service.OrderShippingService;
@@ -47,6 +48,7 @@ public class OrderServiceImpl implements OrderService {
     private final UserVoucherRepository userVoucherRepository;
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
+    private final EmailService emailService;
 
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED");
 
@@ -212,6 +214,19 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderStatus(newStatus);
         markPaymentPaidWhenCompleted(order);
         orderRepository.save(order);
+
+        // Gửi email thông báo trạng thái đơn hàng cho khách
+        try {
+            emailService.sendOrderStatusUpdate(
+                    order.getUser().getEmail(),
+                    getUserDisplayName(order.getUser()),
+                    order,
+                    newStatus
+            );
+        } catch (Exception e) {
+            // log lỗi, không rollback transaction cập nhật đơn hàng
+            // log.error("Gửi mail cập nhật đơn hàng thất bại cho order {}: {}", orderCode, e.getMessage());
+        }
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
