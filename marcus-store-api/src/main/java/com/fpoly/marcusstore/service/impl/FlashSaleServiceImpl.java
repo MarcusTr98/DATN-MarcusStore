@@ -793,7 +793,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                 .toList();
     }
 
-    // Lấy danh sách slot "đang diễn ra" + "sắp diễn ra trong vòng 2h" cho client.
+    // Lấy danh sách slot "đang diễn ra" + "sắp diễn ra gần nhất" cho client.
     // Trả về FlashSaleResponse kèm items[], đã sắp xếp đúng thứ tự ưu tiên.
     //
     // Bổ sung: còn trả thêm các slot đã bị admin hủy (CANCELLED = 4) mà có khoảng thời gian
@@ -803,15 +803,13 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     @Transactional(readOnly = true)
     public List<FlashSaleResponse> getActiveAndUpcomingFlashSaleSlots(int limit) {
         LocalDateTime now = LocalDateTime.now();
-        // Cửa sổ "sắp diễn ra" trong vòng 2 tiếng tới
-        LocalDateTime upcomingThreshold = now.plusHours(2);
 
-        // 1. Lấy tất cả slot ACTIVE đang chạy + SCHEDULED sắp chạy trong 2h tới
-        //    (Repository đã lọc đúng điều kiện 2 nhóm này)
+        // 1. Lấy tất cả slot ACTIVE đang chạy + TẤT CẢ slot SCHEDULED trong tương lai
+        //    (không giới hạn thời gian - lấy slot gần nhất dù xa đến đâu)
         List<FlashSaleSlot> slots = flashSaleSlotRepository
-                .findActiveAndUpcomingSlots(now, upcomingThreshold);
+                .findActiveAndUpcomingSlots(now);
 
-        if (slots.isEmpty()) {
+        if (slots == null || slots.isEmpty()) {
             // Vẫn tiếp tục xử lý slot CANCELLED ở bước 6 bên dưới
             slots = new ArrayList<>();
         }
@@ -849,10 +847,11 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             result.add(buildSlotDetailResponse(slot));
         }
 
-        // 6. Bổ sung slot CANCELLED (đã bị admin hủy) trong khung [now, upcomingThreshold]
+        // 6. Bổ sung slot CANCELLED (đã bị admin hủy) trong khung [now, now+2h]
         //    để FE nhận biết slotId nào đã bị hủy. Không áp dụng limit.
+        LocalDateTime cancelledWindow = now.plusHours(2);
         List<FlashSaleSlot> cancelledSlots = flashSaleSlotRepository
-                .findCancelledSlotsInRange(now, upcomingThreshold);
+                .findCancelledSlotsInRange(now, cancelledWindow);
         for (FlashSaleSlot slot : cancelledSlots) {
             result.add(buildCancelledSlotResponse(slot));
         }
