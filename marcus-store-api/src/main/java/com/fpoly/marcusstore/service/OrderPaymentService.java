@@ -19,10 +19,17 @@ public class OrderPaymentService {
         if (order.getPaymentDate() == null) {
             order.setPaymentDate(LocalDateTime.now());
         }
-        // Chốt chính transaction PENDING đã tạo lúc checkout, không tạo dòng trùng.
         transactionService.markPendingTransactionSuccess(
                 order,
                 type,
                 "Giao dịch hoàn tất, Ref: " + refCode);
+    }
+
+    @Transactional
+    public void handleCodDelivered(Order order, String refCode) {
+        if (!"COD".equalsIgnoreCase(order.getPaymentMethod())) {
+            return;
+        }
+        handlePaymentSuccess(order, "COD_COLLECTION", refCode);
     }
 }

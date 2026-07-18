@@ -20,6 +20,7 @@ public class GhnPollingService {
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final GhnService ghnService;
+    private final OrderPaymentService orderPaymentService;
 
     // Map trạng thái GHN => trạng thái nội bộ
     private static final Map<String, String> GHN_STATUS_MAP = Map.of(
@@ -62,8 +63,11 @@ public class GhnPollingService {
                             newStatus);
 
                     order.setOrderStatus(newStatus);
-                    if ("COMPLETED".equals(newStatus))
-                        order.setPaymentStatus("PAID");
+                    if ("DELIVERED".equals(newStatus)) {
+                        orderPaymentService.handleCodDelivered(
+                                order,
+                                "GHN_POLLING_DELIVERED:" + order.getTrackingCode());
+                    }
                     orderRepository.save(order);
 
                     // Ghi lịch sử

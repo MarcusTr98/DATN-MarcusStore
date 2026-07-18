@@ -67,7 +67,9 @@ ghn.store.ward-code=20310
 
 # token verify webhook từ GHN Dashboard
 # Nếu chưa có thì để trống, webhook sẽ không verify (dùng khi test Ngrok)
-ghn.webhook.token=
+ghn.webhook.token=MARCUS_GHN_TEST_2026_SECRET
+
+
 # cấu hình đăng nhập đăng ký GG
 google.oauth2.client-id=YOUR_GOOGLE_CLIENT_ID
 google.oauth2.client-secret=YOUR_GOOGLE_CLIENT_SECRET
