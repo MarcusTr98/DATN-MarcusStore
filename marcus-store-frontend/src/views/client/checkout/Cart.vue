@@ -43,7 +43,12 @@
           </div>
 
           <div class="cart-item-list">
-            <div v-for="item in cartItems" :key="item.id" class="cart-item" @click="toggleItem(item)">
+            <div
+              v-for="item in cartItems"
+              :key="item.id"
+              class="cart-item"
+              @click="toggleItem(item)"
+            >
               <div class="item-check">
                 <input v-model="item.checked" type="checkbox" @click.stop />
               </div>
@@ -720,13 +725,22 @@ async function fetchAvailableVouchers() {
     loading.value = true
     error.value = null
     const response = await voucherApiClient.getAllVoucherClient()
-    availableVouchers.value = response.data
+    availableVouchers.value = deduplicateVouchers(response.data)
   } catch (e) {
     error.value = 'không thể lấy voucher'
     console.error(e)
   } finally {
     loading.value = false
   }
+}
+
+function deduplicateVouchers(vouchers) {
+  const uniqueVouchers = new Map()
+  for (const voucher of Array.isArray(vouchers) ? vouchers : []) {
+    const key = voucher.voucherId ?? voucher.voucherCode?.trim().toUpperCase()
+    if (key != null && !uniqueVouchers.has(key)) uniqueVouchers.set(key, voucher)
+  }
+  return [...uniqueVouchers.values()]
 }
 
 const cartItems = computed(() => cartStore.items)

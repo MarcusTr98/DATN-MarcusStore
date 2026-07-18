@@ -4,6 +4,7 @@ import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.entity.shopping.Order;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,10 +15,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Integer> {
   Optional<Order> findByOrderCode(String orderCode);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode")
+  Optional<Order> findByOrderCodeForUpdate(@Param("orderCode") String orderCode);
 
   // Được thêm từ nhánh GHN Webhook
   Optional<Order> findByTrackingCode(String trackingCode);

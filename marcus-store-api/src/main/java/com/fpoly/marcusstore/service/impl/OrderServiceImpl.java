@@ -6,20 +6,14 @@ import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
-import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
-import com.fpoly.marcusstore.entity.shopping.Voucher;
-import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
-import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
-import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
-import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
-import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.EmailService;
+import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderPaymentService;
 import com.fpoly.marcusstore.service.OrderService;
 import com.fpoly.marcusstore.service.OrderShippingService;
@@ -32,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,18 +35,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
-    private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
     private final ProductSkuRepository productSkuRepository;
-    private final VoucherRepository voucherRepository;
-    private final UserVoucherRepository userVoucherRepository;
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
+    private final OrderCancellationService orderCancellationService;
     private final EmailService emailService;
-
-    private final FlashSaleItemRepository flashSaleItemRepository;
-
 
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED");
 
@@ -130,12 +118,6 @@ public class OrderServiceImpl implements OrderService {
         };
     }
 
-    private void markPaymentPaidWhenCompleted(Order order) {
-        if ("COMPLETED".equals(normalizeStatusValue(order.getOrderStatus()))) {
-            order.setPaymentStatus("PAID");
-        }
-    }
-
     private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
         Integer currentUserId = SecurityUtils.getCurrentUserId();
         User currentUser = userRepository.getReferenceById(currentUserId);
@@ -152,7 +134,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
-        Order order = orderRepository.findByOrderCode(orderCode)
+        Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
         String newStatus = normalizeStatusValue(request.getStatus());
@@ -165,7 +147,7 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
         }
 
-        // NÂNG CẤP
+        // Tạo vận đơn GHN đúng lúc admin đóng gói đơn hàng
         boolean isPackingNow = "PACKED".equals(newStatus) && !"PACKED".equals(currentStatus);
 
         if (isPackingNow) {
@@ -181,59 +163,24 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Vui lòng nhập lý do cho trạng thái này");
         }
 
-        boolean wasCancelled = "CANCELLED".equals(newStatus);
-        if (wasCancelled) {
-            List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
-            List<Integer> skuIds = orderItems.stream().map(item -> item.getSku().getSkuId()).toList();
-            List<ProductSku> lockedSkus = productSkuRepository.findByIdsForUpdate(skuIds);
-            Map<Integer, ProductSku> skuMap = lockedSkus.stream()
-                    .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
-
-            for (OrderItem item : orderItems) {
-                ProductSku sku = skuMap.get(item.getSku().getSkuId());
-                if (sku != null) {
-                    sku.setStockQuantity(sku.getStockQuantity() + item.getQuantity());
-                }
-
-                // Trả lại soldQuantity cho Flash Sale nếu có
-                if (Boolean.TRUE.equals(item.getIsFlashSale())) {
-                    Integer slotId = item.getFlashSaleSlot() != null ? item.getFlashSaleSlot().getSlotId() : null;
-                    if (slotId != null) {
-                        flashSaleItemRepository.findItemsBySlotIdWithSlot(slotId)
-                                .stream()
-                                .filter(fsi -> fsi.getId().getSkuId().equals(item.getSku().getSkuId()))
-                                .findFirst()
-                                .ifPresent(fsi -> {
-                                    int newSoldQty = fsi.getSoldQuantity() - item.getQuantity();
-                                    fsi.setSoldQuantity(Math.max(0, newSoldQty));
-                                    flashSaleItemRepository.save(fsi);
-                                });
-                    }
-                }
-            }
-
-            if (order.getVoucher() != null) {
-                Voucher voucher = order.getVoucher();
-                LocalDateTime now = LocalDateTime.now();
-                if (voucher.getEndDate() == null || voucher.getEndDate().isAfter(now)) {
-                    voucher.setQuantity(voucher.getQuantity() + 1);
-                    voucherRepository.save(voucher);
-                }
-
-                Integer userId = order.getUser().getUserId();
-                userVoucherRepository.findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId)
-                        .ifPresent(userVoucher -> {
-                            if (Boolean.TRUE.equals(userVoucher.getIsUsed())) {
-                                userVoucher.setIsUsed(false);
-                                userVoucher.setUsedAt(null);
-                                userVoucherRepository.save(userVoucher);
-                            }
-                        });
-            }
+        if ("CANCELLED".equals(newStatus)) {
+            // Hoàn kho, voucher, giỏ hàng và số lượng Flash Sale tại một nơi
+            orderCancellationService.cancelAndRestore(order, note);
+        } else {
+            order.setOrderStatus(newStatus);
         }
 
-        order.setOrderStatus(newStatus);
-        markPaymentPaidWhenCompleted(order);
+        if ("COMPLETED".equals(newStatus)) {
+            String transactionType = "COD".equalsIgnoreCase(order.getPaymentMethod())
+                    ? "COD_COLLECTION"
+                    : "VNPAY_PAYMENT";
+            // Hoàn tất thanh toán và giao dịch đối soát khi admin hoàn thành đơn
+            orderPaymentService.handlePaymentSuccess(
+                    order,
+                    transactionType,
+                    order.getFinalAmount(),
+                    order.getOrderCode());
+        }
         orderRepository.save(order);
 
         // Gửi email thông báo trạng thái đơn hàng cho khách
@@ -242,11 +189,11 @@ public class OrderServiceImpl implements OrderService {
                     order.getUser().getEmail(),
                     getUserDisplayName(order.getUser()),
                     order,
-                    newStatus
-            );
+                    newStatus);
         } catch (Exception e) {
             // log lỗi, không rollback transaction cập nhật đơn hàng
-            // log.error("Gửi mail cập nhật đơn hàng thất bại cho order {}: {}", orderCode, e.getMessage());
+            // log.error("Gửi mail cập nhật đơn hàng thất bại cho order {}: {}", orderCode,
+            // e.getMessage());
         }
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
@@ -351,17 +298,22 @@ public class OrderServiceImpl implements OrderService {
                             Product product = sku.getProduct();
                             // Lấy SKU có fetch variants từ map (tránh N+1 và LazyInit)
                             ProductSku skuWithVariants = skuVariantMap.getOrDefault(sku.getSkuId(), sku);
-                            List<ClientSkuAttributeValueResponse> variants = skuWithVariants.getAttributeValues() == null
-                                    ? List.of()
-                                    : skuWithVariants.getAttributeValues().stream()
-                                            .map(av -> ClientSkuAttributeValueResponse.builder()
-                                                    .valueId(av.getValueId())
-                                                    .attributeId(av.getAttribute() != null ? av.getAttribute().getAttributeId() : null)
-                                                    .attributeName(av.getAttribute() != null ? av.getAttribute().getAttributeName() : null)
-                                                    .valueString(av.getValueString())
-                                                    .valueMeta(av.getValueMeta())
-                                                    .build())
-                                            .toList();
+                            List<ClientSkuAttributeValueResponse> variants = skuWithVariants
+                                    .getAttributeValues() == null
+                                            ? List.of()
+                                            : skuWithVariants.getAttributeValues().stream()
+                                                    .map(av -> ClientSkuAttributeValueResponse.builder()
+                                                            .valueId(av.getValueId())
+                                                            .attributeId(av.getAttribute() != null
+                                                                    ? av.getAttribute().getAttributeId()
+                                                                    : null)
+                                                            .attributeName(av.getAttribute() != null
+                                                                    ? av.getAttribute().getAttributeName()
+                                                                    : null)
+                                                            .valueString(av.getValueString())
+                                                            .valueMeta(av.getValueMeta())
+                                                            .build())
+                                                    .toList();
                             return OrderItemDetailResponse.builder()
                                     .skuId(sku.getSkuId())
                                     .skuCode(sku.getSkuCode())

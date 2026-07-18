@@ -801,13 +801,22 @@ const fetchAvailableVouchers = async () => {
   isAvailableVouchersLoading.value = true
   try {
     const res = await api.get('/client/vouchers/available')
-    availableVouchers.value = res.data?.data ?? res.data ?? []
+    availableVouchers.value = deduplicateVouchers(res.data?.data ?? res.data ?? [])
   } catch (e) {
     console.error('Lỗi tải danh sách voucher khả dụng:', e)
     availableVouchers.value = []
   } finally {
     isAvailableVouchersLoading.value = false
   }
+}
+
+const deduplicateVouchers = (vouchers) => {
+  const uniqueVouchers = new Map()
+  for (const voucher of Array.isArray(vouchers) ? vouchers : []) {
+    const key = voucher.voucherId ?? voucher.voucherCode?.trim().toUpperCase()
+    if (key != null && !uniqueVouchers.has(key)) uniqueVouchers.set(key, voucher)
+  }
+  return [...uniqueVouchers.values()]
 }
 
 const openReSelectVoucherModal = (message) => {

@@ -5,6 +5,7 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+import com.fpoly.marcusstore.service.OrderCancellationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class VnPayController {
     private final VnPayConfig vnPayConfig;
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+    private final OrderCancellationService orderCancellationService;
 
     @Transactional
     @GetMapping("/ipn")
@@ -85,7 +87,7 @@ public class VnPayController {
         long vnpAmount = Long.parseLong(amountStr) / 100;
 
         // ── Bước 4: Tìm đơn hàng trong DB
-        Optional<Order> orderOpt = orderRepository.findByOrderCode(orderCode);
+        Optional<Order> orderOpt = orderRepository.findByOrderCodeForUpdate(orderCode);
         if (orderOpt.isEmpty()) {
             log.warn("[VNPAY IPN] Không tìm thấy đơn hàng: {}", orderCode);
             return ok("01", "Order not found");
@@ -122,9 +124,11 @@ public class VnPayController {
             log.info("[VNPAY IPN] Thanh toán thành công. Đơn hàng {} chuyển sang PENDING để Admin xác nhận.",
                     orderCode);
         } else {
-            // Thanh toán thất bại, hủy đơn luôn
+            // Thanh toán thất bại: hủy đơn và hoàn tồn kho/voucher đúng một lần.
             order.setPaymentStatus("FAILED");
-            order.setOrderStatus("CANCELLED");
+            orderCancellationService.cancelAndRestore(
+                    order,
+                    "Giao dịch VNPAY thất bại. ResponseCode: " + responseCode);
             log.info("[VNPAY IPN] Thanh toán thất bại/hủy. Order={}", orderCode);
         }
 
@@ -133,8 +137,13 @@ public class VnPayController {
         OrderStatusHistory history = new OrderStatusHistory();
         history.setOrder(order);
         history.setStatus(order.getOrderStatus());
-        history.setTitle("Đã thanh toán VNPAY");
-        history.setNote("Giao dịch VNPAY thành công: " + transactionId);
+        if ("00".equals(responseCode)) {
+            history.setTitle("Đã thanh toán VNPAY");
+            history.setNote("Giao dịch VNPAY thành công: " + transactionId);
+        } else {
+            history.setTitle("Thanh toán VNPAY thất bại");
+            history.setNote("ResponseCode: " + responseCode + ", TransactionNo: " + transactionId);
+        }
         orderStatusHistoryRepository.save(history);
 
         return ok("00", "Confirm Success");

@@ -16,9 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,13 +28,14 @@ public class UserVoucherServiceImpl implements UserVoucherService {
     private final UserVoucherRepository userVoucherRepository;
     private final VoucherRepository voucherRepository;
     private final UserRepository userRepository;
-    private final EmailService emailService; 
+    private final EmailService emailService;
+
     // lấy voucher có thể sử dụng cho user
     @Override
     public List<VoucherResponse> getAvailableVouchersForUser() {
         Integer userId = SecurityUtils.getCurrentUserId();
         LocalDateTime now = LocalDateTime.now();
-        Set<VoucherResponse> result = new HashSet<>();
+        Map<Integer, VoucherResponse> resultByVoucherId = new LinkedHashMap<>();
 
         // 1. Lấy voucher ALL (ai cũng dùng được) — loại trừ voucher đã dùng
         List<Voucher> allVouchers = voucherRepository.findAvailableVouchers();
@@ -45,17 +46,17 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                     .map(UserVoucher::getIsUsed)
                     .orElse(false);
             if (!alreadyUsed) {
-                result.add(toResponseFromVoucher(v, false));
+                resultByVoucherId.put(v.getVoucherId(), toResponseFromVoucher(v, false));
             }
         }
 
         // 2. Lấy voucher SPECIFIC đã gán cho user và chưa dùng
         List<UserVoucher> userVouchers = userVoucherRepository.findAvailableVouchersByUserId(userId, now);
         for (UserVoucher uv : userVouchers) {
-            result.add(toResponse(uv));
+            resultByVoucherId.putIfAbsent(uv.getVoucher().getVoucherId(), toResponse(uv));
         }
 
-        return new ArrayList<>(result);
+        return new ArrayList<>(resultByVoucherId.values());
     }
 
     @Override
@@ -65,7 +66,8 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
-// thêm voucher cho từng khách hàng
+
+    // thêm voucher cho từng khách hàng
     @Override
     @Transactional
     public void assignVoucherToUsers(Integer voucherId, List<Integer> userIds) {
@@ -73,7 +75,7 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy voucher với id: " + voucherId));
 
         List<UserVoucher> userVouchers = new ArrayList<>();
-         List<User> usersToNotify = new ArrayList<>();
+        List<User> usersToNotify = new ArrayList<>();
         for (Integer userId : userIds) {
             if (!userVoucherRepository.existsByVoucherVoucherIdAndUserUserId(voucherId, userId)) {
                 User user = userRepository.findById(userId)
@@ -87,23 +89,24 @@ public class UserVoucherServiceImpl implements UserVoucherService {
                         .build();
 
                 userVouchers.add(userVoucher);
-                usersToNotify.add(user); 
+                usersToNotify.add(user);
             }
         }
 
         if (!userVouchers.isEmpty()) {
             userVoucherRepository.saveAll(userVouchers);
 
-                    // gửi mail sau khi save thành công
-        for (User user : usersToNotify) {
-            try {
-                emailService.sendVoucherAssigned(user.getEmail(), user.getFullName(), voucher);
-            } catch (Exception e) {
-                // không để lỗi gửi mail làm rollback cả transaction gán voucher
-                // có thể log lại để theo dõi
-                // log.error("Gửi mail voucher thất bại cho user {}: {}", user.getUserId(), e.getMessage());
+            // gửi mail sau khi save thành công
+            for (User user : usersToNotify) {
+                try {
+                    emailService.sendVoucherAssigned(user.getEmail(), user.getFullName(), voucher);
+                } catch (Exception e) {
+                    // không để lỗi gửi mail làm rollback cả transaction gán voucher
+                    // có thể log lại để theo dõi
+                    // log.error("Gửi mail voucher thất bại cho user {}: {}", user.getUserId(),
+                    // e.getMessage());
+                }
             }
-        }
         }
     }
 
