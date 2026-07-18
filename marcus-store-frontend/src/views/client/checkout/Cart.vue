@@ -815,7 +815,7 @@ const v2Vouchers = computed(() => {
     const isFreeship = discountType === 'FREESHIP'
 
     // Tính giá trị giảm dựa trên loại
-    let title = ''
+    let title
     let discountValue = 0
     let discountPercent = 0
 

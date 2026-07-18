@@ -15,4 +15,6 @@ public interface OrderTransactionRepository extends JpaRepository<OrderTransacti
 
     Optional<OrderTransaction> findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
             Integer orderId, String type, String status);
+
+    boolean existsByOrder_OrderIdAndTypeAndStatus(Integer orderId, String type, String status);
 }

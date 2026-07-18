@@ -47,14 +47,9 @@ public class FinancialService {
                                                 note = note.isEmpty() ? "Lệch số tiền (Gốc: " + orderFinalAmount + ")"
                                                                 : note + " | Lệch tiền (Gốc: " + orderFinalAmount + ")";
                                         }
-                                        // 3. TỰ ĐỘNG GỠ LỖI: Đơn đã trả tiền, khớp giá, nhưng Transaction bị kẹt
-                                        // PENDING
-                                        else if ("PENDING".equals(actualStatus)) {
-                                                actualStatus = "SUCCESS";
-                                        }
-
                                         return TransactionResponse.builder()
                                                         .transactionId(t.getTransactionId())
+                                                        .providerTransactionId(t.getOrder().getTransactionId())
                                                         .orderCode(t.getOrder().getOrderCode())
                                                         .amount(t.getAmount())
                                                         .type(t.getType())

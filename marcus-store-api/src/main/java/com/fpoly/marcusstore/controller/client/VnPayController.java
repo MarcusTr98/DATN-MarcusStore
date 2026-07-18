@@ -6,6 +6,7 @@ import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.OrderCancellationService;
+import com.fpoly.marcusstore.service.OrderTransactionService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,7 @@ public class VnPayController {
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final OrderCancellationService orderCancellationService;
+    private final OrderTransactionService orderTransactionService;
 
     @Transactional
     @GetMapping("/ipn")
@@ -120,15 +122,18 @@ public class VnPayController {
 
             order.setTransactionId(transactionId);
             order.setPaymentDate(LocalDateTime.now());
+            orderTransactionService.markVnPayPaymentSuccess(order, transactionId, responseCode);
 
             log.info("[VNPAY IPN] Thanh toán thành công. Đơn hàng {} chuyển sang PENDING để Admin xác nhận.",
                     orderCode);
         } else {
             // Thanh toán thất bại: hủy đơn và hoàn tồn kho/voucher đúng một lần.
             order.setPaymentStatus("FAILED");
+            order.setTransactionId(transactionId);
             orderCancellationService.cancelAndRestore(
                     order,
-                    "Giao dịch VNPAY thất bại. ResponseCode: " + responseCode);
+                    "Giao dịch VNPAY thất bại. TransactionNo: " + transactionId
+                            + ", ResponseCode: " + responseCode);
             log.info("[VNPAY IPN] Thanh toán thất bại/hủy. Order={}", orderCode);
         }
 

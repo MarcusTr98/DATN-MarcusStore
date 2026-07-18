@@ -174,12 +174,10 @@ public class OrderServiceImpl implements OrderService {
             String transactionType = "COD".equalsIgnoreCase(order.getPaymentMethod())
                     ? "COD_COLLECTION"
                     : "VNPAY_PAYMENT";
-            // Hoàn tất thanh toán và giao dịch đối soát khi admin hoàn thành đơn
             orderPaymentService.handlePaymentSuccess(
                     order,
                     transactionType,
-                    order.getFinalAmount(),
-                    order.getOrderCode());
+                    "ORDER_COMPLETED:" + order.getOrderCode());
         }
         orderRepository.save(order);
 

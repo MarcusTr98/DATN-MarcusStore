@@ -25,4 +25,41 @@ public class OrderTransactionService {
                 .build();
         transactionRepository.save(trans);
     }
+
+    @Transactional
+    public void markVnPayPaymentSuccess(Order order, String providerTransactionId, String responseCode) {
+        markPendingTransactionSuccess(
+                order,
+                "VNPAY_PAYMENT",
+                "VNPAY xác nhận thành công. TransactionNo: "
+                        + providerTransactionId + ", ResponseCode: " + responseCode);
+    }
+
+    @Transactional
+    public void markPendingTransactionSuccess(Order order, String type, String note) {
+        OrderTransaction transaction = transactionRepository
+                .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
+                        order.getOrderId(), type, "PENDING")
+                .orElse(null);
+
+        if (transaction == null && transactionRepository
+                .existsByOrder_OrderIdAndTypeAndStatus(order.getOrderId(), type, "SUCCESS")) {
+            return;
+        }
+
+        if (transaction == null) {
+            transaction = OrderTransaction.builder()
+                    .order(order)
+                    .amount(order.getFinalAmount())
+                    .type(type)
+                    .status("PENDING")
+                    .isReconciled(false)
+                    .build();
+        }
+
+        transaction.setAmount(order.getFinalAmount());
+        transaction.setStatus("SUCCESS");
+        transaction.setNote(note);
+        transactionRepository.save(transaction);
+    }
 }
