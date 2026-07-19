@@ -1,10 +1,9 @@
 package com.fpoly.marcusstore.listener;
 
-import com.fpoly.marcusstore.dto.request.GhnCreateOrderRequest;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.event.OrderConfirmedEvent;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
-import com.fpoly.marcusstore.service.GhnService;
+import com.fpoly.marcusstore.service.OrderShippingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -14,15 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
-import java.util.stream.Collectors;
-
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class GhnOrderListener {
 
         private final OrderRepository orderRepository;
-        private final GhnService ghnService;
+        private final OrderShippingService orderShippingService;
 
         @Async
         @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -50,47 +47,8 @@ public class GhnOrderListener {
                 log.info("🚀 Bắt đầu tạo đơn GHN cho mã: {}", order.getOrderCode());
 
                 try {
-                        boolean isCod = "COD".equalsIgnoreCase(order.getPaymentMethod());
-
-                        int totalWeight = order.getOrderItems().stream()
-                                        .mapToInt(i -> (i.getSku().getWeightGram() > 0 ? i.getSku().getWeightGram()
-                                                        : 500) * i.getQuantity())
-                                        .sum();
-
-                        // Quy trình chuẩn TMĐT: Shop trả ship (paymentTypeId = 1)
-                        int paymentTypeId = 1;
-
-                        GhnCreateOrderRequest request = GhnCreateOrderRequest.builder()
-                                        .paymentTypeId(1) // Marcus trả phí để ko bị thu 2 lần
-                                        .serviceTypeId(2)
-                                        .note(order.getRecipientName())
-                                        .requiredNote("KHONGCHOXEMHANG")
-                                        .toName(order.getRecipientName())
-                                        .toPhone(order.getRecipientPhone())
-                                        .toAddress(order.getShippingAddress())
-                                        .toDistrictId(order.getToDistrictId())
-                                        .toWardCode(order.getToWardCode())
-                                        .weight(totalWeight)
-                                        .codAmount(isCod ? order.getFinalAmount().intValue() : 0) // Tiền thu hộ =
-                                                                                                  // FinalAmount
-                                        // FIX BẢO HIỂM đúng với GHN:
-                                        .insuranceValue(Math.min(order.getTotalAmount().intValue(), 5000000))
-                                        .items(order.getOrderItems().stream()
-                                                        .map(i -> GhnCreateOrderRequest.Item.builder()
-                                                                        .name(i.getSku().getProduct().getProductName())
-                                                                        .code(i.getSku().getSkuCode())
-                                                                        .quantity(i.getQuantity())
-                                                                        .build())
-                                                        .collect(Collectors.toList()))
-                                        .build();
-
-                        String trackingCode = ghnService.createOrderOnGhn(request);
-
-                        if (trackingCode != null) {
-                                order.setTrackingCode(trackingCode);
-                                orderRepository.save(order);
-                                log.info("✅ Tạo đơn GHN thành công. Tracking: {}", trackingCode);
-                        }
+                        orderShippingService.processCreateGhnOrder(order);
+                        log.info("✅ Tạo đơn GHN thành công. Tracking: {}", order.getTrackingCode());
                 } catch (Exception e) {
                         log.error("❌ Lỗi tạo đơn GHN cho đơn {}: {}", order.getOrderCode(), e.getMessage());
                 }

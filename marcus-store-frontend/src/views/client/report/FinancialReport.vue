@@ -304,6 +304,12 @@
                 {{ selectedTransaction?.transactionId || selectedTransaction?.id || '---' }}
               </strong>
             </div>
+            <div class="id-block id-block-provider">
+              <span class="detail-label">Mã giao dịch VNPAY</span>
+              <strong class="font-monospace">
+                {{ selectedTransaction?.providerTransactionId || '---' }}
+              </strong>
+            </div>
             <div class="id-block id-block-order">
               <span class="detail-label">Mã đơn hàng</span>
               <div class="d-flex align-items-center gap-2">
@@ -1377,7 +1383,7 @@ onMounted(() => {
 /* Mã GD nội bộ / mã đơn hàng */
 .id-row {
   display: grid;
-  grid-template-columns: 1fr 1.4fr;
+  grid-template-columns: 0.8fr 1.2fr 1.4fr;
   gap: 12px;
   padding: 14px 16px;
   margin-bottom: 16px;
@@ -1395,6 +1401,7 @@ onMounted(() => {
   font-size: 0.95rem;
   color: #0f2c5c;
 }
+.id-block-provider,
 .id-block-order {
   border-left: 1px solid #d6e6fb;
   padding-left: 12px;
@@ -1583,6 +1590,7 @@ onMounted(() => {
   .badge-row {
     grid-template-columns: 1fr;
   }
+  .id-block-provider,
   .id-block-order {
     border-left: none;
     padding-left: 0;

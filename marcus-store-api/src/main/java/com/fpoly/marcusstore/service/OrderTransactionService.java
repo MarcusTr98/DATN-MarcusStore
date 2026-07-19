@@ -11,18 +11,135 @@ import java.math.BigDecimal;
 @Service
 @RequiredArgsConstructor
 public class OrderTransactionService {
+    private static final String IDEMPOTENCY_KEY_PREFIX = "ORDER";
+    private static final String VNPAY_PAYMENT = "VNPAY_PAYMENT";
+
     private final OrderTransactionRepository transactionRepository;
 
     @Transactional
     public void recordTransaction(Order order, BigDecimal amount, String type, String status, String note) {
-        OrderTransaction trans = OrderTransaction.builder()
-                .order(order)
-                .amount(amount)
-                .type(type)
-                .status(status)
-                .note(note)
-                .isReconciled(false)
-                .build();
-        transactionRepository.save(trans);
+        insertIfAbsent(order, amount, type, status, note);
+    }
+
+    @Transactional
+    public void markVnPayPaymentSuccess(Order order, String providerTransactionId, String responseCode) {
+        markPendingTransactionSuccess(
+                order,
+                VNPAY_PAYMENT,
+                "VNPAY xác nhận thành công. TransactionNo: "
+                        + providerTransactionId + ", ResponseCode: " + responseCode);
+        updateVnPayProviderResult(order, "SUCCESS", providerTransactionId, responseCode);
+    }
+
+    @Transactional
+    public void markVnPayPaymentFailed(
+            Order order, String providerTransactionId, String responseCode, String note) {
+        OrderTransaction transaction = findOrCreateVnPayTransaction(order, note);
+        if (transaction == null || "SUCCESS".equalsIgnoreCase(transaction.getStatus())) {
+            return;
+        }
+        transaction.setAmount(order.getFinalAmount());
+        transaction.setStatus("FAILED");
+        transaction.setNote(note);
+        transaction.setProviderTransactionId(providerTransactionId);
+        transaction.setProviderResponseCode(responseCode);
+        transactionRepository.save(transaction);
+    }
+
+    @Transactional(readOnly = true)
+    public VnPayTransactionState getVnPayTransactionState(Order order) {
+        return transactionRepository
+                .findFirstByOrder_OrderIdAndTypeOrderByCreatedAtDesc(order.getOrderId(), VNPAY_PAYMENT)
+                .map(transaction -> new VnPayTransactionState(
+                        transaction.getStatus(),
+                        transaction.getProviderTransactionId(),
+                        transaction.getProviderResponseCode()))
+                .orElse(null);
+    }
+
+    @Transactional
+    public void markPendingTransactionSuccess(Order order, String type, String note) {
+        OrderTransaction transaction = transactionRepository
+                .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
+                        order.getOrderId(), type, "PENDING")
+                .orElse(null);
+
+        if (transaction == null && transactionRepository
+                .existsByOrder_OrderIdAndTypeAndStatus(order.getOrderId(), type, "SUCCESS")) {
+            return;
+        }
+
+        if (transaction == null) {
+            insertIfAbsent(order, order.getFinalAmount(), type, "PENDING", note);
+            transaction = transactionRepository
+                    .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
+                            order.getOrderId(), type, "PENDING")
+                    .orElse(null);
+        }
+
+        // Một callback đồng thời khác có thể đã chốt transaction trước khi query lại.
+        if (transaction == null) {
+            return;
+        }
+
+        transaction.setAmount(order.getFinalAmount());
+        transaction.setStatus("SUCCESS");
+        transaction.setNote(note);
+        transactionRepository.save(transaction);
+    }
+
+    @Transactional
+    public void recordPendingTransactionIfAbsent(
+            Order order, BigDecimal amount, String type, String note) {
+        insertIfAbsent(order, amount, type, "PENDING", note);
+    }
+
+    private boolean insertIfAbsent(
+            Order order, BigDecimal amount, String type, String status, String note) {
+        if (order == null || order.getOrderId() == null) {
+            throw new IllegalArgumentException("Đơn hàng phải được lưu trước khi tạo transaction");
+        }
+        String idempotencyKey = buildIdempotencyKey(order.getOrderId(), type);
+        return transactionRepository.insertIfAbsent(
+                order.getOrderId(), amount, type, status, note, idempotencyKey) == 1;
+    }
+
+    private String buildIdempotencyKey(Integer orderId, String type) {
+        if (type == null || type.isBlank()) {
+            throw new IllegalArgumentException("Loại transaction không được để trống");
+        }
+        return IDEMPOTENCY_KEY_PREFIX + ":" + orderId + ":" + type.trim().toUpperCase();
+    }
+
+    private OrderTransaction findOrCreateVnPayTransaction(Order order, String note) {
+        OrderTransaction transaction = transactionRepository
+                .findFirstByOrder_OrderIdAndTypeOrderByCreatedAtDesc(order.getOrderId(), VNPAY_PAYMENT)
+                .orElse(null);
+        if (transaction != null) {
+            return transaction;
+        }
+
+        insertIfAbsent(order, order.getFinalAmount(), VNPAY_PAYMENT, "PENDING", note);
+        return transactionRepository
+                .findFirstByOrder_OrderIdAndTypeOrderByCreatedAtDesc(order.getOrderId(), VNPAY_PAYMENT)
+                .orElse(null);
+    }
+
+    private void updateVnPayProviderResult(
+            Order order, String status, String providerTransactionId, String responseCode) {
+        transactionRepository
+                .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
+                        order.getOrderId(), VNPAY_PAYMENT, status)
+                .ifPresent(transaction -> {
+                    transaction.setProviderTransactionId(providerTransactionId);
+                    transaction.setProviderResponseCode(responseCode);
+                    transactionRepository.save(transaction);
+                });
+    }
+
+    public record VnPayTransactionState(
+            String status,
+            String providerTransactionId,
+            String responseCode) {
     }
 }

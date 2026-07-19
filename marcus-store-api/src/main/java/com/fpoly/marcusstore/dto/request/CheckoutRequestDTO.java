@@ -9,7 +9,7 @@ import java.util.List;
 @Data
 public class CheckoutRequestDTO {
     @NotEmpty(message = "Giỏ hàng không được để trống")
-    private List<Integer> cartItemIds;
+    private List<@NotNull(message = "ID sản phẩm trong giỏ không được để trống") Integer> cartItemIds;
 
     @NotBlank(message = "Tên người nhận không được để trống")
     private String recipientName;

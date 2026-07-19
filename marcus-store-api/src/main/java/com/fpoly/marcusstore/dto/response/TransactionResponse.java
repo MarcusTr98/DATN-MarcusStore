@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 @Builder
 public class TransactionResponse {
     private Integer transactionId; // mã nội bộ
+    private String providerTransactionId; // mã giao dịch do VNPAY/GHN cung cấp
     private String orderCode;
     private BigDecimal amount;
     private String type;
