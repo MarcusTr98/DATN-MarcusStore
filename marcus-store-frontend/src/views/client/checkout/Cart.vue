@@ -144,16 +144,53 @@
               <i class="ti ti-chevron-left" aria-hidden="true"></i>
             </button>
 
-            <div id="productTrack" ref="suggestedTrack" class="suggested-track product-track">
+            <div v-if="isLoadingSuggestions" class="sug-loading">
+              <i class="ti ti-loader"></i> Đang tải phụ kiện...
+            </div>
+
+            <div v-else-if="accessories.length === 0" class="sug-empty">
+              Chưa có gợi ý phụ kiện cho giỏ hàng này
+            </div>
+
+            <div
+              v-else
+              id="productTrack"
+              ref="suggestedTrack"
+              class="suggested-track product-track"
+            >
               <div
                 v-for="accessory in accessories"
                 :key="accessory.id"
                 class="sug-card product-card"
               >
-                <div>
-                  <div class="sug-img">{{ accessory.icon }}</div>
+                <div class="sug-img">
+                  <img
+                    v-if="accessory.thumbnailUrl"
+                    :src="accessory.thumbnailUrl"
+                    :alt="accessory.name"
+                    class="sug-product-img"
+                  />
+                  <span v-else class="sug-img-placeholder">{{ accessory.name?.charAt(0) }}</span>
+
+                  <span
+                    v-if="accessory.discountPercent > 0"
+                    class="sug-discount-badge"
+                    :title="`Giảm ${accessory.discountPercent}%`"
+                  >
+                    -{{ accessory.discountPercent }}%
+                  </span>
+                </div>
+                <div class="sug-info">
                   <div class="sug-name">{{ accessory.name }}</div>
-                  <div class="sug-price">{{ formatPrice(accessory.price) }}</div>
+                  <div class="sug-pricing">
+                    <span class="sug-price">{{ formatPrice(accessory.price) }}</span>
+                    <s
+                      v-if="accessory.originalPrice && accessory.discountPercent > 0"
+                      class="sug-original"
+                    >
+                      {{ formatPrice(accessory.originalPrice) }}
+                    </s>
+                  </div>
                 </div>
                 <button class="sug-add" type="button" @click="addAccessoryToCart(accessory)">
                   <i class="ti ti-plus" aria-hidden="true"></i>
@@ -572,6 +609,7 @@ import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 import { expandColorName } from '@/utils/colorUtils'
 import '@/assets/css/cart.css'
 import voucherApiClient from '@/api/voucherApiClient.js'
+import cartApi from '@/api/cartApi'
 const router = useRouter()
 const cartStore = useCartStore()
 const flashSaleStore = useFlashSaleStore()
@@ -654,6 +692,7 @@ onMounted(async () => {
   // Tải song song cả cart và danh sách slot FS để check slot CANCELLED sớm nhất có thể.
   await Promise.all([cartStore.fetchCart(), flashSaleStore.fetchClientSlots(20)])
   await fetchAvailableVouchers()
+  await fetchCartSuggestions()
 
   // Khôi phục trạng thái checkbox từ localStorage (nếu có)
   restoreSelectedItems()
@@ -921,56 +960,51 @@ function formatPriceVnd(value) {
   return `${Number(value || 0).toLocaleString('vi-VN')}đ`
 }
 
-const accessories = [
-  {
-    id: 'item-sac-anker',
-    name: 'Củ sạc nhanh Anker Nano GaN 30W',
-    variant: 'Trắng | Bảo hành 18 tháng',
-    icon: '30W',
-    price: 350000,
-    originalPrice: 450000,
+const accessories = ref([])
+const isLoadingSuggestions = ref(false)
+const suggestionsError = ref(null)
+
+async function fetchCartSuggestions() {
+  if (cartItems.value.length === 0) {
+    accessories.value = []
+    return
+  }
+  isLoadingSuggestions.value = true
+  suggestionsError.value = null
+  try {
+    const res = await cartApi.getCartSuggestions(12)
+    const list = Array.isArray(res) ? res : Array.isArray(res?.data) ? res.data : []
+    accessories.value = list.map((p) => ({
+      id: p.productId ?? p.skuId,
+      skuId: p.skuId,
+      name: p.productName,
+      thumbnailUrl: p.thumbnailUrl,
+      price: Number(p.price) || 0,
+      originalPrice: p.originalPrice != null ? Number(p.originalPrice) : null,
+      discountPercent: Number(p.discountPercent) || 0,
+    }))
+  } catch (e) {
+    console.error('fetchCartSuggestions error:', e)
+    suggestionsError.value = 'không thể tải phụ kiện gợi ý'
+    accessories.value = []
+  } finally {
+    isLoadingSuggestions.value = false
+  }
+}
+
+// Tự reload khi số lượng sp trong giỏ thay đổi (thêm / xóa)
+watch(
+  () => cartItems.value.length,
+  (newLen, oldLen) => {
+    if (newLen === 0 && oldLen !== 0) {
+      accessories.value = []
+      return
+    }
+    if (newLen !== oldLen) {
+      fetchCartSuggestions()
+    }
   },
-  {
-    id: 'item-cl-iphone-12',
-    name: 'Kính cường lực iPhone 12 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 180000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-cl-iphone-13',
-    name: 'Kính cường lực iPhone 13 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 200000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-cl-iphone-14',
-    name: 'Kính cường lực iPhone 14 Pro Max Kingkong',
-    variant: 'Hộp sắt | Chống vân tay',
-    icon: 'Glass',
-    price: 5000000,
-    originalPrice: 250000,
-  },
-  {
-    id: 'item-tui-tomtoc',
-    name: 'Túi chống sốc Laptop/Macbook Tomtoc 13 inch',
-    variant: 'Màu Xám | Kháng nước CornerArmor',
-    icon: 'Tui',
-    price: 790000,
-    originalPrice: 950000,
-  },
-  {
-    id: 'item-chuot-logi',
-    name: 'Chuột không dây Silent Logitech M220',
-    variant: 'Đen | Kết nối USB receiver',
-    icon: 'Mouse',
-    price: 299000,
-    originalPrice: 390000,
-  },
-]
+)
 
 const selectedItems = computed(() => cartItems.value.filter((item) => item.checked))
 
@@ -1075,24 +1109,20 @@ function hideToast() {
   }
 }
 
-function addAccessoryToCart(accessory) {
-  const existingItem = cartItems.value.find((item) => item.id === accessory.id)
-
-  if (existingItem) {
-    existingItem.quantity += 1
-    existingItem.checked = true
-    showToast('Thêm vào giỏ hàng thành công')
+async function addAccessoryToCart(accessory) {
+  if (!accessory || !accessory.skuId) {
+    showAlert('Sản phẩm này chưa sẵn sàng, vui lòng thử lại sau')
     return
   }
 
-  cartItems.value.push({
-    ...accessory,
-    badge: 'Mua kèm giá sốc',
-    quantity: 1,
-    checked: true,
-    isAccessory: true,
-  })
-  showToast('Thêm vào giỏ hàng thành công')
+  const success = await cartStore.addToCart(accessory.skuId, 1)
+  if (success) {
+    showToast('Thêm vào giỏ hàng thành công')
+    // Reload để loại sp vừa thêm + cập nhật gợi ý mới (cart length sẽ trigger watcher,
+    // nhưng gọi tường minh để đảm bảo data đồng bộ trong trường hợp chung product_id khác skuId)
+  } else {
+    showAlert(cartStore.error || 'Thêm vào giỏ hàng thất bại')
+  }
 }
 
 function goToProducts() {
