@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.entity.core.ProductSku;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.entity.shopping.Cart;
 import com.fpoly.marcusstore.entity.shopping.CartItem;
 import com.fpoly.marcusstore.entity.shopping.Order;
@@ -48,8 +49,8 @@ public class OrderCancellationService {
             return false;
         }
 
-        restoreStock(order);
-        restoreFlashSaleQuantity(order);
+        Map<Integer, FlashSaleItem> restorableFlashSaleContexts = restoreFlashSaleQuantity(order);
+        restoreStock(order, restorableFlashSaleContexts);
         restoreVoucher(order);
         markPendingVnPayTransactionFailed(order, reason);
 
@@ -58,8 +59,10 @@ public class OrderCancellationService {
         return true;
     }
 
-    private void restoreFlashSaleQuantity(Order order) {
+    private Map<Integer, FlashSaleItem> restoreFlashSaleQuantity(Order order) {
         List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+        Map<Integer, FlashSaleItem> restorableContexts = new java.util.HashMap<>();
+        LocalDateTime now = LocalDateTime.now();
 
         for (OrderItem item : orderItems) {
             if (!Boolean.TRUE.equals(item.getIsFlashSale()) || item.getFlashSaleSlot() == null) {
@@ -70,17 +73,22 @@ public class OrderCancellationService {
             Integer skuId = item.getSku().getSkuId();
 
             // Khoá dòng Flash Sale để tránh hoàn soldQuantity sai khi hủy đồng thời
-            flashSaleItemRepository.findForUpdate(slotId, skuId).ifPresent(flashSaleItem -> {
+            flashSaleItemRepository.findForRestore(slotId, skuId).ifPresent(flashSaleItem -> {
                 int soldQuantity = flashSaleItem.getSoldQuantity() == null
                         ? 0
                         : flashSaleItem.getSoldQuantity();
                 flashSaleItem.setSoldQuantity(Math.max(0, soldQuantity - item.getQuantity()));
                 flashSaleItemRepository.save(flashSaleItem);
+
+                if (isFlashSaleContextStillUsable(flashSaleItem, item.getQuantity(), now)) {
+                    restorableContexts.put(item.getOrderItemId(), flashSaleItem);
+                }
             });
         }
+        return restorableContexts;
     }
 
-    private void restoreStock(Order order) {
+    private void restoreStock(Order order, Map<Integer, FlashSaleItem> restorableFlashSaleContexts) {
         List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
         List<Integer> skuIds = orderItems.stream()
                 .map(item -> item.getSku().getSkuId())
@@ -102,11 +110,12 @@ public class OrderCancellationService {
             }
         }
 
-        restoreItemsToCart(order, orderItems, lockedSkus);
+        restoreItemsToCart(order, orderItems, lockedSkus, restorableFlashSaleContexts);
     }
 
     private void restoreItemsToCart(Order order, List<OrderItem> orderItems,
-            Map<Integer, ProductSku> lockedSkus) {
+            Map<Integer, ProductSku> lockedSkus,
+            Map<Integer, FlashSaleItem> restorableFlashSaleContexts) {
         Cart cart = cartRepository.findByUserUserId(order.getUser().getUserId())
                 .orElseGet(() -> createCart(order));
 
@@ -118,7 +127,14 @@ public class OrderCancellationService {
 
             CartItem cartItem = cartItemRepository
                     .findByCart_CartIdAndSku_SkuId(cart.getCartId(), sku.getSkuId())
-                    .orElseGet(() -> createCartItem(cart, sku));
+                    .orElse(null);
+            FlashSaleItem flashSaleContext = restorableFlashSaleContexts.get(orderItem.getOrderItemId());
+
+            if (cartItem == null) {
+                cartItem = createCartItem(cart, sku, flashSaleContext);
+            } else {
+                preserveCompatibleFlashSaleContext(cartItem, orderItem, flashSaleContext);
+            }
             cartItem.setQuantity(cartItem.getQuantity() + orderItem.getQuantity());
             cartItemRepository.save(cartItem);
         }
@@ -131,12 +147,61 @@ public class OrderCancellationService {
         return cartRepository.save(cart);
     }
 
-    private CartItem createCartItem(Cart cart, ProductSku sku) {
+    private CartItem createCartItem(Cart cart, ProductSku sku, FlashSaleItem flashSaleContext) {
         CartItem cartItem = new CartItem();
         cartItem.setCart(cart);
         cartItem.setSku(sku);
         cartItem.setQuantity(0);
+        if (flashSaleContext != null) {
+            cartItem.setFlashSaleSlot(flashSaleContext.getSlot());
+            cartItem.setFlashSalePrice(flashSaleContext.getFlashSalePrice());
+        }
         return cartItem;
+    }
+
+    private void preserveCompatibleFlashSaleContext(
+            CartItem cartItem, OrderItem orderItem, FlashSaleItem restoredFlashSaleContext) {
+        if (cartItem.getFlashSaleSlot() == null) {
+            return;
+        }
+
+        Integer existingSlotId = cartItem.getFlashSaleSlot().getSlotId();
+        Integer restoredSlotId = orderItem.getFlashSaleSlot() == null
+                ? null
+                : orderItem.getFlashSaleSlot().getSlotId();
+        if (restoredFlashSaleContext == null) {
+            if (existingSlotId.equals(restoredSlotId)) {
+                cartItem.setFlashSaleSlot(null);
+                cartItem.setFlashSalePrice(null);
+            }
+            return;
+        }
+
+        restoredSlotId = restoredFlashSaleContext.getSlot().getSlotId();
+        if (existingSlotId.equals(restoredSlotId)) {
+            // Giá trong cart phải theo cấu hình Flash Sale hiện hành, không tin snapshot cũ.
+            cartItem.setFlashSalePrice(restoredFlashSaleContext.getFlashSalePrice());
+        }
+    }
+
+    private boolean isFlashSaleContextStillUsable(
+            FlashSaleItem flashSaleItem, int restoredQuantity, LocalDateTime now) {
+        if (flashSaleItem.getSlot() == null
+                || flashSaleItem.getFlashSaleQuantity() == null
+                || flashSaleItem.getSoldQuantity() == null
+                || flashSaleItem.getFlashSalePrice() == null
+                || flashSaleItem.getSlot().getStartDate() == null
+                || flashSaleItem.getSlot().getEndDate() == null) {
+            return false;
+        }
+
+        Short status = flashSaleItem.getSlot().getStatus();
+        boolean usableStatus = status != null && (status == 1 || status == 2);
+        boolean withinTime = !now.isBefore(flashSaleItem.getSlot().getStartDate())
+                && now.isBefore(flashSaleItem.getSlot().getEndDate());
+        int remainingQuantity = flashSaleItem.getFlashSaleQuantity() - flashSaleItem.getSoldQuantity();
+        boolean hasQuota = remainingQuantity >= restoredQuantity;
+        return usableStatus && withinTime && hasQuota;
     }
 
     private void restoreVoucher(Order order) {
