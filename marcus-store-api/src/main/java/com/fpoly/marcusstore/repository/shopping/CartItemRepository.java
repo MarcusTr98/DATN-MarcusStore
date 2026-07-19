@@ -21,4 +21,6 @@ public interface CartItemRepository extends JpaRepository<CartItem, Integer> {
 
     // Marcus thêm
     List<CartItem> findAllById(Iterable<Integer> ids);
+    List<CartItem> findByCart_User_UserIdAndCartItemIdIn(Integer userId, List<Integer> cartItemIds);
+
 }

@@ -12,17 +12,11 @@ import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
-<<<<<<< HEAD
 import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleSlotRepository;
-=======
-import com.fpoly.marcusstore.repository.auth.UserRepository;
-import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
-import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
@@ -39,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -74,11 +69,8 @@ public class CheckoutService {
     private OrderTransactionService orderTransactionService;
     @Autowired
     private FlashSaleItemRepository flashSaleItemRepository;
-<<<<<<< HEAD
     @Autowired
     private FlashSaleSlotRepository flashSaleSlotRepository;
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
     @Transactional(readOnly = true)
     public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -107,19 +99,27 @@ public class CheckoutService {
     @Transactional
     public Order processCheckout(CheckoutRequestDTO req) {
         log.info("📥 [CHECKOUT API] Dữ liệu Frontend gửi lên: Name={}, Phone={}, District={}, Ward={}",
-                req.getRecipientName(), req.getRecipientPhone(), req.getToDistrictId(), req.getToWardCode());
+                req.getRecipientName(), req.getRecipientPhone(), req.getToDistrictId(),
+                req.getToWardCode());
 
         if (req.getToDistrictId() == null || req.getToWardCode() == null || req.getToWardCode().isBlank()) {
-            throw new RuntimeException("Lỗi hệ thống: Dữ liệu Quận/Huyện hoặc Phường/Xã bị trống từ Frontend gửi lên!");
+            throw new RuntimeException(
+                    "Lỗi hệ thống: Dữ liệu Quận/Huyện hoặc Phường/Xã bị trống từ Frontend gửi lên!");
         }
 
         Integer currentUserId = SecurityUtils.getCurrentUserId();
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
 
-        List<CartItem> cartItems = cartItemRepository.findAllById(req.getCartItemIds());
-        if (cartItems.isEmpty()) {
-            throw new RuntimeException("Giỏ hàng rỗng hoặc không tìm thấy sản phẩm hợp lệ.");
+        List<Integer> requestedCartItemIds = req.getCartItemIds();
+        List<CartItem> cartItems = cartItemRepository
+                .findByCart_User_UserIdAndCartItemIdIn(currentUserId, requestedCartItemIds);
+
+        int requestedItemCount = new HashSet<>(requestedCartItemIds).size();
+        if (cartItems.isEmpty() || cartItems.size() != requestedItemCount) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Giỏ hàng chứa sản phẩm không hợp lệ hoặc không thuộc tài khoản hiện tại.");
         }
 
         List<Integer> skuIds = cartItems.stream()
@@ -149,7 +149,8 @@ public class CheckoutService {
         for (CartItem cartItem : cartItems) {
             ProductSku sku = skuMap.get(cartItem.getSku().getSkuId());
             if (sku == null || !sku.getIsActive()) {
-                throw new RuntimeException("Sản phẩm " + cartItem.getSku().getSkuCode() + " không còn tồn tại.");
+                throw new RuntimeException(
+                        "Sản phẩm " + cartItem.getSku().getSkuCode() + " không còn tồn tại.");
             }
 
             int buyQuantity = cartItem.getQuantity();
@@ -163,8 +164,8 @@ public class CheckoutService {
                 // VALIDATE SLOT: chặn đặt hàng khi admin đã hủy Flash Sale (status=4)
                 // hoặc slot đã kết thúc/hết hạn (status=3) hoặc ngoài khung giờ.
                 // Tầng bảo vệ quan trọng nhất — bắt buộc phải có vì:
-                //   1. User có thể bypass UI modal (DevTools, refresh nhanh, gọi thẳng API).
-                //   2. Cart có thể chứa SP FS từ slot đã bị admin hủy SAU khi user thêm vào giỏ.
+                // 1. User có thể bypass UI modal (DevTools, refresh nhanh, gọi thẳng API).
+                // 2. Cart có thể chứa SP FS từ slot đã bị admin hủy SAU khi user thêm vào giỏ.
                 // Nếu vi phạm → throw 409 CONFLICT với mã lỗi FS_CANCELLED để FE nhận biết.
                 FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
                         .orElseThrow(() -> new ResponseStatusException(
@@ -223,7 +224,8 @@ public class CheckoutService {
                         .findForUpdate(slotId, skuId)
                         .orElseThrow(() -> new ResponseStatusException(
                                 HttpStatus.CONFLICT,
-                                "FLASH_SALE_CANCELLED|Flash Sale cho sản phẩm " + sku.getSkuCode()
+                                "FLASH_SALE_CANCELLED|Flash Sale cho sản phẩm "
+                                        + sku.getSkuCode()
                                         + " không còn khả dụng (có thể đã bị admin hủy)."));
 
                 int remaining = fsi.getFlashSaleQuantity() - fsi.getSoldQuantity();
@@ -244,7 +246,8 @@ public class CheckoutService {
 
             if (currentStock < buyQuantity) {
                 throw new RuntimeException(
-                        "Sản phẩm " + sku.getSkuCode() + " không đủ số lượng. Tồn kho: " + currentStock);
+                        "Sản phẩm " + sku.getSkuCode() + " không đủ số lượng. Tồn kho: "
+                                + currentStock);
             }
 
             sku.setStockQuantity(currentStock - buyQuantity);
@@ -311,8 +314,10 @@ public class CheckoutService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, fullReason);
             }
 
-            discountAmount = result.getDiscountAmount() != null ? result.getDiscountAmount() : BigDecimal.ZERO;
-            freeshipAmount = result.getFreeshipAmount() != null ? result.getFreeshipAmount() : BigDecimal.ZERO;
+            discountAmount = result.getDiscountAmount() != null ? result.getDiscountAmount()
+                    : BigDecimal.ZERO;
+            freeshipAmount = result.getFreeshipAmount() != null ? result.getFreeshipAmount()
+                    : BigDecimal.ZERO;
             appliedVoucherId = result.getVoucherId();
             voucher = voucherRepository.findById(appliedVoucherId).orElse(null);
             order.setVoucher(voucher);
@@ -334,24 +339,10 @@ public class CheckoutService {
 
         Order savedOrder = orderRepository.save(order);
 
-<<<<<<< HEAD
-        // (Đã cập nhật soldQuantity cho Flash Sale ngay trong vòng lặp kiểm tra cart phía trên
-        //  để tránh vượt quá flashSaleQuantity và nổ CHECK constraint CK_FlashSaleItems_Qty)
-=======
-        // Cập nhật soldQuantity cho Flash Sale (chỉ khi thanh toán thành công)
-        for (CartItem cartItem : cartItems) {
-            if (cartItem.getFlashSaleSlot() != null) {
-                flashSaleItemRepository.findItemsBySlotIdWithSlot(cartItem.getFlashSaleSlot().getSlotId())
-                        .stream()
-                        .filter(item -> item.getId().getSkuId().equals(cartItem.getSku().getSkuId()))
-                        .findFirst()
-                        .ifPresent(fsi -> {
-                            fsi.setSoldQuantity(fsi.getSoldQuantity() + cartItem.getQuantity());
-                            flashSaleItemRepository.save(fsi);
-                        });
-            }
-        }
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
+        // (Đã cập nhật soldQuantity cho Flash Sale ngay trong vòng lặp kiểm tra cart
+        // phía trên
+        // để tránh vượt quá flashSaleQuantity và nổ CHECK constraint
+        // CK_FlashSaleItems_Qty)
 
         String transactionType = "COD".equalsIgnoreCase(savedOrder.getPaymentMethod())
                 ? "COD_COLLECTION"
@@ -385,10 +376,13 @@ public class CheckoutService {
 
         try {
             String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
-            java.text.NumberFormat formatVN = java.text.NumberFormat.getInstance(new java.util.Locale("vi", "VN"));
-            String notifMessage = "Khách hàng " + savedOrder.getRecipientName() + " vừa đặt một đơn hàng trị giá "
+            java.text.NumberFormat formatVN = java.text.NumberFormat
+                    .getInstance(new java.util.Locale("vi", "VN"));
+            String notifMessage = "Khách hàng " + savedOrder.getRecipientName()
+                    + " vừa đặt một đơn hàng trị giá "
                     + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
-            notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage, savedOrder.getOrderCode());
+            notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage,
+                    savedOrder.getOrderCode());
         } catch (Exception e) {
             log.error("[Cảnh báo] Lỗi khi bắn thông báo WebSocket", e);
         }

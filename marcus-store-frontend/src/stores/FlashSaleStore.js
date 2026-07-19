@@ -1,17 +1,13 @@
 // Pinia store cho Flash Sale - cả Admin và Client dùng chung.
 // Admin CRUD: fetchSlots / fetchOneSlot / addSlot / updateSlot / deleteSlotById / toggleSlotStatus
 // Admin khác: fetchCascade / fetchOverlap
-<<<<<<< HEAD
 // Client storefront: fetchClientSlots + getter displaySlots
-=======
-// Client storefront: fetchClientSlots + getter primarySlot / displaySlots
->>>>>>> f87a0fb (dang lam do giao dien flashsale client)
 
 import { defineStore } from 'pinia'
 import flashSaleApi from '@/api/FlashSaleApi.js'
 
 
- // map data từ BE sang FE
+// map data từ BE sang FE
 
 function formatHm(iso) {
   if (!iso) return ''
@@ -86,22 +82,15 @@ function mapClientSlot(slot) {
     startDate: slot.startDate || null,
     endDate: slot.endDate || null,
     status: Number(slot.status ?? 0),
-<<<<<<< HEAD
     // Flag cho biết slot đã bị admin hủy. BE trả kèm slot CANCELLED trong cùng response
     // để FE có thể hiển thị modal thông báo khi khách tương tác với sản phẩm thuộc slot này.
     isCancelled: slot.isCancelled === true,
-=======
->>>>>>> f87a0fb (dang lam do giao dien flashsale client)
     items: items.map((it) => ({
       skuId: it.skuId,
       productId: it.productId,
       productName: it.productName,
       skuCode: it.skuCode,
-<<<<<<< HEAD
       thumbnailUrl: resolveImageUrl(it.thumbnailUrl),
-=======
-      skuImageUrl: resolveImageUrl(it.skuImageUrl),
->>>>>>> f87a0fb (dang lam do giao dien flashsale client)
       originalPrice: Number(it.originalPrice ?? 0),
       flashSalePrice: Number(it.flashSalePrice ?? 0),
       flashSaleQuantity: Number(it.flashSaleQuantity ?? 0),
@@ -111,10 +100,10 @@ function mapClientSlot(slot) {
       discountPercent:
         Number(it.originalPrice) > 0
           ? Math.floor(
-              ((Number(it.originalPrice) - Number(it.flashSalePrice)) /
-                Number(it.originalPrice)) *
-                100,
-            )
+            ((Number(it.originalPrice) - Number(it.flashSalePrice)) /
+              Number(it.originalPrice)) *
+            100,
+          )
           : 0,
     })),
   }
@@ -213,29 +202,6 @@ export const useFlashSaleStore = defineStore('flashSale', {
   }),
 
   getters: {
-<<<<<<< HEAD
-=======
-    // Slot featured cho trang chủ: ACTIVE đầu tiên (BE đã sort ACTIVE trước theo startDate ASC).
-    // Fallback về slot đầu tiên nếu không có ACTIVE (ví dụ chỉ có SCHEDULED).
-    featuredSlot(state) {
-      if (!Array.isArray(state.clientSlots) || state.clientSlots.length === 0) return null
-      return (
-        state.clientSlots.find((s) => Number(s.status) === 2) ||
-        state.clientSlots[0] ||
-        null
-      )
-    },
-    // Slot ưu tiên cho countdown: ưu tiên ACTIVE trước, rồi SCHEDULED.
-    // Tương đương featuredSlot nhưng semantic rõ ràng cho bộ đếm ngược.
-    primarySlot(state) {
-      if (!Array.isArray(state.clientSlots) || state.clientSlots.length === 0) return null
-      return (
-        state.clientSlots.find((s) => Number(s.status) === 2) ||
-        state.clientSlots.find((s) => Number(s.status) === 1) ||
-        null
-      )
-    },
->>>>>>> f87a0fb (dang lam do giao dien flashsale client)
     // Chuẩn bị dữ liệu cho thanh timeline trên FlashSalePage.vue.
     // Trả về tối đa 4 entry: slot đang diễn ra (live) + các slot sắp diễn ra tiếp theo.
     displaySlots(state) {
@@ -291,7 +257,6 @@ export const useFlashSaleStore = defineStore('flashSale', {
         liveSubLabel,
       }
     },
-<<<<<<< HEAD
     // Kiểm tra 1 slotId cụ thể đã bị admin hủy chưa.
     // FE dùng để chặn click "Mua ngay" / "Thêm giỏ" khi slot CANCELLED.
     isSlotCancelled: (state) => (slotId) => {
@@ -323,8 +288,6 @@ export const useFlashSaleStore = defineStore('flashSale', {
       if (endMs && now >= endMs) return false
       return true
     },
-=======
->>>>>>> f87a0fb (dang lam do giao dien flashsale client)
   },
 
   actions: {
@@ -506,10 +469,6 @@ export const useFlashSaleStore = defineStore('flashSale', {
       }
     },
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     async restoreFlashSale(slotId) {
       try {
         this.loading = true
@@ -536,13 +495,8 @@ export const useFlashSaleStore = defineStore('flashSale', {
       }
     },
 
-<<<<<<< HEAD
-=======
->>>>>>> f87a0fb (dang lam do giao dien flashsale client)
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 
-     // Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
+    // Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
 
     async fetchCascade({ includeOutOfStock = false } = {}) {
       this.cascadeLoading = true
@@ -584,7 +538,7 @@ export const useFlashSaleStore = defineStore('flashSale', {
 
     // === Client side (public storefront) ===
 
-     // Tải danh sách slot ACTIVE + SCHEDULED còn hiệu lực cho trang client.
+    // Tải danh sách slot ACTIVE + SCHEDULED còn hiệu lực cho trang client.
 
 
     async fetchClientSlots(limit = 20) {
@@ -599,18 +553,6 @@ export const useFlashSaleStore = defineStore('flashSale', {
           ? raw.map(mapClientSlot).filter(Boolean)
           : []
         this.clientSlots = list
-<<<<<<< HEAD
-=======
-        if (list.length > 0) {
-          const firstItem = list[0]?.items?.[0]
-          console.log(
-            `[FlashSaleStore] fetchClientSlots: ${list.length} slot(s). Featured items: ${list[0]?.items?.length || 0}. First item image URL =`,
-            firstItem?.skuImageUrl || '(empty)',
-          )
-        } else {
-          console.warn('[FlashSaleStore] fetchClientSlots: 0 slot(s) returned')
-        }
->>>>>>> f87a0fb (dang lam do giao dien flashsale client)
         return this.clientSlots
       } catch (error) {
         console.error('[FlashSaleStore] lỗi fetchClientSlots:', error)
