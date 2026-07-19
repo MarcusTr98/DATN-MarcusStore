@@ -2,7 +2,9 @@ package com.fpoly.marcusstore.repository.shopping;
 
 import com.fpoly.marcusstore.entity.shopping.OrderTransaction;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
@@ -18,5 +20,23 @@ public interface OrderTransactionRepository extends JpaRepository<OrderTransacti
 
     boolean existsByOrder_OrderIdAndTypeAndStatus(Integer orderId, String type, String status);
 
-    boolean existsByOrder_OrderIdAndType(Integer orderId, String type);
+    @Modifying
+    @Query(value = """
+            INSERT INTO Order_Transactions
+                (order_id, amount, type, status, note, created_at, is_reconciled, idempotency_key)
+            SELECT
+                :orderId, :amount, :type, :status, :note, GETDATE(), 0, :idempotencyKey
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM Order_Transactions WITH (UPDLOCK, HOLDLOCK)
+                WHERE idempotency_key = :idempotencyKey
+            )
+            """, nativeQuery = true)
+    int insertIfAbsent(
+            @Param("orderId") Integer orderId,
+            @Param("amount") java.math.BigDecimal amount,
+            @Param("type") String type,
+            @Param("status") String status,
+            @Param("note") String note,
+            @Param("idempotencyKey") String idempotencyKey);
 }

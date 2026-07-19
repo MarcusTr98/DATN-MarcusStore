@@ -11,64 +11,75 @@ import java.math.BigDecimal;
 @Service
 @RequiredArgsConstructor
 public class OrderTransactionService {
-        private final OrderTransactionRepository transactionRepository;
+    private static final String IDEMPOTENCY_KEY_PREFIX = "ORDER";
 
-        @Transactional
-        public void recordTransaction(Order order, BigDecimal amount, String type, String status, String note) {
-                OrderTransaction trans = OrderTransaction.builder()
-                                .order(order)
-                                .amount(amount)
-                                .type(type)
-                                .status(status)
-                                .note(note)
-                                .isReconciled(false)
-                                .build();
-                transactionRepository.save(trans);
+    private final OrderTransactionRepository transactionRepository;
+
+    @Transactional
+    public void recordTransaction(Order order, BigDecimal amount, String type, String status, String note) {
+        insertIfAbsent(order, amount, type, status, note);
+    }
+
+    @Transactional
+    public void markVnPayPaymentSuccess(Order order, String providerTransactionId, String responseCode) {
+        markPendingTransactionSuccess(
+                order,
+                "VNPAY_PAYMENT",
+                "VNPAY xác nhận thành công. TransactionNo: "
+                        + providerTransactionId + ", ResponseCode: " + responseCode);
+    }
+
+    @Transactional
+    public void markPendingTransactionSuccess(Order order, String type, String note) {
+        OrderTransaction transaction = transactionRepository
+                .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
+                        order.getOrderId(), type, "PENDING")
+                .orElse(null);
+
+        if (transaction == null && transactionRepository
+                .existsByOrder_OrderIdAndTypeAndStatus(order.getOrderId(), type, "SUCCESS")) {
+            return;
         }
 
-        @Transactional
-        public void markVnPayPaymentSuccess(Order order, String providerTransactionId, String responseCode) {
-                markPendingTransactionSuccess(
-                                order,
-                                "VNPAY_PAYMENT",
-                                "VNPAY xác nhận thành công. TransactionNo: "
-                                                + providerTransactionId + ", ResponseCode: " + responseCode);
+        if (transaction == null) {
+            insertIfAbsent(order, order.getFinalAmount(), type, "PENDING", note);
+            transaction = transactionRepository
+                    .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
+                            order.getOrderId(), type, "PENDING")
+                    .orElse(null);
         }
 
-        @Transactional
-        public void markPendingTransactionSuccess(Order order, String type, String note) {
-                OrderTransaction transaction = transactionRepository
-                                .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
-                                                order.getOrderId(), type, "PENDING")
-                                .orElse(null);
-
-                if (transaction == null && transactionRepository
-                                .existsByOrder_OrderIdAndTypeAndStatus(order.getOrderId(), type, "SUCCESS")) {
-                        return;
-                }
-
-                if (transaction == null) {
-                        transaction = OrderTransaction.builder()
-                                        .order(order)
-                                        .amount(order.getFinalAmount())
-                                        .type(type)
-                                        .status("PENDING")
-                                        .isReconciled(false)
-                                        .build();
-                }
-
-                transaction.setAmount(order.getFinalAmount());
-                transaction.setStatus("SUCCESS");
-                transaction.setNote(note);
-                transactionRepository.save(transaction);
+        // Một callback đồng thời khác có thể đã chốt transaction trước khi query lại.
+        if (transaction == null) {
+            return;
         }
 
-        @Transactional
-        public void recordPendingTransactionIfAbsent(
-                        Order order, BigDecimal amount, String type, String note) {
-                if (transactionRepository.existsByOrder_OrderIdAndType(order.getOrderId(), type)) {
-                        return;
-                }
-                recordTransaction(order, amount, type, "PENDING", note);
+        transaction.setAmount(order.getFinalAmount());
+        transaction.setStatus("SUCCESS");
+        transaction.setNote(note);
+        transactionRepository.save(transaction);
+    }
+
+    @Transactional
+    public void recordPendingTransactionIfAbsent(
+            Order order, BigDecimal amount, String type, String note) {
+        insertIfAbsent(order, amount, type, "PENDING", note);
+    }
+
+    private boolean insertIfAbsent(
+            Order order, BigDecimal amount, String type, String status, String note) {
+        if (order == null || order.getOrderId() == null) {
+            throw new IllegalArgumentException("Đơn hàng phải được lưu trước khi tạo transaction");
         }
+        String idempotencyKey = buildIdempotencyKey(order.getOrderId(), type);
+        return transactionRepository.insertIfAbsent(
+                order.getOrderId(), amount, type, status, note, idempotencyKey) == 1;
+    }
+
+    private String buildIdempotencyKey(Integer orderId, String type) {
+        if (type == null || type.isBlank()) {
+            throw new IllegalArgumentException("Loại transaction không được để trống");
+        }
+        return IDEMPOTENCY_KEY_PREFIX + ":" + orderId + ":" + type.trim().toUpperCase();
+    }
 }

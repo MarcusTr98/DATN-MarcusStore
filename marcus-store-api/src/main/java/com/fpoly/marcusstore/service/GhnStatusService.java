@@ -21,14 +21,33 @@ public class GhnStatusService {
         UPDATED, NO_CHANGE, INVALID_TRANSITION, UNSUPPORTED_STATUS, ORDER_NOT_FOUND
     }
 
-    private static final Map<String, String> GHN_STATUS_MAP = Map.of(
-            "picking", "SHIPPING",
-            "picked", "SHIPPING",
-            "delivering", "SHIPPING",
-            "delivered", "DELIVERED",
-            "delivery_fail", "FAILED",
-            "return", "FAILED",
-            "cancel", "CANCELLED");
+    private static final Map<String, String> GHN_STATUS_MAP = Map.ofEntries(
+            Map.entry("picking", "SHIPPING"),
+            Map.entry("picked", "SHIPPING"),
+            Map.entry("storing", "SHIPPING"),
+            Map.entry("transporting", "SHIPPING"),
+            Map.entry("sorting", "SHIPPING"),
+            Map.entry("delivering", "SHIPPING"),
+            Map.entry("money_collect_delivering", "SHIPPING"),
+            Map.entry("delivered", "DELIVERED"),
+
+            // Các trạng thái này chưa kết thúc vòng đời vận chuyển: đơn vẫn có thể
+            // được giao lại hoặc hàng vẫn đang trên đường hoàn về shop.
+            Map.entry("delivery_fail", "FAILED"),
+            Map.entry("waiting_to_return", "FAILED"),
+            Map.entry("return", "FAILED"),
+            Map.entry("return_transporting", "FAILED"),
+            Map.entry("return_sorting", "FAILED"),
+            Map.entry("returning", "FAILED"),
+            Map.entry("return_fail", "FAILED"),
+            Map.entry("exception", "FAILED"),
+            Map.entry("damage", "FAILED"),
+            Map.entry("lost", "FAILED"),
+
+            // Chỉ hủy và mở yêu cầu hoàn tiền khi GHN xác nhận vận đơn đã hủy
+            // hoặc hàng đã thực sự được trả về người gửi.
+            Map.entry("cancel", "CANCELLED"),
+            Map.entry("returned", "CANCELLED"));
 
     private static final Map<String, Set<String>> ALLOWED_CURRENT_STATUSES = Map.of(
             "SHIPPING", Set.of("PACKED", "SHIPPING", "FAILED"),
@@ -96,7 +115,7 @@ public class GhnStatusService {
             return;
         }
 
-        if (("FAILED".equals(newStatus) || "CANCELLED".equals(newStatus))
+        if ("CANCELLED".equals(newStatus)
                 && "VNPAY".equalsIgnoreCase(order.getPaymentMethod())
                 && "PAID".equalsIgnoreCase(order.getPaymentStatus())) {
             transactionService.recordPendingTransactionIfAbsent(

@@ -50,6 +50,10 @@ public class OrderTransaction {
     }
 
     @Column(name = "is_reconciled", nullable = false)
+    @Builder.Default
     private Boolean isReconciled = false; // mặc định là chưa đối soát
+
+    @Column(name = "idempotency_key", length = 150)
+    private String idempotencyKey;
 
 }

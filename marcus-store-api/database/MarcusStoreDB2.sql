@@ -612,6 +612,7 @@ CREATE TABLE Order_Transactions (
     CONSTRAINT FK_OrderTrans_Orders FOREIGN KEY (order_id) REFERENCES Orders(order_id) ON DELETE CASCADE
 );
 ALTER TABLE Order_Transactions ADD is_reconciled BIT DEFAULT 0 NOT NULL;
+ALTER TABLE Order_Transactions ADD idempotency_key VARCHAR(150) NULL;
 
 -- Ngọc thêm 1/7 bảng user_Permission
 CREATE TABLE User_Permissions(
