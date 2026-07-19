@@ -51,6 +51,8 @@ vnpay.tmnCode=35MNCPPT
 vnpay.hashSecret=PL1CWRM8WRSLHCA0LCIOECIR08Z87TBV
 vnpay.payUrl=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 vnpay.returnUrl=http://localhost:5173/order-success
+vnpay.refundUrl=https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
+vnpay.refundIpAddr=127.0.0.1
 
 # CẤU HÌNH CLOUDINARY
 cloudinary.cloud-name=dyeb3lju6

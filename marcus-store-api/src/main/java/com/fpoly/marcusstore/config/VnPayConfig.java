@@ -23,6 +23,12 @@ public class VnPayConfig {
     @Value("${vnpay.returnUrl}")
     private String returnUrl;
 
+    @Value("${vnpay.refundUrl:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}")
+    private String refundUrl;
+
+    @Value("${vnpay.refundIpAddr:127.0.0.1}")
+    private String refundIpAddr;
+
     public String getTmnCode() {
         return tmnCode;
     }
@@ -37,6 +43,14 @@ public class VnPayConfig {
 
     public String getReturnUrl() {
         return returnUrl;
+    }
+
+    public String getRefundUrl() {
+        return refundUrl;
+    }
+
+    public String getRefundIpAddr() {
+        return refundIpAddr;
     }
 
     // mã hóa chữ ký

@@ -58,6 +58,16 @@ public class OrderTransactionService {
     }
 
     @Transactional
+    public void recordVnPayPaymentRequestDate(Order order, String transactionDate) {
+        OrderTransaction transaction = findOrCreateVnPayTransaction(
+                order, "Khởi tạo giao dịch chờ thanh toán VNPAY");
+        if (transaction != null && transaction.getProviderTransactionDate() == null) {
+            transaction.setProviderTransactionDate(transactionDate);
+            transactionRepository.save(transaction);
+        }
+    }
+
+    @Transactional
     public void markPendingTransactionSuccess(Order order, String type, String note) {
         OrderTransaction transaction = transactionRepository
                 .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(

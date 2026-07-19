@@ -54,13 +54,7 @@
                     ><i class="fa-solid fa-circle-check"></i>Trạng thái TT</span
                   >
                   <strong class="meta-value">
-                    {{
-                      selectedOrder.paymentStatus === 'PAID'
-                        ? 'Đã thanh toán'
-                        : selectedOrder.paymentStatus === 'UNPAID'
-                          ? 'Chưa thanh toán'
-                          : '---'
-                    }}
+                    {{ getPaymentStatusLabel(selectedOrder.paymentStatus) }}
                   </strong>
                 </div>
                 <div class="meta-item">
@@ -106,6 +100,28 @@
                 </div>
               </div>
             </div>
+
+            <!-- Marcus thêm thẻ theo dõi refund cho khách, không hiển thị dữ liệu kỹ thuật VNPAY. -->
+            <section v-if="refund" class="refund-tracking-card">
+              <div class="refund-icon"><i class="fa-solid fa-rotate-left"></i></div>
+              <div class="refund-content">
+                <div class="refund-heading">
+                  <div>
+                    <h3>Thông tin hoàn tiền</h3>
+                    <p>{{ refundStatusConfig[refund.status]?.description }}</p>
+                  </div>
+                  <span class="refund-pill" :class="refundStatusConfig[refund.status]?.className">
+                    {{ refundStatusConfig[refund.status]?.label || refund.status }}
+                  </span>
+                </div>
+                <div class="refund-values">
+                  <div><span>Số tiền hoàn</span><strong>{{ formatMoney(refund.amount) }}</strong></div>
+                  <div><span>Phí vận chuyển giữ lại</span><strong>{{ formatMoney(refund.shippingDeducted) }}</strong></div>
+                  <div><span>Ngày yêu cầu</span><strong>{{ formatDateTime(refund.createdAt) }}</strong></div>
+                </div>
+                <p class="refund-reason"><strong>Lý do:</strong> {{ refund.reason }}</p>
+              </div>
+            </section>
 
             <div class="detail-grid">
               <div class="inner-stack">
@@ -401,6 +417,8 @@ import UserOrderApi from '@/api/userOrder.js'
 import '@/assets/css/OrderDetailView.css'
 
 const selectedOrder = ref(null)
+// Marcus thêm state refund tách khỏi chi tiết đơn để không ảnh hưởng API cũ của thành viên.
+const refund = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const route = useRoute()
@@ -414,6 +432,14 @@ async function fetchOrderDetail() {
     const response = await UserOrderApi.userOrderDetail(orderCode)
 
     selectedOrder.value = response.data
+    // Marcus sửa: lỗi tải refund không được làm mất toàn bộ trang chi tiết đơn.
+    try {
+      const refundResponse = await UserOrderApi.userRefund(orderCode)
+      refund.value = refundResponse.status === 204 ? null : refundResponse.data
+    } catch (refundError) {
+      refund.value = null
+      console.error(refundError)
+    }
   } catch (e) {
     error.value = 'Không thể lấy chi tiết đơn hàng'
     console.error(e)
@@ -426,10 +452,30 @@ onMounted(fetchOrderDetail)
 
 const USER_CANCELLABLE_STATUSES = ['PENDING', 'PROCESSING', 'PACKED']
 
+// Marcus thêm nội dung thân thiện với khách thay cho response code kỹ thuật của VNPAY.
+const refundStatusConfig = {
+  PENDING_APPROVAL: { label: 'Đang chờ duyệt', className: 'pending', description: 'MarcusStore đã tiếp nhận yêu cầu và đang kiểm tra.' },
+  PROCESSING: { label: 'Đang xử lý', className: 'processing', description: 'Yêu cầu đã được gửi sang VNPAY để xử lý.' },
+  RETRY_PENDING: { label: 'Đang xử lý lại', className: 'processing', description: 'Hệ thống đang tự động xử lý lại yêu cầu.' },
+  SUCCESS: { label: 'Đã hoàn tiền', className: 'success', description: 'VNPAY đã xác nhận hoàn tiền thành công.' },
+  FAILED: { label: 'Cần hỗ trợ', className: 'failed', description: 'Yêu cầu chưa thành công, MarcusStore sẽ tiếp tục kiểm tra.' },
+}
+
+// Marcus sửa nhãn thanh toán để client không còn hiển thị "---" khi đang refund.
+const getPaymentStatusLabel = (status) => ({
+  PAID: 'Đã thanh toán',
+  UNPAID: 'Chưa thanh toán',
+  FAILED: 'Thanh toán thất bại',
+  REFUND_PENDING: 'Đang hoàn tiền',
+  REFUND_FAILED: 'Hoàn tiền cần hỗ trợ',
+  REFUNDED: 'Đã hoàn tiền',
+}[status] || status || '---')
+
 const canCancelOrder = computed(() => {
   const order = selectedOrder.value
   if (!order) return false
-  if ((order.paymentMethod || '').toUpperCase() !== 'COD') return false
+  // Marcus sửa: khách được hủy cả COD và VNPAY khi đơn chưa bước vào giao hàng.
+  if (!['COD', 'VNPAY'].includes((order.paymentMethod || '').toUpperCase())) return false
   const status = (order.orderStatus || '').toUpperCase()
   return USER_CANCELLABLE_STATUSES.includes(status)
 })
@@ -748,4 +794,20 @@ function getVariantText(item) {
   font-weight: 600;
   margin-left: 4px;
 }
+
+/* Marcus thêm giao diện theo dõi refund cho client. */
+.refund-tracking-card { display:flex; gap:16px; padding:20px; border:1px solid #fde68a; border-radius:14px; background:#fffbeb; }
+.refund-icon { width:44px; height:44px; flex:0 0 44px; display:grid; place-items:center; border-radius:50%; background:#fef3c7; color:#d97706; }
+.refund-content { flex:1; min-width:0; }
+.refund-heading { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.refund-heading h3 { margin:0 0 4px; font-size:18px; }
+.refund-heading p, .refund-reason { margin:0; color:#6b7280; }
+.refund-pill { padding:6px 10px; border-radius:999px; white-space:nowrap; font-size:12px; font-weight:700; background:#e5e7eb; }
+.refund-pill.pending, .refund-pill.processing { color:#92400e; background:#fef3c7; }
+.refund-pill.success { color:#166534; background:#dcfce7; }
+.refund-pill.failed { color:#991b1b; background:#fee2e2; }
+.refund-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:16px 0; }
+.refund-values div { padding:12px; border-radius:10px; background:#fff; }
+.refund-values span { display:block; margin-bottom:4px; color:#6b7280; font-size:12px; }
+@media (max-width: 768px) { .refund-heading { flex-direction:column; } .refund-values { grid-template-columns:1fr; } }
 </style>
