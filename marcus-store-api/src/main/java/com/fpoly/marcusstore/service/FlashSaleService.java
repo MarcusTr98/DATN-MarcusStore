@@ -30,21 +30,14 @@ public interface FlashSaleService {
     // hoặc hủy chiến dịch đang diễn ra (status 2 -> 4).
     // hoặc các thao tác đổi status nhanh khác. Trả về slot sau khi cập nhật.
     FlashSaleResponse updateFlashSaleStatus(Integer slotId, Short status);
-<<<<<<< HEAD
-=======
 
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     // Khôi phục flash sale đã bị hủy (CANCELLED -> ACTIVE).
     // Điều kiện:
     //   1. Thời gian: now < (endDate - 1 tiếng)
     //   2. Không trùng khung giờ với slot ACTIVE/SCHEDULED khác trong khoảng [now, endDate]
     // Trả về slot sau khi khôi phục (status = ACTIVE).
     FlashSaleResponse restoreFlashSale(Integer slotId);
-<<<<<<< HEAD
-=======
 
-
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     // Scheduled: auto-update status theo thời gian + khoá tổng SP khi hết hạn
     void autoUpdateFlashSaleStatuses();
 

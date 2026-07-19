@@ -16,17 +16,11 @@
     </section>
 
     <!-- Hero Banner Section -->
-<<<<<<< HEAD
     <section class="flash-hero" :class="{ 'has-banner': showBanner }">
       <!-- Banner image làm background khi có.
            Guard: chỉ hiện khi activeSlot còn valid (ACTIVE/SCHEDULED + còn thời gian).
            Nếu admin vừa hủy slot → showBanner=false → banner được ẩn hoàn toàn. -->
       <div v-if="showBanner" class="hero-banner-bg">
-=======
-    <section class="flash-hero" :class="{ 'has-banner': activeSlot?.bannerImageUrl }">
-      <!-- Banner image làm background khi có -->
-      <div v-if="activeSlot?.bannerImageUrl" class="hero-banner-bg">
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
         <img :src="activeSlot.bannerImageUrl" alt="Flash Sale Banner" />
         <div class="hero-banner-overlay"></div>
       </div>
@@ -354,7 +348,6 @@
         </div>
       </Transition>
     </Teleport>
-<<<<<<< HEAD
 
     <!-- Modal thông báo Flash Sale đã bị admin hủy -->
     <CancelledFlashSaleModal
@@ -370,39 +363,26 @@
       :message="loginRequiredMessage"
       @close="showLoginRequiredModal = false; suppressErrorToast = false"
     />
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
   </div>
 </template>
 
 <script setup>
-<<<<<<< HEAD
 import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
-=======
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 import { useFlashSaleCountdown } from '@/composables/useFlashSaleCountdown'
 import { useCartStore } from '@/stores/cartStore'
-<<<<<<< HEAD
 import { useFlashSaleModals } from '@/composables/useFlashSaleModals'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 import { expandVariantColorNames } from '@/utils/colorUtils'
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 import '@/assets/css/FlashSalePage.css'
 
 const router = useRouter()
 const flashSaleStore = useFlashSaleStore()
 const cartStore = useCartStore()
-<<<<<<< HEAD
 const { clientSlots, displaySlots, bannerStats } = storeToRefs(flashSaleStore)
-=======
-const { clientSlots, clientLoading, displaySlots, bannerStats } = storeToRefs(flashSaleStore)
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 const stats = computed(() => bannerStats.value || {})
 
 // ==== Modal state — dùng chung composable với HomeFlashSale.vue ====
@@ -504,11 +484,7 @@ function buildRawItem(item, idx) {
     slug: item.skuCode || `flash-sale-${item.skuId ?? idx}`,
     spec: item.skuCode ? `Mã: ${item.skuCode}` : 'Sản phẩm chính hãng',
     emoji: '🛍️',
-<<<<<<< HEAD
     image: item.thumbnailUrl || null,
-=======
-    image: item.skuImageUrl || null,
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     price: Number(item.flashSalePrice ?? item.originalPrice ?? 0),
     originalPrice: Number(item.originalPrice ?? item.flashSalePrice ?? 0),
     discount: item.discountPercent ?? 0,
@@ -516,10 +492,6 @@ function buildRawItem(item, idx) {
     left: remaining,
     variants: deriveVariantsFromSku(item.skuCode),
     promos: derivePromoTags(item),
-<<<<<<< HEAD
-=======
-    // Thêm thông tin slot để gửi khi thêm vào giỏ
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     slotId: item._slotId || null,
     slotName: item._slotName || null,
   }
@@ -549,12 +521,7 @@ const rawFlashSaleItems = computed(() => {
   for (const slot of clientSlots.value) {
     if (Array.isArray(slot.items)) {
       for (const it of slot.items) {
-<<<<<<< HEAD
         allItems.push({ ...it, _slotId: slot.slotId, _slotName: slot.name })
-=======
-        // Thêm slotId vào mỗi item để biết nó thuộc slot nào
-        allItems.push({ ...it, _slotId: slot.slotId })
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
       }
     }
   }
@@ -565,7 +532,6 @@ const rawFlashSaleItems = computed(() => {
 const currentPage = ref(1)
 const pageSize = 12
 
-<<<<<<< HEAD
 const totalProducts = computed(() => rawFlashSaleItems.value.length)
 const totalPages = computed(() => Math.ceil(totalProducts.value / pageSize) || 1)
 
@@ -588,44 +554,6 @@ function goToPage(page) {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
   window.scrollTo({ top: 0, behavior: 'smooth' })
-=======
-// ==== Toast ====
-const toast = reactive({
-  show: false,
-  type: 'warning',
-  title: '',
-  message: '',
-})
-let toastTimer = null
-function showToast({ type = 'warning', title, message }) {
-  clearTimeout(toastTimer)
-  toast.type = type
-  toast.title = title
-  toast.message = message
-  toast.show = true
-  toastTimer = setTimeout(() => {
-    toast.show = false
-  }, 2800)
-}
-
-// ==== Điều hướng sản phẩm ====
-// Chỉ cho phép click khi có slot ACTIVE (status=2); nếu không thì chặn + hiển thị toast.
-const isFlashSaleActive = computed(() => {
-  if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return false
-  return clientSlots.value.some((s) => Number(s.status) === 2)
-})
-
-const goToProduct = (product) => {
-  if (!isFlashSaleActive.value) {
-    showToast({
-      type: 'warning',
-      title: 'Oops!',
-      message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
-    })
-    return
-  }
-  router.push(`/product/${product.slug}`)
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 
 // Hiển thị tối đa 5 nút trang, có "..." nếu cần
@@ -837,7 +765,6 @@ function prepareCheckoutSelection(cartItem, product, ownSlot) {
   localStorage.setItem('selectedSubtotal', String(item.totalPrice))
 }
 
-<<<<<<< HEAD
 const buyNow = async (product) => {
   if (product.addingToCart) return
   product.addingToCart = true
@@ -965,40 +892,10 @@ const addToCart = async (product) => {
         type: 'warning',
         title: 'Oops!',
         message: 'Sản phẩm này không nằm trong Flash Sale đang diễn ra',
-=======
-// Thêm vào giỏ hàng - kết nối API thật với Flash Sale
-const addToCart = async (product) => {
-  if (product.addingToCart) return
-  product.addingToCart = true
-  
-  try {
-    // Kiểm tra xem Flash Sale có đang active không
-    if (!isFlashSaleActive.value) {
-      showToast({
-        type: 'warning',
-        title: 'Oops!',
-        message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
       })
       return
     }
 
-<<<<<<< HEAD
-=======
-    // Tìm slot đang active để lấy slotId
-    const activeSlot = clientSlots.value.find(s => Number(s.status) === 2)
-    
-    if (!activeSlot || !product.slotId) {
-      showToast({
-        type: 'error',
-        title: 'Lỗi!',
-        message: 'Không tìm thấy thông tin Flash Sale',
-      })
-      return
-    }
-
-    // Kiểm tra số lượng còn lại
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     if (product.left <= 0) {
       showToast({
         type: 'error',
@@ -1008,7 +905,6 @@ const addToCart = async (product) => {
       return
     }
 
-<<<<<<< HEAD
     const success = await cartStore.addToCartWithFlashSale(
       product.skuId,
       1,
@@ -1016,16 +912,6 @@ const addToCart = async (product) => {
       product.price
     )
 
-=======
-    // Gọi API thêm vào giỏ với thông tin Flash Sale
-    const success = await cartStore.addToCartWithFlashSale(
-      product.skuId,           // skuId
-      1,                      // quantity
-      activeSlot.slotId,      // flashSaleSlotId
-      product.price           // flashSalePrice
-    )
-    
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
     if (success) {
       showToast({
         type: 'success',
@@ -1033,7 +919,6 @@ const addToCart = async (product) => {
         message: 'Đã thêm vào giỏ hàng',
       })
     } else {
-<<<<<<< HEAD
       // Nếu lỗi này đến từ 401 (guest chưa đăng nhập), modal LoginRequiredModal
       // đã hiển thị thông báo rồi -> không cần show thêm toast lỗi trùng lặp.
       if (!suppressErrorToast.value && !isUnauthorizedError(cartStore.error)) {
@@ -1056,21 +941,6 @@ const addToCart = async (product) => {
       })
     }
     suppressErrorToast.value = false
-=======
-      showToast({
-        type: 'error',
-        title: 'Lỗi!',
-        message: cartStore.error || 'Không thể thêm vào giỏ',
-      })
-    }
-  } catch (error) {
-    console.error('Lỗi thêm vào giỏ:', error)
-    showToast({
-      type: 'error',
-      title: 'Lỗi!',
-      message: error.response?.data?.message || 'Không thể thêm vào giỏ hàng',
-    })
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
   } finally {
     setTimeout(() => {
       product.addingToCart = false

@@ -25,13 +25,8 @@
 .home-flash-sale {
   position: relative;
   background: #ffffff;
-<<<<<<< HEAD
   padding: 26px 0 32px;
   margin: 0 0 24px;
-=======
-  padding: 26px 24px 32px;
-  margin: 0 5vw 24px;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
   overflow: hidden;
   isolation: isolate;
   border: 2px solid var(--fs-home-red);
@@ -40,15 +35,12 @@
   animation: hfs-border-glow 3.6s ease-in-out infinite;
 }
 
-<<<<<<< HEAD
 .home-flash-sale::after {
   content: '';
   display: block;
   clear: both;
 }
 
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 @keyframes hfs-border-glow {
   0%, 100% {
     box-shadow: 0 10px 30px rgba(225, 29, 29, 0.12), 0 0 0 0 rgba(225, 29, 29, 0.0);
@@ -78,21 +70,14 @@
   gap: 16px;
   margin-bottom: 18px;
   flex-wrap: wrap;
-<<<<<<< HEAD
   padding: 0 24px;
-=======
-  padding: 0;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 .hfs-title-wrap {
   display: flex;
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-<<<<<<< HEAD
   padding-left: 8px;
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 .hfs-title {
   display: inline-flex;
@@ -190,18 +175,11 @@
 /* ==== Carousel wrapper ==== */
 .hfs-carousel {
   position: relative;
-<<<<<<< HEAD
   padding: 0 24px;
 }
 .hfs-viewport {
   overflow: hidden;
   padding: 6px 0 14px;
-=======
-}
-.hfs-viewport {
-  overflow: hidden;
-  padding: 6px 4px 14px;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
   /* mask fade ở mép giúp UX mượt hơn */
   -webkit-mask-image: linear-gradient(
     90deg,
@@ -210,7 +188,7 @@
     #000 calc(100% - 24px),
     transparent 100%
   );
-          mask-image: linear-gradient(
+  mask-image: linear-gradient(
     90deg,
     transparent 0,
     #000 24px,
@@ -309,48 +287,29 @@
   font-size: 13px;
   font-weight: 700;
   color: var(--fs-home-text);
-<<<<<<< HEAD
   line-height: 1.35;
-=======
-  line-height: 1.3;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-<<<<<<< HEAD
   min-height: calc(1.35em * 2);
   margin-top: 8px;
-=======
-  min-height: calc(1.3em * 2);
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 .hfs-spec {
   font-size: 11px;
   color: var(--fs-home-text-muted);
-<<<<<<< HEAD
   white-space: normal;
   overflow: hidden;
   text-overflow: ellipsis;
   margin-top: 3px;
-=======
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 
 /* Thanh tiến trình kho */
 .hfs-stock {
   display: flex;
   flex-direction: column;
-<<<<<<< HEAD
   gap: 4px;
   margin-top: 4px;
-=======
-  gap: 3px;
-  margin-top: 2px;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 .hfs-stock-row {
   display: flex;
@@ -360,12 +319,9 @@
   font-weight: 700;
   color: var(--fs-home-text-light);
 }
-<<<<<<< HEAD
 .hfs-sold-text {
   color: var(--fs-home-text-muted);
 }
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 .hfs-stock-row .blink {
   color: var(--fs-home-red);
   animation: hfs-blink 1.2s ease-in-out infinite;
@@ -404,32 +360,21 @@
 /* Giá */
 .hfs-price-row {
   display: flex;
-<<<<<<< HEAD
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
   flex-wrap: wrap;
   margin-top: auto;
   padding-top: 4px;
-=======
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 .hfs-price-now {
   font-family: 'Be Vietnam Pro', sans-serif;
   font-weight: 900;
   font-style: italic;
   color: var(--fs-home-red);
-<<<<<<< HEAD
   font-size: 20px;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-=======
-  font-size: 17px;
-  font-variant-numeric: tabular-nums;
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
 .hfs-price-old {
   font-size: 12px;
@@ -437,7 +382,6 @@
   text-decoration: line-through;
 }
 
-<<<<<<< HEAD
 /* Nút Mua ngay */
 .hfs-buy-btn {
   display: flex;
@@ -483,8 +427,6 @@
   box-shadow: none !important;
 }
 
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 /* ==== Nút điều hướng mũi tên ==== */
 .hfs-nav {
   position: absolute;
@@ -648,14 +590,10 @@
 
 /* Mobile: 2 card, luôn hiện nav */
 @media (max-width: 560px) {
-<<<<<<< HEAD
   .home-flash-sale { padding: 18px 0 22px; margin: 0 0 18px; border-radius: 14px; }
   .hfs-carousel { padding: 0 14px; }
   .hfs-head { padding: 0 14px; }
   .hfs-title-wrap { padding-left: 4px; }
-=======
-  .home-flash-sale { padding: 18px 14px 22px; margin: 0 3vw 18px; border-radius: 14px; }
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
   .hfs-card,
   .hfs-card--more {
     flex: 0 0 calc((100% - 14px) / 2);
@@ -713,7 +651,6 @@
 .hfs-toast-leave-to {
   transform: translateY(-12px);
   opacity: 0;
-<<<<<<< HEAD
 }
 
 /* ==== Nút Wishlist trên card Flash Sale ==== */
@@ -757,6 +694,4 @@
 }
 .hfs-wishlist-btn:active svg {
   transform: scale(0.85);
-=======
->>>>>>> 0950ca0 (dang lam do logic mua hang flashsale)
 }
