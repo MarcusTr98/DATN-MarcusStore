@@ -20,9 +20,7 @@ import java.util.stream.Collectors;
 public class FinancialService {
         private final OrderTransactionRepository transactionRepository;
 
-        /**
-         * HÀM LÕI: Lọc và kiểm định tính toàn vẹn của dữ liệu đối soát
-         */
+        // Lọc và kiểm định tính toàn vẹn của dữ liệu đối soát
         private List<TransactionResponse> getProcessedTransactions() {
                 List<OrderTransaction> rawTransactions = transactionRepository.findAllTransactionsWithOrder();
 
@@ -49,7 +47,10 @@ public class FinancialService {
                                         }
                                         return TransactionResponse.builder()
                                                         .transactionId(t.getTransactionId())
-                                                        .providerTransactionId(t.getOrder().getTransactionId())
+                                                        .providerTransactionId(
+                                                                        t.getProviderTransactionId() != null
+                                                                                        ? t.getProviderTransactionId()
+                                                                                        : t.getOrder().getTransactionId())
                                                         .orderCode(t.getOrder().getOrderCode())
                                                         .amount(t.getAmount())
                                                         .type(t.getType())

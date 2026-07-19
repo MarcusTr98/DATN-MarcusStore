@@ -8,6 +8,20 @@ BEGIN
 END;
 GO
 
+IF COL_LENGTH('dbo.Order_Transactions', 'provider_transaction_id') IS NULL
+BEGIN
+    ALTER TABLE dbo.Order_Transactions
+        ADD provider_transaction_id VARCHAR(100) NULL;
+END;
+GO
+
+IF COL_LENGTH('dbo.Order_Transactions', 'provider_response_code') IS NULL
+BEGIN
+    ALTER TABLE dbo.Order_Transactions
+        ADD provider_response_code VARCHAR(20) NULL;
+END;
+GO
+
 IF NOT EXISTS (
     SELECT 1
     FROM sys.indexes

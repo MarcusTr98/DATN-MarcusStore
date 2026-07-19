@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -78,15 +79,20 @@ public class VnPayController {
         String orderCode = fields.get("vnp_TxnRef");
         String responseCode = fields.get("vnp_ResponseCode");
         String transactionId = fields.get("vnp_TransactionNo"); // mã GD phía VNPAY
-
-        // Đã bổ sung check null ở đây để chống lỗi NullPointerException sập Server
         String amountStr = fields.get("vnp_Amount");
-        if (amountStr == null) {
-            log.warn("[VNPAY IPN] VNPAY không gửi số tiền về.");
-            return ok("01", "Invalid Amount");
+
+        if (isBlank(orderCode) || isBlank(transactionId)
+                || responseCode == null || !responseCode.matches("\\d{2}")) {
+            log.warn("[VNPAY IPN] Thiếu tham số nghiệp vụ bắt buộc. TxnRef={}, ResponseCode={}, TransactionNo={}",
+                    orderCode, responseCode, transactionId);
+            return ok("01", "Invalid Parameters");
         }
-        // VNPAY truyền số tiền đã nhân 100 (VD: 500000 → 5000000)
-        long vnpAmount = Long.parseLong(amountStr) / 100;
+
+        BigDecimal vnpAmount = parseVnPayAmount(amountStr);
+        if (vnpAmount == null) {
+            log.warn("[VNPAY IPN] Số tiền không hợp lệ. TxnRef={}, Amount={}", orderCode, amountStr);
+            return ok("04", "Invalid Amount");
+        }
 
         // ── Bước 4: Tìm đơn hàng trong DB
         Optional<Order> orderOpt = orderRepository.findByOrderCodeForUpdate(orderCode);
@@ -98,17 +104,31 @@ public class VnPayController {
         Order order = orderOpt.get();
 
         // ── Bước 5: Kiểm tra số tiền khớp
-        if (order.getFinalAmount().longValue() != vnpAmount) {
+        if (order.getFinalAmount() == null || order.getFinalAmount().compareTo(vnpAmount) != 0) {
             log.warn("[VNPAY IPN] Số tiền không khớp. DB={}, VNPAY={}",
-                    order.getFinalAmount().longValue(), vnpAmount);
+                    order.getFinalAmount(), vnpAmount);
             return ok("04", "Invalid Amount");
         }
 
-        // ── Bước 6: Idempotency — chỉ xử lý khi đơn chưa được xác nhận
-        String currentPaymentStatus = order.getPaymentStatus();
-        if (!"UNPAID".equals(currentPaymentStatus) && !"PENDING".equals(currentPaymentStatus)) {
-            log.info("[VNPAY IPN] Đơn {} đã được xác nhận trước đó (status={}). Bỏ qua.",
-                    orderCode, currentPaymentStatus);
+        // ── Bước 6: Transaction là nguồn idempotency chính, không suy luận từ
+        // paymentStatus của Order.
+        OrderTransactionService.VnPayTransactionState transactionState = orderTransactionService
+                .getVnPayTransactionState(order);
+        if (isTerminal(transactionState)) {
+            if (matchesProcessedCallback(transactionState, transactionId, responseCode)) {
+                log.info("[VNPAY IPN] Callback lặp hợp lệ. Order={}, TransactionNo={}, Status={}",
+                        orderCode, transactionId, transactionState.status());
+            } else {
+                log.warn("[VNPAY IPN] Callback xung đột với giao dịch đã chốt. Order={}, "
+                        + "IncomingTransactionNo={}, StoredTransactionNo={}, "
+                        + "IncomingResponseCode={}, StoredResponseCode={}, Status={}",
+                        orderCode,
+                        transactionId,
+                        transactionState.providerTransactionId(),
+                        responseCode,
+                        transactionState.responseCode(),
+                        transactionState.status());
+            }
             return ok("02", "Order already confirmed");
         }
 
@@ -128,12 +148,13 @@ public class VnPayController {
                     orderCode);
         } else {
             // Thanh toán thất bại: hủy đơn và hoàn tồn kho/voucher đúng một lần.
+            String failureNote = "Giao dịch VNPAY thất bại. TransactionNo: " + transactionId
+                    + ", ResponseCode: " + responseCode;
             order.setPaymentStatus("FAILED");
             order.setTransactionId(transactionId);
-            orderCancellationService.cancelAndRestore(
-                    order,
-                    "Giao dịch VNPAY thất bại. TransactionNo: " + transactionId
-                            + ", ResponseCode: " + responseCode);
+            orderTransactionService.markVnPayPaymentFailed(
+                    order, transactionId, responseCode, failureNote);
+            orderCancellationService.cancelAndRestore(order, failureNote);
             log.info("[VNPAY IPN] Thanh toán thất bại/hủy. Order={}", orderCode);
         }
 
@@ -157,5 +178,36 @@ public class VnPayController {
     // tạo response đúng format VNPAY yêu cầu
     private ResponseEntity<Map<String, String>> ok(String rspCode, String message) {
         return ResponseEntity.ok(Map.of("RspCode", rspCode, "Message", message));
+    }
+
+    BigDecimal parseVnPayAmount(String amount) {
+        if (isBlank(amount) || amount.length() > 30 || !amount.chars().allMatch(Character::isDigit)) {
+            return null;
+        }
+        try {
+            // VNPAY gửi số tiền ở đơn vị 1/100 VND.
+            BigDecimal parsed = new BigDecimal(amount).movePointLeft(2);
+            return parsed.signum() < 0 ? null : parsed;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private boolean isTerminal(OrderTransactionService.VnPayTransactionState state) {
+        return state != null && !"PENDING".equalsIgnoreCase(state.status());
+    }
+
+    private boolean matchesProcessedCallback(
+            OrderTransactionService.VnPayTransactionState state,
+            String transactionId,
+            String responseCode) {
+        String expectedStatus = "00".equals(responseCode) ? "SUCCESS" : "FAILED";
+        return expectedStatus.equalsIgnoreCase(state.status())
+                && Objects.equals(transactionId, state.providerTransactionId())
+                && Objects.equals(responseCode, state.responseCode());
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

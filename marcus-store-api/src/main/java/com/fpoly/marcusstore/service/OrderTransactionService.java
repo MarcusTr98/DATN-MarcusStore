@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 @RequiredArgsConstructor
 public class OrderTransactionService {
     private static final String IDEMPOTENCY_KEY_PREFIX = "ORDER";
+    private static final String VNPAY_PAYMENT = "VNPAY_PAYMENT";
 
     private final OrderTransactionRepository transactionRepository;
 
@@ -24,9 +25,36 @@ public class OrderTransactionService {
     public void markVnPayPaymentSuccess(Order order, String providerTransactionId, String responseCode) {
         markPendingTransactionSuccess(
                 order,
-                "VNPAY_PAYMENT",
+                VNPAY_PAYMENT,
                 "VNPAY xác nhận thành công. TransactionNo: "
                         + providerTransactionId + ", ResponseCode: " + responseCode);
+        updateVnPayProviderResult(order, "SUCCESS", providerTransactionId, responseCode);
+    }
+
+    @Transactional
+    public void markVnPayPaymentFailed(
+            Order order, String providerTransactionId, String responseCode, String note) {
+        OrderTransaction transaction = findOrCreateVnPayTransaction(order, note);
+        if (transaction == null || "SUCCESS".equalsIgnoreCase(transaction.getStatus())) {
+            return;
+        }
+        transaction.setAmount(order.getFinalAmount());
+        transaction.setStatus("FAILED");
+        transaction.setNote(note);
+        transaction.setProviderTransactionId(providerTransactionId);
+        transaction.setProviderResponseCode(responseCode);
+        transactionRepository.save(transaction);
+    }
+
+    @Transactional(readOnly = true)
+    public VnPayTransactionState getVnPayTransactionState(Order order) {
+        return transactionRepository
+                .findFirstByOrder_OrderIdAndTypeOrderByCreatedAtDesc(order.getOrderId(), VNPAY_PAYMENT)
+                .map(transaction -> new VnPayTransactionState(
+                        transaction.getStatus(),
+                        transaction.getProviderTransactionId(),
+                        transaction.getProviderResponseCode()))
+                .orElse(null);
     }
 
     @Transactional
@@ -81,5 +109,37 @@ public class OrderTransactionService {
             throw new IllegalArgumentException("Loại transaction không được để trống");
         }
         return IDEMPOTENCY_KEY_PREFIX + ":" + orderId + ":" + type.trim().toUpperCase();
+    }
+
+    private OrderTransaction findOrCreateVnPayTransaction(Order order, String note) {
+        OrderTransaction transaction = transactionRepository
+                .findFirstByOrder_OrderIdAndTypeOrderByCreatedAtDesc(order.getOrderId(), VNPAY_PAYMENT)
+                .orElse(null);
+        if (transaction != null) {
+            return transaction;
+        }
+
+        insertIfAbsent(order, order.getFinalAmount(), VNPAY_PAYMENT, "PENDING", note);
+        return transactionRepository
+                .findFirstByOrder_OrderIdAndTypeOrderByCreatedAtDesc(order.getOrderId(), VNPAY_PAYMENT)
+                .orElse(null);
+    }
+
+    private void updateVnPayProviderResult(
+            Order order, String status, String providerTransactionId, String responseCode) {
+        transactionRepository
+                .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
+                        order.getOrderId(), VNPAY_PAYMENT, status)
+                .ifPresent(transaction -> {
+                    transaction.setProviderTransactionId(providerTransactionId);
+                    transaction.setProviderResponseCode(responseCode);
+                    transactionRepository.save(transaction);
+                });
+    }
+
+    public record VnPayTransactionState(
+            String status,
+            String providerTransactionId,
+            String responseCode) {
     }
 }

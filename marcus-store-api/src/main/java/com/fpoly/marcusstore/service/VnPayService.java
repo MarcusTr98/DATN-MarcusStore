@@ -19,13 +19,19 @@ public class VnPayService {
 
     public String createPaymentUrl(Order order, HttpServletRequest request) {
         // VNPAY quy định số tiền phải nhân lên 100 lần (để bỏ số thập phân)
-        long amount = order.getFinalAmount().longValue() * 100;
+        if (order.getFinalAmount() == null || order.getFinalAmount().signum() < 0) {
+            throw new IllegalArgumentException("Số tiền thanh toán VNPAY không hợp lệ");
+        }
+        String amount = order.getFinalAmount()
+                .movePointRight(2)
+                .toBigIntegerExact()
+                .toString();
 
         Map<String, String> vnp_Params = new HashMap<>();
         vnp_Params.put("vnp_Version", "2.1.0");
         vnp_Params.put("vnp_Command", "pay");
         vnp_Params.put("vnp_TmnCode", vnPayConfig.getTmnCode());
-        vnp_Params.put("vnp_Amount", String.valueOf(amount));
+        vnp_Params.put("vnp_Amount", amount);
         vnp_Params.put("vnp_CurrCode", "VND");
         vnp_Params.put("vnp_TxnRef", order.getOrderCode()); // Dùng Order Code làm mã tham chiếu
         vnp_Params.put("vnp_OrderInfo", "Thanh toan don hang: " + order.getOrderCode());

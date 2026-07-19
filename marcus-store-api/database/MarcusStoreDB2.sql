@@ -613,6 +613,11 @@ CREATE TABLE Order_Transactions (
 );
 ALTER TABLE Order_Transactions ADD is_reconciled BIT DEFAULT 0 NOT NULL;
 ALTER TABLE Order_Transactions ADD idempotency_key VARCHAR(150) NULL;
+ALTER TABLE Order_Transactions ADD provider_transaction_id VARCHAR(100) NULL;
+ALTER TABLE Order_Transactions ADD provider_response_code VARCHAR(20) NULL;
+CREATE UNIQUE INDEX UX_OrderTransactions_IdempotencyKey
+    ON Order_Transactions(idempotency_key)
+    WHERE idempotency_key IS NOT NULL;
 
 -- Ngọc thêm 1/7 bảng user_Permission
 CREATE TABLE User_Permissions(
