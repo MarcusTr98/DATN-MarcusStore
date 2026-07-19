@@ -17,4 +17,6 @@ public interface OrderTransactionRepository extends JpaRepository<OrderTransacti
             Integer orderId, String type, String status);
 
     boolean existsByOrder_OrderIdAndTypeAndStatus(Integer orderId, String type, String status);
+
+    boolean existsByOrder_OrderIdAndType(Integer orderId, String type);
 }

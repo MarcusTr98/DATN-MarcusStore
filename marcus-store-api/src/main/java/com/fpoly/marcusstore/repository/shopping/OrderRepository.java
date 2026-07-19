@@ -28,8 +28,14 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   // Được thêm từ nhánh GHN Webhook
   Optional<Order> findByTrackingCode(String trackingCode);
 
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM Order o WHERE o.trackingCode = :trackingCode")
+  Optional<Order> findByTrackingCodeForUpdate(@Param("trackingCode") String trackingCode);
+
   // marcus thêm
   List<Order> findByOrderStatus(String orderStatus);
+
+  List<Order> findByOrderStatusIn(List<String> orderStatuses);
 
   List<Order> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
 
