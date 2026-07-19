@@ -7,6 +7,13 @@
       @close="handleModalConfirm"
     />
 
+    <!-- Modal thông báo Flash Sale đã bị admin hủy -->
+    <CancelledFlashSaleModal
+      :visible="showCancelledModal"
+      @close="showCancelledModal = false"
+      @confirm="handleCancelledConfirm"
+    />
+
     <!-- Modal thông báo voucher không khả dụng -->
     <BaseModal
       :visible="isVoucherInvalidModalOpen"
@@ -415,18 +422,34 @@
 
           <div class="order-items">
             <div v-for="item in cartData.items" :key="item.cartItemId" class="order-item">
+              <!-- Cột trái: Ảnh + Badge số lượng -->
               <div class="order-item__img-wrap">
-                <img :src="item.imageUrl" :alt="item.productName" class="order-item__img" />
+                <img :src="item.thumbnailUrl" :alt="item.productName" class="order-item__img" />
                 <span class="order-item__qty">{{ item.quantity }}</span>
               </div>
+
+              <!-- Cột giữa: Thông tin sản phẩm -->
               <div class="order-item__info">
                 <div class="order-item__name">{{ item.productName }}</div>
                 <div class="order-item__variant" v-if="item.variantName">
-                  {{ item.variantName }}
+                  {{ expandColorName(item.variantName) }}
                 </div>
                 <div class="order-item__sku">SKU: {{ item.skuCode }}</div>
+                <!-- Badge Flash Sale -->
+                <span v-if="item.isFlashSale" class="order-item__flash-sale-badge">
+                  ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
+                </span>
               </div>
-              <div class="order-item__price">{{ item.totalPrice?.toLocaleString('vi-VN') }}₫</div>
+
+              <!-- Cột phải: Giá tiền -->
+              <div class="order-item__price-col">
+                <div class="order-item__current-price">
+                  {{ item.totalPrice?.toLocaleString('vi-VN') }}₫
+                </div>
+                <s v-if="item.originalPrice && item.originalPrice > item.price" class="order-item__original-price">
+                  {{ item.originalPrice?.toLocaleString('vi-VN') }}₫
+                </s>
+              </div>
             </div>
           </div>
 
@@ -564,13 +587,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/BaseModal.vue'
+import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import VoucherModal from '@/components/VoucherModal.vue'
+import { expandColorName } from '@/utils/colorUtils'
 
 import { useCartStore } from '@/stores/cartStore'
+import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 const cartStore = useCartStore()
+const flashSaleStore = useFlashSaleStore()
+
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 
 import addressApi from '@/api/addressApi'
 import userApi from '@/api/userApi'
@@ -584,6 +613,50 @@ const router = useRouter()
 const isProcessing = ref(false)
 const isFeeLoading = ref(false)
 const feeError = ref('')
+
+// ==== Modal thông báo Flash Sale bị admin hủy ====
+// Khi user vào trang thanh toán mà đơn hàng có chứa SP FS từ slot CANCELLED
+// (admin vừa hủy sau khi user checkout từ giỏ) → chặn + hiện modal.
+const showCancelledModal = ref(false)
+
+// Cờ chặn vòng lặp modal bật liên tục. Sau khi user bấm "Đồng ý" 1 lần,
+// không tự động mở lại modal trong cùng phiên. Reset khi component unmount
+// (user rời trang) để lần sau quay lại modal vẫn hoạt động nếu vẫn còn lỗi.
+const hasHandledCancelled = ref(false)
+
+function openCancelledModal() {
+  if (hasHandledCancelled.value) return
+  showCancelledModal.value = true
+}
+
+async function handleCancelledConfirm() {
+  if (hasHandledCancelled.value) return
+  hasHandledCancelled.value = true
+
+  showCancelledModal.value = false
+  // Điều hướng về trang chủ thay vì reload toàn trang.
+  // Lý do: reload sẽ trigger lại onMounted → watch(clientSlots) → lại mở modal nếu
+  // cartData trong localStorage vẫn chứa SP CANCELLED. router.replace('/') thì an toàn.
+  await router.replace({ path: '/' }).catch(() => {
+    window.location.href = '/'
+  })
+}
+
+// Kiểm tra trong cartData có SP Flash Sale thuộc slot đã bị admin hủy không.
+// cartData lấy từ localStorage 'selectedCartItems' (đã có isFlashSale + flashSaleSlotId).
+function findCancelledFlashSaleItem() {
+  const items = Array.isArray(cartData.value.items) ? cartData.value.items : []
+  const slots = flashSaleStore.clientSlots
+  if (!Array.isArray(slots)) return null
+  return (
+    items.find(
+      (item) =>
+        item.isFlashSale &&
+        item.flashSaleSlotId &&
+        flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
+    ) || null
+  )
+}
 
 const modal = ref({ show: false, title: 'Thông báo', message: '', action: null })
 
@@ -605,10 +678,22 @@ const getInitialCartData = () => {
     try {
       const items = JSON.parse(savedItems)
       if (Array.isArray(items) && items.length > 0) {
+        // Đảm bảo mỗi item có price/totalPrice hợp lệ — nếu không thì TÍNH LẠI.
+        // Trường hợp totalPrice = 0 (do bug "Mua ngay" từ Flash Sale) → fallback về price * quantity.
+        const safeItems = items.map((i) => {
+          const safePrice = (i.price || 0) > 0 ? i.price : 0
+          const computedTotal =
+            (i.totalPrice || 0) > 0 ? i.totalPrice : safePrice * (i.quantity || 1)
+          return {
+            ...i,
+            price: safePrice,
+            totalPrice: computedTotal,
+          }
+        })
         return {
-          items,
-          totalQuantity: items.reduce((sum, i) => sum + (i.quantity || 0), 0),
-          totalAmount: items.reduce((sum, i) => sum + (i.totalPrice || 0), 0),
+          items: safeItems,
+          totalQuantity: safeItems.reduce((sum, i) => sum + (i.quantity || 0), 0),
+          totalAmount: safeItems.reduce((sum, i) => sum + (i.totalPrice || 0), 0),
         }
       }
     } catch (e) {
@@ -689,6 +774,26 @@ const VOUCHER_RE_SELECT_CODES = new Set([
 ])
 
 const isVoucherReSelectCode = (code) => code && VOUCHER_RE_SELECT_CODES.has(code)
+
+// Mã lỗi từ CheckoutService khi Flash Sale bị admin hủy/hết hạn/hết hàng.
+// Khi nhận các mã này → hiện modal "Flash Sale bị admin hủy" thay vì toast lỗi.
+// Định dạng mã: "FLASH_SALE_CANCELLED|message..." → split('|')[0] để lấy code.
+const FLASH_SALE_CANCELLED_CODES = new Set([
+  'FLASH_SALE_CANCELLED',
+  'FLASH_SALE_ENDED',
+  'FLASH_SALE_NOT_STARTED',
+  'FLASH_SALE_UNAVAILABLE',
+  'FLASH_SALE_INVALID',
+  'FLASH_SALE_NOT_FOUND',
+  'FLASH_SALE_OUT_OF_STOCK',
+])
+
+function isFlashSaleCancelledCode(errorCode) {
+  if (!errorCode) return false
+  // errorCode có thể là "FLASH_SALE_CANCELLED|message..." → tách lấy phần đầu
+  const codeOnly = String(errorCode).split('|')[0].trim()
+  return FLASH_SALE_CANCELLED_CODES.has(codeOnly)
+}
 
 // Modal thông báo áp dụng voucher thành công
 // ─── Re-select voucher modal (mở khi backend re-validate fail) ───
@@ -1032,6 +1137,13 @@ const buildShippingAddress = () => {
 const handleCheckout = async () => {
   if (!cartData.value.items?.length) return
 
+  // Chặn submit nếu đơn hàng có SP Flash Sale thuộc slot đã bị admin hủy.
+  // Hiện modal — user bấm "Đồng ý" sẽ reload trang, khi đó Cart.vue sẽ tự dọn các SP này.
+  if (findCancelledFlashSaleItem()) {
+    openCancelledModal()
+    return
+  }
+
   if (!validatePhone(orderForm.value.recipientPhone)) {
     showModal(
       'Số điện thoại không hợp lệ',
@@ -1120,6 +1232,15 @@ const handleCheckout = async () => {
     const errorCode = responseData?.data // ResponseStatusException -> data = errorCode string
     const errorMessage = responseData?.message ?? 'Hệ thống gián đoạn. Vui lòng thử lại.'
 
+    // Nếu backend báo lỗi liên quan đến Flash Sale (slot đã hủy/hết hạn/hết hàng) →
+    // mở modal thông báo để user hiểu vấn đề, đồng thời reload để Cart.vue tự dọn SP hỏng.
+    // Đây là tuyến phòng thủ cuối cùng phía client — backend đã chặn ngay từ đầu,
+    // nhưng FE cần phản hồi thân thiện thay vì hiện toast lỗi khô khan.
+    if (isFlashSaleCancelledCode(errorCode)) {
+      showCancelledModal.value = true
+      return
+    }
+
     // Nếu backend báo voucher không khả dụng -> clear state + mở Modal 1 (thông báo)
     // User bấm "Đồng ý" ở Modal 1 mới mở Modal 2 (chọn voucher khác).
     if (isVoucherReSelectCode(errorCode) && appliedVoucherCode.value) {
@@ -1136,12 +1257,46 @@ const handleCheckout = async () => {
 
 onMounted(async () => {
   await prefillUserEmail()
-  await Promise.allSettled([fetchGhnProvinces(), fetchCart(), fetchMyAddresses()])
+  await Promise.allSettled([
+    fetchGhnProvinces(),
+    fetchCart(),
+    fetchMyAddresses(),
+    // Tải slot FS để phát hiện slot CANCELLED trước khi user bấm Đặt hàng.
+    flashSaleStore.fetchClientSlots(20),
+  ])
   // Preview voucher nếu có voucher được chọn từ cart
   if (appliedVoucherCode.value) {
     await previewVoucher()
   }
+
+  // Nếu đơn hàng hiện tại có SP Flash Sale thuộc slot bị admin hủy → hiện modal ngay.
+  // Guard: bỏ qua nếu user đã xử lý trong phiên này rồi (tránh vòng lặp modal).
+  if (findCancelledFlashSaleItem()) {
+    openCancelledModal()
+  }
 })
+
+onBeforeUnmount(() => {
+  // Reset cờ khi rời trang để lần sau vào lại modal vẫn hoạt động nếu lỗi còn.
+  hasHandledCancelled.value = false
+})
+
+// Theo dõi khi clientSlots thay đổi (vd: refresh, scheduler reload) để phát hiện
+// slot vừa bị admin hủy trong khi user đang ở trang checkout.
+watch(
+  () => flashSaleStore.clientSlots,
+  () => {
+    // Chỉ mở modal khi: chưa xử lý + chưa mở + có item CANCELLED trong đơn
+    if (
+      !hasHandledCancelled.value &&
+      !showCancelledModal.value &&
+      findCancelledFlashSaleItem()
+    ) {
+      openCancelledModal()
+    }
+  },
+  { deep: true },
+)
 
 // Watch appliedVoucherCode để tự động preview khi thay đổi
 watch(appliedVoucherCode, async (newCode) => {

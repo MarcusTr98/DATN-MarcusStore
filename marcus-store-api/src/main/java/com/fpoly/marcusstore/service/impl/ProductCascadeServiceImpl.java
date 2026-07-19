@@ -81,6 +81,7 @@ public class ProductCascadeServiceImpl implements ProductCascadeService {
                     skuNodes.add(ProductCascadeResponse.SkuNode.builder()
                             .skuId(sku.getSkuId())
                             .productName(product.getProductName())
+                            .skuCode(sku.getSkuCode())
                             .originalPrice(sku.getOriginalPrice())
                             .stockQuantity(sku.getStockQuantity())
                             .attributes(attributes)

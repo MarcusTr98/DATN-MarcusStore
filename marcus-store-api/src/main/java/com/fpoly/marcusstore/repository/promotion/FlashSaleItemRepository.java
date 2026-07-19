@@ -2,7 +2,9 @@ package com.fpoly.marcusstore.repository.promotion;
 
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItemId;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -10,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, FlashSaleItemId> {
@@ -59,4 +62,25 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Fl
     List<FlashSaleItem> findActiveFlashSaleItemBySku(
             @Param("skuId") Integer skuId,
             @Param("now") LocalDateTime now);
+
+    /**
+     * Khoá dòng FlashSaleItem tại thời điểm checkout (PESSIMISTIC_WRITE) để
+     * ngăn 2 request cùng đọc soldQuantity rồi cộng dồn vượt flashSaleQuantity,
+     * gây lỗi CHECK constraint CK_FlashSaleItems_Qty.
+     *
+     * QUAN TRỌNG: Lọc bỏ slot CANCELLED (status=4) để chặn đặt hàng khi admin
+     * đã hủy Flash Sale nhưng user vẫn còn sản phẩm trong giỏ.
+     * Slot hợp lệ: SCHEDULED (1) hoặc ACTIVE (2).
+     * Nếu slot bị hủy → trả Optional.empty() → service ném 409.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT fi FROM FlashSaleItem fi
+            JOIN fi.slot s
+            WHERE fi.id.slotId = :slotId
+              AND fi.id.skuId = :skuId
+              AND s.status IN (1, 2)
+            """)
+    Optional<FlashSaleItem> findForUpdate(@Param("slotId") Integer slotId,
+                                          @Param("skuId") Integer skuId);
 }

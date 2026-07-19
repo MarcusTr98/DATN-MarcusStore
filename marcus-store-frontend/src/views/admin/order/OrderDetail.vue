@@ -96,37 +96,66 @@
             </div>
             <div class="section-body">
               <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Sản phẩm</th>
-                      <th>SKU</th>
-                      <th>Số lượng</th>
-                      <th>Giá mua</th>
-                      <th>Thành tiền</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="item in orderDetail.items" :key="item.skuId">
-                      <td>
-                        <div class="product-cell">
-                          <span class="product-thumb no-print">📦</span>
-                          <span>
-                            <span class="main-line">{{ item.productName }}</span>
-                          </span>
+<table>
+                <thead>
+                  <tr>
+                    <th class="col-product">Sản phẩm</th>
+                    <th class="col-sku">SKU</th>
+                    <th class="col-variant">Biến thể</th>
+                    <th class="col-qty">SL</th>
+                    <th class="col-price">Giá mua</th>
+                    <th class="col-total">Thành tiền</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in orderDetail.items" :key="item.skuId">
+                    <td>
+                      <div class="product-cell">
+                        <img
+                          v-if="item.productImage"
+                          :src="item.productImage"
+                          :alt="item.productName"
+                          class="product-thumb-img"
+                        />
+                        <div v-else class="product-thumb-placeholder">
+                          <i class="fa-solid fa-mobile-screen-button"></i>
                         </div>
-                      </td>
-                      <td>{{ item.skuCode }}</td>
-                      <td>{{ item.quantity }}</td>
-                      <td>
-                        <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
-                      </td>
-                      <td>
-                        <span class="money">{{ formatCurrency(item.lineTotal) }}</span>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                        <span class="main-line">{{ item.productName }}</span>
+                      </div>
+                    </td>
+                    <td class="cell-sku">{{ item.skuCode }}</td>
+                    <td>
+                      <div v-if="item.variants && item.variants.length > 0" class="variant-stack">
+                        <div
+                          v-for="(variant, vIdx) in item.variants || []"
+                          :key="vIdx"
+                          class="variant-row"
+                        >
+                          <span class="variant-label">{{ variant.attributeName || 'Phân loại' }}:</span>
+                          <span class="variant-value">{{ variant.valueString }}</span>
+                        </div>
+                      </div>
+                      <span v-else class="text-muted">---</span>
+                    </td>
+                    <td class="cell-center">{{ item.quantity }}</td>
+                    <td class="cell-price">
+                      <div class="price-cell">
+                        <template v-if="item.isFlashSale && item.originalPrice">
+                          <span class="money original-price">{{ formatCurrency(item.originalPrice) }}</span>
+                          <span class="money flash-price">{{ formatCurrency(item.priceAtPurchase) }}</span>
+                          <span v-if="item.flashSaleSlotName" class="flash-badge" :title="item.flashSaleSlotName">{{ item.flashSaleSlotName }}</span>
+                        </template>
+                        <template v-else>
+                          <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
+                        </template>
+                      </div>
+                    </td>
+                    <td class="cell-price">
+                      <span class="money">{{ formatCurrency(item.lineTotal) }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
               </div>
 
               <!-- NÂNG CẤP: Bảng tổng hợp dòng tiền chuẩn xác -->
@@ -496,6 +525,17 @@ const getPaymentStatusLabel = (status) => paymentStatusMap[status]?.label || sta
 const getPaymentStatusClass = (status) => paymentStatusMap[status]?.className || 'pending'
 const getPaymentMethodLabel = (method) => paymentMethodMap[method] || method || '---'
 
+const getVariantText = (item) => {
+  if (!item || !Array.isArray(item.variants) || item.variants.length === 0) return ''
+  return item.variants
+    .filter((v) => v && v.valueString)
+    .map((v) => {
+      if (v.attributeName) return `${v.attributeName}: ${v.valueString}`
+      return v.valueString
+    })
+    .join(' | ')
+}
+
 const formatDateTime = (value) => {
   if (!value) return '---'
 
@@ -655,4 +695,6 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped></style>
+<style scoped>
+/* Scoped overrides for print scaling - kept minimal as most styles are in OrderDetails.css */
+</style>

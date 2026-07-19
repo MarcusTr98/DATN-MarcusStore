@@ -44,7 +44,7 @@ api.interceptors.response.use(
         case 401: {
           console.error('Lỗi 401: Bạn chưa đăng nhập')
 
-          // Chỉ redirect nếu người dùng đã từng đăng nhập
+          // Chỉ redirect nếu người dùng đã từng đăng nhập (có token)
           const token = localStorage.getItem('ACCESS_TOKEN')
 
           if (token) {
@@ -55,6 +55,13 @@ api.interceptors.response.use(
             window.dispatchEvent(new Event('auth-changed'))
 
             window.location.href = '/auth/login'
+          } else {
+            // Guest (không có token) → dispatch event để các page hiển thị modal đăng nhập
+            window.dispatchEvent(
+              new CustomEvent('auth-required', {
+                detail: { message: 'Vui lòng đăng nhập để tiếp tục.' },
+              }),
+            )
           }
 
           break

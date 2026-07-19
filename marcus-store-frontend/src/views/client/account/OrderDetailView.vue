@@ -44,7 +44,7 @@
                   <strong class="meta-value">{{ selectedOrder.orderCode }}</strong>
                 </div>
                 <div class="meta-item">
-                  <span class="meta-label"><i class="fa-solid fa-credit-card"></i>Thanh toán</span>
+                  <span class="meta-label"><i class="fa-solid fa-credit-card"></i>Phương thức thanh toán</span>
                   <strong class="meta-value">{{
                     getPaymentMethodLabel(selectedOrder.paymentMethod)
                   }}</strong>
@@ -53,7 +53,15 @@
                   <span class="meta-label"
                     ><i class="fa-solid fa-circle-check"></i>Trạng thái TT</span
                   >
-                  <strong class="meta-value">{{ selectedOrder.paymentStatus || '---' }}</strong>
+                  <strong class="meta-value">
+                    {{
+                      selectedOrder.paymentStatus === 'PAID'
+                        ? 'Đã thanh toán'
+                        : selectedOrder.paymentStatus === 'UNPAID'
+                          ? 'Chưa thanh toán'
+                          : '---'
+                    }}
+                  </strong>
                 </div>
                 <div class="meta-item">
                   <span class="meta-label"><i class="fa-solid fa-truck-fast"></i>Mã vận đơn</span>
@@ -126,6 +134,10 @@
                       </div>
                       <div>
                         <h4 class="product-name">{{ item.productName }}</h4>
+                        <div v-if="getVariantText(item)" class="product-variants">
+                          <i class="fa-solid fa-tags"></i>
+                          <span>{{ getVariantText(item) }}</span>
+                        </div>
                         <div class="product-meta">
                           <span
                             >SKU: <strong>{{ item.skuCode }}</strong></span
@@ -133,9 +145,12 @@
                           <span
                             >Số lượng: <strong>{{ item.quantity }}</strong></span
                           >
-                          <span
-                            >Đơn giá: <strong>{{ formatMoney(item.priceAtPurchase) }}</strong></span
-                          >
+                          <span v-if="item.isFlashSale && item.originalPrice">
+                            <span class="price-original">{{ formatMoney(item.originalPrice) }}</span>
+                            <span class="price-flashsale">{{ formatMoney(item.priceAtPurchase) }}</span>
+                            <span v-if="item.flashSaleSlotName" class="flash-badge">{{ item.flashSaleSlotName }}</span>
+                          </span>
+                          <span v-else>Đơn giá: <strong>{{ formatMoney(item.priceAtPurchase) }}</strong></span>
                         </div>
                       </div>
                       <strong class="product-total">{{ formatMoney(item.lineTotal) }}</strong>
@@ -646,6 +661,17 @@ function getPaymentMethodLabel(method) {
   if (method === 'BankTransfer') return 'Chuyển khoản'
   return method || '---'
 }
+
+function getVariantText(item) {
+  if (!item || !Array.isArray(item.variants) || item.variants.length === 0) return ''
+  return item.variants
+    .filter((v) => v && v.valueString)
+    .map((v) => {
+      if (v.attributeName) return `${v.attributeName}: ${v.valueString}`
+      return v.valueString
+    })
+    .join(' | ')
+}
 </script>
 
 <style scoped>
@@ -662,9 +688,64 @@ function getPaymentMethodLabel(method) {
   text-decoration: none;
 }
 
+.product-thumb {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #ccc;
+}
+
 .product-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.price-original {
+  text-decoration: line-through;
+  color: #9ca3af;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.product-variants {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.product-variants i {
+  color: #e60012;
+  font-size: 11px;
+}
+
+.price-flashsale {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.flash-badge {
+  font-size: 10px;
+  background: #fee2e2;
+  color: #ef4444;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  margin-left: 4px;
 }
 </style>

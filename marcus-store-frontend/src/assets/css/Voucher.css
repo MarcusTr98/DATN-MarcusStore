@@ -361,6 +361,15 @@
   gap: 10px;
 }
 
+.voucher-code-control .form-control.is-invalid {
+  margin-bottom: 0;
+}
+
+.invalid-feedback.d-block.mt-1 {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
 .voucher-code-control .voucher-code-input {
   flex: 1 1 auto;
   min-width: 0;

@@ -9,8 +9,10 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
@@ -49,6 +51,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
     private final EmailService emailService;
+
+    private final FlashSaleItemRepository flashSaleItemRepository;
+
 
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED");
 
@@ -189,6 +194,22 @@ public class OrderServiceImpl implements OrderService {
                 if (sku != null) {
                     sku.setStockQuantity(sku.getStockQuantity() + item.getQuantity());
                 }
+
+                // Trả lại soldQuantity cho Flash Sale nếu có
+                if (Boolean.TRUE.equals(item.getIsFlashSale())) {
+                    Integer slotId = item.getFlashSaleSlot() != null ? item.getFlashSaleSlot().getSlotId() : null;
+                    if (slotId != null) {
+                        flashSaleItemRepository.findItemsBySlotIdWithSlot(slotId)
+                                .stream()
+                                .filter(fsi -> fsi.getId().getSkuId().equals(item.getSku().getSkuId()))
+                                .findFirst()
+                                .ifPresent(fsi -> {
+                                    int newSoldQty = fsi.getSoldQuantity() - item.getQuantity();
+                                    fsi.setSoldQuantity(Math.max(0, newSoldQty));
+                                    flashSaleItemRepository.save(fsi);
+                                });
+                    }
+                }
             }
 
             if (order.getVoucher() != null) {
@@ -278,6 +299,15 @@ public class OrderServiceImpl implements OrderService {
         List<OrderStatusHistory> histories = orderStatusHistoryRepository
                 .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
 
+        // Fetch tất cả SKU với variants trong 1 query để tránh N+1
+        List<Integer> skuIds = order.getOrderItems().stream()
+                .map(item -> item.getSku().getSkuId())
+                .toList();
+        Map<Integer, ProductSku> skuVariantMap = skuIds.isEmpty()
+                ? Map.of()
+                : productSkuRepository.findBySkuIdIn(skuIds).stream()
+                        .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
+
         List<OrderStatusHistoryResponse> historyResponses = histories.stream()
                 .map(history -> OrderStatusHistoryResponse.builder()
                         .status(history.getStatus())
@@ -319,17 +349,33 @@ public class OrderServiceImpl implements OrderService {
                         order.getOrderItems().stream().map(orderItem -> {
                             ProductSku sku = orderItem.getSku();
                             Product product = sku.getProduct();
+                            // Lấy SKU có fetch variants từ map (tránh N+1 và LazyInit)
+                            ProductSku skuWithVariants = skuVariantMap.getOrDefault(sku.getSkuId(), sku);
+                            List<ClientSkuAttributeValueResponse> variants = skuWithVariants.getAttributeValues() == null
+                                    ? List.of()
+                                    : skuWithVariants.getAttributeValues().stream()
+                                            .map(av -> ClientSkuAttributeValueResponse.builder()
+                                                    .valueId(av.getValueId())
+                                                    .attributeId(av.getAttribute() != null ? av.getAttribute().getAttributeId() : null)
+                                                    .attributeName(av.getAttribute() != null ? av.getAttribute().getAttributeName() : null)
+                                                    .valueString(av.getValueString())
+                                                    .valueMeta(av.getValueMeta())
+                                                    .build())
+                                            .toList();
                             return OrderItemDetailResponse.builder()
                                     .skuId(sku.getSkuId())
                                     .skuCode(sku.getSkuCode())
                                     .productId(product.getProductId())
                                     .productName(product.getProductName())
-                                    .productImage(sku.getSkuImageUrl() != null ? sku.getSkuImageUrl()
-                                            : product.getThumbnailUrl())
+                                    .productImage(product.getThumbnailUrl())
                                     .quantity(orderItem.getQuantity())
                                     .priceAtPurchase(orderItem.getPriceAtPurchase())
                                     .lineTotal(orderItem.getPriceAtPurchase()
                                             .multiply(BigDecimal.valueOf(orderItem.getQuantity())))
+                                    .isFlashSale(orderItem.getIsFlashSale())
+                                    .originalPrice(orderItem.getOriginalPrice())
+                                    .flashSaleSlotName(orderItem.getFlashSaleSlotName())
+                                    .variants(variants)
                                     .imeis(orderItem.getProductItems().stream()
                                             .map(item -> ImeiResponse.builder().imeiCode(item.getImeiCode()).build())
                                             .toList())

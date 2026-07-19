@@ -1,230 +1,659 @@
 <template>
-  <div class="flash-sale-page">
-
-
-    <!-- Hero Banner Section -->
-    <section class="flash-hero">
-      <div class="hero-bg">
-        <!-- Wave shapes -->
-        <div class="wave wave-1"></div>
-        <div class="wave wave-2"></div>
-        <div class="wave wave-3"></div>
-
-        <!-- Decorative circles -->
-        <div class="deco-circle deco-1"></div>
-        <div class="deco-circle deco-2"></div>
-
-        <!-- Lightning decorations -->
-        <div class="lightning-deco lightning-1">
-          <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
-        </div>
-        <div class="lightning-deco lightning-2">
-          <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
-        </div>
-
-        <!-- Falling Dots Container - inside hero-bg for proper positioning -->
-        <div class="falling-dots" ref="fallingDotsContainer"></div>
-      </div>
-
-      <div class="hero-content">
-        <div class="hero-left">
-          <div class="hero-badge">
-            <span class="badge-icon">⚡</span>
-            <span>FLASH SALE</span>
-          </div>
-          <h1 class="hero-title">
-            <span class="title-line">MARCUS</span>
-            <span class="title-line accent">FLASH SALE</span>
-          </h1>
-          <p class="hero-subtitle">Giảm đến <strong>50%++</strong> cho hàng ngàn sản phẩm công nghệ</p>
-
-          <div class="countdown-wrapper">
-            <span class="countdown-label">Kết thúc sau</span>
-            <div class="countdown" id="countdown">
-              <div class="unit">
-                <div class="digits">
-                  <span class="digit">{{ timer.hours[0] }}</span>
-                  <span class="digit">{{ timer.hours[1] }}</span>
-                </div>
-                <div class="unit-label">Giờ</div>
-              </div>
-              <div class="colon">:</div>
-              <div class="unit">
-                <div class="digits">
-                  <span class="digit">{{ timer.minutes[0] }}</span>
-                  <span class="digit">{{ timer.minutes[1] }}</span>
-                </div>
-                <div class="unit-label">Phút</div>
-              </div>
-              <div class="colon">:</div>
-              <div class="unit">
-                <div class="digits">
-                  <span class="digit">{{ timer.seconds[0] }}</span>
-                  <span class="digit">{{ timer.seconds[1] }}</span>
-                </div>
-                <div class="unit-label">Giây</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="hero-right">
-          <div class="hero-stats">
-            <div class="stat-item">
-              <span class="stat-number">200+</span>
-              <span class="stat-label">Sản phẩm</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-              <span class="stat-number">50%</span>
-              <span class="stat-label">Giảm giá</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-              <span class="stat-number">24h</span>
-              <span class="stat-label">Chỉ hôm nay</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Product Section -->
-    <div class="section-head">
-      <h2>Đang <span>cháy</span> hàng</h2>
-      <router-link to="/khuyen-mai" class="see-all">Đi đến trang khuyến mãi</router-link>
-    </div>
-
-    <section class="product-grid">
-      <article
-        v-for="(product, index) in flashSaleProducts"
-        :key="product.id"
-        class="flash-card"
-        :class="{ 'low-stock': product.left <= 3 }"
-        :style="{ '--enter-delay': (index * 80) + 'ms' }"
-        @click="goToProduct(product)"
-      >
-        <span class="card-tag" :style="{ animationDelay: (index * 0.35) + 's' }">
-          <svg viewBox="0 0 24 24" class="lightning-icon"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
-          SALE
+  <section class="home-flash-sale">
+    <!-- Header -->
+    <header class="hfs-head">
+      <div class="hfs-title-wrap">
+        <h2 class="hfs-title">
+          <span class="bolt" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
+          </span>
+          <span>FLASH SALE</span>
+          <span class="accent">ĐANG CHÁY HÀNG</span>
+        </h2>
+        <span v-if="featuredSlotName" class="hfs-mini-timer" aria-label="Đếm ngược flash sale">
+          <span class="mini-label">{{ miniLabel || 'Kết thúc sau' }}</span>
+          <span class="mini-digit">{{ miniTimer.hours[0] }}</span>
+          <span class="mini-digit">{{ miniTimer.hours[1] }}</span>
+          <span class="mini-colon">:</span>
+          <span class="mini-digit">{{ miniTimer.minutes[0] }}</span>
+          <span class="mini-digit">{{ miniTimer.minutes[1] }}</span>
+          <span class="mini-colon">:</span>
+          <span class="mini-digit">{{ miniTimer.seconds[0] }}</span>
+          <span class="mini-digit">{{ miniTimer.seconds[1] }}</span>
         </span>
-        <span class="card-discount">-{{ product.discount }}%</span>
-        <div class="thumb">
-          <span class="product-emoji">{{ product.emoji }}</span>
+      </div>
 
-        </div>
-        <div class="card-name">{{ product.name }}</div>
-        <div class="card-spec">{{ product.spec }}</div>
-        <div class="price-row">
-          <span class="price-now">{{ formatPrice(product.displayPrice) }}</span>
-          <span class="price-old">{{ formatPrice(product.originalPrice) }}</span>
-        </div>
-        <div class="scarcity">
-          <div class="bar-row">
-            <span>Đã bán {{ product.soldPercent }}%</span>
-            <span class="blink">Sắp cháy · Còn {{ product.left }} SP</span>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill" :style="{ width: product.soldPercent + '%' }">
-              <span class="bar-shimmer"></span>
+      <router-link to="/khuyen-mai" class="see-all">
+        Xem tất cả
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6"/>
+        </svg>
+      </router-link>
+    </header>
+
+    <!-- Carousel -->
+    <div class="hfs-carousel" @mouseenter="paused = true" @mouseleave="paused = false">
+      <button
+        type="button"
+        class="hfs-nav hfs-nav--prev"
+        :disabled="currentIndex === 0"
+        aria-label="Sản phẩm trước"
+        @click="scrollBy(-1)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 18l-6-6 6-6"/>
+        </svg>
+      </button>
+
+      <div class="hfs-viewport" ref="viewport">
+        <div
+          class="hfs-track"
+          :style="{ transform: `translateX(${trackOffset}px)` }"
+        >
+          <article
+            v-for="(product, index) in displayedProducts"
+            :key="product.id"
+            class="hfs-card"
+            :class="{ 'low-stock': product.left <= 3 }"
+            :style="{ '--enter-delay': (index * 50) + 'ms' }"
+            @click="goToProduct(product)"
+          >
+            <span class="hfs-discount" aria-label="Giảm giá">
+              <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
+              -{{ product.discount }}%
+            </span>
+
+            <div class="hfs-thumb">
+              <img
+                v-if="product.image"
+                :src="product.image"
+                :alt="product.name"
+                @error="(e) => { e.target.style.display = 'none' }"
+              />
+              <span v-else class="hfs-emoji">{{ product.emoji }}</span>
             </div>
+
+            <div class="hfs-name">{{ product.name }}</div>
+            <div class="hfs-spec">
+              <span v-if="product.spec">{{ product.spec }}</span>
+              <span v-if="product.spec && product.variant"><br/></span>
+              <span v-if="product.variant">{{ product.variant }}</span>
+            </div>
+
+            <div class="hfs-stock">
+              <div class="hfs-stock-row">
+                <span class="hfs-sold-text">Đã bán {{ product.soldPercent }}%</span>
+                <span class="blink">Còn {{ product.left }} SP</span>
+              </div>
+              <div class="hfs-stock-track">
+                <div class="hfs-stock-fill" :style="{ width: product.soldPercent + '%' }"></div>
+              </div>
+            </div>
+
+            <div class="hfs-price-row">
+              <span class="hfs-price-now">{{ formatPrice(product.displayPrice) }}</span>
+              <span class="hfs-price-old">{{ formatPrice(product.originalPrice) }}</span>
+            </div>
+
+            <button
+              type="button"
+              class="hfs-buy-btn"
+              :class="{ 'hfs-buy-btn--disabled': product.left <= 0 || product.addingToCart }"
+              :disabled="product.left <= 0 || product.addingToCart"
+              @click.stop="product.left > 0 && !product.addingToCart && buyNow(product)"
+            >
+              <svg v-if="product.left > 0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path
+                  d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm-8 2a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/>
+              </svg>
+              <span>{{ product.left > 0 ? 'Mua ngay' : 'Hết hàng' }}</span>
+            </button>
+          </article>
+
+          <!-- Nút Xem thêm chen vào cuối danh sách -->
+          <router-link
+            v-if="displayedProducts.length > 0"
+            to="/khuyen-mai"
+            class="hfs-card--more"
+            aria-label="Xem thêm sản phẩm Flash Sale"
+          >
+            <span class="more-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M13 6l6 6-6 6"/>
+              </svg>
+            </span>
+            <span class="more-title">Xem thêm</span>
+            <span class="more-sub">
+              {{
+                remainingCount > 0
+                  ? `Còn ${remainingCount} sản phẩm đang giảm giá`
+                  : 'Khám phá toàn bộ Flash Sale hôm nay'
+              }}
+            </span>
+            <span class="more-arrow">
+              SANG TRANG
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14M13 6l6 6-6 6"/>
+              </svg>
+            </span>
+          </router-link>
+
+          <div v-if="displayedProducts.length === 0" class="hfs-empty">
+            <span v-if="clientLoading">Đang tải sản phẩm Flash Sale...</span>
+            <span v-else>Hiện chưa có Flash Sale nào đang diễn ra. Quay lại sau nhé!</span>
           </div>
         </div>
-        <button type="button" class="cta" @click.stop="handleBuyClick($event, product)">
-          Mua ngay
-          <span
-            v-for="ripple in product.ripples"
-            :key="ripple.id"
-            class="ripple"
-            :style="{ left: ripple.x + 'px', top: ripple.y + 'px' }"
-          ></span>
-        </button>
-      </article>
-    </section>
-    <!-- FOMO Popup -->
-    <div class="fomo" :class="{ show: fomoVisible }" role="status" aria-live="polite">
-      <button class="fomo-close" @click="closeFomo">✕</button>
-      <div class="fomo-dot">
-        <svg viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 11-14h-7z"/></svg>
       </div>
-      <div class="fomo-text">
-        <b>{{ fomoMessage }}</b>
-        <span>{{ fomoSub }}</span>
-      </div>
-      <div class="fomo-progress-track">
-        <div v-if="fomoVisible" :key="fomoKey" class="fomo-progress-bar"></div>
-      </div>
+
+      <button
+        type="button"
+        class="hfs-nav hfs-nav--next"
+        :disabled="currentIndex >= maxIndex"
+        aria-label="Sản phẩm tiếp theo"
+        @click="scrollBy(1)"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 6l6 6-6 6"/>
+        </svg>
+      </button>
     </div>
-  </div>
+
+    <!-- Toast thông báo — Teleport ra body để tránh bị clip bởi overflow/transform của container -->
+    <Teleport to="body">
+      <Transition name="hfs-toast">
+        <div v-if="toast.show" class="hfs-toast-alert">
+          <strong>{{ toast.title }}</strong>
+          <span>{{ toast.message }}</span>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Modal thông báo Flash Sale đã bị admin hủy -->
+    <CancelledFlashSaleModal
+      :visible="showCancelledModal"
+      @close="handleCancelledClose"
+      @confirm="handleCancelledConfirm"
+    />
+
+    <!-- Modal yêu cầu đăng nhập (khi guest nhận 401) -->
+    <LoginRequiredModal
+      :visible="showLoginRequiredModal"
+      :title="loginRequiredTitle"
+      :message="loginRequiredMessage"
+      @close="showLoginRequiredModal = false"
+    />
+  </section>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import '@/assets/css/FlashSalePage.css'
+import {ref, reactive, computed, onMounted, onUnmounted, nextTick, watch} from 'vue'
+import {useRouter} from 'vue-router'
+import {storeToRefs} from 'pinia'
+import {useFlashSaleStore} from '@/stores/FlashSaleStore'
+import {useCartStore} from '@/stores/cartStore'
+import {useFlashSaleCountdown} from '@/composables/useFlashSaleCountdown'
+import {useFlashSaleModals} from '@/composables/useFlashSaleModals'
+import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
+import {expandVariantColorNames} from '@/utils/colorUtils'
+import '@/assets/css/HomeFlashSale.css'
+
 const router = useRouter()
+const flashSaleStore = useFlashSaleStore()
+const cartStore = useCartStore()
+const {clientSlots, clientLoading} = storeToRefs(flashSaleStore)
 
-// Countdown Timer
-const timer = ref({ hours: '05', minutes: '32', seconds: '47' })
-let timerInterval = null
+// ==== Modal state — dùng chung composable với FlashSalePage.vue ====
+const {
+  showCancelledModal,
+  showLoginRequiredModal,
+  loginRequiredTitle,
+  loginRequiredMessage,
+  openCancelledModal,
+  handleCancelledClose,
+  handleCancelledConfirm,
+  handleAuthRequired,
+} = useFlashSaleModals({
+  onCancelledConfirm: async () => {
+    await flashSaleStore.fetchClientSlots(20)
+  },
+})
 
-const tickTimer = () => {
-  let h = parseInt(timer.value.hours)
-  let m = parseInt(timer.value.minutes)
-  let s = parseInt(timer.value.seconds)
-  s--
-  if (s < 0) { s = 59; m-- }
-  if (m < 0) { m = 59; h-- }
-  if (h < 0) { h = 0; m = 0; s = 0 }
-  timer.value = {
-    hours: String(h).padStart(2, '0'),
-    minutes: String(m).padStart(2, '0'),
-    seconds: String(s).padStart(2, '0'),
+const MAX_PRODUCTS = 10
+const VISIBLE_DEFAULT = 5
+
+// Tên slot Flash Sale đang hiển thị - đồng bộ với nearestSlot
+const featuredSlotName = computed(() => nearestSlot.value?.name || '')
+
+// ==== Bộ đếm ngược: dùng chung composable với FlashSalePage.vue ====
+// Khi timer chạm 00:00:00 sẽ tự gọi lại fetchClientSlots để cập nhật slot mới.
+const {label: miniLabel, timer: miniTimer} = useFlashSaleCountdown(
+  () => flashSaleStore.clientSlots,
+  () => flashSaleStore.fetchClientSlots(8),
+)
+
+// ==== Slot gần nhất (featured) ====
+function safeDate(v) {
+  if (!v) return null
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+const nearestSlot = computed(() => {
+  const slots = Array.isArray(clientSlots.value) ? clientSlots.value : []
+  if (slots.length === 0) return null
+
+  // 1. Ưu tiên ACTIVE (status=2)
+  const active = slots.filter((s) => Number(s.status) === 2)
+  if (active.length > 0) {
+    return [...active].sort((a, b) => {
+      const da = safeDate(a.endDate)
+      const db = safeDate(b.endDate)
+      if (da && db) return da - db
+      if (da) return -1
+      if (db) return 1
+      return 0
+    })[0]
+  }
+
+  // 2. SCHEDULED (status=1)
+  const upcoming = slots.filter((s) => Number(s.status) === 1)
+  if (upcoming.length > 0) {
+    return [...upcoming].sort((a, b) => {
+      const da = safeDate(a.startDate)
+      const db = safeDate(b.startDate)
+      if (da && db) return da - db
+      if (da) return -1
+      if (db) return 1
+      return 0
+    })[0]
+  }
+
+  return null
+})
+
+// ==== Dữ liệu sản phẩm ====
+function deriveVariantsFromSku(skuCode) {
+  if (!skuCode) return []
+  const parts = String(skuCode).split('-').filter(Boolean)
+  const tail = parts.slice(-2)
+  return tail.map((p) => expandVariantColorNames(p.replace(/_/g, ' ').trim())).filter((p) => p.length > 0)
+}
+
+function mapItemToCard(item, idx) {
+  const totalQty = Number(item.flashSaleQuantity ?? 0)
+  const soldQty = Number(item.soldQuantity ?? 0)
+  const soldPercent = totalQty > 0 ? Math.min(100, Math.round((soldQty / totalQty) * 100)) : 0
+  const remaining = Math.max(0, Number(item.remainingQuantity ?? totalQty - soldQty))
+  const flashPrice = Number(item.flashSalePrice ?? 0)
+  const origPrice = Number(item.originalPrice ?? 0)
+  const price = flashPrice > 0 ? flashPrice : origPrice
+  const discountFromBE = Number(item.discountPercent ?? 0)
+  const discount = discountFromBE > 0
+    ? discountFromBE
+    : (origPrice > 0 && price > 0 && price < origPrice
+      ? Math.floor(((origPrice - price) / origPrice) * 100)
+      : 0)
+  return {
+    id: item.skuId ?? `fs-${idx}`,
+    skuId: item.skuId ?? item.id,
+    name: item.productName || item.skuCode || `Sản phẩm Flash Sale #${idx + 1}`,
+    slug: item.skuCode || `flash-sale-${item.skuId ?? idx}`,
+    variant: deriveVariantsFromSku(item.skuCode).join(' / ') || '',
+    spec: item.skuCode ? `Mã: ${item.skuCode}` : '',
+    variants: deriveVariantsFromSku(item.skuCode),
+    emoji: '🛍️',
+    image: item.thumbnailUrl || null,
+    price: price,
+    originalPrice: origPrice,
+    discount,
+    soldPercent,
+    left: remaining,
+    displayPrice: 0,
+    addingToCart: false,
+    slotId: item._slotId || null,
   }
 }
 
-// Timeline slots
-const flashSlots = ref([
-  { time: 'Đang diễn ra · 09:00–12:00', isLive: true },
-  { time: '12:00 SA', isLive: false },
-  { time: '16:00 CH', isLive: false },
-  { time: '20:00 CH', isLive: false },
-])
+const allProducts = computed(() => {
+  const slot = nearestSlot.value
+  if (!slot || !Array.isArray(slot.items) || slot.items.length === 0) return []
+  const itemsWithSlot = slot.items.map((it) => ({...it, _slotId: slot.slotId}))
+  const mapped = itemsWithSlot.map(mapItemToCard)
+  return mapped.slice(0, MAX_PRODUCTS)
+})
 
-// Products
-const flashSaleProducts = ref([
-  { id: 1, name: 'iPhone 15 Pro Max 256GB', slug: 'iphone-15-pro-max', spec: 'Titan tự nhiên · 5G', emoji: '📱', price: 27990000, originalPrice: 34990000, discount: 20, soldPercent: 85, left: 6, displayPrice: 0, ripples: [] },
-  { id: 2, name: 'Samsung Galaxy S24 Ultra', slug: 'samsung-galaxy-s24-ultra', spec: '12GB/256GB · Galaxy AI', emoji: '📱', price: 22490000, originalPrice: 29990000, discount: 25, soldPercent: 92, left: 3, displayPrice: 0, ripples: [] },
-  { id: 3, name: 'MacBook Air M2 13"', slug: 'macbook-air-m2', spec: '8GB/256GB · Midnight', emoji: '💻', price: 21990000, originalPrice: 28990000, discount: 24, soldPercent: 78, left: 9, displayPrice: 0, ripples: [] },
-  { id: 4, name: 'Laptop Gaming ROG Strix', slug: 'rog-strix', spec: 'RTX 4060 · 16GB/512GB', emoji: '💻', price: 26990000, originalPrice: 35990000, discount: 25, soldPercent: 64, left: 12, displayPrice: 0, ripples: [] },
-  { id: 5, name: 'Apple Watch Series 9', slug: 'apple-watch-series-9', spec: 'GPS · 45mm', emoji: '⌚', price: 8490000, originalPrice: 11990000, discount: 29, soldPercent: 97, left: 2, displayPrice: 0, ripples: [] },
-  { id: 6, name: 'Samsung Galaxy Watch 6', slug: 'galaxy-watch-6', spec: 'Bluetooth · 44mm', emoji: '⌚', price: 5290000, originalPrice: 7490000, discount: 29, soldPercent: 70, left: 14, displayPrice: 0, ripples: [] },
-  { id: 7, name: 'Loa JBL Flip 6', slug: 'jbl-flip-6', spec: 'Chống nước IP67', emoji: '🔊', price: 2190000, originalPrice: 3290000, discount: 33, soldPercent: 99, left: 3, displayPrice: 0, ripples: [] },
-  { id: 8, name: 'AirPods Pro 2', slug: 'airpods-pro-2', spec: 'Chống ồn chủ động', emoji: '🎧', price: 4990000, originalPrice: 6490000, discount: 23, soldPercent: 88, left: 7, displayPrice: 0, ripples: [] },
-])
+const displayedProducts = computed(() => allProducts.value)
+const remainingCount = computed(() => Math.max(0, allProducts.value.length - VISIBLE_DEFAULT))
 
-const formatPrice = (price) =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price)
+// ==== Carousel state ====
+const viewport = ref(null)
+const currentIndex = ref(0)
+const paused = ref(false)
+const cardWidth = ref(0)
+const gap = 14
 
-const goToProduct = (product) => {
-  router.push(`/product/${product.slug}`)
+const visibleCount = ref(VISIBLE_DEFAULT)
+const trackOffset = computed(() => -(currentIndex.value * (cardWidth.value + gap)))
+const maxIndex = computed(() => Math.max(0, displayedProducts.value.length - visibleCount.value))
+
+function measureCardWidth() {
+  const el = viewport.value
+  if (!el) return
+  const totalGaps = gap * (visibleCount.value - 1)
+  cardWidth.value = Math.max(0, (el.clientWidth - totalGaps) / visibleCount.value)
 }
 
-// --- Hiệu ứng "đếm số" cho giá khi card xuất hiện ---
+function updateVisibleCount() {
+  const w = window.innerWidth
+  if (w <= 560) visibleCount.value = 2
+  else if (w <= 820) visibleCount.value = 3
+  else if (w <= 1080) visibleCount.value = 4
+  else visibleCount.value = VISIBLE_DEFAULT
+}
+
+function scrollBy(delta) {
+  const next = currentIndex.value + delta
+  if (next < 0) currentIndex.value = 0
+  else if (next > maxIndex.value) currentIndex.value = maxIndex.value
+  else currentIndex.value = next
+}
+
+let resizeHandler = null
+let refreshTimer = null
+
+// ==== Auto-scroll nhẹ nhàng (chỉ chạy khi không hover) ====
+let autoTimer = null
+
+function startAutoScroll() {
+  stopAutoScroll()
+  autoTimer = setInterval(() => {
+    if (paused.value) return
+    if (displayedProducts.value.length <= visibleCount.value) return
+    if (currentIndex.value >= maxIndex.value) currentIndex.value = 0
+    else currentIndex.value += 1
+  }, 5000)
+}
+
+function stopAutoScroll() {
+  if (autoTimer) clearInterval(autoTimer)
+  autoTimer = null
+}
+
+// ==== Helpers ====
+const formatPrice = (price) =>
+  new Intl.NumberFormat('vi-VN', {style: 'currency', currency: 'VND'}).format(price)
+
+// ==== Toast ====
+const toast = reactive({
+  show: false,
+  type: 'warning',
+  title: '',
+  message: '',
+})
+let toastTimer = null
+
+function showToast({type = 'warning', title, message}) {
+  clearTimeout(toastTimer)
+  toast.type = type
+  toast.title = title
+  toast.message = message
+  toast.show = true
+  toastTimer = setTimeout(() => {
+    toast.show = false
+  }, 2800)
+}
+
+// ==== Điều hướng sản phẩm ====
+const isFlashSaleActive = computed(() => {
+  if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return false
+  return clientSlots.value.some((s) => Number(s.status) === 2)
+})
+
+function ensureProductSlotIsBuyable(product) {
+  if (product.slotId && flashSaleStore.isSlotCancelled(product.slotId)) {
+    openCancelledModal()
+    return false
+  }
+  if (product.slotId && !flashSaleStore.isSlotActive(product.slotId)) {
+    const ownSlot = flashSaleStore.getSlotById(product.slotId)
+    let msg = 'Sản phẩm này không nằm trong Flash Sale đang diễn ra'
+    if (ownSlot) {
+      const status = Number(ownSlot.status)
+      if (status === 1) msg = 'Flash Sale này chưa bắt đầu'
+      else if (status === 3) msg = 'Flash Sale này đã kết thúc'
+      else if (status === 4) msg = 'Flash Sale này đã bị admin hủy'
+    }
+    showToast({type: 'warning', title: 'Oops!', message: msg})
+    return false
+  }
+  if (!isFlashSaleActive.value) {
+    showToast({
+      type: 'warning',
+      title: 'Oops!',
+      message: 'Flash Sale chưa bắt đầu, hãy chờ thêm nhé!',
+    })
+    return false
+  }
+  return true
+}
+
+function prepareCheckoutSelection(cartItem, product, ownSlot) {
+  const item = {
+    cartItemId: cartItem.cartItemId,
+    productName: cartItem.name || product.name,
+    variantName: cartItem.variant || '',
+    skuCode: cartItem.skuCode || product.variant || product.skuCode || '',
+    skuId: cartItem.skuId ?? product.skuId,
+    thumbnailUrl: cartItem.thumbnailUrl || product.image || '',
+    quantity: cartItem.quantity ?? 1,
+    price:
+      (cartItem.price || 0) > 0 ? cartItem.price : product.price,
+    originalPrice: cartItem.originalPrice ?? product.originalPrice ?? null,
+    // Nếu cartItem.totalPrice = 0/null/undefined thì TÍNH LẠI từ price * quantity.
+    // Lưu ý: dùng || thay vì ?? vì backend có thể trả totalPrice = 0 do round/lỗi serialize.
+    totalPrice:
+      (cartItem.totalPrice || 0) > 0
+        ? cartItem.totalPrice
+        : ((cartItem.price || 0) > 0 ? cartItem.price : product.price) *
+        (cartItem.quantity ?? 1),
+    isFlashSale: true,
+    flashSaleSlotId: ownSlot?.slotId ?? product.slotId ?? null,
+    flashSaleSlotName:
+      ownSlot?.name || ownSlot?.slotName || product.slotName || 'Flash Sale',
+  }
+
+  localStorage.setItem('selectedCartItems', JSON.stringify([item]))
+  localStorage.setItem('selectedSubtotal', String(item.totalPrice))
+}
+
+const buyNow = async (product) => {
+  try {
+    if (!ensureProductSlotIsBuyable(product)) return
+
+    const ownSlot = flashSaleStore.getSlotById(product.slotId)
+    if (!ownSlot || Number(ownSlot.status) !== 2) {
+      showToast({
+        type: 'warning',
+        title: 'Oops!',
+        message: 'Sản phẩm này không nằm trong Flash Sale đang diễn ra',
+      })
+      return
+    }
+
+    if (product.left <= 0) {
+      showToast({
+        type: 'error',
+        title: 'Hết hàng!',
+        message: 'Sản phẩm đã hết hàng trong Flash Sale này',
+      })
+      return
+    }
+
+    if (!Array.isArray(cartStore.items) || cartStore.items.length === 0) {
+      try {
+        await cartStore.fetchCart()
+      } catch (e) {
+        console.warn('[HomeFlashSale] fetchCart thất bại:', e)
+      }
+    }
+
+    const existingItem =
+      (cartStore.items || []).find(
+        (ci) => ci.skuId === product.skuId && ci.isFlashSale === true,
+      ) ||
+      (cartStore.items || []).find((ci) => ci.skuId === product.skuId) ||
+      null
+
+    let matchedItem = existingItem
+
+    if (!matchedItem) {
+      const success = await cartStore.addToCartWithFlashSale(
+        product.skuId,
+        1,
+        ownSlot.slotId,
+        product.price,
+      )
+
+      if (!success) {
+        if (!isUnauthorizedError(cartStore.error)) {
+          showToast({
+            type: 'error',
+            title: 'Lỗi!',
+            message: cartStore.error || 'Không thể thêm vào giỏ',
+          })
+        }
+        return
+      }
+
+      matchedItem =
+        (cartStore.items || []).find(
+          (ci) => ci.skuId === product.skuId && ci.isFlashSale === true,
+        ) ||
+        (cartStore.items || []).find((ci) => ci.skuId === product.skuId) ||
+        null
+    }
+
+    if (!matchedItem) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: 'Không tìm thấy sản phẩm trong giỏ, vui lòng thử lại.',
+      })
+      return
+    }
+
+    prepareCheckoutSelection(matchedItem, product, ownSlot)
+    router.push('/checkout')
+  } catch (error) {
+    console.error('Lỗi mua ngay:', error)
+    if (!isUnauthorizedError(error)) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: error.response?.data?.message || 'Không thể mua ngay',
+      })
+    }
+  }
+}
+
+function addToCartProduct(product) {
+  if (product.addingToCart) return
+  product.addingToCart = true
+
+  const ownSlot = flashSaleStore.getSlotById(product.slotId)
+  if (!ownSlot || Number(ownSlot.status) !== 2) {
+    showToast({
+      type: 'warning',
+      title: 'Oops!',
+      message: 'Sản phẩm này không nằm trong Flash Sale đang diễn ra',
+    })
+    product.addingToCart = false
+    return
+  }
+
+  if (product.left <= 0) {
+    showToast({
+      type: 'error',
+      title: 'Hết hàng!',
+      message: 'Sản phẩm đã hết hàng trong Flash Sale này',
+    })
+    product.addingToCart = false
+    return
+  }
+
+  cartStore.addToCartWithFlashSale(
+    product.skuId,
+    1,
+    ownSlot.slotId,
+    product.price,
+  ).then((success) => {
+    if (success) {
+      showToast({
+        type: 'success',
+        title: 'Thành công!',
+        message: 'Đã thêm vào giỏ hàng',
+      })
+    } else {
+      if (!isUnauthorizedError(cartStore.error)) {
+        showToast({
+          type: 'error',
+          title: 'Lỗi!',
+          message: cartStore.error || 'Không thể thêm vào giỏ',
+        })
+      }
+    }
+  }).catch((error) => {
+    if (!isUnauthorizedError(error)) {
+      showToast({
+        type: 'error',
+        title: 'Lỗi!',
+        message: error.response?.data?.message || 'Không thể thêm vào giỏ hàng',
+      })
+    }
+  }).finally(() => {
+    setTimeout(() => {
+      product.addingToCart = false
+    }, 700)
+  })
+}
+
+function goToProduct(product) {
+  if (!ensureProductSlotIsBuyable(product)) return
+  addToCartProduct(product)
+}
+
+// Helper: phát hiện lỗi 401/Unauthorized để bỏ qua toast
+// (modal LoginRequiredModal đã hiển thị thông báo rồi, không cần toast trùng)
+function isUnauthorizedError(errOrMessage) {
+  if (!errOrMessage) return false
+  const status = errOrMessage?.response?.status
+  if (status === 401) return true
+  const msg = typeof errOrMessage === 'string' ? errOrMessage : errOrMessage?.message
+  if (typeof msg === 'string' && /unauthor/i.test(msg)) return true
+  return false
+}
+
+// Animate count up cho giá
 const animateCountUp = (product, delayMs = 0) => {
-  const duration = 900
+  const duration = 800
   const to = product.price
   let startTs = null
-
   const step = (now) => {
     if (startTs === null) startTs = now + delayMs
     if (now < startTs) {
-      requestAnimationFrame(step)
+      requestAnimationFrame(step);
       return
     }
-    const elapsed = now - startTs
-    const t = Math.min(elapsed / duration, 1)
-    const eased = 1 - Math.pow(1 - t, 3) // easeOutCubic
+    const t = Math.min((now - startTs) / duration, 1)
+    const eased = 1 - Math.pow(1 - t, 3)
     product.displayPrice = Math.round(to * eased)
     if (t < 1) requestAnimationFrame(step)
     else product.displayPrice = to
@@ -232,135 +661,54 @@ const animateCountUp = (product, delayMs = 0) => {
   requestAnimationFrame(step)
 }
 
-// --- Hiệu ứng ripple khi bấm "Mua ngay" ---
-const handleBuyClick = (event, product) => {
-  const btn = event.currentTarget
-  const rect = btn.getBoundingClientRect()
-  const ripple = {
-    id: Date.now() + Math.random(),
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top,
-  }
-  product.ripples.push(ripple)
-  setTimeout(() => {
-    product.ripples = product.ripples.filter((r) => r.id !== ripple.id)
-  }, 650)
+watch(
+  displayedProducts,
+  (products) => {
+    products.forEach((p, i) => animateCountUp(p, i * 50))
+  },
+  {immediate: true},
+)
 
-  // TODO: gắn logic thêm vào giỏ hàng thật ở đây
-}
+onMounted(async () => {
+  // Lắng nghe event auth-required (khi guest nhận 401 từ API)
+  window.addEventListener('auth-required', handleAuthRequired)
 
-// FOMO popup
-const fomoVisible = ref(false)
-const fomoMessage = ref('')
-const fomoSub = ref('')
-const fomoKey = ref(0)
-const fomoMessages = [
-  ['Anh T. vừa mua iPhone 15 Pro Max', 'TP. Hồ Chí Minh · 1 phút trước'],
-  ['Chỉ còn 3 chiếc Loa JBL Flip 6 cuối cùng!', 'Kho Hà Nội · vừa xong'],
-  ['Chị H. vừa đặt Samsung Galaxy S24 Ultra', 'Đà Nẵng · 3 phút trước'],
-  ['Apple Watch Series 9 sắp hết size 45mm', 'Kho Hà Nội · vừa xong'],
-  ['Anh K. vừa mua AirPods Pro 2', 'Hải Phòng · 4 phút trước'],
-]
-let fomoIdx = 0
-let fomoTimer = null
+  updateVisibleCount()
+  await nextTick()
+  measureCardWidth()
 
-const showNextFomo = () => {
-  const [msg, sub] = fomoMessages[fomoIdx % fomoMessages.length]
-  fomoMessage.value = msg
-  fomoSub.value = sub
-  fomoVisible.value = true
-  fomoKey.value++ // ép progress-bar remount để chạy lại animation từ đầu
-  fomoIdx++
-  setTimeout(() => { fomoVisible.value = false }, 4200)
-}
-
-const closeFomo = () => {
-  fomoVisible.value = false
-  clearInterval(fomoTimer)
-}
-
-// Special Effects: Falling Dots
-const fallingDotsContainer = ref(null)
-
-const createFallingDots = () => {
-  const container = fallingDotsContainer.value
-  if (!container) {
-    console.log('Container not found')
-    return
+  try {
+    await flashSaleStore.fetchClientSlots(20)
+  } catch (e) {
+    console.warn('[HomeFlashSale] không tải được dữ liệu flash sale:', e)
   }
 
-  const isMobile = window.innerWidth < 640
-  const count = isMobile ? 60 : 120
+  await nextTick()
+  measureCardWidth()
 
-  // Quãng đường rơi = đúng chiều cao thật của banner (thay vì số cứng 400px)
-  const fallDistance = container.offsetHeight || 340
+  // Đo lại sau khi ảnh load xong (ảnh có thể làm thay đổi flex/height)
+  setTimeout(() => measureCardWidth(), 350)
 
-  container.innerHTML = '' // Clear existing
+  // Refresh dữ liệu mỗi 60s để cập nhật giá/sold realtime (không spam BE)
+  refreshTimer = setInterval(() => {
+    flashSaleStore.fetchClientSlots(20).catch(() => {
+    })
+  }, 60000)
 
-  for (let i = 0; i < count; i++) {
-    const dot = document.createElement('div')
-    dot.classList.add('falling-dot')
-
-    // Random properties với distribution đều
-    const x = Math.random() * 100 // 0% - 100% spread evenly
-    const size = 3 + Math.random() * 8
-    const duration = 2.5 + Math.random() * 4 // 2.5s - 6.5s
-    const delay = Math.random() * 6 // 0s - 6s spread
-    const isWhite = Math.random() > 0.4
-
-    // Gán trực tiếp từng style property
-    dot.style.position = 'absolute'
-    dot.style.left = `${x}%`
-    dot.style.top = '-20px' // Fixed start position above
-    dot.style.width = `${size}px`
-    dot.style.height = `${size}px`
-    dot.style.background = isWhite ? '#fff' : '#fbbf24'
-    dot.style.borderRadius = '50%'
-    dot.style.setProperty('--fall-distance', `${fallDistance}px`)
-    dot.style.animationName = 'fallDown'
-    dot.style.animationDuration = `${duration}s`
-    dot.style.animationDelay = `${delay}s`
-    dot.style.animationTimingFunction = 'linear'
-    dot.style.animationIterationCount = 'infinite'
-    dot.style.boxShadow = `0 0 ${size}px ${isWhite ? 'rgba(255,255,255,0.9)' : 'rgba(251,191,36,0.9)'}`
-    dot.style.opacity = '0' // Start invisible
-
-    container.appendChild(dot)
+  resizeHandler = () => {
+    updateVisibleCount()
+    measureCardWidth()
+    if (currentIndex.value > maxIndex.value) currentIndex.value = maxIndex.value
   }
-  console.log('Created', count, 'falling dots')
-}
-
-let resizeHandler = null
-
-onMounted(() => {
-  timerInterval = setInterval(tickTimer, 1000)
-  createFallingDots()
-
-  // Tạo lại các chấm khi resize để quãng rơi luôn khớp chiều cao banner
-  resizeHandler = () => createFallingDots()
   window.addEventListener('resize', resizeHandler)
 
-  // Đếm số giá tăng dần, chạy sau khi card entrance animation gần xong, so le từng card
-  flashSaleProducts.value.forEach((product, index) => {
-    animateCountUp(product, 300 + index * 80)
-  })
-
-  setTimeout(showNextFomo, 1800)
-  fomoTimer = setInterval(showNextFomo, 6000)
+  startAutoScroll()
 })
 
 onUnmounted(() => {
-  clearInterval(timerInterval)
-  clearInterval(fomoTimer)
+  stopAutoScroll()
+  if (refreshTimer) clearInterval(refreshTimer)
   if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+  if (toastTimer) clearTimeout(toastTimer)
 })
 </script>
-
-<style scoped>
-
-</style>
-
-
-<style>
-
-</style>

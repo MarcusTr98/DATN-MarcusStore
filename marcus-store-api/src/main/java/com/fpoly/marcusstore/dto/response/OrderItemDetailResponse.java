@@ -24,4 +24,8 @@ public class OrderItemDetailResponse {
     private BigDecimal priceAtPurchase;
     private BigDecimal lineTotal;
     private List<ImeiResponse> imeis;
+    private Boolean isFlashSale;
+    private BigDecimal originalPrice;
+    private String flashSaleSlotName;
+    private List<ClientSkuAttributeValueResponse> variants;
 }

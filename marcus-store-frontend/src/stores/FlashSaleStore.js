@@ -1,8 +1,26 @@
+// Pinia store cho Flash Sale - cả Admin và Client dùng chung.
+// Admin CRUD: fetchSlots / fetchOneSlot / addSlot / updateSlot / deleteSlotById / toggleSlotStatus
+// Admin khác: fetchCascade / fetchOverlap
+// Client storefront: fetchClientSlots + getter displaySlots
+
 import { defineStore } from 'pinia'
-import flashSaleApi from '@/api/flashSaleApi.js'
+import flashSaleApi from '@/api/FlashSaleApi.js'
 
 
  // map data từ BE sang FE
+
+function formatHm(iso) {
+  if (!iso) return ''
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mm = String(d.getMinutes()).padStart(2, '0')
+    return `${hh}:${mm}`
+  } catch {
+    return ''
+  }
+}
 
 function mapSlot(slot) {
   return {
@@ -17,6 +35,77 @@ function mapSlot(slot) {
     items: Array.isArray(slot.items) ? slot.items : [],
     createdAt: slot.createdAt || null,
     updatedAt: slot.updatedAt || null,
+  }
+}
+
+// === Client side (public) — map cho storefront ===
+
+// Chuẩn hoá URL ảnh:
+//  - Nếu BE trả relative path dạng "/images/..." (ảnh sản phẩm đã được upload lên Cloudinary
+//    nhưng DB đang giữ path cũ) → map sang URL Cloudinary tương ứng.
+//  - Ngược lại, nếu là http/https → dùng luôn.
+//  - Các relative path khác (vd "/uploads/x.jpg") → ghép domain BE như cũ.
+// Lý do: BE không serve folder /images/ nên trả 404, browser block bằng ORB.
+const CLOUDINARY_CLOUD_NAME = 'dyeb3lju6'
+const CLOUDINARY_BASE = `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/image/upload/marcus-store`
+
+const BE_RESOURCE_ORIGIN = (() => {
+  const base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+  // Cắt "/api" cuối nếu có để ra origin
+  return base.replace(/\/api\/?$/, '')
+})()
+
+function resolveImageUrl(url) {
+  if (!url || typeof url !== 'string') return null
+  const trimmed = url.trim()
+  if (!trimmed) return null
+  // Đã là http/https → dùng luôn
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  // Relative path "/images/..." → redirect sang Cloudinary (giữ nguyên tên file + đuôi).
+  // BE không serve folder này; DB vẫn lưu path cũ nên ta rewrite phía FE.
+  if (/^\/?images\//i.test(trimmed)) {
+    const filename = trimmed.replace(/^\/?images\//i, '')
+    return `${CLOUDINARY_BASE}/${filename}`
+  }
+  // Relative path khác → ghép domain BE
+  const path = trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+  return `${BE_RESOURCE_ORIGIN}${path}`
+}
+
+function mapClientSlot(slot) {
+  if (!slot) return null
+  const items = Array.isArray(slot.items) ? slot.items : []
+  return {
+    slotId: slot.slotId,
+    name: slot.name,
+    bannerImageUrl: resolveImageUrl(slot.bannerImageUrl),
+    startDate: slot.startDate || null,
+    endDate: slot.endDate || null,
+    status: Number(slot.status ?? 0),
+    // Flag cho biết slot đã bị admin hủy. BE trả kèm slot CANCELLED trong cùng response
+    // để FE có thể hiển thị modal thông báo khi khách tương tác với sản phẩm thuộc slot này.
+    isCancelled: slot.isCancelled === true,
+    items: items.map((it) => ({
+      skuId: it.skuId,
+      productId: it.productId,
+      productName: it.productName,
+      skuCode: it.skuCode,
+      thumbnailUrl: resolveImageUrl(it.thumbnailUrl),
+      originalPrice: Number(it.originalPrice ?? 0),
+      flashSalePrice: Number(it.flashSalePrice ?? 0),
+      flashSaleQuantity: Number(it.flashSaleQuantity ?? 0),
+      soldQuantity: Number(it.soldQuantity ?? 0),
+      remainingQuantity: Number(it.remainingQuantity ?? 0),
+      // Tính discountPercent ở FE, không cần BE trả thêm field
+      discountPercent:
+        Number(it.originalPrice) > 0
+          ? Math.floor(
+              ((Number(it.originalPrice) - Number(it.flashSalePrice)) /
+                Number(it.originalPrice)) *
+                100,
+            )
+          : 0,
+    })),
   }
 }
 
@@ -106,7 +195,100 @@ export const useFlashSaleStore = defineStore('flashSale', {
     cascadeTree: [],
     cascadeLoading: false,
     cascadeError: null,
+
+    // === Client side (public storefront) ===
+    clientSlots: [],           // danh sách slot ACTIVE + SCHEDULED cho /khuyen-mai và home
+    clientLoading: false,
   }),
+
+  getters: {
+    // Chuẩn bị dữ liệu cho thanh timeline trên FlashSalePage.vue.
+    // Trả về tối đa 4 entry: slot đang diễn ra (live) + các slot sắp diễn ra tiếp theo.
+    displaySlots(state) {
+      if (!Array.isArray(state.clientSlots) || state.clientSlots.length === 0) return []
+      const list = []
+      const live = state.clientSlots.find((s) => Number(s.status) === 2)
+      if (live) {
+        list.push({
+          slotId: live.slotId,
+          isLive: true,
+          time: `Đang diễn ra · ${formatHm(live.startDate)}–${formatHm(live.endDate)}`,
+          startDate: live.startDate,
+          endDate: live.endDate,
+        })
+      }
+      const upcomings = state.clientSlots
+        .filter((s) => Number(s.status) === 1)
+        .slice(0, 3)
+      upcomings.forEach((s) => {
+        list.push({
+          slotId: s.slotId,
+          isLive: false,
+          time: `${formatHm(s.startDate)}`,
+          startDate: s.startDate,
+          endDate: s.endDate,
+        })
+      })
+      return list.slice(0, 4)
+    },
+    // Thống kê nhanh cho banner: tổng SP, % giảm cao nhất, label trạng thái.
+    bannerStats(state) {
+      const slots = Array.isArray(state.clientSlots) ? state.clientSlots : []
+      let totalProducts = 0
+      let maxDiscount = 0
+      let hasLive = false
+      let hasUpcoming = false
+      for (const slot of slots) {
+        const items = Array.isArray(slot.items) ? slot.items : []
+        for (const it of items) {
+          totalProducts += 1
+          const d = Number(it.discountPercent ?? 0)
+          if (d > maxDiscount) maxDiscount = d
+        }
+        if (Number(slot.status) === 2) hasLive = true
+        if (Number(slot.status) === 1) hasUpcoming = true
+      }
+      const liveLabel = hasLive ? 'ĐANG CHÁY' : (hasUpcoming ? 'SẮP DIỄN RA' : '24h')
+      const liveSubLabel = hasLive ? 'Đến lúc mua' : (hasUpcoming ? 'Chuẩn bị sẵn' : 'Chỉ hôm nay')
+      return {
+        totalProducts: totalProducts > 0 ? `${totalProducts}+` : '200+',
+        maxDiscount: maxDiscount > 0 ? `${maxDiscount}%` : '50%',
+        liveLabel,
+        liveSubLabel,
+      }
+    },
+    // Kiểm tra 1 slotId cụ thể đã bị admin hủy chưa.
+    // FE dùng để chặn click "Mua ngay" / "Thêm giỏ" khi slot CANCELLED.
+    isSlotCancelled: (state) => (slotId) => {
+      if (!Array.isArray(state.clientSlots) || slotId == null) return false
+      const slot = state.clientSlots.find((s) => s.slotId === slotId)
+      return slot ? slot.isCancelled === true : false
+    },
+    // Lấy slot theo slotId trong clientSlots. Dùng để check trạng thái slot
+    // của riêng 1 sản phẩm (tránh phụ thuộc slot ACTIVE đầu tiên - global).
+    getSlotById: (state) => (slotId) => {
+      if (!Array.isArray(state.clientSlots) || slotId == null) return null
+      return state.clientSlots.find((s) => s.slotId === slotId) || null
+    },
+    // Kiểm tra 1 slotId cụ thể có đang ACTIVE không.
+    // Tiêu chí: status=2 VÀ thời gian thực tế 'now' nằm trong [startDate, endDate).
+    // Check thêm thời gian thực tế để phòng trường hợp scheduler chưa kịp cập nhật status
+    // hoặc clientSlots bị stale sau khi admin cancel/restore.
+    isSlotActive: (state) => (slotId) => {
+      if (!Array.isArray(state.clientSlots) || slotId == null) return false
+      const slot = state.clientSlots.find((s) => s.slotId === slotId)
+      if (!slot) return false
+      // Bắt buộc status=2
+      if (Number(slot.status) !== 2) return false
+      // Check thời gian thực tế
+      const now = Date.now()
+      const startMs = slot.startDate ? new Date(slot.startDate).getTime() : null
+      const endMs = slot.endDate ? new Date(slot.endDate).getTime() : null
+      if (startMs && now < startMs) return false
+      if (endMs && now >= endMs) return false
+      return true
+    },
+  },
 
   actions: {
     async fetchSlots(params = {}) {
@@ -287,12 +469,35 @@ export const useFlashSaleStore = defineStore('flashSale', {
       }
     },
 
-    /**
-     * Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
-     * cho Flash Sale.
-     * @param {Object} options
-     * @param {boolean} options.includeOutOfStock mặc định false.
-     */
+    async restoreFlashSale(slotId) {
+      try {
+        this.loading = true
+        this.error = null
+
+        const res = await flashSaleApi.restoreFlashSale(slotId)
+        const restored = mapSlot(res.data)
+
+        const index = this.slots.findIndex((s) => s.slotId === slotId)
+        if (index !== -1) {
+          this.slots[index] = restored
+        }
+
+        return true
+      } catch (error) {
+        console.error('lỗi restoreFlashSale:', error)
+        this.error =
+          error.response?.data?.message ||
+          error.response?.data?.data ||
+          'Không thể khôi phục flash sale'
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+
+
+     // Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
+
     async fetchCascade({ includeOutOfStock = false } = {}) {
       this.cascadeLoading = true
       this.cascadeError = null
@@ -328,6 +533,33 @@ export const useFlashSaleStore = defineStore('flashSale', {
       } catch (error) {
         console.error('lỗi fetchOverlap:', error)
         return []
+      }
+    },
+
+    // === Client side (public storefront) ===
+
+     // Tải danh sách slot ACTIVE + SCHEDULED còn hiệu lực cho trang client.
+
+
+    async fetchClientSlots(limit = 20) {
+      this.clientLoading = true
+      try {
+        const res = await flashSaleApi.getActiveAndUpcoming(limit)
+        // Có 2 dạng response có thể gặp:
+        //   1. Array trực tiếp: res.data = [...]
+        //   2. ApiResponse envelope: res.data = { code, message, data: [...] }
+        const raw = res.data?.data ?? res.data ?? []
+        const list = Array.isArray(raw)
+          ? raw.map(mapClientSlot).filter(Boolean)
+          : []
+        this.clientSlots = list
+        return this.clientSlots
+      } catch (error) {
+        console.error('[FlashSaleStore] lỗi fetchClientSlots:', error)
+        this.clientSlots = []
+        return []
+      } finally {
+        this.clientLoading = false
       }
     },
   },

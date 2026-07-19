@@ -35,7 +35,9 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     private final FlashSaleItemRepository flashSaleItemRepository;
     private final ProductSkuRepository productSkuRepository;
 
-    //  Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
+
+    // Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
+
     private FlashSaleResponse toResponse(FlashSaleSlot slot,
                                          Map<Integer, Integer> qtyMap,
                                          Map<Integer, Integer> usedMap) {
@@ -50,6 +52,27 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                 .createdAt(slot.getCreatedAt())
                 .updatedAt(slot.getUpdatedAt())
                 .bannerImageUrl(slot.getBannerImageUrl())
+                // Slot CANCELLED được map từ các nơi gọi hàm này nên mặc định false.
+                .isCancelled(false)
+                .build();
+    }
+
+    // Tạo response rỗng cho slot CANCELLED — chỉ giữ thông tin slot, KHÔNG trả items[].
+    // FE dùng để nhận biết slotId đã bị admin hủy và hiển thị modal thông báo.
+    private FlashSaleResponse buildCancelledSlotResponse(FlashSaleSlot slot) {
+        return FlashSaleResponse.builder()
+                .slotId(slot.getSlotId())
+                .name(slot.getName())
+                .startDate(slot.getStartDate())
+                .endDate(slot.getEndDate())
+                .status(slot.getStatus())
+                .quantityFlashSaleSlot(0)
+                .usedQuantity(0)
+                .createdAt(slot.getCreatedAt())
+                .updatedAt(slot.getUpdatedAt())
+                .bannerImageUrl(slot.getBannerImageUrl())
+                .isCancelled(true)
+                .items(Collections.emptyList())
                 .build();
     }
 
@@ -181,7 +204,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     public Page<FlashSaleResponse> getFlashSaleSlotsPage(String keyword, Short status, Pageable pageable) {
         String normalizedKeyword = normalizeKeyword(keyword);
         Page<FlashSaleSlot> page = flashSaleSlotRepository
-                .searchFlashSaleSlots(normalizedKeyword, status, LocalDateTime.now(), pageable);
+                .searchFlashSaleSlots(normalizedKeyword, status, pageable);
 
         // Lấy tổng quantity theo batch trong 1 query duy nhất
         List<Integer> slotIds = page.getContent().stream()
@@ -252,7 +275,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productName(sku != null && sku.getProduct() != null
                             ? sku.getProduct().getProductName() : null)
                     .skuCode(sku != null ? sku.getSkuCode() : null)
-                    .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
+                    .thumbnailUrl(resolveSkuImageUrl(sku))
                     .originalPrice(item.getOriginalPrice())
                     .flashSalePrice(item.getFlashSalePrice())
                     .flashSaleQuantity(item.getFlashSaleQuantity())
@@ -348,7 +371,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productId(sku.getProduct() != null ? sku.getProduct().getProductId() : null)
                     .productName(sku.getProduct() != null ? sku.getProduct().getProductName() : null)
                     .skuCode(sku.getSkuCode())
-                    .skuImageUrl(sku.getSkuImageUrl())
+                    .thumbnailUrl(resolveSkuImageUrl(sku))
                     .originalPrice(saved.getOriginalPrice())
                     .flashSalePrice(saved.getFlashSalePrice())
                     .flashSaleQuantity(saved.getFlashSaleQuantity())
@@ -586,7 +609,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
 
         // 11. Build response giống createFlashSale để có items[] (form chỉnh sửa render lại đúng)
-        Map<Integer, ProductSku> skuMapForResponse = skuMap; // đã load ở bước 3
+        Map<Integer, ProductSku> skuMapForResponse = skuMap;
         List<FlashSaleItemResponse> itemResponses = new ArrayList<>();
         for (FlashSaleItem savedItem : savedSlot.getFlashSaleItems()) {
             ProductSku sku = skuMapForResponse.get(savedItem.getId().getSkuId());
@@ -597,7 +620,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     .productName(sku != null && sku.getProduct() != null
                             ? sku.getProduct().getProductName() : null)
                     .skuCode(sku != null ? sku.getSkuCode() : null)
-                    .skuImageUrl(sku != null ? sku.getSkuImageUrl() : null)
+                    .thumbnailUrl(resolveSkuImageUrl(sku))
                     .originalPrice(savedItem.getOriginalPrice())
                     .flashSalePrice(savedItem.getFlashSalePrice())
                     .flashSaleQuantity(savedItem.getFlashSaleQuantity())
@@ -643,25 +666,98 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         Short currentStatus = slot.getStatus();
 
-        // 3. Chặn đổi status nếu slot đang ở trạng thái đã đóng (2/3/4)
-        //    Slot ACTIVE/ENDED/CANCELLED là bất biến — chỉ scheduler được phép đổi.
-        if (currentStatus != null && currentStatus != 1) {
+        // 3. Chặn đổi status nếu slot đang ở trạng thái đã đóng (3/4)
+        //    Slot ENDED/CANCELLED là bất biến — chỉ scheduler được phép đổi.
+        //    Cho phép hủy: SCHEDULED (1) và ACTIVE (2) → CANCELLED (4)
+        if (currentStatus != null && currentStatus != 1 && currentStatus != 2) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "Không thể đổi trạng thái của slot đang ở trạng thái '"
-                            + currentStatus + "'. Chỉ cho phép hủy slot SCHEDULED (status = 1).");
+                            + currentStatus + "'. Chỉ cho phép hủy slot SCHEDULED (status = 1) hoặc ACTIVE (status = 2).");
         }
 
-        // 4. Từ SCHEDULED chỉ cho đi tới CANCELLED (status = 4)
-        if (currentStatus == 1 && status != 4) {
+        // 4. Từ SCHEDULED (1) hoặc ACTIVE (2) chỉ cho đi tới CANCELLED (status = 4)
+        if ((currentStatus == 1 || currentStatus == 2) && status != 4) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "Chỉ cho phép hủy slot SCHEDULED (chuyển sang CANCELLED = 4).");
+                    "Chỉ cho phép hủy slot SCHEDULED hoặc ACTIVE (chuyển sang CANCELLED = 4).");
         }
         slot.setStatus(status);
         flashSaleSlotRepository.save(slot);
         log.info("[FlashSale] Admin đổi status slot #{}: {} → {}", slotId, currentStatus, status);
         return buildSlotDetailResponse(slot);
+    }
+
+    /**
+     * Khôi phục Flash Sale đã bị hủy (CANCELLED) để tiếp tục chạy trong khoảng thời gian còn lại.
+     *
+     * Điều kiện 1: Thời gian khôi phục
+     * - Chỉ được phép khôi phục khi Flash Sale vẫn còn trong thời gian hiệu lực ban đầu.
+     * - Thời điểm thực hiện khôi phục phải cách thời điểm kết thúc (End Time) tối thiểu 1 tiếng.
+     *
+     * Điều kiện 2: Tránh trùng lặp khung giờ (No Overlapping)
+     * - Kiểm tra xem có Flash Sale nào khác đang ACTIVE (2) hoặc SCHEDULED (1)
+     *   trùng với khoảng thời gian còn lại [now, endDate] hay không.
+     * - Nếu có bất kỳ Flash Sale nào bị trùng, không cho phép khôi phục.
+     *
+     * Khi khôi phục thành công, trạng thái chuyển sang ACTIVE (2).
+     */
+    @Override
+    @Transactional
+    public FlashSaleResponse restoreFlashSale(Integer slotId) {
+        // 1. Tìm slot, 404 nếu không có
+        FlashSaleSlot slot = flashSaleSlotRepository.findById(slotId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy flash sale với id: " + slotId));
+
+        // 2. Validate slot phải ở trạng thái CANCELLED (4)
+        Short currentStatus = slot.getStatus();
+        if (currentStatus != 4) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Chỉ có thể khôi phục các flash sale đã bị hủy (CANCELLED). Trạng thái hiện tại: " + currentStatus);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime endDate = slot.getEndDate();
+        LocalDateTime restoreDeadline = endDate.minusHours(1);
+
+        // 3. Điều kiện 1: Kiểm tra thời gian khôi phục
+        //    now phải < (endDate - 1 tiếng) để còn ít nhất 1 tiếng chạy
+        if (!now.isBefore(restoreDeadline)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Đã quá thời hạn khôi phục. Flash Sale kết thúc lúc " + endDate
+                            + ", phải khôi phục trước " + restoreDeadline + " (ít nhất 1 tiếng trước khi kết thúc).");
+        }
+
+        // 4. Điều kiện 2: Kiểm tra overlap với các slot khác
+        //    Tìm các slot ACTIVE (2) hoặc SCHEDULED (1) trùng với [now, endDate]
+        List<FlashSaleSlot> overlappingSlots = flashSaleSlotRepository
+                .findOverlappingSlotsForRestore(now, endDate, slotId);
+
+        if (!overlappingSlots.isEmpty()) {
+            String detail = overlappingSlots.stream()
+                    .map(s -> String.format("#%d '%s' (%s → %s, status=%d)",
+                            s.getSlotId(),
+                            s.getName(),
+                            s.getStartDate(),
+                            s.getEndDate(),
+                            s.getStatus()))
+                    .collect(Collectors.joining("; "));
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Không thể khôi phục do trùng khung giờ với các flash sale khác: " + detail);
+        }
+
+        // 5. Khôi phục: Chuyển status về ACTIVE (2) để tiếp tục chạy
+        slot.setStatus((short) 2);
+        FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
+
+        log.info("[FlashSale] Admin khôi phục slot #{}: {} → ACTIVE, endDate={}, now={}",
+                slotId, currentStatus, endDate, now);
+        return buildSlotDetailResponse(savedSlot);
     }
 
     // Kiểm tra khoảng thời gian có đang đụng với slot khác không.
@@ -695,6 +791,72 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         return overlapping.stream()
                 .map(s -> toResponse(s, qtyMap, usedMap))
                 .toList();
+    }
+
+    // Lấy danh sách slot "đang diễn ra" + "sắp diễn ra gần nhất" cho client.
+    // Trả về FlashSaleResponse kèm items[], đã sắp xếp đúng thứ tự ưu tiên.
+    //
+    // Bổ sung: còn trả thêm các slot đã bị admin hủy (CANCELLED = 4) mà có khoảng thời gian
+    // overlap với [now, now+2h]. Slot CANCELLED không có items[] và được đánh dấu isCancelled=true.
+    // Mục đích: FE nhận biết slotId nào đã bị hủy để hiển thị modal thông báo khi khách tương tác.
+    @Override
+    @Transactional(readOnly = true)
+    public List<FlashSaleResponse> getActiveAndUpcomingFlashSaleSlots(int limit) {
+        LocalDateTime now = LocalDateTime.now();
+
+        // 1. Lấy tất cả slot ACTIVE đang chạy + TẤT CẢ slot SCHEDULED trong tương lai
+        //    (không giới hạn thời gian - lấy slot gần nhất dù xa đến đâu)
+        List<FlashSaleSlot> slots = flashSaleSlotRepository
+                .findActiveAndUpcomingSlots(now);
+
+        if (slots == null || slots.isEmpty()) {
+            // Vẫn tiếp tục xử lý slot CANCELLED ở bước 6 bên dưới
+            slots = new ArrayList<>();
+        }
+
+        // 2. Phân tách 2 nhóm để sort theo đúng ưu tiên nghiệp vụ
+        List<FlashSaleSlot> activeGroup = new ArrayList<>();
+        List<FlashSaleSlot> upcomingGroup = new ArrayList<>();
+        for (FlashSaleSlot s : slots) {
+            Short status = s.getStatus();
+            if (status != null && status == 2) {
+                activeGroup.add(s);
+            } else if (status != null && status == 1) {
+                upcomingGroup.add(s);
+            }
+        }
+
+        // 3. Sắp xếp theo yêu cầu nghiệp vụ:
+        //    - Nhóm ACTIVE: endDate ASC (slot kết thúc gần nhất đứng trước)
+        //    - Nhóm SCHEDULED: startDate ASC (slot bắt đầu sớm nhất đứng trước)
+        activeGroup.sort(Comparator.comparing(FlashSaleSlot::getEndDate));
+        upcomingGroup.sort(Comparator.comparing(FlashSaleSlot::getStartDate));
+
+        // 4. Ghép 2 nhóm: ACTIVE trước, SCHEDULED sau; áp dụng limit
+        List<FlashSaleSlot> combined = new ArrayList<>(activeGroup.size() + upcomingGroup.size());
+        combined.addAll(activeGroup);
+        combined.addAll(upcomingGroup);
+        if (limit > 0 && combined.size() > limit) {
+            combined = combined.subList(0, limit);
+        }
+
+        // 5. Build response kèm items[] cho từng slot
+        //    (1 query batch mỗi slot - số slot client hiển thị thường rất nhỏ)
+        List<FlashSaleResponse> result = new ArrayList<>(combined.size());
+        for (FlashSaleSlot slot : combined) {
+            result.add(buildSlotDetailResponse(slot));
+        }
+
+        // 6. Bổ sung slot CANCELLED (đã bị admin hủy) trong khung [now, now+2h]
+        //    để FE nhận biết slotId nào đã bị hủy. Không áp dụng limit.
+        LocalDateTime cancelledWindow = now.plusHours(2);
+        List<FlashSaleSlot> cancelledSlots = flashSaleSlotRepository
+                .findCancelledSlotsInRange(now, cancelledWindow);
+        for (FlashSaleSlot slot : cancelledSlots) {
+            result.add(buildCancelledSlotResponse(slot));
+        }
+
+        return result;
     }
 
     // SCHEDULED: Tự động chuyển trạng thái flash sale theo thời gian
@@ -735,5 +897,14 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                     overdue.stream().map(FlashSaleSlot::getSlotId).toList());
         }
     }
-}
 
+    /**
+     * Lấy ảnh đại diện cho SKU từ Product cha (product.thumbnailUrl).
+     * Giữ nguyên sku.skuImageUrl trong DB, không xóa.
+     */
+    private String resolveSkuImageUrl(ProductSku sku) {
+        if (sku == null || sku.getProduct() == null) return null;
+        String thumb = sku.getProduct().getThumbnailUrl();
+        return (thumb != null && !thumb.isBlank()) ? thumb : null;
+    }
+}

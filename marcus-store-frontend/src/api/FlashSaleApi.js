@@ -32,12 +32,15 @@ const flashSaleApi = {
     return api.patch(`/admin/flashsale/${slotId}/status`, { status })
   },
 
-  /**
-   * Lấy cây brand -> categoryL2 -> sku để admin chọn sản phẩm cho Flash Sale.
-   * @param {Object} options
-   * @param {boolean} options.includeOutOfStock - true = lấy cả SKU hết hàng
-   *   (stockQuantity = 0). Mặc định false cho modal Flash Sale.
-   */
+  // Khôi phục flash sale đã bị hủy (CANCELLED -> ACTIVE)
+  restoreFlashSale(slotId) {
+    return api.post(`/admin/flashsale/${slotId}/restore`)
+  },
+
+
+   //Lấy cây brand -> categoryL2 -> sku để admin chọn sản phẩm cho Flash Sale.
+
+
   getProductCascade({ includeOutOfStock = false } = {}) {
     return api.get('/admin/products/cascade', {
       params: { includeOutOfStock },
@@ -52,6 +55,13 @@ const flashSaleApi = {
     return api.get('/admin/flashsale/check-overlap', {
       params: { startDate, endDate, excludeSlotId },
     })
+  },
+
+  // === Public endpoint cho client storefront ===
+  // Lấy các slot ACTIVE + SCHEDULED còn hiệu lực (kèm items[]).
+  // FE tự lấy phần tử đầu làm featured (BE đã sort ACTIVE trước theo startDate ASC).
+  getActiveAndUpcoming(limit = 20) {
+    return api.get('/home/flashsales', { params: { limit } })
   },
 
   /**

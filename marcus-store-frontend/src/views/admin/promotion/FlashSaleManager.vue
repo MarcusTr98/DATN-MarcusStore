@@ -162,12 +162,23 @@
                 </button>
                 <!-- Slot SCHEDULED/UPCOMING: nút Hủy chiến dịch (SCHEDULED sẽ chuyển sang CANCELLED, các trạng thái khác sẽ xóa) -->
                 <button
-                  v-else
+                  v-else-if="Number(slot.status) === 1 || Number(slot.status) === 2"
                   class="icon-button danger ms-1"
-                  :title="Number(slot.status) === 1 ? 'Hủy chiến dịch' : 'Xóa'"
+                  :title="Number(slot.status) === 1 ? 'Hủy chiến dịch' : 'Hủy chiến dịch đang chạy'"
                   @click="openDelModal(slot)"
                 >
                   <i class="bi bi-trash3"></i>
+                </button>
+                <!-- Slot CANCELLED: nút Khôi phục -->
+                <button
+                  v-if="Number(slot.status) === 4"
+                  class="icon-button restore ms-1"
+                  :class="{ 'icon-button-disabled': !canRestoreSlot(slot) }"
+                  :title="restoreReason(slot)"
+                  :disabled="!canRestoreSlot(slot)"
+                  @click="openRestoreModal(slot)"
+                >
+                  <i class="bi bi-arrow-counterclockwise"></i>
                 </button>
               </td>
             </tr>
@@ -231,7 +242,6 @@
     <div
       class="modal-backdrop-custom"
       v-if="isModalOpen"
-      @click.self="closeModal"
     >
       <div class="flashsale-modal">
         <div class="modal-head">
@@ -472,6 +482,7 @@
           <!-- TABS -->
           <div class="fs-tabs">
             <button
+              type="button"
               class="fs-tab-btn"
               :class="{ active: activeTab === 0 }"
               :disabled="formLocked"
@@ -480,6 +491,7 @@
               <i class="bi bi-box-seam"></i> Chọn sản phẩm
             </button>
             <button
+              type="button"
               class="fs-tab-btn"
               :class="{ active: activeTab === 1 }"
               :disabled="formLocked"
@@ -668,18 +680,33 @@
                 <thead>
                 <tr>
                   <th>Sản phẩm</th>
-                  <th>Giá gốc</th>
-                  <th>Giá Flash Sale</th>
-                  <th>Chiết khấu (%)</th>
-                  <th>Số lượng</th>
+                  <th class="text-end">Giá gốc</th>
+                  <th class="text-center">Giá Flash Sale</th>
+                  <th class="text-center">Chiết khấu (%)</th>
+                  <th class="text-center">Số lượng</th>
                   <th></th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr v-for="pid in selectedItemPids" :key="pid">
-                  <td><strong>{{ getProductName(pid) }}</strong></td>
-                  <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div class="fs-sel-thumb">
+                        <img
+                          v-if="getSku(pid)?.thumbnailUrl"
+                          :src="getSku(pid).thumbnailUrl"
+                          :alt="getSku(pid)?.productName"
+                        />
+                        <i v-else class="bi bi-image"></i>
+                      </div>
+                      <div class="fs-sel-name-wrap">
+                        <div class="fs-sel-name">{{ getSku(pid)?.productName || `Sản phẩm #${pid}` }}</div>
+                        <div class="fs-sel-sku">SKU: {{ getSku(pid)?.skuCode || pid }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-end">{{ formatVND(getProductPrice(pid)) }}</td>
+                  <td class="text-center">
                     <input
                       type="text"
                       inputmode="numeric"
@@ -694,7 +721,7 @@
                       {{ errors[`item_${pid}_price`] }}
                     </div>
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"
@@ -705,7 +732,7 @@
                       max="100"
                     />
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"
@@ -806,18 +833,33 @@
                 <thead>
                 <tr>
                   <th>Sản phẩm</th>
-                  <th>Giá gốc</th>
-                  <th>Giá Flash Sale</th>
-                  <th>Chiết khấu (%)</th>
-                  <th>Số lượng</th>
+                  <th class="text-end">Giá gốc</th>
+                  <th class="text-center">Giá Flash Sale</th>
+                  <th class="text-center">Chiết khấu (%)</th>
+                  <th class="text-center">Số lượng</th>
                   <th></th>
                 </tr>
                 </thead>
                 <tbody>
                 <tr v-for="pid in selectedItemPids" :key="pid">
-                  <td><strong>{{ getProductName(pid) }}</strong></td>
-                  <td>{{ formatVND(getProductPrice(pid)) }}</td>
                   <td>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                      <div class="fs-sel-thumb">
+                        <img
+                          v-if="getSku(pid)?.thumbnailUrl"
+                          :src="getSku(pid).thumbnailUrl"
+                          :alt="getSku(pid)?.productName"
+                        />
+                        <i v-else class="bi bi-image"></i>
+                      </div>
+                      <div class="fs-sel-name-wrap">
+                        <div class="fs-sel-name">{{ getSku(pid)?.productName || `Sản phẩm #${pid}` }}</div>
+                        <div class="fs-sel-sku">SKU: {{ getSku(pid)?.skuCode || pid }}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-end">{{ formatVND(getProductPrice(pid)) }}</td>
+                  <td class="text-center">
                     <input
                       type="text"
                       inputmode="numeric"
@@ -832,7 +874,7 @@
                       {{ errors[`item_${pid}_price`] }}
                     </div>
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"
@@ -843,7 +885,7 @@
                       max="100"
                     />
                   </td>
-                  <td>
+                  <td class="text-center">
                     <input
                       type="number"
                       class="fs-input"
@@ -890,23 +932,34 @@
               <i class="bi bi-arrow-counterclockwise"></i>Làm mới
             </button>
 
-            <!-- Ẩn hoàn toàn nút Lưu khi slot bị khóa; chỉ hiện nút Đóng -->
+            <!-- Khi slot ACTIVE đang mở (formLocked=true): hiện nút "Hủy Flash Sale" thay vì "Đóng" -->
             <button
-              v-if="!formLocked"
+              v-if="formLocked && editSlot && Number(editSlot.status) === 2"
+              type="button"
+              class="btn btn-primary-action"
+              style="background:#dc3545"
+              @click="openCancelFromModal"
+            >
+              <i class="bi bi-x-circle-fill"></i> Hủy Flash Sale
+            </button>
+            <!-- Khi slot không phải ACTIVE (formLocked=true): hiện nút Đóng -->
+            <button
+              v-else-if="formLocked"
+              type="button"
+              class="btn btn-primary-action"
+              @click="closeModal"
+            >
+              <i class="bi bi-x-circle"></i> Đóng
+            </button>
+            <!-- Khi slot SCHEDULED: hiện nút Lưu -->
+            <button
+              v-else
               type="submit"
               class="btn btn-primary-action"
               :disabled="saving || bannerUploading"
             >
               <i class="bi bi-check2-circle"></i>
               {{ saving || bannerUploading ? 'Đang xử lý...' : 'Lưu chiến dịch' }}
-            </button>
-            <button
-              v-else
-              type="button"
-              class="btn btn-primary-action"
-              @click="closeModal"
-            >
-              <i class="bi bi-x-circle"></i> Đóng
             </button>
           </div>
 
@@ -931,14 +984,15 @@
     <div
       class="modal-backdrop-custom"
       v-if="showDelModal"
-      @click.self="closeDelModal"
     >
       <div class="flashsale-modal flashsale-modal--sm">
         <div class="modal-head">
           <div>
             <h2>{{ isCancellingSlot ? 'Hủy chiến dịch này?' : 'Xóa chiến dịch này?' }}</h2>
             <p>{{ isCancellingSlot
-              ? 'Chiến dịch sẽ chuyển sang trạng thái "Đã hủy" và được đẩy xuống cuối bảng.'
+              ? (Number(delTarget?.status) === 2
+                ? 'Chiến dịch đang diễn ra sẽ bị hủy và chuyển sang trạng thái "Đã hủy".'
+                : 'Chiến dịch sẽ chuyển sang trạng thái "Đã hủy" và được đẩy xuống cuối bảng.')
               : 'Hành động này không thể hoàn tác.' }}
             </p>
           </div>
@@ -953,7 +1007,9 @@
               <div>
                 <h3>{{ delTarget?.name }}</h3>
                 <p>{{ isCancellingSlot
-                  ? 'Chiến dịch sẽ bị hủy và có thể xem lại ở trạng thái "Đã hủy".'
+                  ? (Number(delTarget?.status) === 2
+                    ? 'Chiến dịch đang diễn ra sẽ bị hủy ngay lập tức và có thể khôi phục lại sau.'
+                    : 'Chiến dịch sẽ bị hủy và có thể xem lại ở trạng thái "Đã hủy".')
                   : 'Chiến dịch sẽ bị xóa vĩnh viễn khỏi hệ thống.' }}
                 </p>
               </div>
@@ -1007,6 +1063,49 @@
       :slot-id="detailSlotId"
       @close="closeDetailModal"
     />
+
+    <!-- RESTORE CONFIRM MODAL -->
+    <div
+      class="modal-backdrop-custom"
+      v-if="showRestoreModal"
+    >
+      <div class="flashsale-modal flashsale-modal--sm">
+        <div class="modal-head">
+          <div>
+            <h2>Khôi phục chiến dịch này?</h2>
+            <p>Chiến dịch sẽ tiếp tục chạy cho đến khi kết thúc.</p>
+          </div>
+          <button class="modal-close-btn" @click="closeRestoreModal">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+        <div class="voucher-form">
+          <div class="form-section">
+            <div class="section-title">
+              <span><i class="bi bi-arrow-counterclockwise"></i></span>
+              <div>
+                <h3>{{ restoreTarget?.name }}</h3>
+                <p>Flash Sale sẽ chuyển sang trạng thái "Đang diễn ra" và tiếp tục hoạt động.</p>
+              </div>
+            </div>
+            <div v-if="restoreTarget?.endDate" class="alert alert-info mt-2">
+              <i class="bi bi-info-circle-fill me-2"></i>
+              <strong>Lưu ý:</strong> Flash Sale kết thúc lúc {{ formatDateTime(restoreTarget.endDate) }}.
+              Bạn chỉ có thể khôi phục trước thời điểm này ít nhất 1 tiếng.
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-soft" @click="closeRestoreModal">
+              <i class="bi bi-x-circle"></i>Hủy bỏ
+            </button>
+            <button type="button" class="btn-primary-action" style="background:#198754" @click="confirmRestore">
+              <i class="bi bi-arrow-counterclockwise"></i>
+              Khôi phục
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 <script setup>
@@ -1023,7 +1122,7 @@ const {
   cascadeTree, cascadeLoading, cascadeError,
 } = storeToRefs(flashSaleStore)
 
-const now = new Date()
+
 
 /* ── FILTERS ── */
 const filters = reactive({
@@ -1130,10 +1229,6 @@ const slotsWithStatus = computed(() =>
     })
 )
 
-const filteredSlots = computed(() => {
-  return slotsWithStatus.value
-})
-
 function formatVND(value) {
   if (value === null || value === undefined || value === '') return '-'
   return new Intl.NumberFormat('vi-VN', {
@@ -1230,6 +1325,29 @@ function isSlotExhausted(slot) {
   return total > 0 && used >= total
 }
 
+// Kiểm tra slot có thể khôi phục hay không (chỉ áp dụng cho CANCELLED)
+function canRestoreSlot(slot) {
+  if (Number(slot.status) !== 4) return false
+  if (!slot.endDate) return false
+  const endDate = new Date(slot.endDate)
+  const now = new Date()
+  const deadline = new Date(endDate.getTime() - 60 * 60 * 1000) // endDate - 1 tiếng
+  return now < deadline
+}
+
+// Lý do không thể khôi phục (tooltip)
+function restoreReason(slot) {
+  if (Number(slot.status) !== 4) return 'Slot không ở trạng thái đã hủy'
+  if (!slot.endDate) return 'Slot không có thông tin thời gian kết thúc'
+  const endDate = new Date(slot.endDate)
+  const now = new Date()
+  const deadline = new Date(endDate.getTime() - 60 * 60 * 1000)
+  if (now >= deadline) {
+    return `Đã quá thời hạn khôi phục (phải trước ${deadline.toLocaleString('vi-VN')})`
+  }
+  return 'Có thể khôi phục'
+}
+
 // Tooltip hiển thị thông tin sử dụng
 function getUsedTitle(slot) {
   const used = slot.usedQuantity ?? 0
@@ -1263,12 +1381,6 @@ function openBannerPreview(url) {
 
 function closeBannerPreview() {
   bannerLightboxUrl.value = ''
-}
-
-function onKeyDown(e) {
-  if (e.key === 'Escape' && bannerPreviewUrl.value) {
-    closeBannerPreview()
-  }
 }
 
 const defaultForm = {
@@ -1735,18 +1847,6 @@ function openCreateModal() {
   flashSaleStore.fetchCascade({ includeOutOfStock: false })
 }
 
-/**
- * Khi admin click nút Sửa trên slot đã khóa → mở form view-only (không toast).
- * Helper này hiện không được gọi trực tiếp nhưng giữ lại để dùng cho test/debug.
- */
-// eslint-disable-next-line no-unused-vars
-function onLockedEditClick(slot) {
-  showToast({
-    type: 'warning',
-    title: 'Không thể chỉnh sửa',
-    message: lockReason(slot),
-  })
-}
 
 /**
  * Mở modal Xem chi tiết thống kê cho slot đã ACTIVE/ENDED/CANCELLED/PENDING.
@@ -2006,7 +2106,7 @@ const delTarget = ref(null)
 
 // Slot ở trạng thái SCHEDULED (status = 1) khi bấm Xóa sẽ được hủy (đổi sang CANCELLED = 4)
 // chứ không xóa vĩnh viễn. Cờ này dùng để đổi text/tooltip của modal xác nhận.
-const isCancellingSlot = computed(() => Number(delTarget.value?.status) === 1)
+const isCancellingSlot = computed(() => Number(delTarget.value?.status) === 1 || Number(delTarget.value?.status) === 2)
 
 function openDelModal(slot) {
   delTarget.value = slot
@@ -2018,26 +2118,68 @@ function closeDelModal() {
   delTarget.value = null
 }
 
+// === Khôi phục Flash Sale đã hủy ===
+const showRestoreModal = ref(false)
+const restoreTarget = ref(null)
+
+function openRestoreModal(slot) {
+  restoreTarget.value = slot
+  showRestoreModal.value = true
+}
+
+function closeRestoreModal() {
+  showRestoreModal.value = false
+  restoreTarget.value = null
+}
+
+// Mở modal hủy từ bên trong modal xem chi tiết (khi slot ACTIVE)
+function openCancelFromModal() {
+  if (!editSlot.value) return
+  delTarget.value = { ...editSlot.value }
+  showDelModal.value = true
+}
+
+async function confirmRestore() {
+  if (!restoreTarget.value) return
+  const target = restoreTarget.value
+
+  const ok = await flashSaleStore.restoreFlashSale(target.slotId)
+  if (ok) {
+    await loadSlots()
+    showToast({
+      type: 'success',
+      title: 'Thành công',
+      message: 'Đã khôi phục chiến dịch Flash Sale.',
+    })
+    closeRestoreModal()
+  } else {
+    showToast({
+      type: 'error',
+      title: 'Lỗi',
+      message: flashSaleStore.error || 'Không thể khôi phục Flash Sale.',
+    })
+    closeRestoreModal()
+  }
+}
+
 async function confirmDel() {
   if (!delTarget.value) return
   const target = delTarget.value
-  const isScheduled = Number(target.status) === 1
+  const currentStatus = Number(target.status)
 
-  // CHỈ những slot ở trạng thái SCHEDULED (status = 1) mới được "Hủy chiến dịch".
-  // Tất cả trạng thái khác (ACTIVE/ENDED/CANCELLED) đều đã khóa (nút Xóa bị ẩn).
-  // Giữ nhánh này để tương thích với logic cũ + defense in depth.
-  if (isScheduled) {
+  // Slot SCHEDULED (1) hoặc ACTIVE (2): hủy bằng cách đổi sang CANCELLED (4)
+  if (currentStatus === 1 || currentStatus === 2) {
     const ok = await flashSaleStore.toggleSlotStatus(target.slotId, 4)
     if (ok) {
-      const idx = slots.value.findIndex((s) => s.slotId === target.slotId)
-      if (idx !== -1) {
-        slots.value[idx] = { ...slots.value[idx], status: 4 }
-      }
+      // Đóng modal xem chi tiết nếu đang mở
+      closeModal()
       await loadSlots()
       showToast({
         type: 'success',
         title: 'Thành công',
-        message: 'Đã hủy chiến dịch Flash Sale.',
+        message: currentStatus === 2
+          ? 'Đã hủy chiến dịch đang diễn ra.'
+          : 'Đã hủy chiến dịch Flash Sale.',
       })
       closeDelModal()
     } else {
@@ -2051,19 +2193,13 @@ async function confirmDel() {
     return
   }
 
-  // Fallback: còn nhánh deleteSlotById cho trường hợp đặc biệt (hiện không dùng).
-  const ok = await flashSaleStore.deleteSlotById(target.slotId)
-  if (ok) {
-    showToast({type: 'success', title: 'Thành công', message: 'Đã xóa Flash Sale.'})
-    closeDelModal()
-  } else {
-    showToast({
-      type: 'error',
-      title: 'Lỗi',
-      message: flashSaleStore.error || 'Không thể xóa Flash Sale.',
-    })
-    closeDelModal()
-  }
+  // Trạng thái khác (ENDED/CANCELLED): không cho xóa
+  showToast({
+    type: 'warning',
+    title: 'Không thể thực hiện',
+    message: 'Flash Sale ở trạng thái này không thể xóa.',
+  })
+  closeDelModal()
 }
 
 
@@ -2121,230 +2257,5 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* === Banner thumbnail trong bảng === */
-.banner-thumb {
-  width: 96px;
-  height: 48px;
-  border-radius: 6px;
-  overflow: hidden;
-  cursor: zoom-in;
-  border: 1px solid #e5e7eb;
-  background: #f8fafc;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.banner-thumb:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-.banner-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
 
-/* === Icon button khi bị khóa (slot ACTIVE/ENDED/CANCELLED/PENDING) — LÀM ĐẬM === */
-/* Mục đích: nút 👁️ vẫn phải nổi bật, dễ click, dễ thấy */
-.icon-button-locked {
-  opacity: 1 !important;          /* KHÔNG mờ icon */
-  cursor: pointer !important;     /* vẫn click được mở form */
-  color: #2563eb;                 /* xanh dương đậm thay vì xám */
-  font-weight: 700;
-  transform: scale(1.08);         /* phóng to nhẹ để nổi bật */
-  transition: transform 0.15s ease, color 0.15s ease;
-}
-.icon-button-locked:hover {
-  color: #1d4ed8;
-  transform: scale(1.15);
-  background: rgba(37, 99, 235, 0.08);
-}
-.icon-button-locked i {
-  font-size: 1.1em;               /* icon to hơn */
-  font-weight: 700;
-}
-.icon-button.danger {
-  color: #dc2626;
-  font-weight: 700;
-}
-.icon-button.danger:hover {
-  color: #b91c1c;
-  background: rgba(220, 38, 38, 0.08);
-}
-.icon-button.danger i {
-  font-size: 1.1em;
-}
-
-/* === Icon button Xem chi tiết thống kê (slot đã ACTIVE/ENDED/CANCELLED/PENDING) === */
-/* Màu teal/cyan đậm để phân biệt với nút Sửa (xanh) và Xóa (đỏ) */
-.icon-button-detail {
-  color: #0891b2;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.15s ease, color 0.15s ease, background 0.15s ease;
-}
-.icon-button-detail:hover {
-  color: #0e7490;
-  background: rgba(8, 145, 178, 0.10);
-  transform: scale(1.08);
-}
-.icon-button-detail:active {
-  transform: scale(0.96);
-}
-.icon-button-detail i {
-  font-size: 1.1em;
-}
-
-/* === Banner cảnh báo trong modal khi slot bị khóa === */
-.fs-locked-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 24px;
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
-  border: 1px solid #ffc107;
-  border-radius: 8px;
-  color: #7a5d00;
-}
-.fs-locked-banner i {
-  font-size: 24px;
-  color: #b8860b;
-  flex-shrink: 0;
-}
-.fs-locked-banner > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.fs-locked-banner strong {
-  font-size: 14px;
-  color: #5c4400;
-}
-.fs-locked-banner span {
-  font-size: 13px;
-  color: #7a5d00;
-}
-
-/* === Banner file label bị khóa === */
-.fs-banner-file-locked {
-  opacity: 0.5;
-  cursor: not-allowed !important;
-  pointer-events: none;
-  background-color: #f3f4f6;
-}
-
-/* === View-only mode: MỜ NHẸ 30% + giữ form dễ đọc === */
-/* Khi admin mở form edit slot đã ACTIVE/ENDED/CANCELLED/PENDING */
-.form-locked-view .form-section,
-.form-locked-view .fs-tabs,
-.form-locked-view .fs-tab-content,
-.form-locked-view .fs-sel-table-wrap {
-  opacity: 0.7;                  /* mờ 30% (1 - 0.7 = 30%) */
-}
-/* BỎ overlay xám phủ — không cần vì input đã được readonly + mờ 30% */
-.form-locked-view .form-section::after,
-.form-locked-view .fs-tab-content::after {
-  display: none;
-}
-
-/* Input/select/textarea readonly → mờ nhẹ + nền xám nhẹ + cursor */
-.form-locked-view input[readonly],
-.form-locked-view textarea[readonly],
-.form-locked-view select[readonly] {
-  background-color: #f9fafb !important;   /* xám rất nhạt */
-  color: #4b5563 !important;              /* chữ xám đậm để dễ đọc */
-  cursor: default !important;             /* default thay vì not-allowed vì vẫn select được */
-  border-color: #e5e7eb !important;
-}
-/* KHÔNG làm mờ input/select thêm — đã mờ 30% ở container rồi */
-.form-locked-view input[readonly],
-.form-locked-view textarea[readonly] {
-  opacity: 1;
-}
-.form-locked-view input[readonly]:focus,
-.form-locked-view textarea[readonly]:focus {
-  box-shadow: none !important;
-  outline: none !important;
-}
-
-/* Button/file bị disabled → KHÔNG mờ thêm (đã mờ ở container 30%) */
-.form-locked-view button:disabled,
-.form-locked-view input[type="file"]:disabled {
-  opacity: 1;
-  cursor: not-allowed !important;
-  pointer-events: none;
-}
-
-/* Cascade/cat trigger khi locked */
-.form-locked-view .fs-cascade-trigger,
-.form-locked-view .fs-cat-trigger {
-  opacity: 1;
-  background-color: #f9fafb !important;
-  cursor: not-allowed !important;
-  pointer-events: none;
-}
-
-/* Tabs cũng bị mờ nhẹ */
-.form-locked-view .fs-tab-btn:disabled {
-  opacity: 1;
-  cursor: not-allowed !important;
-}
-
-/* === Banner lightbox === */
-.banner-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  background: rgba(15, 23, 42, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  outline: none;
-  cursor: zoom-out;
-}
-.banner-lightbox-img {
-  max-width: 90vw;
-  max-height: 90vh;
-  object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-  background: #fff;
-  cursor: default;
-}
-.banner-lightbox-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.92);
-  color: #111827;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-.banner-lightbox-close:hover {
-  background: #fff;
-  transform: rotate(90deg);
-}
-
-/* Fade transition cho lightbox */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
 </style>

@@ -28,16 +28,20 @@ function mapVoucher(voucher) {
   }
 }
 
-function mapFieldErrors(errors = {}) {
+function mapFieldErrors(errors) {
+  if (!errors || typeof errors !== 'object') {
+    return {}
+  }
+
   const mappedErrors = {
     voucher_code: errors.voucherCode,
-  discount_value: errors.discountValue,
-  discount_type: errors.discountType,
-  max_discount_amount: errors.maxDiscountAmount,
-  min_order_value: errors.minOrderValue,
-  start_date: errors.startDate,
-  end_date: errors.endDate,
-}
+    discount_value: errors.discountValue,
+    discount_type: errors.discountType,
+    max_discount_amount: errors.maxDiscountAmount,
+    min_order_value: errors.minOrderValue,
+    start_date: errors.startDate,
+    end_date: errors.endDate,
+  }
 
   return Object.fromEntries(
     Object.entries(mappedErrors).filter(([, message]) => Boolean(message))

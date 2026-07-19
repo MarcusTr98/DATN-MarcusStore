@@ -46,7 +46,6 @@ public class FlashSaleSlot {
     @OneToMany(mappedBy = "slot", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FlashSaleItem> flashSaleItems = new ArrayList<>();
 
-
     @Column(name = "banner_image_url", length = 500)
     private String bannerImageUrl;
 }

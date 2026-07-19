@@ -21,6 +21,7 @@ public class OrderTransactionService {
                 .type(type)
                 .status(status)
                 .note(note)
+                .isReconciled(false)
                 .build();
         transactionRepository.save(trans);
     }

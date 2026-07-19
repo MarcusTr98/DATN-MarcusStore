@@ -261,7 +261,7 @@
               <div class="modal-body-grid compact voucher-main-grid">
                 <div class="voucher-code-field">
                   <label class="form-label">Mã voucher <span>*</span></label>
-                  <div class="voucher-code-control">
+                    <div class="voucher-code-control">
                     <input
                       v-model.trim="form.voucher_code"
                       type="text"
@@ -276,15 +276,8 @@
                     </button>
                   </div>
                   <div class="voucher-code-footer">
-                    <span class="voucher-char-count" :class="{ 'near-limit': codeLength >= 10, 'at-limit': codeLength >= 12 }">
-                      {{ codeLength }}/12 ký tự
-                    </span>
-                    <span v-if="codeLength >= 12" class="voucher-char-warning">
-                      <i class="bi bi-exclamation-circle"></i>
-                      Mã voucher tối đa 12 ký tự
-                    </span>
                   </div>
-                  <div v-if="errors.voucher_code" class="invalid-feedback">
+                  <div v-if="errors.voucher_code" class="invalid-feedback d-block mt-1">
                     {{ errors.voucher_code }}
                   </div>
                 </div>
@@ -600,7 +593,7 @@
                       Mã voucher tối đa 12 ký tự
                     </span>
                   </div>
-                  <div v-if="errors.voucher_code" class="invalid-feedback">
+                  <div v-if="errors.voucher_code" class="invalid-feedback d-block mt-1">
                     {{ errors.voucher_code }}
                   </div>
                 </div>
@@ -1412,7 +1405,7 @@ async function saveVoucher() {
 
   showSuccessModal({
     title: 'Thêm voucher thành công',
-    message: `Voucher ${voucherData.voucherCode} đã được thêm. Mỗi tài khoản chỉ dùng được 1 lần.`,
+    message: `Voucher ${voucherData.voucherCode} đã được thêm.`,
   })
 }
 
