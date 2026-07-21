@@ -81,4 +81,32 @@ public class HomeProductService {
                 return rawPage.map(raw -> toHomeProductResponse(raw, ratingMap.get(raw.getProductId()),
                                 specsMap.get(raw.getProductId())));
         }
+
+        public List<HomeProductResponse> getNewestProducts() {
+                List<HomeProductRawProjection> rawProducts = homeRepo.findNewestProducts();
+
+                if (rawProducts.isEmpty()) {
+                        return Collections.emptyList();
+                }
+
+                List<Integer> productIds = rawProducts.stream()
+                                .map(HomeProductRawProjection::getProductId)
+                                .collect(Collectors.toList());
+
+                Map<Integer, RatingProjection> ratingMap = homeRepo
+                                .findRatingDataByProductIds(productIds).stream()
+                                .collect(Collectors.toMap(RatingProjection::getProductId, r -> r));
+
+                Map<Integer, List<String>> specsMap = homeRepo
+                                .findSpecsByProductIds(productIds).stream()
+                                .collect(Collectors.groupingBy(
+                                                SpecProjection::getProductId,
+                                                Collectors.mapping(SpecProjection::getValueString,
+                                                                Collectors.toList())));
+
+                return rawProducts.stream()
+                                .map(raw -> toHomeProductResponse(raw, ratingMap.get(raw.getProductId()),
+                                                specsMap.get(raw.getProductId())))
+                                .collect(Collectors.toList());
+        }
 }
