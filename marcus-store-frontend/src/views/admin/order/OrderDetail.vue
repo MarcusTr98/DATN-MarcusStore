@@ -437,6 +437,15 @@
               >
                 {{ refundBusy ? 'Đang thử lại...' : 'Thử lại hoàn tiền' }}
               </button>
+              <button
+                v-else-if="refund.status === 'PROCESSING'"
+                class="primary-btn"
+                type="button"
+                :disabled="refundBusy"
+                @click="reconcileRefund"
+              >
+                {{ refundBusy ? 'Đang đối soát...' : 'Đối soát VNPAY' }}
+              </button>
             </div>
           </section>
         </aside>
@@ -628,7 +637,7 @@ const getPaymentMethodLabel = (method) => paymentMethodMap[method] || method || 
 const getRefundStatusLabel = (status) =>
   ({
     PENDING_APPROVAL: 'Chờ admin duyệt',
-    PROCESSING: 'VNPAY đang xử lý',
+  PROCESSING: 'Chờ VNPAY xử lý/duyệt',
     RETRY_PENDING: 'Chờ tự động thử lại',
     SUCCESS: 'Hoàn tiền thành công',
     FAILED: 'Hoàn tiền thất bại',
@@ -676,17 +685,15 @@ const retryRefund = () =>
     () => OrderDetailApi.retryRefund(refund.value.refundId),
     'Đã gửi lại yêu cầu hoàn tiền.',
   )
+// Marcus thêm thao tác QueryDR thủ công, scheduler backend vẫn tự chạy song song.
+const reconcileRefund = () =>
+  runRefundAction(
+    () => OrderDetailApi.reconcileRefund(refund.value.refundId),
+    'Đã đối soát trạng thái hoàn tiền với VNPAY.',
+  )
 
-const getVariantText = (item) => {
-  if (!item || !Array.isArray(item.variants) || item.variants.length === 0) return ''
-  return item.variants
-    .filter((v) => v && v.valueString)
-    .map((v) => {
-      if (v.attributeName) return `${v.attributeName}: ${v.valueString}`
-      return v.valueString
-    })
-    .join(' | ')
-}
+// Marcus sửa: đã bỏ helper getVariantText không được giao diện sử dụng để tránh
+// cảnh báo no-unused-vars, phần biến thể vẫn render trực tiếp trong template cũ.
 
 const formatDateTime = (value) => {
   if (!value) return '---'

@@ -23,6 +23,12 @@ public class RefundProcessor {
         return execute(refundService.prepareAdminRetry(refundId));
     }
 
+    // Marcus thêm đối soát thủ công để admin kiểm tra ngay sau khi duyệt trên
+    // VNPAY.
+    public RefundResponse reconcile(Long refundId) {
+        return reconcile(refundService.prepareReconciliation(refundId));
+    }
+
     @Scheduled(fixedDelay = 60000)
     public void retryTechnicalFailures() {
         for (Long refundId : refundService.findRetryableIds(PageRequest.of(0, 20))) {
@@ -31,10 +37,19 @@ public class RefundProcessor {
                 execute(command);
             }
         }
+        // Marcus thêm scheduler QueryDR cho các refund VNPAY còn PROCESSING.
+        for (Long refundId : refundService.findProcessingIds(PageRequest.of(0, 20))) {
+            reconcile(refundService.prepareReconciliation(refundId));
+        }
     }
 
     private RefundResponse execute(VnPayRefundClient.RefundCommand command) {
         VnPayRefundClient.RefundGatewayResult result = refundClient.refund(command);
         return refundService.completeAttempt(command.refundId(), result);
+    }
+
+    private RefundResponse reconcile(VnPayRefundClient.QueryCommand command) {
+        return refundService.completeReconciliation(
+                command.refundId(), refundClient.queryRefund(command));
     }
 }

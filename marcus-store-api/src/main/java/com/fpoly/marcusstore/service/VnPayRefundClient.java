@@ -77,6 +77,78 @@ public class VnPayRefundClient {
         }
     }
 
+    // Marcus thêm QueryDR để đối soát trạng thái hoàn tiền sau bước duyệt trên
+    // VNPAY.
+    public ReconciliationResult queryRefund(QueryCommand query) {
+        try {
+            Map<String, String> payload = buildQueryPayload(query);
+            ResponseEntity<Map> response = createSecureRestTemplate().postForEntity(
+                    vnPayConfig.getRefundUrl(), payload, Map.class);
+            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                return ReconciliationResult.error("HTTP " + response.getStatusCode().value());
+            }
+            Map<String, String> body = stringify(response.getBody());
+            if (!verifyQueryChecksum(body)) {
+                return ReconciliationResult.error("Checksum QueryDR không hợp lệ");
+            }
+            String responseCode = body.get("vnp_ResponseCode");
+            String transactionType = body.get("vnp_TransactionType");
+            String transactionStatus = body.get("vnp_TransactionStatus");
+            String message = body.get("vnp_Message");
+            if (!"00".equals(responseCode)) {
+                return ReconciliationResult.error(message);
+            }
+            if ("02".equals(transactionType) && "00".equals(transactionStatus)) {
+                return ReconciliationResult.success(body);
+            }
+            if ("02".equals(transactionType) && "09".equals(transactionStatus)) {
+                return ReconciliationResult.rejected(body);
+            }
+            return ReconciliationResult.processing(body);
+        } catch (RuntimeException ex) {
+            return ReconciliationResult.error(ex.getMessage());
+        }
+    }
+
+    private Map<String, String> buildQueryPayload(QueryCommand query) {
+        String createDate = LocalDateTime.now(VIETNAM_ZONE).format(VNPAY_DATE);
+        String orderInfo = "Query refund order " + query.orderCode();
+        Map<String, String> payload = new LinkedHashMap<>();
+        payload.put("vnp_RequestId", query.requestCode());
+        payload.put("vnp_Version", VERSION);
+        payload.put("vnp_Command", "querydr");
+        payload.put("vnp_TmnCode", vnPayConfig.getTmnCode());
+        payload.put("vnp_TxnRef", query.orderCode());
+        payload.put("vnp_OrderInfo", orderInfo);
+        payload.put("vnp_TransactionNo", nullToEmpty(query.paymentProviderTransactionId()));
+        payload.put("vnp_TransactionDate", query.paymentTransactionDate());
+        payload.put("vnp_CreateDate", createDate);
+        payload.put("vnp_IpAddr", vnPayConfig.getRefundIpAddr());
+        String hashData = String.join("|",
+                payload.get("vnp_RequestId"), VERSION, "querydr", vnPayConfig.getTmnCode(),
+                query.orderCode(), query.paymentTransactionDate(), createDate,
+                vnPayConfig.getRefundIpAddr(), orderInfo);
+        payload.put("vnp_SecureHash", vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), hashData));
+        return payload;
+    }
+
+    private boolean verifyQueryChecksum(Map<String, String> body) {
+        String receivedHash = body.get("vnp_SecureHash");
+        if (receivedHash == null || receivedHash.isBlank())
+            return false;
+        String hashData = String.join("|",
+                value(body, "vnp_ResponseId"), value(body, "vnp_Command"),
+                value(body, "vnp_ResponseCode"), value(body, "vnp_Message"),
+                value(body, "vnp_TmnCode"), value(body, "vnp_TxnRef"),
+                value(body, "vnp_Amount"), value(body, "vnp_BankCode"),
+                value(body, "vnp_PayDate"), value(body, "vnp_TransactionNo"),
+                value(body, "vnp_TransactionType"), value(body, "vnp_TransactionStatus"),
+                value(body, "vnp_OrderInfo"), value(body, "vnp_PromotionCode"),
+                value(body, "vnp_PromotionAmount"));
+        return vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), hashData)
+                .equalsIgnoreCase(receivedHash);
+    }
+
     private RestTemplate createSecureRestTemplate() {
         try {
             HttpClient.Builder httpClient = HttpClient.newBuilder()
@@ -238,5 +310,40 @@ public class VnPayRefundClient {
             String paymentProviderTransactionId,
             String paymentTransactionDate,
             String createBy) {
+    }
+
+    public record QueryCommand(Long refundId, String requestCode, String orderCode,
+            String paymentProviderTransactionId, String paymentTransactionDate) {
+    }
+
+    public record ReconciliationResult(ReconciliationOutcome outcome, String message,
+            String responseCode, String transactionStatus, String transactionId) {
+        static ReconciliationResult success(Map<String, String> body) {
+            // Marcus sửa: gọi đầy đủ enum để IDE/Java Language Server nhận ổn định.
+            return fromBody(ReconciliationOutcome.SUCCESS_QUERY, body);
+        }
+
+        static ReconciliationResult rejected(Map<String, String> body) {
+            return fromBody(ReconciliationOutcome.REJECTED_QUERY, body);
+        }
+
+        static ReconciliationResult processing(Map<String, String> body) {
+            return fromBody(ReconciliationOutcome.PROCESSING_QUERY, body);
+        }
+
+        static ReconciliationResult error(String message) {
+            return new ReconciliationResult(ReconciliationOutcome.ERROR, message, null, null, null);
+        }
+
+        private static ReconciliationResult fromBody(
+                ReconciliationOutcome outcome, Map<String, String> body) {
+            return new ReconciliationResult(outcome, body.get("vnp_Message"),
+                    body.get("vnp_ResponseCode"), body.get("vnp_TransactionStatus"),
+                    body.get("vnp_TransactionNo"));
+        }
+    }
+
+    public enum ReconciliationOutcome {
+        SUCCESS_QUERY, PROCESSING_QUERY, REJECTED_QUERY, ERROR
     }
 }

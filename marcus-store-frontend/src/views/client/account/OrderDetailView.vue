@@ -44,7 +44,9 @@
                   <strong class="meta-value">{{ selectedOrder.orderCode }}</strong>
                 </div>
                 <div class="meta-item">
-                  <span class="meta-label"><i class="fa-solid fa-credit-card"></i>Phương thức thanh toán</span>
+                  <span class="meta-label"
+                    ><i class="fa-solid fa-credit-card"></i>Phương thức thanh toán</span
+                  >
                   <strong class="meta-value">{{
                     getPaymentMethodLabel(selectedOrder.paymentMethod)
                   }}</strong>
@@ -115,9 +117,16 @@
                   </span>
                 </div>
                 <div class="refund-values">
-                  <div><span>Số tiền hoàn</span><strong>{{ formatMoney(refund.amount) }}</strong></div>
-                  <div><span>Phí vận chuyển giữ lại</span><strong>{{ formatMoney(refund.shippingDeducted) }}</strong></div>
-                  <div><span>Ngày yêu cầu</span><strong>{{ formatDateTime(refund.createdAt) }}</strong></div>
+                  <div>
+                    <span>Số tiền hoàn</span><strong>{{ formatMoney(refund.amount) }}</strong>
+                  </div>
+                  <div>
+                    <span>Phí vận chuyển giữ lại</span
+                    ><strong>{{ formatMoney(refund.shippingDeducted) }}</strong>
+                  </div>
+                  <div>
+                    <span>Ngày yêu cầu</span><strong>{{ formatDateTime(refund.createdAt) }}</strong>
+                  </div>
                 </div>
                 <p class="refund-reason"><strong>Lý do:</strong> {{ refund.reason }}</p>
               </div>
@@ -162,11 +171,19 @@
                             >Số lượng: <strong>{{ item.quantity }}</strong></span
                           >
                           <span v-if="item.isFlashSale && item.originalPrice">
-                            <span class="price-original">{{ formatMoney(item.originalPrice) }}</span>
-                            <span class="price-flashsale">{{ formatMoney(item.priceAtPurchase) }}</span>
-                            <span v-if="item.flashSaleSlotName" class="flash-badge">{{ item.flashSaleSlotName }}</span>
+                            <span class="price-original">{{
+                              formatMoney(item.originalPrice)
+                            }}</span>
+                            <span class="price-flashsale">{{
+                              formatMoney(item.priceAtPurchase)
+                            }}</span>
+                            <span v-if="item.flashSaleSlotName" class="flash-badge">{{
+                              item.flashSaleSlotName
+                            }}</span>
                           </span>
-                          <span v-else>Đơn giá: <strong>{{ formatMoney(item.priceAtPurchase) }}</strong></span>
+                          <span v-else
+                            >Đơn giá: <strong>{{ formatMoney(item.priceAtPurchase) }}</strong></span
+                          >
                         </div>
                       </div>
                       <strong class="product-total">{{ formatMoney(item.lineTotal) }}</strong>
@@ -309,11 +326,7 @@
                         :disabled="cancelling || !canCancelOrder"
                         @click="handleCancelOrder"
                       >
-
-                        <i
-                          v-if="cancelling"
-                          class="fa-solid fa-spinner fa-spin"
-                        ></i>
+                        <i v-if="cancelling" class="fa-solid fa-spinner fa-spin"></i>
                         <i v-else class="fa-solid fa-ban"></i>
                         {{ cancelling ? 'Đang hủy đơn...' : 'Hủy đơn hàng' }}
                       </button>
@@ -325,11 +338,7 @@
           </section>
         </div>
       </div>
-      <div
-        v-if="cancelModal.open"
-        class="modal-backdrop"
-        @click.self="closeCancelModal"
-      >
+      <div v-if="cancelModal.open" class="modal-backdrop" @click.self="closeCancelModal">
         <div class="modal-card" role="dialog" aria-modal="true">
           <div class="modal-header">
             <h4 class="modal-title">
@@ -350,7 +359,8 @@
             <p class="modal-text">
               Vui lòng cho Marcus Store biết lý do bạn muốn hủy đơn
 
-              <strong>{{ cancelModal.orderCode }}</strong>.
+              <strong>{{ cancelModal.orderCode }}</strong
+              >.
             </p>
             <textarea
               v-model="cancelModal.reason"
@@ -361,9 +371,7 @@
               :disabled="cancelling"
             ></textarea>
 
-            <div class="modal-counter">
-              {{ cancelModal.reason.length }}/500
-            </div>
+            <div class="modal-counter">{{ cancelModal.reason.length }}/500</div>
 
             <div
               v-if="cancelModal.feedback.message"
@@ -373,7 +381,11 @@
             >
               <i
                 class="fa-solid"
-                :class="cancelModal.feedback.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'"
+                :class="
+                  cancelModal.feedback.type === 'error'
+                    ? 'fa-circle-exclamation'
+                    : 'fa-circle-check'
+                "
               ></i>
               <span>{{ cancelModal.feedback.message }}</span>
             </div>
@@ -394,11 +406,7 @@
               :disabled="cancelling || !cancelModal.reason.trim()"
               @click="confirmCancelOrder"
             >
-
-              <i
-                v-if="cancelling"
-                class="fa-solid fa-spinner fa-spin"
-              ></i>
+              <i v-if="cancelling" class="fa-solid fa-spinner fa-spin"></i>
               <i v-else class="fa-solid fa-check"></i>
               {{ cancelling ? 'Đang xử lý...' : 'Xác nhận hủy' }}
             </button>
@@ -410,7 +418,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 
 import UserOrderApi from '@/api/userOrder.js'
@@ -422,6 +430,24 @@ const refund = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const route = useRoute()
+let refundPollingTimer = null
+
+// Marcus thêm hàm đồng bộ nhẹ để trạng thái khách cập nhật sau khi admin refund,
+// không bật lại loading toàn trang và không làm nháy giao diện.
+async function refreshRefundStatus() {
+  const orderCode = route.params.id
+  if (!orderCode) return
+  try {
+    const [orderResponse, refundResponse] = await Promise.all([
+      UserOrderApi.userOrderDetail(orderCode),
+      UserOrderApi.userRefund(orderCode),
+    ])
+    selectedOrder.value = orderResponse.data
+    refund.value = refundResponse.status === 204 ? null : refundResponse.data
+  } catch (refreshError) {
+    console.error(refreshError)
+  }
+}
 
 async function fetchOrderDetail() {
   try {
@@ -448,28 +474,65 @@ async function fetchOrderDetail() {
   }
 }
 
-onMounted(fetchOrderDetail)
+onMounted(() => {
+  fetchOrderDetail()
+  // Marcus thêm polling khi refund chưa kết thúc và refresh ngay khi khách quay lại tab.
+  refundPollingTimer = window.setInterval(() => {
+    if (refund.value && !['SUCCESS', 'FAILED'].includes(refund.value.status)) {
+      refreshRefundStatus()
+    }
+  }, 10000)
+  window.addEventListener('focus', refreshRefundStatus)
+})
+
+onBeforeUnmount(() => {
+  if (refundPollingTimer) window.clearInterval(refundPollingTimer)
+  window.removeEventListener('focus', refreshRefundStatus)
+})
 
 const USER_CANCELLABLE_STATUSES = ['PENDING', 'PROCESSING', 'PACKED']
 
 // Marcus thêm nội dung thân thiện với khách thay cho response code kỹ thuật của VNPAY.
 const refundStatusConfig = {
-  PENDING_APPROVAL: { label: 'Đang chờ duyệt', className: 'pending', description: 'MarcusStore đã tiếp nhận yêu cầu và đang kiểm tra.' },
-  PROCESSING: { label: 'Đang xử lý', className: 'processing', description: 'Yêu cầu đã được gửi sang VNPAY để xử lý.' },
-  RETRY_PENDING: { label: 'Đang xử lý lại', className: 'processing', description: 'Hệ thống đang tự động xử lý lại yêu cầu.' },
-  SUCCESS: { label: 'Đã hoàn tiền', className: 'success', description: 'VNPAY đã xác nhận hoàn tiền thành công.' },
-  FAILED: { label: 'Cần hỗ trợ', className: 'failed', description: 'Yêu cầu chưa thành công, MarcusStore sẽ tiếp tục kiểm tra.' },
+  PENDING_APPROVAL: {
+    label: 'Đang chờ duyệt',
+    className: 'pending',
+    description: 'MarcusStore đã tiếp nhận yêu cầu và đang kiểm tra.',
+  },
+  PROCESSING: {
+    label: 'Đang xử lý',
+    className: 'processing',
+    description: 'Yêu cầu đã được gửi sang VNPAY để xử lý.',
+  },
+  RETRY_PENDING: {
+    label: 'Đang xử lý lại',
+    className: 'processing',
+    description: 'Hệ thống đang tự động xử lý lại yêu cầu.',
+  },
+  SUCCESS: {
+    label: 'Đã hoàn tiền',
+    className: 'success',
+    description: 'VNPAY đã xác nhận hoàn tiền thành công.',
+  },
+  FAILED: {
+    label: 'Cần hỗ trợ',
+    className: 'failed',
+    description: 'Yêu cầu chưa thành công, MarcusStore sẽ tiếp tục kiểm tra.',
+  },
 }
 
 // Marcus sửa nhãn thanh toán để client không còn hiển thị "---" khi đang refund.
-const getPaymentStatusLabel = (status) => ({
-  PAID: 'Đã thanh toán',
-  UNPAID: 'Chưa thanh toán',
-  FAILED: 'Thanh toán thất bại',
-  REFUND_PENDING: 'Đang hoàn tiền',
-  REFUND_FAILED: 'Hoàn tiền cần hỗ trợ',
-  REFUNDED: 'Đã hoàn tiền',
-}[status] || status || '---')
+const getPaymentStatusLabel = (status) =>
+  ({
+    PAID: 'Đã thanh toán',
+    UNPAID: 'Chưa thanh toán',
+    FAILED: 'Thanh toán thất bại',
+    REFUND_PENDING: 'Đang hoàn tiền',
+    REFUND_FAILED: 'Hoàn tiền cần hỗ trợ',
+    REFUNDED: 'Đã hoàn tiền',
+  })[status] ||
+  status ||
+  '---'
 
 const canCancelOrder = computed(() => {
   const order = selectedOrder.value
@@ -543,17 +606,15 @@ async function confirmCancelOrder() {
 }
 
 const statusConfig = {
-
-  CREATED:   { label: 'Tạo đơn',               className: 'pending',    icon: 'fa-file-circle-plus' },
-  PENDING:   { label: 'Chờ xác nhận',          className: 'pending',    icon: 'fa-clock' },
-  CONFIRMED: { label: 'Đã xác nhận',           className: 'confirmed',  icon: 'fa-circle-check' },
-  PROCESSING:{ label: 'Đang chuẩn bị',          className: 'processing', icon: 'fa-boxes-packing' },
-  PACKED:    { label: 'Đã đóng gói',            className: 'processing', icon: 'fa-box' },
-  SHIPPING:  { label: 'Đang giao',              className: 'shipping',   icon: 'fa-truck-fast' },
-  DELIVERED: { label: 'Giao thành công',        className: 'delivered',  icon: 'fa-circle-check' },
-  CANCELLED: { label: 'Đã hủy',                className: 'cancelled',  icon: 'fa-ban' },
-  FAILED:    { label: 'Giao thất bại',          className: 'failed',     icon: 'fa-triangle-exclamation' },
-
+  CREATED: { label: 'Tạo đơn', className: 'pending', icon: 'fa-file-circle-plus' },
+  PENDING: { label: 'Chờ xác nhận', className: 'pending', icon: 'fa-clock' },
+  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed', icon: 'fa-circle-check' },
+  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing', icon: 'fa-boxes-packing' },
+  PACKED: { label: 'Đã đóng gói', className: 'processing', icon: 'fa-box' },
+  SHIPPING: { label: 'Đang giao', className: 'shipping', icon: 'fa-truck-fast' },
+  DELIVERED: { label: 'Giao thành công', className: 'delivered', icon: 'fa-circle-check' },
+  CANCELLED: { label: 'Đã hủy', className: 'cancelled', icon: 'fa-ban' },
+  FAILED: { label: 'Giao thất bại', className: 'failed', icon: 'fa-triangle-exclamation' },
 }
 
 const defaultTimelineSteps = [
@@ -584,7 +645,6 @@ const visibleTimelineSteps = computed(() => {
       .map((step) => step.status)
     flowStatuses.push(currentStatus)
   } else if (currentIndex >= 0 || isCompletedStatus) {
-
     // COMPLETED: hiển thị đầy đủ flow như DELIVERED (không hiện COMPLETED trên timeline)
     flowStatuses = [...defaultTimelineSteps.map((step) => step.status)]
   } else {
@@ -602,8 +662,8 @@ const visibleTimelineSteps = computed(() => {
       historyItem?.note,
     )
 
-    timelineStep.isCurrent = (currentStatus === status) ||
-      (currentStatus === 'COMPLETED' && status === 'DELIVERED')
+    timelineStep.isCurrent =
+      currentStatus === status || (currentStatus === 'COMPLETED' && status === 'DELIVERED')
     return timelineStep
   })
 })
@@ -611,10 +671,8 @@ const visibleTimelineSteps = computed(() => {
 const displayHistory = computed(() => {
   if (!selectedOrder.value) return []
 
-
   // Lọc bỏ COMPLETED cho UI client (vẫn giữ ở admin)
-  const history = (selectedOrder.value.history || [])
-    .filter((item) => item.status !== 'COMPLETED')
+  const history = (selectedOrder.value.history || []).filter((item) => item.status !== 'COMPLETED')
   const hasCreated = history.some((item) => item.status === 'CREATED')
 
   if (hasCreated) return history
@@ -636,12 +694,10 @@ const displayPaymentDate = computed(() => {
   const isCOD = order.paymentMethod === 'COD'
   const hasPaymentDate = order.paymentDate
 
-
   // Nếu đã có paymentDate thì hiển thị paymentDate
   if (hasPaymentDate) {
     return formatDateTime(hasPaymentDate)
   }
-
 
   // Nếu là COD và chưa có paymentDate, lấy thời gian DELIVERED từ history
   if (isCOD) {
@@ -796,18 +852,87 @@ function getVariantText(item) {
 }
 
 /* Marcus thêm giao diện theo dõi refund cho client. */
-.refund-tracking-card { display:flex; gap:16px; padding:20px; border:1px solid #fde68a; border-radius:14px; background:#fffbeb; }
-.refund-icon { width:44px; height:44px; flex:0 0 44px; display:grid; place-items:center; border-radius:50%; background:#fef3c7; color:#d97706; }
-.refund-content { flex:1; min-width:0; }
-.refund-heading { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
-.refund-heading h3 { margin:0 0 4px; font-size:18px; }
-.refund-heading p, .refund-reason { margin:0; color:#6b7280; }
-.refund-pill { padding:6px 10px; border-radius:999px; white-space:nowrap; font-size:12px; font-weight:700; background:#e5e7eb; }
-.refund-pill.pending, .refund-pill.processing { color:#92400e; background:#fef3c7; }
-.refund-pill.success { color:#166534; background:#dcfce7; }
-.refund-pill.failed { color:#991b1b; background:#fee2e2; }
-.refund-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:16px 0; }
-.refund-values div { padding:12px; border-radius:10px; background:#fff; }
-.refund-values span { display:block; margin-bottom:4px; color:#6b7280; font-size:12px; }
-@media (max-width: 768px) { .refund-heading { flex-direction:column; } .refund-values { grid-template-columns:1fr; } }
+.refund-tracking-card {
+  display: flex;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #fde68a;
+  border-radius: 14px;
+  background: #fffbeb;
+}
+.refund-icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fef3c7;
+  color: #d97706;
+}
+.refund-content {
+  flex: 1;
+  min-width: 0;
+}
+.refund-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.refund-heading h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+.refund-heading p,
+.refund-reason {
+  margin: 0;
+  color: #6b7280;
+}
+.refund-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  background: #e5e7eb;
+}
+.refund-pill.pending,
+.refund-pill.processing {
+  color: #92400e;
+  background: #fef3c7;
+}
+.refund-pill.success {
+  color: #166534;
+  background: #dcfce7;
+}
+.refund-pill.failed {
+  color: #991b1b;
+  background: #fee2e2;
+}
+.refund-values {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.refund-values div {
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff;
+}
+.refund-values span {
+  display: block;
+  margin-bottom: 4px;
+  color: #6b7280;
+  font-size: 12px;
+}
+@media (max-width: 768px) {
+  .refund-heading {
+    flex-direction: column;
+  }
+  .refund-values {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

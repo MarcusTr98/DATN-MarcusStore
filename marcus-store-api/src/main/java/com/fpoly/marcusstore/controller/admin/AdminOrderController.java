@@ -106,4 +106,11 @@ public class AdminOrderController {
     public RefundResponse retryRefund(@PathVariable Long refundId) {
         return refundProcessor.retry(refundId);
     }
+
+    // Marcus thêm nút đối soát QueryDR thủ công cho admin.
+    @PostMapping("/refunds/{refundId}/reconcile")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public RefundResponse reconcileRefund(@PathVariable Long refundId) {
+        return refundProcessor.reconcile(refundId);
+    }
 }

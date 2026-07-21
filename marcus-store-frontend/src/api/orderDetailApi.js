@@ -20,5 +20,9 @@ const OrderDetailApi = {
   retryRefund(refundId) {
     return api.post(`/admin/refunds/${refundId}/retry`)
   },
+  // Marcus thêm API QueryDR để admin chủ động đối soát trạng thái VNPAY.
+  reconcileRefund(refundId) {
+    return api.post(`/admin/refunds/${refundId}/reconcile`)
+  },
 }
 export default OrderDetailApi

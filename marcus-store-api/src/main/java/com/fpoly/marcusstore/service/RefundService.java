@@ -169,6 +169,56 @@ public class RefundService {
         return refundRepository.findRetryableIds(LocalDateTime.now(), limit);
     }
 
+    // Marcus thêm chuẩn bị QueryDR; mỗi lần truy vấn dùng RequestId mới theo yêu
+    // cầu VNPAY.
+    @Transactional
+    public VnPayRefundClient.QueryCommand prepareReconciliation(Long refundId) {
+        RefundRequest refund = lock(refundId);
+        if (!PROCESSING.equals(refund.getStatus())) {
+            throw new RuntimeException("Chỉ đối soát refund đang được VNPAY xử lý");
+        }
+        refund.setLastAttemptAt(LocalDateTime.now());
+        refundRepository.save(refund);
+        OrderTransaction payment = refund.getPaymentTransaction();
+        return new VnPayRefundClient.QueryCommand(
+                refundId, newRequestCode(), refund.getOrder().getOrderCode(),
+                payment.getProviderTransactionId(), resolvePaymentTransactionDate(refund));
+    }
+
+    // Marcus thêm cập nhật kết quả đối soát; lỗi QueryDR không làm refund thành
+    // FAILED.
+    @Transactional
+    public RefundResponse completeReconciliation(
+            Long refundId, VnPayRefundClient.ReconciliationResult result) {
+        RefundRequest refund = lock(refundId);
+        if (!PROCESSING.equals(refund.getStatus()))
+            return toResponse(refund);
+        refund.setProviderMessage(result.message());
+        refund.setProviderResponseCode(result.responseCode());
+        refund.setProviderTransactionStatus(result.transactionStatus());
+        if (result.transactionId() != null) {
+            refund.setProviderRefundTransactionId(result.transactionId());
+        }
+        switch (result.outcome()) {
+            case SUCCESS_QUERY -> markSuccess(refund);
+            case REJECTED_QUERY -> markFailed(refund);
+            case PROCESSING_QUERY, ERROR -> {
+                refund.setStatus(PROCESSING);
+                refund.getOrder().setPaymentStatus("REFUND_PENDING");
+            }
+        }
+        refundRepository.save(refund);
+        if (SUCCESS.equals(refund.getStatus()) || FAILED.equals(refund.getStatus())) {
+            sendStatusEmailSafely(refund);
+        }
+        return toResponse(refund);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Long> findProcessingIds(Pageable limit) {
+        return refundRepository.findProcessingIds(LocalDateTime.now().minusMinutes(1), limit);
+    }
+
     private RefundRequest createPendingRefund(Order order, String reason, User requestedBy) {
         if (!isEligible(order)) {
             throw new RuntimeException("Đơn hàng không đủ điều kiện hoàn tiền VNPAY");
@@ -250,13 +300,7 @@ public class RefundService {
         refundRepository.save(refund);
 
         OrderTransaction payment = refund.getPaymentTransaction();
-        String transactionDate = payment.getProviderTransactionDate();
-        if (transactionDate == null || !transactionDate.matches("\\d{14}")) {
-            LocalDateTime fallback = payment.getCreatedAt() != null
-                    ? payment.getCreatedAt()
-                    : refund.getOrder().getCreatedAt();
-            transactionDate = fallback.format(VNPAY_DATE);
-        }
+        String transactionDate = resolvePaymentTransactionDate(refund);
         return new VnPayRefundClient.RefundCommand(
                 refund.getRefundId(),
                 refund.getRequestCode(),
@@ -265,6 +309,18 @@ public class RefundService {
                 payment.getProviderTransactionId(),
                 transactionDate,
                 createBy);
+    }
+
+    private String resolvePaymentTransactionDate(RefundRequest refund) {
+        OrderTransaction payment = refund.getPaymentTransaction();
+        String transactionDate = payment.getProviderTransactionDate();
+        if (transactionDate == null || !transactionDate.matches("\\d{14}")) {
+            LocalDateTime fallback = payment.getCreatedAt() != null
+                    ? payment.getCreatedAt()
+                    : refund.getOrder().getCreatedAt();
+            transactionDate = fallback.format(VNPAY_DATE);
+        }
+        return transactionDate;
     }
 
     private void markSuccess(RefundRequest refund) {
