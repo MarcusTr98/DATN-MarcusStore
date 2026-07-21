@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/home")
@@ -37,5 +38,11 @@ public class HomeController {
         Page<HomeProductResponse> data = homeProductService.getHomeProducts(
                 sortBy, categoryId, parentCategoryId, minPrice, maxPrice, valueIds, brandIds, pageable);
         return ApiResponse.success(data);
+    }
+
+    @GetMapping("/newest")
+    public ApiResponse<List<HomeProductResponse>> getNewestProducts() {
+        List<HomeProductResponse> products = homeProductService.getNewestProducts();
+        return ApiResponse.success(products);
     }
 }
