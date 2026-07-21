@@ -1,39 +1,42 @@
 <template>
   <section class="dashboard-grid">
 
+    <!-- 1. Xu hướng doanh thu -->
     <article class="dashboard-card">
       <div class="card-header">
         <div>
           <h2>Xu hướng doanh thu</h2>
           <p>{{ compareData.currentLabel }} so với {{ compareData.previousLabel }}</p>
         </div>
-        <span>Line chart</span>
+        <span>Biểu đồ đường</span>
       </div>
       <div class="chart-frame">
         <canvas ref="revenueChartRef"></canvas>
       </div>
     </article>
 
+    <!-- 2. Số đơn hoàn thành -->
     <article class="dashboard-card">
       <div class="card-header">
         <div>
-          <h2>Đơn hàng thành công</h2>
+          <h2>Số đơn hoàn thành</h2>
           <p>{{ orderChartSubtitle }}</p>
         </div>
-        <span>Bar chart</span>
+        <span>Biểu đồ cột</span>
       </div>
       <div class="chart-frame">
         <canvas ref="orderChartRef"></canvas>
       </div>
     </article>
 
+    <!-- 3. Doanh thu theo thương hiệu (doughnut + số tiền) -->
     <article class="dashboard-card">
       <div class="card-header">
         <div>
           <h2>Doanh thu theo thương hiệu</h2>
-          <p>Tỷ lệ % theo thương hiệu</p>
+          <p>Tỷ lệ phần trăm và doanh thu theo từng thương hiệu</p>
         </div>
-        <span>Doughnut</span>
+        <span>Biểu đồ tròn</span>
       </div>
       <div class="donut-wrap">
         <div class="chart-frame donut-canvas">
@@ -42,22 +45,57 @@
         <div class="legend-list">
           <span v-for="item in brandRevenue" :key="item.label">
             <i :style="{ backgroundColor: item.color }"></i>
-            {{ item.label }} {{ item.value }}%
+            <span class="legend-text">
+              <b>{{ item.label }}</b>
+              <small>{{ item.value }}% · {{ formatShortCurrency(item.revenue) }}</small>
+            </span>
           </span>
         </div>
       </div>
     </article>
 
+    <!-- 4. Thanh toán & Trạng thái đơn (2 doughnut cạnh nhau) -->
     <article class="dashboard-card">
       <div class="card-header">
         <div>
-          <h2>Tài khoản mới đăng ký</h2>
-          <p>Số lượng theo ngày trong kỳ</p>
+          <h2>Phương thức thanh toán & Trạng thái đơn hàng</h2>
+          <p>Tỷ lệ phần trăm theo phương thức thanh toán và trạng thái đơn</p>
         </div>
-        <span>Line chart</span>
+        <span>Biểu đồ tròn</span>
       </div>
-      <div class="chart-frame">
-        <canvas ref="newUserChartRef"></canvas>
+      <div class="payment-wrap">
+        <!-- Phương thức -->
+        <div class="payment-half">
+          <p class="chart-sub">Phương thức thanh toán</p>
+          <div class="chart-frame donut-canvas">
+            <canvas ref="methodChartRef"></canvas>
+          </div>
+          <div class="legend-list compact">
+            <span v-for="item in methodSlices" :key="item.method">
+              <i :style="{ backgroundColor: item.color }"></i>
+              <span class="legend-text">
+                <b>{{ item.method }}</b>
+                <small>{{ item.percentage }}% ({{ item.totalOrders }} đơn)</small>
+              </span>
+            </span>
+          </div>
+        </div>
+        <!-- Trạng thái -->
+        <div class="payment-half">
+          <p class="chart-sub">Trạng thái đơn hàng</p>
+          <div class="chart-frame donut-canvas">
+            <canvas ref="statusChartRef"></canvas>
+          </div>
+          <div class="legend-list compact">
+            <span v-for="item in statusSlices" :key="item.status">
+              <i :style="{ backgroundColor: item.color }"></i>
+              <span class="legend-text">
+                <b>{{ statusLabel(item.status) }}</b>
+                <small>{{ item.percentage }}% ({{ item.totalOrders }} đơn)</small>
+              </span>
+            </span>
+          </div>
+        </div>
       </div>
     </article>
 
@@ -71,31 +109,52 @@ import { Chart, registerables } from 'chart.js'
 Chart.register(...registerables)
 
 const props = defineProps({
-  selectedTime: { type: String, default: 'month' },
-  compareData:  { type: Object, default: () => ({ current: [], previous: [], currentLabel: '', previousLabel: '' }) },
-  weekdayStats: { type: Array,  default: () => [] },
-  brandStats:   { type: Array,  default: () => [] },
-  newUsersData: { type: Array,  default: () => [] },
-  orderStats:   { type: Array,  default: () => [] },
+  selectedTime:  { type: String, default: 'month' },
+  compareData:   { type: Object, default: () => ({ current: [], previous: [], currentLabel: '', previousLabel: '' }) },
+  weekdayStats:  { type: Array,  default: () => [] },
+  brandStats:    { type: Array,  default: () => [] },
+  orderStats:    { type: Array,  default: () => [] },
+  paymentStats:  { type: Object, default: () => ({ byMethod: [], byStatus: [] }) },  // MỚI
 })
 
+// ── refs ──────────────────────────────────────────────────────
 const revenueChartRef = ref(null)
 const orderChartRef   = ref(null)
 const brandChartRef   = ref(null)
-const newUserChartRef = ref(null)
+const methodChartRef  = ref(null)
+const statusChartRef  = ref(null)
 
 let revenueChart = null
 let orderChart   = null
 let brandChart   = null
-let newUserChart = null
+let methodChart  = null
+let statusChart  = null
 
-const DONUT_COLORS      = ['#2563eb', '#16a34a', '#0891b2', '#f59e0b', '#7c3aed', '#0d9488']
-const gridColor         = 'rgba(37, 99, 235, 0.08)'
-const tickColor         = '#4b5563'
-const COLOR_BLUE        = '#2563eb'
-const COLOR_BLUE_LIGHT  = 'rgba(37, 99, 235, 0.12)'
-const COLOR_PREV        = '#9ca3af'
-const COLOR_GREEN_LIGHT = 'rgba(22, 163, 74, 0.8)'
+// ── colors ────────────────────────────────────────────────────
+const DONUT_COLORS  = ['#2563eb', '#16a34a', '#0891b2', '#f59e0b', '#7c3aed', '#0d9488', '#dc2626', '#db2777']
+const STATUS_COLORS = {
+  COMPLETED:  '#16a34a',
+  PAID:       '#16a34a',
+  PENDING:    '#f59e0b',
+  PROCESSING: '#0891b2',
+  CONFIRMED:  '#2563eb',
+  SHIPPING:   '#7c3aed',
+  CANCELLED:  '#dc2626',
+  UNPAID:     '#9ca3af',
+}
+const METHOD_COLORS = {
+  VNPay:  '#2563eb',
+  VNPAY:  '#2563eb',
+  COD:    '#f59e0b',
+  MOMO:   '#db2777',
+  ZALOPAY:'#0891b2',
+}
+const gridColor  = 'rgba(37, 99, 235, 0.08)'
+const tickColor  = '#4b5563'
+const COLOR_BLUE       = '#2563eb'
+const COLOR_BLUE_LIGHT = 'rgba(37, 99, 235, 0.12)'
+const COLOR_PREV       = '#9ca3af'
+const COLOR_GREEN_LIGHT= 'rgba(22, 163, 74, 0.8)'
 
 const chartDefaults = {
   responsive: true,
@@ -103,26 +162,43 @@ const chartDefaults = {
   plugins: { legend: { display: false } },
 }
 
+// ── computed slices ────────────────────────────────────────────
 const brandRevenue = computed(() =>
   props.brandStats.map((item, idx) => ({
-    label: item.brand || 'Khác',
-    value: item.percentage,
-    color: DONUT_COLORS[idx % DONUT_COLORS.length],
+    label:   item.brand || 'Khác',
+    value:   item.percentage,
+    revenue: item.revenue,
+    color:   DONUT_COLORS[idx % DONUT_COLORS.length],
+  })),
+)
+
+const methodSlices = computed(() =>
+  (props.paymentStats?.byMethod ?? []).map((item, idx) => ({
+    ...item,
+    color: METHOD_COLORS[item.method] ?? DONUT_COLORS[idx % DONUT_COLORS.length],
+  })),
+)
+
+const statusSlices = computed(() =>
+  (props.paymentStats?.byStatus ?? []).map((item) => ({
+    ...item,
+    color: STATUS_COLORS[item.status] ?? '#9ca3af',
   })),
 )
 
 const orderChartSubtitle = computed(() => {
   switch (props.selectedTime) {
-    case 'today':
-    case 'yesterday': return 'Số đơn trong ngày'
-    case '7days':     return 'Số đơn 7 ngày qua'
-    case '30days':    return 'Số đơn 30 ngày qua'
-    case 'week':      return 'Số đơn theo thứ trong tuần'
-    case 'year':      return 'Số đơn theo tháng trong năm'
-    default:          return 'Số đơn theo ngày trong tháng'
+    case 'today':     return 'Số đơn hoàn thành trong hôm nay'
+    case 'yesterday': return 'Số đơn hoàn thành trong hôm qua'
+    case '7days':     return 'Số đơn hoàn thành trong 7 ngày qua'
+    case '30days':    return 'Số đơn hoàn thành trong 30 ngày qua'
+    case 'week':      return 'Số đơn hoàn thành theo từng ngày trong tuần'
+    case 'year':      return 'Số đơn hoàn thành theo từng tháng trong năm'
+    default:          return 'Số đơn hoàn thành theo từng ngày trong tháng'
   }
 })
 
+// ── helpers ───────────────────────────────────────────────────
 function destroyChart(c) { if (c) c.destroy(); return null }
 
 function formatCurrency(value) {
@@ -132,15 +208,12 @@ function formatCurrency(value) {
 }
 
 function formatShortCurrency(value) {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}T`
-  if (value >= 1_000_000)     return `${(value / 1_000_000).toFixed(0)}tr`
-  if (value >= 1_000)         return `${(value / 1_000).toFixed(0)}k`
-  return String(value)
-}
-
-function formatShortDate(dateStr) {
-  const d = new Date(dateStr)
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+  if (!value) return '0đ'
+  const n = Number(value)
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}T`
+  if (n >= 1_000_000)     return `${(n / 1_000_000).toFixed(0)}tr`
+  if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}k`
+  return `${n}đ`
 }
 
 function reportDateToLabel(reportDate) {
@@ -155,7 +228,6 @@ function findTodayIndex(labels, period) {
   const dd = String(today.getDate()).padStart(2, '0')
   const mm = String(today.getMonth() + 1).padStart(2, '0')
   const todayShort = `${dd}/${mm}`
-
   if (period === 'week') {
     const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
     return labels.indexOf(days[today.getDay()])
@@ -163,16 +235,18 @@ function findTodayIndex(labels, period) {
   if (['month', '7days', '30days', 'today', 'yesterday'].includes(period)) {
     return labels.indexOf(todayShort)
   }
-  if (period === 'year') {
-    return labels.indexOf(`T${today.getMonth() + 1}`)
-  }
+  if (period === 'year') return labels.indexOf(`T${today.getMonth() + 1}`)
   return -1
 }
 
-function getNewUserCount(d) {
-  return d.totalNewUsers ?? d.newUsers ?? d.count ?? d.total ?? 0
+const STATUS_LABELS = {
+  PENDING: 'Chờ xử lý', CONFIRMED: 'Đã xác nhận', SHIPPING: 'Đang giao',
+  COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy', PROCESSING: 'Đang xử lý',
+  PAID: 'Đã thanh toán', UNPAID: 'Chưa thanh toán',
 }
+function statusLabel(s) { return STATUS_LABELS[s] || s }
 
+// ── chart builders ─────────────────────────────────────────────
 function buildRevenueChart() {
   revenueChart = destroyChart(revenueChart)
   if (!revenueChartRef.value || !props.compareData.current?.length) return
@@ -199,12 +273,10 @@ function buildRevenueChart() {
     prevValues = props.compareData.previous.map(d => d.revenue)
   }
 
-  const todayIdx      = findTodayIndex(labels, period)
+  const todayIdx       = findTodayIndex(labels, period)
   const pointRadiusCur = labels.map((_, i) => i === todayIdx ? 7 : 4)
   const pointStyleCur  = labels.map((_, i) => i === todayIdx ? 'star' : 'circle')
-
-  // Khi chỉ có 1 data point (lọc 1 ngày), thêm offset để điểm không dính vào trục Y
-  const isSinglePoint = labels.length <= 1
+  const isSinglePoint  = labels.length <= 1
 
   revenueChart = new Chart(revenueChartRef.value, {
     type: 'line',
@@ -241,7 +313,7 @@ function buildRevenueChart() {
       ...chartDefaults,
       scales: {
         x: {
-          offset: isSinglePoint, // 👈 FIX: thêm offset khi chỉ có 1 điểm, tránh dính vào trục Y
+          offset: isSinglePoint,
           ticks: { color: tickColor, font: { size: 11, weight: '600' }, maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 31 },
           grid: { color: gridColor },
         },
@@ -253,8 +325,7 @@ function buildRevenueChart() {
       },
       plugins: {
         legend: {
-          display: true,
-          position: 'top',
+          display: true, position: 'top',
           labels: { color: '#374151', font: { size: 11, weight: '700' }, boxWidth: 14 },
         },
         tooltip: {
@@ -281,8 +352,7 @@ function buildOrderChart() {
   if (!orderChartRef.value) return
 
   const period = props.selectedTime
-  let labels = []
-  let data   = []
+  let labels = [], data = []
 
   if (period === 'week') {
     const ORDER = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
@@ -293,7 +363,6 @@ function buildOrderChart() {
     })
     labels = ORDER
     data   = ORDER.map(day => map[day] ?? 0)
-
   } else if (period === 'year') {
     const monthMap = {}
     for (let m = 1; m <= 12; m++) monthMap[`T${m}`] = 0
@@ -305,7 +374,6 @@ function buildOrderChart() {
     })
     labels = Object.keys(monthMap)
     data   = Object.values(monthMap)
-
   } else {
     labels = props.orderStats.map(d => reportDateToLabel(d.reportDate))
     data   = props.orderStats.map(d => d.totalOrders ?? 0)
@@ -353,15 +421,19 @@ function buildBrandChart() {
   brandChart = destroyChart(brandChart)
   if (!brandChartRef.value || !props.brandStats.length) return
 
+  // Dùng revenue làm data thực (Chart.js tự tính tỉ lệ),
+  // percentage chỉ dùng để hiển thị trong tooltip/legend
+  const validItems = brandRevenue.value.filter(b => Number(b.revenue) > 0)
+  if (!validItems.length) return
+
   brandChart = new Chart(brandChartRef.value, {
     type: 'doughnut',
     data: {
-      labels: brandRevenue.value.map(b => b.label),
+      labels: validItems.map(b => b.label),
       datasets: [{
-        data:            brandRevenue.value.map(b => b.value),
-        backgroundColor: brandRevenue.value.map(b => b.color),
-        borderWidth: 2,
-        borderColor: '#fff',
+        data:            validItems.map(b => Number(b.revenue)),
+        backgroundColor: validItems.map(b => b.color),
+        borderWidth: 2, borderColor: '#fff',
       }],
     },
     options: {
@@ -369,78 +441,78 @@ function buildBrandChart() {
       cutout: '68%',
       plugins: {
         legend: { display: false },
-        tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${ctx.parsed}%` } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const item = validItems[ctx.dataIndex]
+              return ` ${ctx.label}: ${item?.value ?? 0}% · ${formatShortCurrency(item?.revenue)}`
+            },
+          },
+        },
       },
     },
   })
 }
 
-function buildNewUserChart() {
-  newUserChart = destroyChart(newUserChart)
-  if (!newUserChartRef.value || !props.newUsersData.length) return
+function buildMethodChart() {
+  methodChart = destroyChart(methodChart)
+  if (!methodChartRef.value || !methodSlices.value.length) return
 
-  const isYear = props.selectedTime === 'year'
-  let labels, data
-
-  if (isYear) {
-    labels = props.newUsersData.map(d => {
-      const r = d.registerDate ?? ''
-      // "T6/2026" → "T6"
-      return r.includes('/') ? r.split('/')[0] : r
-    })
-    data = props.newUsersData.map(d => getNewUserCount(d))
-  } else {
-   
-    labels = props.newUsersData.map(d => {
-      const dateStr = d.registerDate ?? ''
-      if (!dateStr) return ''
-      const parts = String(dateStr).split('-')
-      if (parts.length === 3) return `${parts[2]}/${parts[1]}`
-      return dateStr
-    })
-    data = props.newUsersData.map(d => getNewUserCount(d))
-  }
-
-  const todayIdx = findTodayIndex(labels, props.selectedTime)
-
-  newUserChart = new Chart(newUserChartRef.value, {
-    type: 'bar',
+  methodChart = new Chart(methodChartRef.value, {
+    type: 'doughnut',
     data: {
-      labels,
+      labels: methodSlices.value.map(m => m.method),
       datasets: [{
-        label: 'Tài khoản mới',
-        data,
-        backgroundColor: labels.map((_, i) => i === todayIdx ? '#f59e0b' : 'rgba(8, 145, 178, 0.8)'),
-        borderRadius: 10,
-        borderSkipped: false,
-        barThickness: labels.length <= 2 ? 60 : undefined,
-        maxBarThickness: 80,
+        data:            methodSlices.value.map(m => m.totalOrders),
+        backgroundColor: methodSlices.value.map(m => m.color),
+        borderWidth: 2, borderColor: '#fff',
       }],
     },
     options: {
       ...chartDefaults,
-      scales: {
-        x: {
-          ticks: {
-            color: tickColor,
-            font: { size: 10, weight: '600' },
-            maxRotation: isYear ? 0 : 45,
-            minRotation: 0,
-            autoSkip: false,
-            maxTicksLimit: isYear ? 12 : 31,
+      cutout: '65%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const item = methodSlices.value[ctx.dataIndex]
+              return ` ${ctx.label}: ${item.percentage}% · ${formatShortCurrency(item.totalRevenue)}`
+            },
           },
-          grid: { color: gridColor },
-        },
-        y: {
-          min: 0,
-          ticks: { color: tickColor, font: { size: 11, weight: '600' }, stepSize: 1, precision: 0 },
-          grid: { color: gridColor },
-          title: { display: true, text: 'Tài khoản', color: tickColor, font: { size: 11, weight: '600' } },
         },
       },
+    },
+  })
+}
+
+function buildStatusChart() {
+  statusChart = destroyChart(statusChart)
+  if (!statusChartRef.value || !statusSlices.value.length) return
+
+  statusChart = new Chart(statusChartRef.value, {
+    type: 'doughnut',
+    data: {
+      labels: statusSlices.value.map(s => statusLabel(s.status)),
+      datasets: [{
+        data:            statusSlices.value.map(s => s.totalOrders),
+        backgroundColor: statusSlices.value.map(s => s.color),
+        borderWidth: 2, borderColor: '#fff',
+      }],
+    },
+    options: {
+      ...chartDefaults,
+      cutout: '65%',
       plugins: {
-        ...chartDefaults.plugins,
-        tooltip: { callbacks: { label: (ctx) => ` ${ctx.parsed.y} tài khoản` } },
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const item = statusSlices.value[ctx.dataIndex]
+              return ` ${statusLabel(item.status)}: ${item.percentage}% (${item.totalOrders} đơn)`
+            },
+          },
+        },
       },
     },
   })
@@ -451,12 +523,13 @@ function buildAllCharts() {
     buildRevenueChart()
     buildOrderChart()
     buildBrandChart()
-    buildNewUserChart()
+    buildMethodChart()
+    buildStatusChart()
   })
 }
 
 watch(
-  () => [props.compareData, props.weekdayStats, props.orderStats, props.brandStats, props.newUsersData],
+  () => [props.compareData, props.weekdayStats, props.orderStats, props.brandStats, props.paymentStats],
   () => buildAllCharts(),
   { deep: true },
 )
@@ -465,7 +538,8 @@ onBeforeUnmount(() => {
   revenueChart = destroyChart(revenueChart)
   orderChart   = destroyChart(orderChart)
   brandChart   = destroyChart(brandChart)
-  newUserChart = destroyChart(newUserChart)
+  methodChart  = destroyChart(methodChart)
+  statusChart  = destroyChart(statusChart)
 })
 </script>
 
@@ -520,7 +594,7 @@ onBeforeUnmount(() => {
 }
 
 .chart-frame {
-  height: 400px;
+  height: 340px;
   position: relative;
 }
 
@@ -529,17 +603,16 @@ onBeforeUnmount(() => {
   height: 100% !important;
 }
 
+/* ── Brand doughnut ── */
 .donut-wrap {
-  min-height: 400px;
+  min-height: 340px;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
   align-items: center;
   gap: 20px;
 }
 
-.donut-canvas {
-  height: 340px !important;
-}
+.donut-canvas { height: 300px !important; }
 
 .legend-list {
   display: grid;
@@ -562,21 +635,44 @@ onBeforeUnmount(() => {
   flex: none;
 }
 
+.legend-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.legend-text b { font-size: 13px; font-weight: 800; color: #111827; }
+.legend-text small { font-size: 11px; color: #6b7280; font-weight: 700; }
+
+/* ── Payment chart ── */
+.payment-wrap {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.payment-half { display: flex; flex-direction: column; gap: 12px; }
+
+.chart-sub {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 900;
+  color: #374151;
+  text-align: center;
+}
+
+.legend-list.compact { gap: 8px; }
+.legend-list.compact span { font-size: 12px; }
+.legend-list.compact .legend-text b { font-size: 12px; }
+
 @media (max-width: 1400px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
+  .dashboard-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 992px) {
-  .card-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .donut-wrap {
-    grid-template-columns: 1fr;
-    justify-items: center;
-  }
+  .card-header { flex-direction: column; align-items: stretch; }
+  .donut-wrap  { grid-template-columns: 1fr; justify-items: center; }
+  .payment-wrap { grid-template-columns: 1fr; }
 }
 </style>

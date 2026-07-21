@@ -16,18 +16,24 @@
           :style="{
             background: item.type === 'warning' ? '#ffedd5' : '#fff2f7',
             color: item.type === 'warning' ? '#c2410c' : '#ff4d8d',
-            width: '46px',
-            height: '46px',
-            minWidth: '46px',
-            borderRadius: '14px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '20px',
-            flex: 'none',
+            width: '46px', height: '46px', minWidth: '46px',
+            borderRadius: '14px', display: 'inline-flex',
+            alignItems: 'center', justifyContent: 'center',
+            fontSize: '20px', flex: 'none',
           }"
         ></span>
-        <small v-if="item.growth">{{ item.growth }}</small>
+        <!-- Badge % thay đổi (chỉ 4 ô đầu) -->
+        <small
+          v-if="item.change !== undefined"
+          :class="changeBadgeClass(item.change)"
+        >
+          <i :class="item.change === null ? 'bi bi-dash' : item.change >= 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
+          {{ item.change === null ? 'N/A' : Math.abs(item.change) + '%' }}
+        </small>
+        <!-- Badge cảnh báo (ô warning) -->
+        <small v-else-if="item.badge" :class="item.badgeClass ?? 'badge-warning'">
+          {{ item.badge }}
+        </small>
       </div>
       <div>
         <p>{{ item.title }}</p>
@@ -42,10 +48,10 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  kpiSummary:         { type: Object, default: () => ({ totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 }) },
+  kpiCompare:         { type: Object, default: () => ({}) },   // từ /kpi-compare
   pendingOrdersCount: { type: Number, default: 0 },
   lowStockData:       { type: Array,  default: () => [] },
-  periodLabel:        { type: String, default: 'tháng này' },
+  periodLabel:        { type: String, default: 'hôm nay' },
 })
 
 const emit = defineEmits(['action'])
@@ -56,59 +62,74 @@ function formatCurrency(value) {
   }).format(value || 0)
 }
 
-const inventoryAlerts = computed(() =>
-  props.lowStockData.slice(0, 3).map(item => ({
-    title: item.status === 'Hết hàng'
-      ? `Hết hàng: ${item.productName} (${item.skuCode})`
-      : `Sắp hết hàng: ${item.productName} chỉ còn ${item.stockQuantity} sản phẩm`,
-  }))
-)
+function changeBadgeClass(change) {
+  if (change === null || change === undefined) return 'badge-neutral'
+  if (change > 0)  return 'badge-up'
+  if (change < 0)  return 'badge-down'
+  return 'badge-neutral'
+}
+
+const kd = computed(() => props.kpiCompare)
+const prevLabel = computed(() => kd.value.previousLabel ? `so với ${kd.value.previousLabel}` : '')
 
 const kpiItems = computed(() => [
   {
-    key: 'revenue', title: 'Doanh thu',
-    value: formatCurrency(props.kpiSummary.totalRevenue), growth: '',
-    note: `Tổng doanh thu ${props.periodLabel}`,
+    key: 'revenue',
+    title: 'Doanh thu',
+    value: formatCurrency(kd.value.totalRevenue),
+    change: kd.value.revenueChangePercent ?? null,
+    note: `Tổng doanh thu ghi nhận ${props.periodLabel} · ${prevLabel.value}`,
     icon: 'bi bi-currency-dollar', type: 'normal', link: null, action: null,
   },
   {
-    key: 'orders', title: 'Tổng đơn hàng',
-    value: String(props.kpiSummary.totalOrders), growth: '',
-    note: `Đơn hàng đã ghi nhận ${props.periodLabel}`,
+    key: 'orders',
+    title: 'Tổng đơn hàng',
+    value: String(kd.value.totalOrders ?? 0),
+    change: kd.value.ordersChangePercent ?? null,
+    note: `Số đơn hàng đã tiếp nhận ${props.periodLabel} · ${prevLabel.value}`,
     icon: 'bi bi-bag-check', type: 'normal', link: null, action: null,
   },
   {
-    key: 'soldProducts', title: 'Sản phẩm đã bán',
-    value: String(props.kpiSummary.totalProductsSold), growth: '',
-    note: `Số lượng SKU đã bán ${props.periodLabel}`,
+    key: 'completedOrders',
+    title: 'Đơn hoàn thành',
+    value: String(kd.value.completedOrders ?? 0),
+    change: kd.value.completedOrdersChangePercent ?? null,
+    note: `Số đơn giao thành công ${props.periodLabel} · ${prevLabel.value}`,
+    icon: 'bi bi-patch-check', type: 'normal', link: null, action: null,
+  },
+  {
+    key: 'soldProducts',
+    title: 'Sản phẩm đã bán',
+    value: String(kd.value.totalProductsSold ?? 0),
+    change: kd.value.productsSoldChangePercent ?? null,
+    note: `Tổng số lượng sản phẩm bán ra ${props.periodLabel} · ${prevLabel.value}`,
     icon: 'bi bi-box-seam', type: 'normal', link: null, action: null,
   },
   {
-    key: 'pendingOrders', title: 'Đơn mới chưa xử lý',
+    key: 'pendingOrders',
+    title: 'Đơn chờ xử lý',
     value: String(props.pendingOrdersCount),
-    growth: props.pendingOrdersCount > 0 ? 'Ưu tiên' : '',
-    note: 'Ưu tiên duyệt để tránh trễ SLA',
+    badge: props.pendingOrdersCount > 0 ? 'Cần xử lý' : '',
+    badgeClass: 'badge-warning',
+    note: props.pendingOrdersCount > 0
+      ? 'Cần xử lý ngay để tránh chậm trễ đơn hàng'
+      : 'Không có đơn nào đang chờ xử lý',
     icon: 'bi bi-exclamation-triangle',
     type: props.pendingOrdersCount > 0 ? 'warning' : 'normal',
     link: '/admin/order', action: null,
   },
   {
-    key: 'lowStock', title: 'SP sắp / hết hàng',
+    key: 'lowStock',
+    title: 'Sản phẩm sắp hết / hết hàng',
     value: String(props.lowStockData.length),
-    growth: props.lowStockData.length > 0 ? 'Cần xử lý' : '',
-    note: 'Cần nhập thêm hàng',
+    badge: props.lowStockData.length > 0 ? 'Cần nhập thêm' : '',
+    badgeClass: 'badge-warning',
+    note: props.lowStockData.length > 0
+      ? `${props.lowStockData.filter(i => i.status === 'Hết hàng').length} sản phẩm hết hàng · ${props.lowStockData.filter(i => i.status !== 'Hết hàng').length} sắp hết`
+      : 'Tồn kho đang ở mức an toàn',
     icon: 'bi bi-archive',
     type: props.lowStockData.length > 0 ? 'warning' : 'normal',
     link: null, action: 'lowStock',
-  },
-  {
-    key: 'alerts', title: 'Cảnh báo tồn kho',
-    value: String(inventoryAlerts.value.length),
-    growth: inventoryAlerts.value.length > 0 ? 'Mới' : '',
-    note: inventoryAlerts.value.length > 0 ? inventoryAlerts.value[0].title : 'Không có cảnh báo',
-    icon: 'bi bi-bell',
-    type: inventoryAlerts.value.length > 0 ? 'warning' : 'normal',
-    link: null, action: inventoryAlerts.value.length > 0 ? 'lowStock' : null,
   },
 ])
 </script>
@@ -120,11 +141,11 @@ const kpiItems = computed(() => [
   gap: 16px;
 }
 
-.kpi-grid .kpi-card {
+.kpi-card {
   background: #fff;
   border: 1px solid #ffe0ec;
   box-shadow: 0 2px 12px rgba(37, 99, 235, 0.06);
-  min-height: 170px;
+  min-height: 160px;
   border-radius: 22px;
   padding: 20px;
   display: flex;
@@ -135,66 +156,48 @@ const kpiItems = computed(() => [
   color: inherit;
 }
 
-.kpi-grid .kpi-card.clickable {
-  cursor: pointer;
-}
-
-.kpi-grid .kpi-card.clickable:hover {
+.kpi-card.clickable { cursor: pointer; }
+.kpi-card.clickable:hover {
   transform: translateY(-4px);
   box-shadow: 0 16px 40px rgba(37, 99, 235, 0.15);
 }
-
-.kpi-grid .kpi-card.warning {
+.kpi-card.warning {
   background: #fff7ed;
   border-color: #fed7aa;
 }
 
-.kpi-grid .kpi-top {
+.kpi-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.kpi-grid .kpi-icon {
-  width: 46px;
-  height: 46px;
-  min-width: 46px;
-  border-radius: 14px;
+.kpi-icon::before { display: block; line-height: 1; }
+
+/* ── Badges ── */
+.kpi-top small {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex: none;
-  font-size: 20px;
-}
-
-.kpi-grid .kpi-icon::before {
-  display: block;
-  line-height: 1;
-}
-
-.kpi-grid .kpi-top small {
+  gap: 3px;
   padding: 5px 10px;
   border-radius: 999px;
-  background: #ecfdf5;
-  color: #047857;
   font-size: 12px;
   font-weight: 900;
 }
 
-.kpi-grid .kpi-card.warning .kpi-top small {
-  background: #ffedd5;
-  color: #c2410c;
-}
+.badge-up      { background: #ecfdf5; color: #047857; }
+.badge-down    { background: #fef2f2; color: #b91c1c; }
+.badge-neutral { background: #f3f4f6; color: #6b7280; }
+.badge-warning { background: #ffedd5; color: #c2410c; }
 
-.kpi-grid .kpi-card p {
+.kpi-card p {
   margin: 0;
   font-size: 13px;
   font-weight: 800;
   color: #6b7280;
 }
-
-.kpi-grid .kpi-card strong {
+.kpi-card strong {
   display: block;
   margin-top: 4px;
   color: #111827;
@@ -205,8 +208,7 @@ const kpiItems = computed(() => [
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-.kpi-grid .kpi-card span {
+.kpi-card span {
   display: block;
   margin-top: 8px;
   font-size: 12px;
@@ -214,11 +216,6 @@ const kpiItems = computed(() => [
   color: #6b7280;
 }
 
-@media (max-width: 992px) {
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 600px) {
-  .kpi-grid { grid-template-columns: 1fr; }
-}
+@media (max-width: 992px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .kpi-grid { grid-template-columns: 1fr; } }
 </style>

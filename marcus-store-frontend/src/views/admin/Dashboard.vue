@@ -8,7 +8,7 @@
       />
 
       <KpiGrid
-        :kpiSummary="kpiSummary"
+        :kpiCompare="kpiCompare"
         :pendingOrdersCount="pendingOrdersCount"
         :lowStockData="lowStockData"
         :periodLabel="periodNoteLabel"
@@ -20,8 +20,8 @@
         :compareData="compareData"
         :weekdayStats="weekdayStats"
         :brandStats="brandStats"
-        :newUsersData="newUsersData"
         :orderStats="orderStats"
+        :paymentStats="paymentStats"
       />
 
       <DataSection
@@ -44,17 +44,18 @@ import KpiGrid         from '../../layouts/Dashboard/Kpigrid.vue'
 import ChartsSection   from '../../layouts/Dashboard/Chartssection.vue'
 import DataSection     from '../../layouts/Dashboard/Datasection.vue'
 
-const selectedTime = ref('month')
+// ── Mặc định "today" khi vào trang ──
+const selectedTime = ref('today')
 const customDate   = ref('')
 
-const kpiSummary         = ref({ totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 })
+const kpiCompare         = ref({})
 const pendingOrdersCount = ref(0)
 const weekdayStats       = ref([])
 const brandStats         = ref([])
 const compareData        = ref({ current: [], previous: [], currentLabel: '', previousLabel: '' })
-const newUsersData       = ref([])
 const lowStockData       = ref([])
 const orderStats         = ref([])
+const paymentStats       = ref({ byMethod: [], byStatus: [] })
 const childCategories    = ref([])
 const dataSectionRef     = ref(null)
 
@@ -78,30 +79,36 @@ const brandNameList = computed(() =>
   brandStats.value.map(b => b.brand).filter(Boolean)
 )
 
-async function fetchDashboardData(period = 'month', startDate = '', endDate = '') {
+async function fetchDashboardData(period = 'today', startDate = '', endDate = '') {
   try {
     const [
-      kpiRes, weekdayRes, brandRes, lowStockRes,
-      compareRes, pendingRes, newUserRes, orderStatsRes,
+      kpiCompareRes,
+      weekdayRes,
+      brandRes,
+      lowStockRes,
+      compareRes,
+      pendingRes,
+      orderStatsRes,
+      paymentStatsRes,
     ] = await Promise.all([
-      statisticsApi.getKpiSummary(period, startDate, endDate),
+      statisticsApi.getKpiCompare(period, startDate, endDate),        // KPI + % thay đổi
       statisticsApi.getOrdersByWeekday(period, startDate, endDate),
       statisticsApi.getRevenueByBrand(period, startDate, endDate),
       statisticsApi.getLowStockProducts(),
       statisticsApi.getRevenueCompare(period, startDate, endDate),
       statisticsApi.getPendingOrdersCount(),
-      statisticsApi.getNewUsers(period, startDate, endDate),
       statisticsApi.getRevenueByDay(period, startDate, endDate),
+      statisticsApi.getPaymentStats(period, startDate, endDate),      // MỚI
     ])
 
-    kpiSummary.value         = kpiRes.data.data
+    kpiCompare.value         = kpiCompareRes.data.data
     weekdayStats.value       = weekdayRes.data.data
     brandStats.value         = brandRes.data.data
     lowStockData.value       = lowStockRes.data.data
     compareData.value        = compareRes.data.data
     pendingOrdersCount.value = pendingRes.data.data
-    newUsersData.value       = newUserRes.data.data
     orderStats.value         = orderStatsRes.data.data
+    paymentStats.value       = paymentStatsRes.data.data
   } catch (err) {
     console.error('Không thể tải dữ liệu thống kê:', err)
   }
@@ -111,10 +118,8 @@ watch(
   [selectedTime, customDate],
   ([time, custom]) => {
     if (custom) {
-      // User đang chọn ngày cụ thể → luôn query 1 ngày đó
       fetchDashboardData('today', custom, custom)
     } else {
-      // User chọn preset hoặc vừa xóa custom date
       fetchDashboardData(time)
     }
   },
@@ -129,7 +134,7 @@ function handleKpiAction(action) {
 }
 
 onMounted(async () => {
-  fetchDashboardData(selectedTime.value)
+  fetchDashboardData(selectedTime.value)   // gọi với 'today'
   try {
     const catRes = await statisticsApi.getChildCategories()
     childCategories.value = catRes.data.data

@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.response.*;
 import com.fpoly.marcusstore.repository.statistics.BrandRevenueProjection;
 import com.fpoly.marcusstore.repository.statistics.NewUserByDayProjection;
+import com.fpoly.marcusstore.repository.statistics.PaymentStatusProjection;
 import com.fpoly.marcusstore.repository.statistics.RevenueCompareProjection;
 import com.fpoly.marcusstore.repository.statistics.StatisticsRepository;
 import com.fpoly.marcusstore.repository.shopping.TopCustomerProjection;
@@ -85,6 +86,49 @@ public class StatisticsService {
                 .totalRevenue(p.getTotalRevenue() != null ? p.getTotalRevenue() : BigDecimal.ZERO)
                 .totalOrders(p.getTotalOrders() != null ? p.getTotalOrders() : 0L)
                 .totalProductsSold(p.getTotalProductsSold() != null ? p.getTotalProductsSold() : 0L)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public KpiCompareDTO getKpiCompare(String period, LocalDate startDate, LocalDate endDate) {
+        LocalDate[] cur = resolveDateRange(startDate, endDate, period);
+        LocalDate curStart = cur[0], curEnd = cur[1];
+
+        long days = java.time.temporal.ChronoUnit.DAYS.between(curStart, curEnd) + 1;
+        LocalDate prevStart = curStart.minusDays(days);
+        LocalDate prevEnd   = curEnd.minusDays(days);
+
+        String previousLabel;
+        if (days == 1) {
+            previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } else {
+            previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM"))
+                    + "–" + prevEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        }
+
+        var curP  = statisticsRepository.getKpiSummaryV2(curStart, curEnd);
+        var prevP = statisticsRepository.getKpiSummaryV2(prevStart, prevEnd);
+
+        BigDecimal curRev  = curP.getTotalRevenue()      != null ? curP.getTotalRevenue()      : BigDecimal.ZERO;
+        long curOrders     = curP.getTotalOrders()       != null ? curP.getTotalOrders()       : 0L;
+        long curCompleted  = curP.getCompletedOrders()   != null ? curP.getCompletedOrders()   : 0L;
+        long curSold       = curP.getTotalProductsSold() != null ? curP.getTotalProductsSold() : 0L;
+
+        BigDecimal prevRev = prevP.getTotalRevenue()      != null ? prevP.getTotalRevenue()      : BigDecimal.ZERO;
+        long prevOrders    = prevP.getTotalOrders()       != null ? prevP.getTotalOrders()       : 0L;
+        long prevCompleted = prevP.getCompletedOrders()   != null ? prevP.getCompletedOrders()   : 0L;
+        long prevSold      = prevP.getTotalProductsSold() != null ? prevP.getTotalProductsSold() : 0L;
+
+        return KpiCompareDTO.builder()
+                .totalRevenue(curRev)
+                .totalOrders(curOrders)
+                .completedOrders(curCompleted)
+                .totalProductsSold(curSold)
+                .revenueChangePercent(calcChange(curRev.doubleValue(), prevRev.doubleValue()))
+                .ordersChangePercent(calcChange(curOrders, prevOrders))
+                .completedOrdersChangePercent(calcChange(curCompleted, prevCompleted))
+                .productsSoldChangePercent(calcChange(curSold, prevSold))
+                .previousLabel(previousLabel)
                 .build();
     }
 
@@ -190,6 +234,59 @@ public class StatisticsService {
                         .orderStatus(p.getOrderStatus()).totalAmount(p.getTotalAmount())
                         .createdAt(p.getCreatedAt().toLocalDateTime()).build())
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<RecentOrderResponseDTO> getPendingOrders(int limit, String keyword) {
+        return statisticsRepository.getPendingOrders(limit, toNullIfBlank(keyword)).stream()
+                .map(p -> RecentOrderResponseDTO.builder()
+                        .orderCode(p.getOrderCode()).customerName(p.getCustomerName())
+                        .phone(p.getPhone()).paymentMethod(p.getPaymentMethod())
+                        .orderStatus(p.getOrderStatus()).totalAmount(p.getTotalAmount())
+                        .createdAt(p.getCreatedAt().toLocalDateTime()).build())
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public PaymentStatsDTO getPaymentStats(LocalDate startDate, LocalDate endDate) {
+        var raw = statisticsRepository.getPaymentStats(startDate, endDate);
+
+        Map<String, long[]>     methodMap    = new LinkedHashMap<>();
+        Map<String, BigDecimal> methodRevMap = new LinkedHashMap<>();
+        for (var p : raw) {
+            String m = p.getPaymentMethod() != null ? p.getPaymentMethod() : "Khác";
+            methodMap.computeIfAbsent(m, k -> new long[]{0})[0] += p.getTotalOrders();
+            methodRevMap.merge(m, p.getTotalRevenue() != null ? p.getTotalRevenue() : BigDecimal.ZERO, BigDecimal::add);
+        }
+        long totalByMethod = methodMap.values().stream().mapToLong(a -> a[0]).sum();
+        List<PaymentStatsDTO.MethodSlice> byMethod = methodMap.entrySet().stream()
+                .map(e -> PaymentStatsDTO.MethodSlice.builder()
+                        .method(e.getKey())
+                        .totalOrders(e.getValue()[0])
+                        .totalRevenue(methodRevMap.getOrDefault(e.getKey(), BigDecimal.ZERO))
+                        .percentage(totalByMethod > 0
+                                ? Math.round(e.getValue()[0] * 1000.0 / totalByMethod) / 10.0
+                                : 0.0)
+                        .build())
+                .collect(Collectors.toList());
+
+        Map<String, long[]> statusMap = new LinkedHashMap<>();
+        for (var p : raw) {
+            String s = p.getOrderStatus() != null ? p.getOrderStatus() : "Khác";
+            statusMap.computeIfAbsent(s, k -> new long[]{0})[0] += p.getTotalOrders();
+        }
+        long totalByStatus = statusMap.values().stream().mapToLong(a -> a[0]).sum();
+        List<PaymentStatsDTO.StatusSlice> byStatus = statusMap.entrySet().stream()
+                .map(e -> PaymentStatsDTO.StatusSlice.builder()
+                        .status(e.getKey())
+                        .totalOrders(e.getValue()[0])
+                        .percentage(totalByStatus > 0
+                                ? Math.round(e.getValue()[0] * 1000.0 / totalByStatus) / 10.0
+                                : 0.0)
+                        .build())
+                .collect(Collectors.toList());
+
+        return PaymentStatsDTO.builder().byMethod(byMethod).byStatus(byStatus).build();
     }
 
     @Transactional(readOnly = true)
@@ -333,6 +430,11 @@ public class StatisticsService {
         return statisticsRepository.countPendingOrders();
     }
 
+    private Double calcChange(double current, double previous) {
+        if (previous == 0) return null;
+        return Math.round((current - previous) * 1000.0 / previous) / 10.0;
+    }
+
     private String toNullIfBlank(String value) {
         return (value == null || value.isBlank()) ? null : value;
     }
@@ -394,7 +496,6 @@ public class StatisticsService {
                 monthYearMap.put(m, periodStart.getYear());
             }
             for (RevenueCompareProjection p : raw) {
-                // FIX #8: parse an toàn
                 LocalDate date = toLocalDate(p.getDateLabel());
                 if (date == null) continue;
                 int month = date.getMonthValue();
