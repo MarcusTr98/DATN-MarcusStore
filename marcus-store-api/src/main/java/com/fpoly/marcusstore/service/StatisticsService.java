@@ -91,19 +91,64 @@ public class StatisticsService {
 
     @Transactional(readOnly = true)
     public KpiCompareDTO getKpiCompare(String period, LocalDate startDate, LocalDate endDate) {
-        LocalDate[] cur = resolveDateRange(startDate, endDate, period);
+        LocalDate[] cur    = resolveDateRange(startDate, endDate, period);
         LocalDate curStart = cur[0], curEnd = cur[1];
 
-        long days = java.time.temporal.ChronoUnit.DAYS.between(curStart, curEnd) + 1;
-        LocalDate prevStart = curStart.minusDays(days);
-        LocalDate prevEnd   = curEnd.minusDays(days);
-
+        LocalDate today = LocalDate.now();
+        LocalDate prevStart, prevEnd;
         String previousLabel;
-        if (days == 1) {
-            previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
-        } else {
+
+        if (startDate != null && endDate != null) {
+            // Custom range: trừ ngày thô là đúng
+            long days     = java.time.temporal.ChronoUnit.DAYS.between(curStart, curEnd) + 1;
+            prevStart     = curStart.minusDays(days);
+            prevEnd       = curEnd.minusDays(days);
             previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM"))
                     + "–" + prevEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+        } else {
+            switch (period == null ? "month" : period) {
+                case "today" -> {
+                    prevStart     = today.minusDays(1);
+                    prevEnd       = today.minusDays(1);
+                    previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                }
+                case "yesterday" -> {
+                    prevStart     = today.minusDays(2);
+                    prevEnd       = today.minusDays(2);
+                    previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                }
+                case "7days" -> {
+                    prevStart     = today.minusDays(13);
+                    prevEnd       = today.minusDays(7);
+                    previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM"))
+                            + "–" + prevEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                }
+                case "30days" -> {
+                    prevStart     = today.minusDays(59);
+                    prevEnd       = today.minusDays(30);
+                    previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM"))
+                            + "–" + prevEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                }
+                case "week" -> {
+                    prevStart     = today.with(DayOfWeek.MONDAY).minusDays(7);
+                    prevEnd       = today.minusDays(7);
+                    previousLabel = prevStart.format(DateTimeFormatter.ofPattern("dd/MM"))
+                            + "–" + prevEnd.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"));
+                }
+                case "year" -> {
+                    prevStart     = today.minusYears(1).withDayOfYear(1);
+                    prevEnd       = today.minusYears(1);
+                    previousLabel = "Năm " + (today.getYear() - 1);
+                }
+                default -> { // month
+                    prevStart = today.minusMonths(1).withDayOfMonth(1);
+                    int lastDay = today.minusMonths(1).lengthOfMonth();
+                    prevEnd   = today.minusMonths(1).withDayOfMonth(
+                            Math.min(today.getDayOfMonth(), lastDay));
+                    previousLabel = "Tháng " + today.minusMonths(1).getMonthValue()
+                            + "/" + today.minusMonths(1).getYear();
+                }
+            }
         }
 
         var curP  = statisticsRepository.getKpiSummaryV2(curStart, curEnd);

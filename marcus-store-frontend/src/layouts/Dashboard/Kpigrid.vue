@@ -51,6 +51,8 @@ const props = defineProps({
   kpiCompare:         { type: Object, default: () => ({}) },   // từ /kpi-compare
   pendingOrdersCount: { type: Number, default: 0 },
   lowStockData:       { type: Array,  default: () => [] },
+  // periodLabel: nhãn kỳ hiện tại — 'hôm nay' | '7 ngày qua' | 'tháng này' | ...
+  // dùng để suy ra nhãn kỳ trước tương ứng hiển thị trong note
   periodLabel:        { type: String, default: 'hôm nay' },
 })
 
@@ -69,8 +71,36 @@ function changeBadgeClass(change) {
   return 'badge-neutral'
 }
 
+/**
+ * Từ periodLabel của kỳ HIỆN TẠI, suy ra nhãn kỳ TRƯỚC để hiển thị trong note.
+ * Ví dụ: periodLabel = '7 ngày qua'  → 'tuần trước'
+ *        periodLabel = 'tháng này'   → 'tháng trước'
+ *        periodLabel = 'hôm nay'     → 'hôm qua'
+ */
+function resolvePreviousPeriodName(periodLabel) {
+  const map = {
+    'hôm nay':     'hôm qua',
+    '7 ngày qua':  'tuần trước',
+    '30 ngày qua': 'tháng trước',
+    'tháng này':   'tháng trước',
+    'tuần này':    'tuần trước',
+    'năm nay':     'năm ngoái',
+  }
+  return map[periodLabel] ?? 'kỳ trước'
+}
+
+/**
+ * Tạo note rõ ràng dạng:
+ * "So với tuần trước (08/07–14/07/2026)"
+ * Badge % đã hiển thị tăng/giảm rồi nên note chỉ cần nói SO VỚI CÁI GÌ.
+ */
+function buildChangeNote(previousLabel, periodLabel) {
+  if (!previousLabel) return ''
+  const periodName = resolvePreviousPeriodName(periodLabel)
+  return `So với ${periodName} (${previousLabel})`
+}
+
 const kd = computed(() => props.kpiCompare)
-const prevLabel = computed(() => kd.value.previousLabel ? `so với ${kd.value.previousLabel}` : '')
 
 const kpiItems = computed(() => [
   {
@@ -78,7 +108,7 @@ const kpiItems = computed(() => [
     title: 'Doanh thu',
     value: formatCurrency(kd.value.totalRevenue),
     change: kd.value.revenueChangePercent ?? null,
-    note: `Tổng doanh thu ghi nhận ${props.periodLabel} · ${prevLabel.value}`,
+    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
     icon: 'bi bi-currency-dollar', type: 'normal', link: null, action: null,
   },
   {
@@ -86,7 +116,7 @@ const kpiItems = computed(() => [
     title: 'Tổng đơn hàng',
     value: String(kd.value.totalOrders ?? 0),
     change: kd.value.ordersChangePercent ?? null,
-    note: `Số đơn hàng đã tiếp nhận ${props.periodLabel} · ${prevLabel.value}`,
+    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
     icon: 'bi bi-bag-check', type: 'normal', link: null, action: null,
   },
   {
@@ -94,7 +124,7 @@ const kpiItems = computed(() => [
     title: 'Đơn hoàn thành',
     value: String(kd.value.completedOrders ?? 0),
     change: kd.value.completedOrdersChangePercent ?? null,
-    note: `Số đơn giao thành công ${props.periodLabel} · ${prevLabel.value}`,
+    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
     icon: 'bi bi-patch-check', type: 'normal', link: null, action: null,
   },
   {
@@ -102,7 +132,7 @@ const kpiItems = computed(() => [
     title: 'Sản phẩm đã bán',
     value: String(kd.value.totalProductsSold ?? 0),
     change: kd.value.productsSoldChangePercent ?? null,
-    note: `Tổng số lượng sản phẩm bán ra ${props.periodLabel} · ${prevLabel.value}`,
+    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
     icon: 'bi bi-box-seam', type: 'normal', link: null, action: null,
   },
   {
