@@ -7,38 +7,39 @@
       :to="item.link || undefined"
       class="kpi-card"
       :class="{ warning: item.type === 'warning', clickable: !!item.link || !!item.action }"
+      :style="{ background: item.bg }"
       @click="item.action ? $emit('action', item.action) : undefined"
     >
       <div class="kpi-top">
         <span
           class="kpi-icon"
           :class="item.icon"
-          :style="{
-            background: item.type === 'warning' ? '#ffedd5' : '#fff2f7',
-            color: item.type === 'warning' ? '#c2410c' : '#ff4d8d',
-            width: '46px', height: '46px', minWidth: '46px',
-            borderRadius: '14px', display: 'inline-flex',
-            alignItems: 'center', justifyContent: 'center',
-            fontSize: '20px', flex: 'none',
-          }"
+          :style="{ background: item.iconBg, color: item.iconColor }"
         ></span>
-        <!-- Badge % thay đổi (chỉ 4 ô đầu) -->
-        <small
-          v-if="item.change !== undefined"
-          :class="changeBadgeClass(item.change)"
-        >
-          <i :class="item.change === null ? 'bi bi-dash' : item.change >= 0 ? 'bi bi-arrow-up' : 'bi bi-arrow-down'"></i>
-          {{ item.change === null ? 'N/A' : Math.abs(item.change) + '%' }}
-        </small>
         <!-- Badge cảnh báo (ô warning) -->
-        <small v-else-if="item.badge" :class="item.badgeClass ?? 'badge-warning'">
+        <small v-if="item.badge" :class="item.badgeClass ?? 'badge-warning'">
           {{ item.badge }}
         </small>
       </div>
-      <div>
-        <p>{{ item.title }}</p>
-        <strong>{{ item.value }}</strong>
-        <span>{{ item.note }}</span>
+      <div class="kpi-body">
+        <p class="kpi-title">{{ item.title }}</p>
+        <strong class="kpi-value">{{ item.value }}</strong>
+        <!-- Note gộp % tăng/giảm vào câu -->
+        <span class="kpi-note">
+          <template v-if="item.change !== undefined && item.change !== null">
+            <span :class="item.change >= 0 ? 'trend-up' : 'trend-down'">
+              <i :class="item.change >= 0 ? 'bi bi-arrow-up-short' : 'bi bi-arrow-down-short'"></i>
+              {{ Math.abs(item.change) }}%
+            </span>
+            so với {{ kd.previousLabel }}
+          </template>
+          <template v-else-if="item.change === null">
+            <span class="trend-neutral">— Chưa có dữ liệu kỳ trước</span>
+          </template>
+          <template v-else>
+            {{ item.note }}
+          </template>
+        </span>
       </div>
     </component>
   </section>
@@ -51,8 +52,6 @@ const props = defineProps({
   kpiCompare:         { type: Object, default: () => ({}) },   // từ /kpi-compare
   pendingOrdersCount: { type: Number, default: 0 },
   lowStockData:       { type: Array,  default: () => [] },
-  // periodLabel: nhãn kỳ hiện tại — 'hôm nay' | '7 ngày qua' | 'tháng này' | ...
-  // dùng để suy ra nhãn kỳ trước tương ứng hiển thị trong note
   periodLabel:        { type: String, default: 'hôm nay' },
 })
 
@@ -71,69 +70,71 @@ function changeBadgeClass(change) {
   return 'badge-neutral'
 }
 
-/**
- * Từ periodLabel của kỳ HIỆN TẠI, suy ra nhãn kỳ TRƯỚC để hiển thị trong note.
- * Ví dụ: periodLabel = '7 ngày qua'  → 'tuần trước'
- *        periodLabel = 'tháng này'   → 'tháng trước'
- *        periodLabel = 'hôm nay'     → 'hôm qua'
- */
-function resolvePreviousPeriodName(periodLabel) {
-  const map = {
-    'hôm nay':     'hôm qua',
-    '7 ngày qua':  'tuần trước',
-    '30 ngày qua': 'tháng trước',
-    'tháng này':   'tháng trước',
-    'tuần này':    'tuần trước',
-    'năm nay':     'năm ngoái',
-  }
-  return map[periodLabel] ?? 'kỳ trước'
-}
-
-/**
- * Tạo note rõ ràng dạng:
- * "So với tuần trước (08/07–14/07/2026)"
- * Badge % đã hiển thị tăng/giảm rồi nên note chỉ cần nói SO VỚI CÁI GÌ.
- */
-function buildChangeNote(previousLabel, periodLabel) {
-  if (!previousLabel) return ''
-  const periodName = resolvePreviousPeriodName(periodLabel)
-  return `So với ${periodName} (${previousLabel})`
-}
-
 const kd = computed(() => props.kpiCompare)
+
+// Label động theo period
+const periodTitle = computed(() => {
+  switch (props.periodLabel) {
+    case 'hôm nay':     return 'hôm nay'
+    case 'hôm qua':     return 'hôm qua'
+    case '7 ngày qua':  return '7 ngày qua'
+    case '30 ngày qua': return '30 ngày qua'
+    case 'tuần này':    return 'tuần này'
+    case 'năm nay':     return 'năm nay'
+    default:            return 'tháng này'
+  }
+})
+
+// Helper: bg + iconBg + iconColor theo trend
+function trendStyle(change, icon) {
+  if (change === null || change === undefined) {
+    // Chưa có dữ liệu kỳ trước → vàng
+    return { bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', iconBg: '#fde68a', iconColor: '#92400e', icon }
+  }
+  if (change > 0) {
+    // Tăng → xanh lá
+    return { bg: 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)', iconBg: '#86efac', iconColor: '#14532d', icon }
+  }
+  if (change < 0) {
+    // Giảm → hồng đỏ
+    return { bg: 'linear-gradient(135deg, #fff1f2 0%, #fecdd3 100%)', iconBg: '#fda4af', iconColor: '#881337', icon }
+  }
+  // Bằng 0 → vàng
+  return { bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', iconBg: '#fde68a', iconColor: '#92400e', icon }
+}
 
 const kpiItems = computed(() => [
   {
     key: 'revenue',
-    title: 'Doanh thu',
+    title: `Doanh thu ${periodTitle.value}`,
     value: formatCurrency(kd.value.totalRevenue),
     change: kd.value.revenueChangePercent ?? null,
-    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
-    icon: 'bi bi-currency-dollar', type: 'normal', link: null, action: null,
+    ...trendStyle(kd.value.revenueChangePercent ?? null, 'bi bi-currency-dollar'),
+    type: 'normal', link: null, action: null,
   },
   {
     key: 'orders',
-    title: 'Tổng đơn hàng',
+    title: `Tổng đơn hàng ${periodTitle.value}`,
     value: String(kd.value.totalOrders ?? 0),
     change: kd.value.ordersChangePercent ?? null,
-    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
-    icon: 'bi bi-bag-check', type: 'normal', link: null, action: null,
+    ...trendStyle(kd.value.ordersChangePercent ?? null, 'bi bi-bag-check'),
+    type: 'normal', link: null, action: null,
   },
   {
     key: 'completedOrders',
-    title: 'Đơn hoàn thành',
+    title: `Đơn hoàn thành ${periodTitle.value}`,
     value: String(kd.value.completedOrders ?? 0),
     change: kd.value.completedOrdersChangePercent ?? null,
-    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
-    icon: 'bi bi-patch-check', type: 'normal', link: null, action: null,
+    ...trendStyle(kd.value.completedOrdersChangePercent ?? null, 'bi bi-patch-check'),
+    type: 'normal', link: null, action: null,
   },
   {
     key: 'soldProducts',
-    title: 'Sản phẩm đã bán',
+    title: `Sản phẩm đã bán ${periodTitle.value}`,
     value: String(kd.value.totalProductsSold ?? 0),
     change: kd.value.productsSoldChangePercent ?? null,
-    note: buildChangeNote(kd.value.previousLabel, props.periodLabel),
-    icon: 'bi bi-box-seam', type: 'normal', link: null, action: null,
+    ...trendStyle(kd.value.productsSoldChangePercent ?? null, 'bi bi-box-seam'),
+    type: 'normal', link: null, action: null,
   },
   {
     key: 'pendingOrders',
@@ -147,6 +148,11 @@ const kpiItems = computed(() => [
     icon: 'bi bi-exclamation-triangle',
     type: props.pendingOrdersCount > 0 ? 'warning' : 'normal',
     link: '/admin/order', action: null,
+    bg: props.pendingOrdersCount > 0
+      ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'
+      : 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+    iconBg: props.pendingOrdersCount > 0 ? '#ffedd5' : '#f3f4f6',
+    iconColor: props.pendingOrdersCount > 0 ? '#c2410c' : '#6b7280',
   },
   {
     key: 'lowStock',
@@ -160,6 +166,11 @@ const kpiItems = computed(() => [
     icon: 'bi bi-archive',
     type: props.lowStockData.length > 0 ? 'warning' : 'normal',
     link: null, action: 'lowStock',
+    bg: props.lowStockData.length > 0
+      ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'
+      : 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)',
+    iconBg: props.lowStockData.length > 0 ? '#ffedd5' : '#86efac',
+    iconColor: props.lowStockData.length > 0 ? '#c2410c' : '#14532d',
   },
 ])
 </script>
@@ -172,9 +183,8 @@ const kpiItems = computed(() => [
 }
 
 .kpi-card {
-  background: #fff;
-  border: 1px solid #ffe0ec;
-  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.06);
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
   min-height: 160px;
   border-radius: 22px;
   padding: 20px;
@@ -189,11 +199,7 @@ const kpiItems = computed(() => [
 .kpi-card.clickable { cursor: pointer; }
 .kpi-card.clickable:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.15);
-}
-.kpi-card.warning {
-  background: #fff7ed;
-  border-color: #fed7aa;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.1);
 }
 
 .kpi-top {
@@ -203,9 +209,21 @@ const kpiItems = computed(() => [
   gap: 12px;
 }
 
+.kpi-icon {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex: none;
+}
+
 .kpi-icon::before { display: block; line-height: 1; }
 
-/* ── Badges ── */
+/* Badge cảnh báo */
 .kpi-top small {
   display: inline-flex;
   align-items: center;
@@ -216,34 +234,63 @@ const kpiItems = computed(() => [
   font-weight: 900;
 }
 
-.badge-up      { background: #ecfdf5; color: #047857; }
-.badge-down    { background: #fef2f2; color: #b91c1c; }
-.badge-neutral { background: #f3f4f6; color: #6b7280; }
-.badge-warning { background: #ffedd5; color: #c2410c; }
+.badge-warning { background: rgba(0,0,0,0.08); color: #c2410c; }
 
-.kpi-card p {
+/* Body */
+.kpi-body { display: flex; flex-direction: column; gap: 2px; }
+
+.kpi-title {
   margin: 0;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   color: #6b7280;
 }
-.kpi-card strong {
+
+.kpi-value {
   display: block;
   margin-top: 4px;
   color: #111827;
-  font-size: 20px;
-  line-height: 1.1;
+  font-size: 22px;
+  line-height: 1.15;
   font-weight: 900;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.kpi-card span {
-  display: block;
-  margin-top: 8px;
+
+.kpi-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
   font-size: 12px;
   font-weight: 700;
   color: #6b7280;
+  flex-wrap: wrap;
+}
+
+/* Trend inline */
+.trend-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: #15803d;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.trend-down {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: #b91c1c;
+  font-weight: 900;
+  font-size: 13px;
+}
+
+.trend-neutral {
+  color: #9ca3af;
+  font-style: italic;
 }
 
 @media (max-width: 992px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
