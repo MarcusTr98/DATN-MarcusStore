@@ -2,15 +2,20 @@ package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.config.VnPayConfig;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
+import java.net.ConnectException;
+import java.net.UnknownHostException;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -19,10 +24,12 @@ import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.TrustManagerFactory;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 // Marcus thêm client gọi Refund API chính thức của VNPAY và kiểm tra checksum
 // phản hồi.
 public class VnPayRefundClient {
@@ -47,7 +54,17 @@ public class VnPayRefundClient {
             }
             Map<String, String> body = stringify(response.getBody());
             if (!verifyResponseChecksum(body)) {
-                return RefundGatewayResult.failed("97", null, "Phản hồi VNPAY có checksum không hợp lệ");
+                // Marcus sửa: request có thể đã tới VNPAY dù response không xác thực
+                // được. Giữ PROCESSING để QueryDR, không retry mù gây hoàn hai lần.
+                log.warn("VNPAY refund checksum invalid. responseCode={}, transactionStatus={}, keys={}, received={}",
+                        body.get("vnp_ResponseCode"), body.get("vnp_TransactionStatus"),
+                        body.keySet(), hashPrefix(body.get("vnp_SecureHash")));
+                return RefundGatewayResult.processing(
+                        "CHECKSUM_INVALID", null,
+                        // Marcus sửa thông báo nghiệp vụ: chi tiết checksum chỉ ghi log,
+                        // màn hình chỉ cần biết yêu cầu đã gửi và đang chờ kết quả.
+                        "Đã gửi yêu cầu hoàn tiền đến VNPAY; đang chờ VNPAY xác nhận",
+                        null, null);
             }
 
             String responseCode = body.get("vnp_ResponseCode");
@@ -71,7 +88,14 @@ public class VnPayRefundClient {
             }
             return RefundGatewayResult.failed(responseCode, transactionStatus, message);
         } catch (RestClientException ex) {
-            return RefundGatewayResult.retryable(ex.getMessage());
+            // Marcus sửa: chỉ retry khi chắc chắn kết nối chưa được thiết lập.
+            // Timeout đọc response là tình huống mơ hồ, phải QueryDR trước.
+            return isDefinitelyNotSent(ex)
+                    ? RefundGatewayResult.retryable(ex.getMessage())
+                    : RefundGatewayResult.processing(
+                            "AMBIGUOUS_NETWORK", null,
+                            "Hệ thống đang kiểm tra trạng thái yêu cầu hoàn tiền với VNPAY",
+                            null, null);
         } catch (RuntimeException ex) {
             return RefundGatewayResult.failed("CLIENT_ERROR", null, ex.getMessage());
         }
@@ -124,11 +148,13 @@ public class VnPayRefundClient {
         payload.put("vnp_TransactionDate", query.paymentTransactionDate());
         payload.put("vnp_CreateDate", createDate);
         payload.put("vnp_IpAddr", vnPayConfig.getRefundIpAddr());
-        String hashData = String.join("|",
+        // Marcus sửa: tách tên biến checksum QueryDR khỏi checksum Refund.
+        String queryHashData = String.join("|",
                 payload.get("vnp_RequestId"), VERSION, "querydr", vnPayConfig.getTmnCode(),
                 query.orderCode(), query.paymentTransactionDate(), createDate,
                 vnPayConfig.getRefundIpAddr(), orderInfo);
-        payload.put("vnp_SecureHash", vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), hashData));
+        payload.put("vnp_SecureHash", vnPayConfig.hmacSHA512(
+                vnPayConfig.getHashSecret(), queryHashData));
         return payload;
     }
 
@@ -136,7 +162,8 @@ public class VnPayRefundClient {
         String receivedHash = body.get("vnp_SecureHash");
         if (receivedHash == null || receivedHash.isBlank())
             return false;
-        String hashData = String.join("|",
+        // Marcus sửa: chuỗi ký response QueryDR nằm riêng trong đúng scope.
+        String queryResponseHashData = String.join("|",
                 value(body, "vnp_ResponseId"), value(body, "vnp_Command"),
                 value(body, "vnp_ResponseCode"), value(body, "vnp_Message"),
                 value(body, "vnp_TmnCode"), value(body, "vnp_TxnRef"),
@@ -145,8 +172,9 @@ public class VnPayRefundClient {
                 value(body, "vnp_TransactionType"), value(body, "vnp_TransactionStatus"),
                 value(body, "vnp_OrderInfo"), value(body, "vnp_PromotionCode"),
                 value(body, "vnp_PromotionAmount"));
-        return vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), hashData)
-                .equalsIgnoreCase(receivedHash);
+        return secureHashEquals(
+                vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), queryResponseHashData),
+                receivedHash);
     }
 
     private RestTemplate createSecureRestTemplate() {
@@ -220,7 +248,8 @@ public class VnPayRefundClient {
         if (receivedHash == null || receivedHash.isBlank()) {
             return false;
         }
-        String hashData = String.join("|",
+        // Marcus sửa: đặt đúng scope cho chuỗi ký response Refund.
+        String refundHashData = String.join("|",
                 value(body, "vnp_ResponseId"),
                 value(body, "vnp_Command"),
                 value(body, "vnp_ResponseCode"),
@@ -234,8 +263,46 @@ public class VnPayRefundClient {
                 value(body, "vnp_TransactionType"),
                 value(body, "vnp_TransactionStatus"),
                 value(body, "vnp_OrderInfo"));
-        String computed = vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), hashData);
-        return computed.equalsIgnoreCase(receivedHash);
+        String standardHash = vnPayConfig.hmacSHA512(
+                vnPayConfig.getHashSecret(), refundHashData);
+        if (secureHashEquals(standardHash, receivedHash)) {
+            return true;
+        }
+
+        // Marcus sửa: Refund chỉ chấp nhận đúng công thức chính thức; hai trường
+        // promotion chỉ thuộc checksum QueryDR, không dùng làm fallback Refund.
+        log.warn("VNPAY refund hash mismatch. expected={}, received={}",
+                hashPrefix(standardHash), hashPrefix(receivedHash));
+        return false;
+    }
+
+    private boolean secureHashEquals(String expected, String received) {
+        if (expected == null || received == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(
+                expected.toLowerCase().getBytes(java.nio.charset.StandardCharsets.US_ASCII),
+                received.toLowerCase().getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+    }
+
+    private String hashPrefix(String hash) {
+        return hash == null ? "null" : hash.substring(0, Math.min(12, hash.length()));
+    }
+
+    private boolean isDefinitelyNotSent(RestClientException exception) {
+        if (!(exception instanceof ResourceAccessException)) {
+            return false;
+        }
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof ConnectException
+                    || cause instanceof UnknownHostException
+                    || cause instanceof SSLHandshakeException) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private Map<String, String> stringify(Map<?, ?> source) {

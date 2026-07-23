@@ -29,4 +29,14 @@ public class RefundResponse {
     private LocalDateTime createdAt;
     private LocalDateTime approvedAt;
     private LocalDateTime processedAt;
+    private Integer reconciliationAttempts;
+    private LocalDateTime lastReconciledAt;
+    private LocalDateTime nextReconciliationAt;
+    private String lastReconciliationMessage;
+    private String manuallyConfirmedBy;
+    private LocalDateTime manuallyConfirmedAt;
+    private String manualConfirmationNote;
+    // Marcus thêm cờ để UI chỉ hiện xác nhận thủ công khi backend đang chạy
+    // Sandbox.
+    private Boolean manualConfirmationAllowed;
 }

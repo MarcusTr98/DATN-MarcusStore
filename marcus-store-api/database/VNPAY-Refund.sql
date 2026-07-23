@@ -57,3 +57,37 @@ BEGIN
         ON dbo.Refund_Requests(status, next_retry_at);
 END;
 GO
+
+-- Marcus thêm dữ liệu điều phối QueryDR và audit xác nhận Sandbox sau khi
+-- Refund_Requests chắc chắn đã tồn tại.
+IF COL_LENGTH('dbo.Refund_Requests', 'reconciliation_attempts') IS NULL
+    ALTER TABLE dbo.Refund_Requests ADD reconciliation_attempts INT NOT NULL
+        CONSTRAINT DF_RefundRequests_ReconciliationAttempts DEFAULT 0;
+GO
+IF COL_LENGTH('dbo.Refund_Requests', 'last_reconciled_at') IS NULL
+    ALTER TABLE dbo.Refund_Requests ADD last_reconciled_at DATETIME2 NULL;
+GO
+IF COL_LENGTH('dbo.Refund_Requests', 'next_reconciliation_at') IS NULL
+    ALTER TABLE dbo.Refund_Requests ADD next_reconciliation_at DATETIME2 NULL;
+GO
+IF COL_LENGTH('dbo.Refund_Requests', 'last_reconciliation_message') IS NULL
+    ALTER TABLE dbo.Refund_Requests ADD last_reconciliation_message NVARCHAR(500) NULL;
+GO
+IF COL_LENGTH('dbo.Refund_Requests', 'manually_confirmed_by') IS NULL
+BEGIN
+    ALTER TABLE dbo.Refund_Requests ADD manually_confirmed_by INT NULL;
+    ALTER TABLE dbo.Refund_Requests ADD CONSTRAINT FK_RefundRequests_ManuallyConfirmedBy
+        FOREIGN KEY (manually_confirmed_by) REFERENCES dbo.Users(user_id);
+END;
+GO
+IF COL_LENGTH('dbo.Refund_Requests', 'manually_confirmed_at') IS NULL
+    ALTER TABLE dbo.Refund_Requests ADD manually_confirmed_at DATETIME2 NULL;
+GO
+IF COL_LENGTH('dbo.Refund_Requests', 'manual_confirmation_note') IS NULL
+    ALTER TABLE dbo.Refund_Requests ADD manual_confirmation_note NVARCHAR(500) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_RefundRequests_Reconciliation'
+    AND object_id = OBJECT_ID('dbo.Refund_Requests'))
+    CREATE INDEX IX_RefundRequests_Reconciliation
+        ON dbo.Refund_Requests(status, next_reconciliation_at);
+GO

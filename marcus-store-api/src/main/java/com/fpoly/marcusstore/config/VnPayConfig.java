@@ -29,6 +29,13 @@ public class VnPayConfig {
     @Value("${vnpay.refundIpAddr:127.0.0.1}")
     private String refundIpAddr;
 
+    // Marcus thêm feature flag để tuyệt đối không xác nhận thủ công ở production.
+    @Value("${vnpay.sandbox:true}")
+    private boolean sandbox;
+
+    @Value("${vnpay.allowManualRefundConfirmation:false}")
+    private boolean allowManualRefundConfirmation;
+
     public String getTmnCode() {
         return tmnCode;
     }
@@ -51,6 +58,14 @@ public class VnPayConfig {
 
     public String getRefundIpAddr() {
         return refundIpAddr;
+    }
+
+    public boolean isSandbox() {
+        return sandbox;
+    }
+
+    public boolean isAllowManualRefundConfirmation() {
+        return allowManualRefundConfirmation;
     }
 
     // mã hóa chữ ký

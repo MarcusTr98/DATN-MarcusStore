@@ -29,17 +29,30 @@ public class RefundProcessor {
         return reconcile(refundService.prepareReconciliation(refundId));
     }
 
+    // Marcus thêm xác nhận thủ công có kiểm soát cho môi trường Sandbox.
+    public RefundResponse confirmSandbox(Long refundId, String note) {
+        return refundService.confirmSandboxRefund(refundId, note);
+    }
+
     @Scheduled(fixedDelay = 60000)
     public void retryTechnicalFailures() {
         for (Long refundId : refundService.findRetryableIds(PageRequest.of(0, 20))) {
-            VnPayRefundClient.RefundCommand command = refundService.prepareAutomaticRetry(refundId);
-            if (command != null) {
-                execute(command);
+            try {
+                VnPayRefundClient.RefundCommand command = refundService.prepareAutomaticRetry(refundId);
+                if (command != null) {
+                    execute(command);
+                }
+            } catch (RuntimeException ignored) {
+                // Marcus sửa: một refund lỗi không được làm dừng toàn bộ batch scheduler.
             }
         }
         // Marcus thêm scheduler QueryDR cho các refund VNPAY còn PROCESSING.
         for (Long refundId : refundService.findProcessingIds(PageRequest.of(0, 20))) {
-            reconcile(refundService.prepareReconciliation(refundId));
+            try {
+                reconcile(refundService.prepareReconciliation(refundId));
+            } catch (RuntimeException ignored) {
+                // Marcus sửa: batch tiếp tục đối soát các refund còn lại.
+            }
         }
     }
 

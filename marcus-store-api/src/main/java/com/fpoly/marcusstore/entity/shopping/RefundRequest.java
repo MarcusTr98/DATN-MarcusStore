@@ -94,6 +94,30 @@ public class RefundRequest {
     @Column(name = "last_attempt_at")
     private LocalDateTime lastAttemptAt;
 
+    // Marcus thêm dữ liệu đối soát riêng, không dùng chung bộ đếm gửi refund.
+    @Column(name = "reconciliation_attempts", nullable = false)
+    private Integer reconciliationAttempts = 0;
+
+    @Column(name = "last_reconciled_at")
+    private LocalDateTime lastReconciledAt;
+
+    @Column(name = "next_reconciliation_at")
+    private LocalDateTime nextReconciliationAt;
+
+    @Column(name = "last_reconciliation_message", length = 500)
+    private String lastReconciliationMessage;
+
+    // Marcus thêm audit xác nhận thủ công, chỉ được dùng trên Sandbox.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manually_confirmed_by")
+    private User manuallyConfirmedBy;
+
+    @Column(name = "manually_confirmed_at")
+    private LocalDateTime manuallyConfirmedAt;
+
+    @Column(name = "manual_confirmation_note", length = 500)
+    private String manualConfirmationNote;
+
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 

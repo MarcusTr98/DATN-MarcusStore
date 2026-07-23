@@ -372,7 +372,8 @@
             <div class="section-header">
               <div>
                 <h4>Hoàn tiền VNPAY</h4>
-                <p>Marcus nâng cấp: hoàn toàn bộ tiền khách đã thanh toán, bao gồm phí ship.</p>
+                <!-- Marcus sửa mô tả trung lập vì số tiền hoàn phụ thuộc bên hủy đơn. -->
+                <p>Theo dõi từ lúc tạo yêu cầu đến khi VNPAY xác nhận hoàn tất.</p>
               </div>
             </div>
             <div class="section-body">
@@ -386,16 +387,17 @@
                   <strong class="mini-value money">{{ formatCurrency(refund.amount) }}</strong>
                 </div>
                 <div class="mini-row">
-                  <span class="mini-label">Phí ship giữ lại</span>
+                  <span class="mini-label">Phí vận chuyển không hoàn</span>
                   <span class="mini-value">{{ formatCurrency(refund.shippingDeducted) }}</span>
                 </div>
                 <div class="mini-row">
                   <span class="mini-label">Lý do</span>
                   <span class="mini-value">{{ refund.reason }}</span>
                 </div>
-                <div v-if="refund.providerMessage" class="mini-row">
-                  <span class="mini-label">VNPAY</span>
-                  <span class="mini-value">{{ refund.providerMessage }}</span>
+                <div class="mini-row">
+                  <span class="mini-label">Diễn giải</span>
+                  <!-- Marcus sửa: không đưa lỗi checksum/response kỹ thuật ra màn quản trị. -->
+                  <span class="mini-value">{{ getRefundStatusDescription(refund.status) }}</span>
                 </div>
               </div>
 
@@ -444,8 +446,10 @@
                 :disabled="refundBusy"
                 @click="reconcileRefund"
               >
-                {{ refundBusy ? 'Đang đối soát...' : 'Đối soát VNPAY' }}
+                {{ refundBusy ? 'Đang kiểm tra...' : 'Kiểm tra trạng thái với VNPAY' }}
               </button>
+              <!-- Marcus xóa xác nhận thành công giả trên Sandbox; môi trường dev
+                   dừng đúng tại trạng thái chờ VNPAY xác nhận. -->
             </div>
           </section>
         </aside>
@@ -636,14 +640,28 @@ const getPaymentMethodLabel = (method) => paymentMethodMap[method] || method || 
 // Marcus lam them refund
 const getRefundStatusLabel = (status) =>
   ({
-    PENDING_APPROVAL: 'Chờ admin duyệt',
-  PROCESSING: 'Chờ VNPAY xử lý/duyệt',
-    RETRY_PENDING: 'Chờ tự động thử lại',
-    SUCCESS: 'Hoàn tiền thành công',
-    FAILED: 'Hoàn tiền thất bại',
+    PENDING_APPROVAL: 'Chờ phê duyệt',
+    PROCESSING: 'Đã gửi - chờ VNPAY xác nhận',
+    SUBMITTING: 'Đang gửi yêu cầu sang VNPAY',
+    RETRY_PENDING: 'Chờ hệ thống gửi lại',
+    MANUAL_REVIEW: 'Cần nhân viên kiểm tra',
+    SUCCESS: 'VNPAY đã xác nhận hoàn tiền',
+    FAILED: 'VNPAY từ chối hoặc gửi thất bại',
   })[status] ||
   status ||
   '---'
+
+// Marcus thêm diễn giải thống nhất theo góc nhìn nghiệp vụ, không lộ trạng thái kỹ thuật.
+const getRefundStatusDescription = (status) =>
+  ({
+    PENDING_APPROVAL: 'Yêu cầu đã được tạo và chưa gửi sang VNPAY.',
+    SUBMITTING: 'Hệ thống đang gửi yêu cầu hoàn tiền sang VNPAY.',
+    PROCESSING: 'VNPAY đã tiếp nhận hoặc hệ thống đã gửi yêu cầu; đang chờ kết quả xác nhận cuối.',
+    RETRY_PENDING: 'Lần gửi trước chưa kết nối được VNPAY; hệ thống sẽ tự động gửi lại.',
+    MANUAL_REVIEW: 'Chưa có kết quả cuối từ VNPAY; nhân viên cần kiểm tra giao dịch.',
+    SUCCESS: 'VNPAY đã trả kết quả xác nhận hoàn tiền thành công.',
+    FAILED: 'Yêu cầu không hoàn tất. Kiểm tra nhật ký kỹ thuật trước khi thao tác lại.',
+  })[status] || 'Đang cập nhật trạng thái hoàn tiền.'
 
 const fetchRefund = async (orderCode) => {
   try {
@@ -661,7 +679,7 @@ const runRefundAction = async (action, successMessage) => {
     const response = await action()
     refund.value = response.data
     await fetchGetDetailOrder(orderDetail.value.orderCode)
-    showToast(successMessage)
+    showToast(typeof successMessage === 'function' ? successMessage(response.data) : successMessage)
   } catch (e) {
     const message = e.response?.data?.message || e.response?.data || 'Không xử lý được hoàn tiền'
     showToast(message)
@@ -678,20 +696,31 @@ const createRefund = () =>
 const approveRefund = () =>
   runRefundAction(
     () => OrderDetailApi.approveRefund(refund.value.refundId),
-    'Đã gửi yêu cầu hoàn tiền sang VNPAY.',
+    // Marcus sửa toast theo kết quả thật, không báo “đã gửi” khi request thất bại.
+    (result) =>
+      result.status === 'SUCCESS'
+        ? 'VNPAY đã xác nhận hoàn tiền thành công.'
+        : result.status === 'FAILED'
+          ? 'Yêu cầu hoàn tiền chưa thành công. Vui lòng kiểm tra trạng thái.'
+          : 'Đã gửi yêu cầu hoàn tiền. Đang chờ VNPAY xác nhận.',
   )
 const retryRefund = () =>
   runRefundAction(
     () => OrderDetailApi.retryRefund(refund.value.refundId),
-    'Đã gửi lại yêu cầu hoàn tiền.',
+    (result) =>
+      result.status === 'FAILED'
+        ? 'Gửi lại chưa thành công. Vui lòng kiểm tra trạng thái.'
+        : 'Đã thực hiện gửi lại. Đang chờ VNPAY xác nhận.',
   )
-// Marcus thêm thao tác QueryDR thủ công, scheduler backend vẫn tự chạy song song.
+// Marcus thêm thao tác kiểm tra trạng thái; scheduler backend vẫn tự chạy song song.
 const reconcileRefund = () =>
   runRefundAction(
     () => OrderDetailApi.reconcileRefund(refund.value.refundId),
-    'Đã đối soát trạng thái hoàn tiền với VNPAY.',
+    (result) =>
+      result.status === 'SUCCESS'
+        ? 'VNPAY đã xác nhận hoàn tiền thành công.'
+        : 'Đã kiểm tra. VNPAY chưa xác nhận hoàn tiền hoàn tất.',
   )
-
 // Marcus sửa: đã bỏ helper getVariantText không được giao diện sử dụng để tránh
 // cảnh báo no-unused-vars, phần biến thể vẫn render trực tiếp trong template cũ.
 

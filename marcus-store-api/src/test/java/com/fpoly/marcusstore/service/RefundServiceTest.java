@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.config.VnPayConfig;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderTransaction;
 import com.fpoly.marcusstore.entity.shopping.RefundRequest;
@@ -38,7 +39,8 @@ class RefundServiceTest {
                 orderRepository,
                 transactionRepository,
                 mock(UserRepository.class),
-                emailService);
+                emailService,
+                mock(VnPayConfig.class));
         when(refundRepository.save(any(RefundRequest.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
     }

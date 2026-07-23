@@ -24,5 +24,6 @@ const OrderDetailApi = {
   reconcileRefund(refundId) {
     return api.post(`/admin/refunds/${refundId}/reconcile`)
   },
+  // Marcus thêm xác nhận thủ công chỉ dành cho Sandbox, kèm ghi chú audit.
 }
 export default OrderDetailApi

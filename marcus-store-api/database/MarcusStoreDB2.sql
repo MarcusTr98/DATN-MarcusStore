@@ -645,6 +645,13 @@ CREATE TABLE Refund_Requests (
     created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
     approved_at DATETIME2 NULL,
     last_attempt_at DATETIME2 NULL,
+    reconciliation_attempts INT NOT NULL DEFAULT 0,
+    last_reconciled_at DATETIME2 NULL,
+    next_reconciliation_at DATETIME2 NULL,
+    last_reconciliation_message NVARCHAR(500) NULL,
+    manually_confirmed_by INT NULL,
+    manually_confirmed_at DATETIME2 NULL,
+    manual_confirmation_note NVARCHAR(500) NULL,
     processed_at DATETIME2 NULL,
     row_version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT FK_RefundRequests_Order FOREIGN KEY (order_id) REFERENCES Orders(order_id),
@@ -653,9 +660,11 @@ CREATE TABLE Refund_Requests (
     CONSTRAINT FK_RefundRequests_RefundTransaction FOREIGN KEY (refund_transaction_id)
         REFERENCES Order_Transactions(transaction_id),
     CONSTRAINT FK_RefundRequests_RequestedBy FOREIGN KEY (requested_by) REFERENCES Users(user_id),
-    CONSTRAINT FK_RefundRequests_ApprovedBy FOREIGN KEY (approved_by) REFERENCES Users(user_id)
+    CONSTRAINT FK_RefundRequests_ApprovedBy FOREIGN KEY (approved_by) REFERENCES Users(user_id),
+    CONSTRAINT FK_RefundRequests_ManuallyConfirmedBy FOREIGN KEY (manually_confirmed_by) REFERENCES Users(user_id)
 );
 CREATE INDEX IX_RefundRequests_StatusRetry ON Refund_Requests(status, next_retry_at);
+CREATE INDEX IX_RefundRequests_Reconciliation ON Refund_Requests(status, next_reconciliation_at);
 
 -- Ngọc thêm 1/7 bảng user_Permission
 CREATE TABLE User_Permissions(

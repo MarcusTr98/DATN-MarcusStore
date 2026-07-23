@@ -53,6 +53,9 @@ vnpay.payUrl=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 vnpay.returnUrl=http://localhost:5173/order-success
 vnpay.refundUrl=https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
 vnpay.refundIpAddr=127.0.0.1
+# Marcus thêm feature flag xác nhận refund thủ công dành riêng cho sandbox/demo.
+vnpay.sandbox=true
+vnpay.allowManualRefundConfirmation=false
 
 # CẤU HÌNH CLOUDINARY
 cloudinary.cloud-name=dyeb3lju6

@@ -109,7 +109,7 @@
               <div class="refund-content">
                 <div class="refund-heading">
                   <div>
-                    <h3>Thông tin hoàn tiền</h3>
+                    <h3>Tiến trình hoàn tiền</h3>
                     <p>{{ refundStatusConfig[refund.status]?.description }}</p>
                   </div>
                   <span class="refund-pill" :class="refundStatusConfig[refund.status]?.className">
@@ -121,7 +121,7 @@
                     <span>Số tiền hoàn</span><strong>{{ formatMoney(refund.amount) }}</strong>
                   </div>
                   <div>
-                    <span>Phí vận chuyển giữ lại</span
+                    <span>Phí vận chuyển không hoàn</span
                     ><strong>{{ formatMoney(refund.shippingDeducted) }}</strong>
                   </div>
                   <div>
@@ -478,7 +478,7 @@ onMounted(() => {
   fetchOrderDetail()
   // Marcus thêm polling khi refund chưa kết thúc và refresh ngay khi khách quay lại tab.
   refundPollingTimer = window.setInterval(() => {
-    if (refund.value && !['SUCCESS', 'FAILED'].includes(refund.value.status)) {
+  if (refund.value && !['SUCCESS', 'FAILED', 'MANUAL_REVIEW'].includes(refund.value.status)) {
       refreshRefundStatus()
     }
   }, 10000)
@@ -495,19 +495,24 @@ const USER_CANCELLABLE_STATUSES = ['PENDING', 'PROCESSING', 'PACKED']
 // Marcus thêm nội dung thân thiện với khách thay cho response code kỹ thuật của VNPAY.
 const refundStatusConfig = {
   PENDING_APPROVAL: {
-    label: 'Đang chờ duyệt',
+    label: 'Chờ cửa hàng duyệt',
     className: 'pending',
-    description: 'MarcusStore đã tiếp nhận yêu cầu và đang kiểm tra.',
+    description: 'Cửa hàng đã tiếp nhận và đang kiểm tra yêu cầu hoàn tiền.',
   },
   PROCESSING: {
-    label: 'Đang xử lý',
+    label: 'Chờ VNPAY xác nhận',
     className: 'processing',
-    description: 'Yêu cầu đã được gửi sang VNPAY để xử lý.',
+    description: 'Yêu cầu đã được gửi đến VNPAY và đang chờ xác nhận hoàn trả.',
+  },
+  SUBMITTING: {
+    label: 'Đang gửi yêu cầu',
+    className: 'processing',
+    description: 'MarcusStore đang gửi yêu cầu hoàn tiền sang VNPAY.',
   },
   RETRY_PENDING: {
-    label: 'Đang xử lý lại',
+    label: 'Đang gửi lại yêu cầu',
     className: 'processing',
-    description: 'Hệ thống đang tự động xử lý lại yêu cầu.',
+    description: 'Kết nối VNPAY chưa thành công; hệ thống sẽ tự động gửi lại.',
   },
   SUCCESS: {
     label: 'Đã hoàn tiền',
@@ -515,9 +520,14 @@ const refundStatusConfig = {
     description: 'VNPAY đã xác nhận hoàn tiền thành công.',
   },
   FAILED: {
-    label: 'Cần hỗ trợ',
+    label: 'Chưa hoàn tất',
     className: 'failed',
-    description: 'Yêu cầu chưa thành công, MarcusStore sẽ tiếp tục kiểm tra.',
+    description: 'Yêu cầu hoàn tiền chưa hoàn tất. Cửa hàng sẽ kiểm tra và hỗ trợ bạn.',
+  },
+  MANUAL_REVIEW: {
+    label: 'Cửa hàng đang kiểm tra',
+    className: 'processing',
+    description: 'Chưa có kết quả cuối từ VNPAY; cửa hàng đang kiểm tra giao dịch.',
   },
 }
 
@@ -527,7 +537,7 @@ const getPaymentStatusLabel = (status) =>
     PAID: 'Đã thanh toán',
     UNPAID: 'Chưa thanh toán',
     FAILED: 'Thanh toán thất bại',
-    REFUND_PENDING: 'Đang hoàn tiền',
+    REFUND_PENDING: 'Đang chờ hoàn tiền',
     REFUND_FAILED: 'Hoàn tiền cần hỗ trợ',
     REFUNDED: 'Đã hoàn tiền',
   })[status] ||

@@ -113,4 +113,13 @@ public class AdminOrderController {
     public RefundResponse reconcileRefund(@PathVariable Long refundId) {
         return refundProcessor.reconcile(refundId);
     }
+
+    // Marcus thêm xác nhận thủ công chỉ dành cho Sandbox, bắt buộc ghi chú audit.
+    @PostMapping("/refunds/{refundId}/sandbox-confirm")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public RefundResponse confirmSandboxRefund(
+            @PathVariable Long refundId,
+            @Valid @RequestBody CreateRefundRequest request) {
+        return refundProcessor.confirmSandbox(refundId, request.getReason());
+    }
 }

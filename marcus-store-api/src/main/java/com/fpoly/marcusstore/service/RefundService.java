@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.response.RefundResponse;
 import com.fpoly.marcusstore.dto.response.ClientRefundResponse;
+import com.fpoly.marcusstore.config.VnPayConfig;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderTransaction;
@@ -30,10 +31,12 @@ import java.util.UUID;
 public class RefundService {
 
     public static final String PENDING_APPROVAL = "PENDING_APPROVAL";
+    public static final String SUBMITTING = "SUBMITTING";
     public static final String PROCESSING = "PROCESSING";
     public static final String RETRY_PENDING = "RETRY_PENDING";
     public static final String SUCCESS = "SUCCESS";
     public static final String FAILED = "FAILED";
+    public static final String MANUAL_REVIEW = "MANUAL_REVIEW";
 
     private static final String VNPAY_PAYMENT = "VNPAY_PAYMENT";
     private static final String REFUND = "REFUND";
@@ -44,6 +47,7 @@ public class RefundService {
     private final OrderTransactionRepository transactionRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final VnPayConfig vnPayConfig;
 
     @Transactional
     public RefundResponse requestManualRefund(String orderCode, String reason) {
@@ -151,6 +155,9 @@ public class RefundService {
     @Transactional
     public RefundResponse completeAttempt(Long refundId, VnPayRefundClient.RefundGatewayResult result) {
         RefundRequest refund = lock(refundId);
+        if (!SUBMITTING.equals(refund.getStatus())) {
+            return toResponse(refund);
+        }
         copyProviderResult(refund, result);
 
         switch (result.outcome()) {
@@ -174,10 +181,18 @@ public class RefundService {
     @Transactional
     public VnPayRefundClient.QueryCommand prepareReconciliation(Long refundId) {
         RefundRequest refund = lock(refundId);
+        // Marcus thêm phục hồi lệnh SUBMITTING bị treo do ứng dụng dừng sau khi gửi
+        // request: chuyển sang QueryDR, tuyệt đối không gửi lại refund mù.
+        if (SUBMITTING.equals(refund.getStatus())
+                && refund.getLastAttemptAt() != null
+                && !refund.getLastAttemptAt().isAfter(LocalDateTime.now().minusMinutes(2))) {
+            refund.setStatus(PROCESSING);
+        }
         if (!PROCESSING.equals(refund.getStatus())) {
             throw new RuntimeException("Chỉ đối soát refund đang được VNPAY xử lý");
         }
-        refund.setLastAttemptAt(LocalDateTime.now());
+        refund.setLastReconciledAt(LocalDateTime.now());
+        refund.setNextReconciliationAt(null);
         refundRepository.save(refund);
         OrderTransaction payment = refund.getPaymentTransaction();
         return new VnPayRefundClient.QueryCommand(
@@ -193,7 +208,11 @@ public class RefundService {
         RefundRequest refund = lock(refundId);
         if (!PROCESSING.equals(refund.getStatus()))
             return toResponse(refund);
-        refund.setProviderMessage(result.message());
+        LocalDateTime now = LocalDateTime.now();
+        int attempts = valueOrZero(refund.getReconciliationAttempts()) + 1;
+        refund.setReconciliationAttempts(attempts);
+        refund.setLastReconciledAt(now);
+        refund.setLastReconciliationMessage(normalizeProviderMessage(result.message()));
         refund.setProviderResponseCode(result.responseCode());
         refund.setProviderTransactionStatus(result.transactionStatus());
         if (result.transactionId() != null) {
@@ -203,8 +222,16 @@ public class RefundService {
             case SUCCESS_QUERY -> markSuccess(refund);
             case REJECTED_QUERY -> markFailed(refund);
             case PROCESSING_QUERY, ERROR -> {
-                refund.setStatus(PROCESSING);
-                refund.getOrder().setPaymentStatus("REFUND_PENDING");
+                if (refund.getApprovedAt() != null
+                        && refund.getApprovedAt().isBefore(now.minusHours(72))) {
+                    // Marcus thêm: không QueryDR vô hạn; chuyển sang hàng chờ xử lý tay.
+                    markManualReview(refund,
+                            "VNPAY chưa có kết quả cuối sau 72 giờ. Cần kiểm tra thủ công.");
+                } else {
+                    refund.setStatus(PROCESSING);
+                    refund.getOrder().setPaymentStatus("REFUND_PENDING");
+                    refund.setNextReconciliationAt(now.plusMinutes(reconciliationDelayMinutes(attempts)));
+                }
             }
         }
         refundRepository.save(refund);
@@ -216,7 +243,32 @@ public class RefundService {
 
     @Transactional(readOnly = true)
     public List<Long> findProcessingIds(Pageable limit) {
-        return refundRepository.findProcessingIds(LocalDateTime.now().minusMinutes(1), limit);
+        LocalDateTime now = LocalDateTime.now();
+        return refundRepository.findProcessingIds(now, now.minusMinutes(2), limit);
+    }
+
+    // Marcus thêm xác nhận thủ công chỉ dành cho sandbox/demo, có người xác nhận và
+    // ghi chú.
+    @Transactional
+    public RefundResponse confirmSandboxRefund(Long refundId, String note) {
+        if (!vnPayConfig.isSandbox() || !vnPayConfig.isAllowManualRefundConfirmation()) {
+            throw new RuntimeException("Xác nhận refund thủ công đang bị khóa");
+        }
+        RefundRequest refund = lock(refundId);
+        if (!(PROCESSING.equals(refund.getStatus()) || MANUAL_REVIEW.equals(refund.getStatus()))) {
+            throw new RuntimeException("Refund không ở trạng thái được phép xác nhận thủ công");
+        }
+        User confirmer = currentUser();
+        refund.setManuallyConfirmedBy(confirmer);
+        refund.setManuallyConfirmedAt(LocalDateTime.now());
+        refund.setManualConfirmationNote(normalizeReason(note));
+        refund.setProviderMessage("SANDBOX_MANUAL_CONFIRM: " + normalizeReason(note));
+        markSuccess(refund);
+        refund.getRefundTransaction().setNote(
+                "Marcus xác nhận hoàn tiền thủ công trên Sandbox: " + normalizeReason(note));
+        refundRepository.save(refund);
+        sendStatusEmailSafely(refund);
+        return toResponse(refund);
     }
 
     private RefundRequest createPendingRefund(Order order, String reason, User requestedBy) {
@@ -294,7 +346,9 @@ public class RefundService {
         if (automaticRetry || refund.getRetryCount() == 0) {
             refund.setRetryCount(refund.getRetryCount() + 1);
         }
-        refund.setStatus(PROCESSING);
+        // Marcus thêm trạng thái SUBMITTING để tách lúc đang gọi network khỏi lúc
+        // VNPAY đã tiếp nhận và đang xử lý.
+        refund.setStatus(SUBMITTING);
         refund.setLastAttemptAt(LocalDateTime.now());
         refund.setNextRetryAt(null);
         refundRepository.save(refund);
@@ -327,16 +381,19 @@ public class RefundService {
         refund.setStatus(SUCCESS);
         refund.setProcessedAt(LocalDateTime.now());
         refund.setNextRetryAt(null);
+        refund.setNextReconciliationAt(null);
         refund.getOrder().setPaymentStatus("REFUNDED");
         refund.getRefundTransaction().setStatus("SUCCESS");
         refund.getRefundTransaction().setProviderTransactionId(refund.getProviderRefundTransactionId());
         refund.getRefundTransaction().setProviderResponseCode(refund.getProviderResponseCode());
+        refund.getRefundTransaction().setIsReconciled(true);
         refund.getRefundTransaction().setNote("Hoàn tiền VNPAY thành công");
     }
 
     private void markProcessing(RefundRequest refund) {
         refund.setStatus(PROCESSING);
         refund.setNextRetryAt(null);
+        refund.setNextReconciliationAt(LocalDateTime.now().plusMinutes(1));
         refund.getOrder().setPaymentStatus("REFUND_PENDING");
         refund.getRefundTransaction().setStatus("PENDING");
         refund.getRefundTransaction().setNote("VNPAY đang xử lý yêu cầu hoàn tiền");
@@ -361,6 +418,7 @@ public class RefundService {
         refund.setStatus(FAILED);
         refund.setProcessedAt(LocalDateTime.now());
         refund.setNextRetryAt(null);
+        refund.setNextReconciliationAt(null);
         refund.getOrder().setPaymentStatus("REFUND_FAILED");
         refund.getRefundTransaction().setStatus("FAILED");
         refund.getRefundTransaction().setNote("Hoàn tiền VNPAY thất bại: " + refund.getProviderMessage());
@@ -372,6 +430,34 @@ public class RefundService {
         refund.setProviderMessage(result.message());
         refund.setProviderResponseId(result.responseId());
         refund.setProviderRefundTransactionId(result.refundTransactionId());
+    }
+
+    private void markManualReview(RefundRequest refund, String message) {
+        refund.setStatus(MANUAL_REVIEW);
+        refund.setNextReconciliationAt(null);
+        refund.setLastReconciliationMessage(message);
+        refund.getOrder().setPaymentStatus("REFUND_PENDING");
+        refund.getRefundTransaction().setStatus("PENDING");
+        refund.getRefundTransaction().setNote(message);
+    }
+
+    private long reconciliationDelayMinutes(int attempts) {
+        if (attempts <= 10)
+            return 1;
+        if (attempts <= 22)
+            return 5;
+        return 30;
+    }
+
+    private int valueOrZero(Integer value) {
+        return value == null ? 0 : value;
+    }
+
+    private String normalizeProviderMessage(String message) {
+        if (message == null || message.isBlank())
+            return "VNPAY chưa trả thông tin đối soát";
+        String normalized = message.trim();
+        return normalized.substring(0, Math.min(500, normalized.length()));
     }
 
     private boolean isEligible(Order order) {
@@ -441,6 +527,17 @@ public class RefundService {
                 .createdAt(refund.getCreatedAt())
                 .approvedAt(refund.getApprovedAt())
                 .processedAt(refund.getProcessedAt())
+                .reconciliationAttempts(refund.getReconciliationAttempts())
+                .lastReconciledAt(refund.getLastReconciledAt())
+                .nextReconciliationAt(refund.getNextReconciliationAt())
+                .lastReconciliationMessage(refund.getLastReconciliationMessage())
+                .manuallyConfirmedBy(refund.getManuallyConfirmedBy() == null
+                        ? null
+                        : displayName(refund.getManuallyConfirmedBy()))
+                .manuallyConfirmedAt(refund.getManuallyConfirmedAt())
+                .manualConfirmationNote(refund.getManualConfirmationNote())
+                .manualConfirmationAllowed(
+                        vnPayConfig.isSandbox() && vnPayConfig.isAllowManualRefundConfirmation())
                 .build();
     }
 
