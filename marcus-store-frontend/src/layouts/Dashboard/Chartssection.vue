@@ -114,7 +114,7 @@ const props = defineProps({
   weekdayStats:  { type: Array,  default: () => [] },
   brandStats:    { type: Array,  default: () => [] },
   orderStats:    { type: Array,  default: () => [] },
-  paymentStats:  { type: Object, default: () => ({ byMethod: [], byStatus: [] }) },  // MỚI
+  paymentStats:  { type: Object, default: () => ({ byMethod: [], byStatus: [] }) },
 })
 
 // ── refs ──────────────────────────────────────────────────────
@@ -143,14 +143,14 @@ const STATUS_COLORS = {
   UNPAID:     '#9ca3af',
 }
 const METHOD_COLORS = {
-  VNPay:  '#2563eb',
-  VNPAY:  '#2563eb',
-  COD:    '#f59e0b',
-  MOMO:   '#db2777',
-  ZALOPAY:'#0891b2',
+  VNPay:   '#2563eb',
+  VNPAY:   '#2563eb',
+  COD:     '#f59e0b',
+  MOMO:    '#db2777',
+  ZALOPAY: '#0891b2',
 }
-const gridColor  = 'rgba(37, 99, 235, 0.08)'
-const tickColor  = '#4b5563'
+const gridColor        = 'rgba(37, 99, 235, 0.08)'
+const tickColor        = '#4b5563'
 const COLOR_BLUE       = '#2563eb'
 const COLOR_BLUE_LIGHT = 'rgba(37, 99, 235, 0.12)'
 const COLOR_PREV       = '#9ca3af'
@@ -207,11 +207,12 @@ function formatCurrency(value) {
   }).format(value || 0)
 }
 
+// FIX 1: dùng "tỷ" và "triệu" thay vì "T" và "tr"
 function formatShortCurrency(value) {
   if (!value) return '0đ'
   const n = Number(value)
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}T`
-  if (n >= 1_000_000)     return `${(n / 1_000_000).toFixed(0)}tr`
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)} tỷ`
+  if (n >= 1_000_000)     return `${(n / 1_000_000).toFixed(0)} triệu`
   if (n >= 1_000)         return `${(n / 1_000).toFixed(0)}k`
   return `${n}đ`
 }
@@ -347,6 +348,7 @@ function buildRevenueChart() {
   })
 }
 
+// FIX 2: bỏ màu vàng cột hôm nay, thêm pill "Hôm nay" bằng custom plugin
 function buildOrderChart() {
   orderChart = destroyChart(orderChart)
   if (!orderChartRef.value) return
@@ -380,7 +382,58 @@ function buildOrderChart() {
   }
 
   const todayIdx = findTodayIndex(labels, period)
-  const bgColors = labels.map((_, i) => i === todayIdx ? '#f59e0b' : COLOR_GREEN_LIGHT)
+
+  // Custom plugin: vẽ pill "Hôm nay" ngay trên đỉnh cột hiện tại
+  const todayTagPlugin = {
+    id: 'todayTag',
+    afterDatasetsDraw(chart) {
+      if (todayIdx < 0) return
+      const { ctx } = chart
+      const meta = chart.getDatasetMeta(0)
+      const bar  = meta.data[todayIdx]
+      if (!bar) return
+
+      const x        = bar.x
+      const barTop   = bar.y
+      const fontSize = 10
+      const padX     = 7
+      const padY     = 4
+      const arrowH   = 5
+      const gap      = 4  // khoảng cách giữa mũi tên và đỉnh cột
+
+      ctx.save()
+      ctx.font = `700 ${fontSize}px Inter, sans-serif`
+      const textW  = ctx.measureText('Hôm nay').width
+      const boxW   = textW + padX * 2
+      const boxH   = fontSize + padY * 2
+
+      // pill nằm ngay trên cột, mũi tên chỉ xuống đỉnh cột
+      const pillBottom = barTop - gap - arrowH
+      const pillTop    = pillBottom - boxH
+
+      // Nền pill bo tròn
+      ctx.beginPath()
+      ctx.roundRect(x - boxW / 2, pillTop, boxW, boxH, 4)
+      ctx.fillStyle = '#2563eb'
+      ctx.fill()
+
+      // Mũi tên tam giác nhỏ phía dưới pill
+      ctx.beginPath()
+      ctx.moveTo(x - 5, pillBottom)
+      ctx.lineTo(x + 5, pillBottom)
+      ctx.lineTo(x,     pillBottom + arrowH)
+      ctx.closePath()
+      ctx.fillStyle = '#2563eb'
+      ctx.fill()
+
+      // Text "Hôm nay"
+      ctx.fillStyle    = '#fff'
+      ctx.textAlign    = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('Hôm nay', x, pillTop + boxH / 2)
+      ctx.restore()
+    },
+  }
 
   orderChart = new Chart(orderChartRef.value, {
     type: 'bar',
@@ -388,7 +441,7 @@ function buildOrderChart() {
       labels,
       datasets: [{
         data,
-        backgroundColor: bgColors,
+        backgroundColor: COLOR_GREEN_LIGHT,  // tất cả cột đều xanh, không đổi màu cột hôm nay
         borderRadius: 10,
         borderSkipped: false,
         barThickness: labels.length <= 2 ? 60 : undefined,
@@ -397,6 +450,7 @@ function buildOrderChart() {
     },
     options: {
       ...chartDefaults,
+      layout: { padding: { top: 36 } },  // chừa chỗ cho pill "Hôm nay"
       scales: {
         x: {
           ticks: { color: tickColor, font: { size: 11, weight: '600' }, maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 31 },
@@ -414,6 +468,7 @@ function buildOrderChart() {
         tooltip: { callbacks: { label: (ctx) => ` ${ctx.parsed.y} đơn` } },
       },
     },
+    plugins: [todayTagPlugin],
   })
 }
 
@@ -421,8 +476,6 @@ function buildBrandChart() {
   brandChart = destroyChart(brandChart)
   if (!brandChartRef.value || !props.brandStats.length) return
 
-  // Dùng revenue làm data thực (Chart.js tự tính tỉ lệ),
-  // percentage chỉ dùng để hiển thị trong tooltip/legend
   const validItems = brandRevenue.value.filter(b => Number(b.revenue) > 0)
   if (!validItems.length) return
 
