@@ -51,10 +51,12 @@ vnpay.tmnCode=35MNCPPT
 vnpay.hashSecret=PL1CWRM8WRSLHCA0LCIOECIR08Z87TBV
 vnpay.payUrl=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 vnpay.returnUrl=http://localhost:5173/order-success
+# Marcus thêm endpoint Refund API của môi trường sandbox/dev VNPAY.
 vnpay.refundUrl=https://sandbox.vnpayment.vn/merchant_webapi/api/transaction
 vnpay.refundIpAddr=127.0.0.1
-# Marcus thêm feature flag xác nhận refund thủ công dành riêng cho sandbox/demo.
+# Marcus thêm: chỉ môi trường sandbox mới được phép xác nhận refund thủ công.
 vnpay.sandbox=true
+# Marcus sửa: Sandbox dừng ở trạng thái chờ VNPAY, không xác nhận thành công giả trên giao diện.
 vnpay.allowManualRefundConfirmation=false
 
 # CẤU HÌNH CLOUDINARY
