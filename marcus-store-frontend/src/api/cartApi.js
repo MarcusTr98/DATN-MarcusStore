@@ -5,6 +5,10 @@ const cartApi = {
     return api.get('/cart')
   },
 
+  getCartSuggestions(limit = 12) {
+    return api.get('/cart/suggestions', { params: { limit } })
+  },
+
   addToCart(data) {
     return api.post('/cart/items', data)
   },

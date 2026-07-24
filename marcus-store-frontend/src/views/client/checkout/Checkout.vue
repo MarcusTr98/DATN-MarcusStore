@@ -439,6 +439,7 @@
                 <span v-if="item.isFlashSale" class="order-item__flash-sale-badge">
                   ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
                 </span>
+
               </div>
 
               <!-- Cột phải: Giá tiền -->
@@ -449,6 +450,7 @@
                 <s v-if="item.originalPrice && item.originalPrice > item.price" class="order-item__original-price">
                   {{ item.originalPrice?.toLocaleString('vi-VN') }}₫
                 </s>
+
               </div>
             </div>
           </div>

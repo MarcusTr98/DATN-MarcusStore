@@ -7,7 +7,7 @@ import { defineStore } from 'pinia'
 import flashSaleApi from '@/api/FlashSaleApi.js'
 
 
- // map data từ BE sang FE
+// map data từ BE sang FE
 
 function formatHm(iso) {
   if (!iso) return ''
@@ -100,10 +100,10 @@ function mapClientSlot(slot) {
       discountPercent:
         Number(it.originalPrice) > 0
           ? Math.floor(
-              ((Number(it.originalPrice) - Number(it.flashSalePrice)) /
-                Number(it.originalPrice)) *
-                100,
-            )
+            ((Number(it.originalPrice) - Number(it.flashSalePrice)) /
+              Number(it.originalPrice)) *
+            100,
+          )
           : 0,
     })),
   }
@@ -496,7 +496,7 @@ export const useFlashSaleStore = defineStore('flashSale', {
     },
 
 
-     // Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
+    // Lấy cây brand -> categoryL2 -> sku từ BE để admin chọn sản phẩm
 
     async fetchCascade({ includeOutOfStock = false } = {}) {
       this.cascadeLoading = true
@@ -538,7 +538,7 @@ export const useFlashSaleStore = defineStore('flashSale', {
 
     // === Client side (public storefront) ===
 
-     // Tải danh sách slot ACTIVE + SCHEDULED còn hiệu lực cho trang client.
+    // Tải danh sách slot ACTIVE + SCHEDULED còn hiệu lực cho trang client.
 
 
     async fetchClientSlots(limit = 20) {

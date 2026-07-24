@@ -179,7 +179,7 @@ import api from '@/utils/api' // Bổ sung import API trực tiếp
 import HeroBanner from '@/layouts/home/HomeBanner.vue'
 import FlashSaleSection from '@/layouts/home/HomeFlashSale.vue'
 import NewsAndInfoSection from '@/layouts/home/HomeNewAndInfo.vue'
-import HomeHotProducts from '@/layouts/home/HomeHotProducts.vue'
+import HomeHotProducts from '@/layouts/home/HomeNewProducts.vue'
 import ProductCard from '@/components/client/ProductCard.vue'
 import ClientSlider from '@/components/client/ClientSlider.vue'
 

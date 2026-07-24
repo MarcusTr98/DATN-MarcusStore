@@ -15,7 +15,10 @@ function mapCartItem(item) {
     name: item.productName,
     // nếu BE có sẵn variantText thì dùng còn không thì nối chuỗi giữa color và storage
     variant: item.variantText || [item.color, item.storage].filter(Boolean).join(' / '),
+
     thumbnailUrl: item.thumbnailUrl,
+
+
     // Nếu là Flash Sale: price = giá FS, originalPrice = giá gốc
     // Nếu không: price = giá bán, originalPrice = giá gốc
     price: Number(item.price || 0),

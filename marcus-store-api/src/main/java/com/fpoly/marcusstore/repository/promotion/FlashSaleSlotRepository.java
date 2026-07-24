@@ -144,6 +144,7 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
             @Param("newEndDate") LocalDateTime newEndDate,
             @Param("excludeSlotId") Integer excludeSlotId);
 
+
     // Cancelled: tìm slot đã bị admin hủy (4) mà vẫn còn hiệu lực hoặc sắp diễn ra trong tương lai.
     // Dùng cho client API để FE biết slot nào đã bị hủy và hiển thị modal thông báo.
     // Lọc các slot CANCELLED có khoảng thời gian overlap với [now, endWindow].
@@ -157,7 +158,6 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
     List<FlashSaleSlot> findCancelledSlotsInRange(
             @Param("now") LocalDateTime now,
             @Param("endWindow") LocalDateTime endWindow);
-
     // Kiểm tra overlap cho việc khôi phục flash sale đã hủy.
     // Tìm các slot ACTIVE (2) hoặc SCHEDULED (1) trùng với khoảng [restoreStart, restoreEnd].
     // restoreStart = thời điểm khôi phục (now), restoreEnd = endDate gốc của slot bị hủy.

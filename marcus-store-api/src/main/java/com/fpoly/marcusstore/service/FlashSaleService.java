@@ -38,7 +38,6 @@ public interface FlashSaleService {
     // Trả về slot sau khi khôi phục (status = ACTIVE).
     FlashSaleResponse restoreFlashSale(Integer slotId);
 
-
     // Scheduled: auto-update status theo thời gian + khoá tổng SP khi hết hạn
     void autoUpdateFlashSaleStatuses();
 
