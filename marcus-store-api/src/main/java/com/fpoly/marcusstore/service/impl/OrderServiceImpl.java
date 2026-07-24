@@ -362,8 +362,10 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderCodeAndUserUserId(orderCode, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
-        if (!"COD".equalsIgnoreCase(order.getPaymentMethod())) {
-            throw new RuntimeException("Chỉ hỗ trợ hủy đơn COD");
+        // Marcus sửa: cho phép khách hủy cả COD và VNPAY trong các trạng thái an toàn.
+        if (!("COD".equalsIgnoreCase(order.getPaymentMethod())
+                || "VNPAY".equalsIgnoreCase(order.getPaymentMethod()))) {
+            throw new RuntimeException("Phương thức thanh toán này chưa hỗ trợ tự hủy");
         }
 
         String currentStatus = normalizeStatusValue(order.getOrderStatus());

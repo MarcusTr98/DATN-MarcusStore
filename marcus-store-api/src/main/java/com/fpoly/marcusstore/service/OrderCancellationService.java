@@ -40,6 +40,7 @@ public class OrderCancellationService {
     private final VoucherRepository voucherRepository;
     private final UserVoucherRepository userVoucherRepository;
     private final OrderTransactionRepository transactionRepository;
+    private final RefundService refundService;
 
     // Marcus thêm hủy đơn và hoàn tài nguyên đúng một lần. Trả về false nếu đơn đã
     // được hủy trước đó.
@@ -49,14 +50,29 @@ public class OrderCancellationService {
             return false;
         }
 
+        // Marcus sửa: đơn VNPAY đã thanh toán tạo refund và không hoàn lại voucher.
+        boolean paidByVnPay = isPaidVnPay(order);
         Map<Integer, FlashSaleItem> restorableFlashSaleContexts = restoreFlashSaleQuantity(order);
         restoreStock(order, restorableFlashSaleContexts);
-        restoreVoucher(order);
+        if (!paidByVnPay) {
+            restoreVoucher(order);
+        }
         markPendingVnPayTransactionFailed(order, reason);
 
         order.setOrderStatus("CANCELLED");
         orderRepository.save(order);
+        if (paidByVnPay) {
+            refundService.requestSystemRefundIfEligible(order, reason);
+        }
         return true;
+    }
+
+    // Marcus them refund
+    private boolean isPaidVnPay(Order order) {
+        return "VNPAY".equalsIgnoreCase(order.getPaymentMethod())
+                && ("PAID".equalsIgnoreCase(order.getPaymentStatus())
+                        || "REFUND_PENDING".equalsIgnoreCase(order.getPaymentStatus())
+                        || "REFUND_FAILED".equalsIgnoreCase(order.getPaymentStatus()));
     }
 
     private Map<Integer, FlashSaleItem> restoreFlashSaleQuantity(Order order) {
@@ -179,7 +195,8 @@ public class OrderCancellationService {
 
         restoredSlotId = restoredFlashSaleContext.getSlot().getSlotId();
         if (existingSlotId.equals(restoredSlotId)) {
-            // Giá trong cart phải theo cấu hình Flash Sale hiện hành, không tin snapshot cũ.
+            // Giá trong cart phải theo cấu hình Flash Sale hiện hành, không tin snapshot
+            // cũ.
             cartItem.setFlashSalePrice(restoredFlashSaleContext.getFlashSalePrice());
         }
     }

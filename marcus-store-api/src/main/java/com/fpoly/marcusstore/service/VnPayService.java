@@ -16,6 +16,7 @@ import java.util.*;
 public class VnPayService {
 
     private final VnPayConfig vnPayConfig;
+    private final OrderTransactionService orderTransactionService;
 
     public String createPaymentUrl(Order order, HttpServletRequest request) {
         // VNPAY quy định số tiền phải nhân lên 100 lần (để bỏ số thập phân)
@@ -44,6 +45,7 @@ public class VnPayService {
         SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMddHHmmss");
         String vnp_CreateDate = formatter.format(cld.getTime());
         vnp_Params.put("vnp_CreateDate", vnp_CreateDate);
+        orderTransactionService.recordVnPayPaymentRequestDate(order, vnp_CreateDate);
 
         // Đơn hàng hết hạn thanh toán sau 15 phút
         cld.add(Calendar.MINUTE, 15);

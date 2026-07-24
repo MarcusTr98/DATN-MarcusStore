@@ -62,4 +62,7 @@ public class OrderTransaction {
     @Column(name = "provider_response_code", length = 20)
     private String providerResponseCode;
 
+    @Column(name = "provider_transaction_date", length = 14)
+    private String providerTransactionDate;
+
 }

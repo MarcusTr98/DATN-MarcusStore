@@ -96,66 +96,77 @@
             </div>
             <div class="section-body">
               <div class="table-wrap">
-<table>
-                <thead>
-                  <tr>
-                    <th class="col-product">Sản phẩm</th>
-                    <th class="col-sku">SKU</th>
-                    <th class="col-variant">Biến thể</th>
-                    <th class="col-qty">SL</th>
-                    <th class="col-price">Giá mua</th>
-                    <th class="col-total">Thành tiền</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="item in orderDetail.items" :key="item.skuId">
-                    <td>
-                      <div class="product-cell">
-                        <img
-                          v-if="item.productImage"
-                          :src="item.productImage"
-                          :alt="item.productName"
-                          class="product-thumb-img"
-                        />
-                        <div v-else class="product-thumb-placeholder">
-                          <i class="fa-solid fa-mobile-screen-button"></i>
+                <table>
+                  <thead>
+                    <tr>
+                      <th class="col-product">Sản phẩm</th>
+                      <th class="col-sku">SKU</th>
+                      <th class="col-variant">Biến thể</th>
+                      <th class="col-qty">SL</th>
+                      <th class="col-price">Giá mua</th>
+                      <th class="col-total">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in orderDetail.items" :key="item.skuId">
+                      <td>
+                        <div class="product-cell">
+                          <img
+                            v-if="item.productImage"
+                            :src="item.productImage"
+                            :alt="item.productName"
+                            class="product-thumb-img"
+                          />
+                          <div v-else class="product-thumb-placeholder">
+                            <i class="fa-solid fa-mobile-screen-button"></i>
+                          </div>
+                          <span class="main-line">{{ item.productName }}</span>
                         </div>
-                        <span class="main-line">{{ item.productName }}</span>
-                      </div>
-                    </td>
-                    <td class="cell-sku">{{ item.skuCode }}</td>
-                    <td>
-                      <div v-if="item.variants && item.variants.length > 0" class="variant-stack">
-                        <div
-                          v-for="(variant, vIdx) in item.variants || []"
-                          :key="vIdx"
-                          class="variant-row"
-                        >
-                          <span class="variant-label">{{ variant.attributeName || 'Phân loại' }}:</span>
-                          <span class="variant-value">{{ variant.valueString }}</span>
+                      </td>
+                      <td class="cell-sku">{{ item.skuCode }}</td>
+                      <td>
+                        <div v-if="item.variants && item.variants.length > 0" class="variant-stack">
+                          <div
+                            v-for="(variant, vIdx) in item.variants || []"
+                            :key="vIdx"
+                            class="variant-row"
+                          >
+                            <span class="variant-label"
+                              >{{ variant.attributeName || 'Phân loại' }}:</span
+                            >
+                            <span class="variant-value">{{ variant.valueString }}</span>
+                          </div>
                         </div>
-                      </div>
-                      <span v-else class="text-muted">---</span>
-                    </td>
-                    <td class="cell-center">{{ item.quantity }}</td>
-                    <td class="cell-price">
-                      <div class="price-cell">
-                        <template v-if="item.isFlashSale && item.originalPrice">
-                          <span class="money original-price">{{ formatCurrency(item.originalPrice) }}</span>
-                          <span class="money flash-price">{{ formatCurrency(item.priceAtPurchase) }}</span>
-                          <span v-if="item.flashSaleSlotName" class="flash-badge" :title="item.flashSaleSlotName">{{ item.flashSaleSlotName }}</span>
-                        </template>
-                        <template v-else>
-                          <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
-                        </template>
-                      </div>
-                    </td>
-                    <td class="cell-price">
-                      <span class="money">{{ formatCurrency(item.lineTotal) }}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                        <span v-else class="text-muted">---</span>
+                      </td>
+                      <td class="cell-center">{{ item.quantity }}</td>
+                      <td class="cell-price">
+                        <div class="price-cell">
+                          <template v-if="item.isFlashSale && item.originalPrice">
+                            <span class="money original-price">{{
+                              formatCurrency(item.originalPrice)
+                            }}</span>
+                            <span class="money flash-price">{{
+                              formatCurrency(item.priceAtPurchase)
+                            }}</span>
+                            <span
+                              v-if="item.flashSaleSlotName"
+                              class="flash-badge"
+                              :title="item.flashSaleSlotName"
+                              >{{ item.flashSaleSlotName }}</span
+                            >
+                          </template>
+                          <template v-else>
+                            <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
+                          </template>
+                        </div>
+                      </td>
+                      <td class="cell-price">
+                        <span class="money">{{ formatCurrency(item.lineTotal) }}</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               <!-- NÂNG CẤP: Bảng tổng hợp dòng tiền chuẩn xác -->
@@ -356,6 +367,91 @@
               </div>
             </div>
           </section>
+          <!-- Marcus lam them refund -->
+          <section v-if="canManageRefund || refund" class="card section-card no-print">
+            <div class="section-header">
+              <div>
+                <h4>Hoàn tiền VNPAY</h4>
+                <!-- Marcus sửa mô tả trung lập vì số tiền hoàn phụ thuộc bên hủy đơn. -->
+                <p>Theo dõi từ lúc tạo yêu cầu đến khi VNPAY xác nhận hoàn tất.</p>
+              </div>
+            </div>
+            <div class="section-body">
+              <div v-if="refund" class="mini-list">
+                <div class="mini-row">
+                  <span class="mini-label">Trạng thái</span>
+                  <strong class="mini-value">{{ getRefundStatusLabel(refund.status) }}</strong>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Tiền hoàn</span>
+                  <strong class="mini-value money">{{ formatCurrency(refund.amount) }}</strong>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Phí vận chuyển không hoàn</span>
+                  <span class="mini-value">{{ formatCurrency(refund.shippingDeducted) }}</span>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Lý do</span>
+                  <span class="mini-value">{{ refund.reason }}</span>
+                </div>
+                <div class="mini-row">
+                  <span class="mini-label">Diễn giải</span>
+                  <!-- Marcus sửa: không đưa lỗi checksum/response kỹ thuật ra màn quản trị. -->
+                  <span class="mini-value">{{ getRefundStatusDescription(refund.status) }}</span>
+                </div>
+              </div>
+
+              <div v-else class="form-group">
+                <label class="form-label" for="refundReason">Lý do hoàn tiền</label>
+                <input
+                  id="refundReason"
+                  v-model="refundReason"
+                  class="control"
+                  maxlength="500"
+                  placeholder="Nhập lý do để tạo yêu cầu..."
+                />
+              </div>
+
+              <button
+                v-if="!refund"
+                class="primary-btn"
+                type="button"
+                :disabled="refundBusy || !refundReason.trim()"
+                @click="createRefund"
+              >
+                {{ refundBusy ? 'Đang tạo...' : 'Tạo yêu cầu hoàn tiền' }}
+              </button>
+              <button
+                v-else-if="refund.status === 'PENDING_APPROVAL'"
+                class="primary-btn"
+                type="button"
+                :disabled="refundBusy"
+                @click="approveRefund"
+              >
+                {{ refundBusy ? 'Đang gửi VNPAY...' : 'Duyệt & gửi hoàn tiền' }}
+              </button>
+              <button
+                v-else-if="['FAILED', 'RETRY_PENDING'].includes(refund.status)"
+                class="primary-btn"
+                type="button"
+                :disabled="refundBusy"
+                @click="retryRefund"
+              >
+                {{ refundBusy ? 'Đang thử lại...' : 'Thử lại hoàn tiền' }}
+              </button>
+              <button
+                v-else-if="refund.status === 'PROCESSING'"
+                class="primary-btn"
+                type="button"
+                :disabled="refundBusy"
+                @click="reconcileRefund"
+              >
+                {{ refundBusy ? 'Đang kiểm tra...' : 'Kiểm tra trạng thái với VNPAY' }}
+              </button>
+              <!-- Marcus xóa xác nhận thành công giả trên Sandbox; môi trường dev
+                   dừng đúng tại trạng thái chờ VNPAY xác nhận. -->
+            </div>
+          </section>
         </aside>
       </div>
     </template>
@@ -379,6 +475,9 @@ const toastMessage = ref('')
 const orderDetail = ref(null)
 const loading = ref(false)
 const error = ref(null)
+const refund = ref(null)
+const refundReason = ref('')
+const refundBusy = ref(false)
 
 const selectedStatus = ref('')
 const statusNote = ref('')
@@ -390,6 +489,7 @@ async function fetchGetDetailOrder(orderCode) {
     error.value = null
     const response = await OrderDetailApi.getOrderDetail(orderCode)
     orderDetail.value = response.data
+    await fetchRefund(orderCode)
   } catch (e) {
     error.value = 'Không tải được chi tiết đơn hàng'
     console.error(e)
@@ -426,6 +526,8 @@ const paymentStatusMap = {
   UNPAID: { label: 'Chưa thanh toán', className: 'pending' },
   REFUNDED: { label: 'Đã hoàn tiền', className: 'cancelled' },
   FAILED: { label: 'Lỗi thanh toán', className: 'failed' },
+  REFUND_PENDING: { label: 'Đang hoàn tiền', className: 'pending' },
+  REFUND_FAILED: { label: 'Hoàn tiền lỗi', className: 'failed' },
 }
 
 const paymentMethodMap = {
@@ -472,6 +574,16 @@ const statusesRequiringNote = ['CANCELLED', 'FAILED']
 const nextStatuses = computed(() =>
   orderDetail.value ? allowedTransitions[orderDetail.value.orderStatus] || [] : [],
 )
+// Marcus lam them refund
+const canManageRefund = computed(() => {
+  const order = orderDetail.value
+  return (
+    order &&
+    String(order.paymentMethod).toUpperCase() === 'VNPAY' &&
+    ['CANCELLED', 'FAILED'].includes(order.orderStatus) &&
+    ['PAID', 'REFUND_PENDING', 'REFUND_FAILED'].includes(order.paymentStatus)
+  )
+})
 
 const subTotal = computed(
   () => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0,
@@ -525,16 +637,92 @@ const getPaymentStatusLabel = (status) => paymentStatusMap[status]?.label || sta
 const getPaymentStatusClass = (status) => paymentStatusMap[status]?.className || 'pending'
 const getPaymentMethodLabel = (method) => paymentMethodMap[method] || method || '---'
 
-const getVariantText = (item) => {
-  if (!item || !Array.isArray(item.variants) || item.variants.length === 0) return ''
-  return item.variants
-    .filter((v) => v && v.valueString)
-    .map((v) => {
-      if (v.attributeName) return `${v.attributeName}: ${v.valueString}`
-      return v.valueString
-    })
-    .join(' | ')
+// Marcus lam them refund
+const getRefundStatusLabel = (status) =>
+  ({
+    PENDING_APPROVAL: 'Chờ phê duyệt',
+    PROCESSING: 'Đã gửi - chờ VNPAY xác nhận',
+    SUBMITTING: 'Đang gửi yêu cầu sang VNPAY',
+    RETRY_PENDING: 'Chờ hệ thống gửi lại',
+    MANUAL_REVIEW: 'Cần nhân viên kiểm tra',
+    SUCCESS: 'VNPAY đã xác nhận hoàn tiền',
+    FAILED: 'VNPAY từ chối hoặc gửi thất bại',
+  })[status] ||
+  status ||
+  '---'
+
+// Marcus thêm diễn giải thống nhất theo góc nhìn nghiệp vụ, không lộ trạng thái kỹ thuật.
+const getRefundStatusDescription = (status) =>
+  ({
+    PENDING_APPROVAL: 'Yêu cầu đã được tạo và chưa gửi sang VNPAY.',
+    SUBMITTING: 'Hệ thống đang gửi yêu cầu hoàn tiền sang VNPAY.',
+    PROCESSING: 'VNPAY đã tiếp nhận hoặc hệ thống đã gửi yêu cầu; đang chờ kết quả xác nhận cuối.',
+    RETRY_PENDING: 'Lần gửi trước chưa kết nối được VNPAY; hệ thống sẽ tự động gửi lại.',
+    MANUAL_REVIEW: 'Chưa có kết quả cuối từ VNPAY; nhân viên cần kiểm tra giao dịch.',
+    SUCCESS: 'VNPAY đã trả kết quả xác nhận hoàn tiền thành công.',
+    FAILED: 'Yêu cầu không hoàn tất. Kiểm tra nhật ký kỹ thuật trước khi thao tác lại.',
+  })[status] || 'Đang cập nhật trạng thái hoàn tiền.'
+
+const fetchRefund = async (orderCode) => {
+  try {
+    const response = await OrderDetailApi.getRefund(orderCode)
+    refund.value = response.status === 204 ? null : response.data
+  } catch (e) {
+    refund.value = null
+    if (e.response?.status !== 404) console.error(e)
+  }
 }
+
+const runRefundAction = async (action, successMessage) => {
+  try {
+    refundBusy.value = true
+    const response = await action()
+    refund.value = response.data
+    await fetchGetDetailOrder(orderDetail.value.orderCode)
+    showToast(typeof successMessage === 'function' ? successMessage(response.data) : successMessage)
+  } catch (e) {
+    const message = e.response?.data?.message || e.response?.data || 'Không xử lý được hoàn tiền'
+    showToast(message)
+  } finally {
+    refundBusy.value = false
+  }
+}
+
+const createRefund = () =>
+  runRefundAction(
+    () => OrderDetailApi.createRefund(orderDetail.value.orderCode, refundReason.value.trim()),
+    'Đã tạo yêu cầu hoàn tiền.',
+  )
+const approveRefund = () =>
+  runRefundAction(
+    () => OrderDetailApi.approveRefund(refund.value.refundId),
+    // Marcus sửa toast theo kết quả thật, không báo “đã gửi” khi request thất bại.
+    (result) =>
+      result.status === 'SUCCESS'
+        ? 'VNPAY đã xác nhận hoàn tiền thành công.'
+        : result.status === 'FAILED'
+          ? 'Yêu cầu hoàn tiền chưa thành công. Vui lòng kiểm tra trạng thái.'
+          : 'Đã gửi yêu cầu hoàn tiền. Đang chờ VNPAY xác nhận.',
+  )
+const retryRefund = () =>
+  runRefundAction(
+    () => OrderDetailApi.retryRefund(refund.value.refundId),
+    (result) =>
+      result.status === 'FAILED'
+        ? 'Gửi lại chưa thành công. Vui lòng kiểm tra trạng thái.'
+        : 'Đã thực hiện gửi lại. Đang chờ VNPAY xác nhận.',
+  )
+// Marcus thêm thao tác kiểm tra trạng thái; scheduler backend vẫn tự chạy song song.
+const reconcileRefund = () =>
+  runRefundAction(
+    () => OrderDetailApi.reconcileRefund(refund.value.refundId),
+    (result) =>
+      result.status === 'SUCCESS'
+        ? 'VNPAY đã xác nhận hoàn tiền thành công.'
+        : 'Đã kiểm tra. VNPAY chưa xác nhận hoàn tiền hoàn tất.',
+  )
+// Marcus sửa: đã bỏ helper getVariantText không được giao diện sử dụng để tránh
+// cảnh báo no-unused-vars, phần biến thể vẫn render trực tiếp trong template cũ.
 
 const formatDateTime = (value) => {
   if (!value) return '---'
@@ -694,7 +882,3 @@ onBeforeUnmount(() => {
   resetPrintScale()
 })
 </script>
-
-<style scoped>
-/* Scoped overrides for print scaling - kept minimal as most styles are in OrderDetails.css */
-</style>

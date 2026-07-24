@@ -58,8 +58,8 @@ public class GhnStatusService {
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderPaymentService orderPaymentService;
-    private final OrderTransactionService transactionService;
     private final OrderCancellationService orderCancellationService;
+    private final RefundService refundService;
 
     @Transactional
     public SyncResult applyStatus(String trackingCode, String ghnStatus, String source) {
@@ -77,6 +77,7 @@ public class GhnStatusService {
         String currentStatus = normalize(order.getOrderStatus());
         if (newStatus.equals(currentStatus)) {
             repairFinancialStateIfNeeded(order, newStatus, trackingCode, source);
+            requestExceptionalRefundIfNeeded(order, normalizedGhnStatus, trackingCode, source);
             return SyncResult.NO_CHANGE;
         }
 
@@ -93,6 +94,7 @@ public class GhnStatusService {
             order.setOrderStatus(newStatus);
         }
         repairFinancialStateIfNeeded(order, newStatus, trackingCode, source);
+        requestExceptionalRefundIfNeeded(order, normalizedGhnStatus, trackingCode, source);
         createHistory(order, newStatus, normalizedGhnStatus, source);
         orderRepository.save(order);
         return SyncResult.UPDATED;
@@ -115,15 +117,18 @@ public class GhnStatusService {
             return;
         }
 
-        if ("CANCELLED".equals(newStatus)
-                && "VNPAY".equalsIgnoreCase(order.getPaymentMethod())
-                && "PAID".equalsIgnoreCase(order.getPaymentStatus())) {
-            transactionService.recordPendingTransactionIfAbsent(
-                    order,
-                    order.getFinalAmount(),
-                    "REFUND_PENDING",
-                    "GHN báo giao/hoàn thất bại; chờ hoàn tiền VNPAY. Tracking: " + trackingCode);
+    }
+
+    private void requestExceptionalRefundIfNeeded(
+            Order order, String ghnStatus, String trackingCode, String source) {
+        // Marcus thêm: lost/damage chỉ mở yêu cầu refund, không hoàn kho như luồng
+        // returned.
+        if (!Set.of("lost", "damage").contains(ghnStatus)) {
+            return;
         }
+        refundService.requestSystemRefundIfEligible(
+                order,
+                "GHN " + source + " báo " + ghnStatus + ". Tracking: " + trackingCode);
     }
 
     private void createHistory(Order order, String status, String ghnStatus, String source) {

@@ -318,6 +318,7 @@ ALTER TABLE Orders ADD payment_date DATETIME2;
 ALTER TABLE Orders ADD to_district_id INT NULL;
 ALTER TABLE Orders ADD to_ward_code VARCHAR(20) NULL;
 ALTER TABLE Orders ADD shipping_subsidy DECIMAL(18,2) DEFAULT 0 CHECK (shipping_subsidy >= 0);
+ALTER TABLE Orders ADD customer_shipping_fee DECIMAL(18,2) NULL;
 ALTER TABLE Orders ADD delivery_note NVARCHAR(500) NULL;
 
 
@@ -615,9 +616,55 @@ ALTER TABLE Order_Transactions ADD is_reconciled BIT DEFAULT 0 NOT NULL;
 ALTER TABLE Order_Transactions ADD idempotency_key VARCHAR(150) NULL;
 ALTER TABLE Order_Transactions ADD provider_transaction_id VARCHAR(100) NULL;
 ALTER TABLE Order_Transactions ADD provider_response_code VARCHAR(20) NULL;
+ALTER TABLE Order_Transactions ADD provider_transaction_date VARCHAR(14) NULL;
 CREATE UNIQUE INDEX UX_OrderTransactions_IdempotencyKey
     ON Order_Transactions(idempotency_key)
     WHERE idempotency_key IS NOT NULL;
+
+CREATE TABLE Refund_Requests (
+    refund_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    order_id INT NOT NULL,
+    payment_transaction_id INT NOT NULL,
+    refund_transaction_id INT NULL,
+    request_code VARCHAR(32) NOT NULL UNIQUE,
+    idempotency_key VARCHAR(150) NOT NULL UNIQUE,
+    amount DECIMAL(18,2) NOT NULL CHECK (amount > 0),
+    shipping_deducted DECIMAL(18,2) NOT NULL DEFAULT 0,
+    reason NVARCHAR(500) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    requested_by INT NULL,
+    approved_by INT NULL,
+    retry_count INT NOT NULL DEFAULT 0,
+    max_retries INT NOT NULL DEFAULT 3,
+    next_retry_at DATETIME2 NULL,
+    provider_response_id VARCHAR(100) NULL,
+    provider_refund_transaction_id VARCHAR(100) NULL,
+    provider_response_code VARCHAR(20) NULL,
+    provider_transaction_status VARCHAR(20) NULL,
+    provider_message NVARCHAR(500) NULL,
+    created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+    approved_at DATETIME2 NULL,
+    last_attempt_at DATETIME2 NULL,
+    reconciliation_attempts INT NOT NULL DEFAULT 0,
+    last_reconciled_at DATETIME2 NULL,
+    next_reconciliation_at DATETIME2 NULL,
+    last_reconciliation_message NVARCHAR(500) NULL,
+    manually_confirmed_by INT NULL,
+    manually_confirmed_at DATETIME2 NULL,
+    manual_confirmation_note NVARCHAR(500) NULL,
+    processed_at DATETIME2 NULL,
+    row_version BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT FK_RefundRequests_Order FOREIGN KEY (order_id) REFERENCES Orders(order_id),
+    CONSTRAINT FK_RefundRequests_PaymentTransaction FOREIGN KEY (payment_transaction_id)
+        REFERENCES Order_Transactions(transaction_id),
+    CONSTRAINT FK_RefundRequests_RefundTransaction FOREIGN KEY (refund_transaction_id)
+        REFERENCES Order_Transactions(transaction_id),
+    CONSTRAINT FK_RefundRequests_RequestedBy FOREIGN KEY (requested_by) REFERENCES Users(user_id),
+    CONSTRAINT FK_RefundRequests_ApprovedBy FOREIGN KEY (approved_by) REFERENCES Users(user_id),
+    CONSTRAINT FK_RefundRequests_ManuallyConfirmedBy FOREIGN KEY (manually_confirmed_by) REFERENCES Users(user_id)
+);
+CREATE INDEX IX_RefundRequests_StatusRetry ON Refund_Requests(status, next_retry_at);
+CREATE INDEX IX_RefundRequests_Reconciliation ON Refund_Requests(status, next_reconciliation_at);
 
 -- Ngọc thêm 1/7 bảng user_Permission
 CREATE TABLE User_Permissions(
