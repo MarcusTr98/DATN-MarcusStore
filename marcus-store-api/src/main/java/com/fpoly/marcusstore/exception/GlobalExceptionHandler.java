@@ -1,19 +1,24 @@
 package com.fpoly.marcusstore.exception;
 
 import com.fpoly.marcusstore.dto.response.ApiResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.server.ResponseStatusException;
+
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final String INTERNAL_ERROR_MESSAGE = "Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.";
 
     // 1. Bắt các lỗi validate form (ví dụ: để trống username, email sai định dạng)
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -31,9 +36,12 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
-    // 2. Xử lý ResponseStatusException - tách errorCode nhúng trong reason theo pattern "MESSAGE|CODE"
-    //    VD: "Voucher đã ngừng hoạt động.|VOUCHER_INACTIVE" -> message="Voucher đã ngừng hoạt động.", data="VOUCHER_INACTIVE"
-    //    Lý do: cho phép service throw kèm mã lỗi để FE phân biệt loại lỗi mà không cần tạo class Exception mới.
+    // 2. Xử lý ResponseStatusException - tách errorCode nhúng trong reason theo
+    // pattern "MESSAGE|CODE"
+    // VD: "Voucher đã ngừng hoạt động.|VOUCHER_INACTIVE" -> message="Voucher đã
+    // ngừng hoạt động.", data="VOUCHER_INACTIVE"
+    // Lý do: cho phép service throw kèm mã lỗi để FE phân biệt loại lỗi mà không
+    // cần tạo class Exception mới.
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Object>> handleResponseStatusException(ResponseStatusException ex) {
         String reason = ex.getReason() != null ? ex.getReason() : "Đã xảy ra lỗi";
@@ -65,21 +73,19 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }
 
-    // 4. (Optional) Bắt các lỗi hệ thống không xác định
+    // 4. Bắt lỗi hệ thống không xác định, chỉ ghi chi tiết ở server.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleGlobalExceptions(Exception ex) {
-        ApiResponse<Object> response = new ApiResponse<>(500, "Đã xảy ra lỗi hệ thống: " + ex.getMessage(), null);
+        log.error("Lỗi hệ thống chưa được xử lý", ex);
+        ApiResponse<Object> response = ApiResponse.error(500, INTERNAL_ERROR_MESSAGE);
         return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
-       }
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
-public ResponseEntity<ApiResponse<Object>> handleAccessDenied(
-        AccessDeniedException ex){
-
-    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-            .body(ApiResponse.error(
-                    403,
-                    "Bạn không có quyền truy cập"));
-
-}
+    public ResponseEntity<ApiResponse<Object>> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(
+                        403,
+                        "Bạn không có quyền truy cập"));
+    }
 }
