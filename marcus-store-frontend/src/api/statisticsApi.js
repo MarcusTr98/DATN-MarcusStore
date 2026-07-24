@@ -12,9 +12,14 @@ function buildQuery(params = {}) {
 }
 
 const statisticsApi = {
-  // KPI summary
+  // KPI summary (cũ — giữ lại)
   getKpiSummary(period = 'month', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/kpi-summary${buildQuery({ period, startDate, endDate })}`)
+  },
+
+  // KPI mới: có completedOrders + % so kỳ trước
+  getKpiCompare(period = 'today', startDate = '', endDate = '') {
+    return api.get(`/admin/statistics/kpi-compare${buildQuery({ period, startDate, endDate })}`)
   },
 
   // Doanh thu theo ngày
@@ -22,7 +27,7 @@ const statisticsApi = {
     return api.get(`/admin/statistics/revenue/daily${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // Đơn hàng theo thứ (chỉ dùng khi period = week)
+  // Đơn hàng theo thứ
   getOrdersByWeekday(period = 'month', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/orders/weekday${buildQuery({ period, startDate, endDate })}`)
   },
@@ -47,18 +52,29 @@ const statisticsApi = {
     return api.get(`/admin/statistics/recent-orders${buildQuery({ limit, period, startDate, endDate, keyword, status, brand })}`)
   },
 
-  // Sản phẩm sắp / hết hàng (không phụ thuộc period)
+  // Sản phẩm sắp / hết hàng
   getLowStockProducts(keyword = '', brand = '', status = '') {
     return api.get(`/admin/statistics/low-stock${buildQuery({ keyword, brand, status })}`)
   },
 
   // So sánh doanh thu kỳ này vs kỳ trước
   getRevenueCompare(period, startDate = '', endDate = '') {
-  return api.get(`/admin/statistics/revenue/compare${buildQuery({ period, startDate, endDate })}`)
-},
-  // Đếm đơn đang chờ xử lý
+    return api.get(`/admin/statistics/revenue/compare${buildQuery({ period, startDate, endDate })}`)
+  },
+
+  // Đếm đơn PENDING (dùng cho KPI card)
   getPendingOrdersCount() {
     return api.get('/admin/statistics/pending-orders/count')
+  },
+
+  // Đơn cần xử lý: PENDING + CONFIRMED + PROCESSING (dùng cho tab DataSection)
+  getPendingOrders(limit = 100, keyword = '') {
+    return api.get(`/admin/statistics/pending-orders${buildQuery({ limit, keyword })}`)
+  },
+
+  // Thống kê phương thức thanh toán + trạng thái đơn (doughnut chart)
+  getPaymentStats(period = 'today', startDate = '', endDate = '') {
+    return api.get(`/admin/statistics/payment-stats${buildQuery({ period, startDate, endDate })}`)
   },
 
   // Tài khoản mới đăng ký theo ngày
@@ -69,7 +85,6 @@ const statisticsApi = {
   getChildCategories() {
     return api.get('/admin/categories/children')
   },
-  
 }
 
 export default statisticsApi

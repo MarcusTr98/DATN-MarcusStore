@@ -36,6 +36,14 @@ public class AdminStatisticsController {
         return ApiResponse.success(statisticsService.getKpiSummary(dates[0], dates[1]));
     }
 
+    @GetMapping("/kpi-compare")
+    public ApiResponse<KpiCompareDTO> getKpiCompare(
+            @RequestParam(required = false, defaultValue = "today") String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ApiResponse.success(statisticsService.getKpiCompare(period, startDate, endDate));
+    }
+
     @GetMapping("/top-products")
     public ApiResponse<List<TopProductResponseDTO>> getTopSellingProducts(
             @RequestParam(defaultValue = "10") int topN,
@@ -98,16 +106,32 @@ public class AdminStatisticsController {
     }
 
     @GetMapping("/revenue/compare")
-public ApiResponse<RevenueCompareResponseDTO> getRevenueCompare(
-        @RequestParam(required = false, defaultValue = "month") String period,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
-    return ApiResponse.success(statisticsService.getRevenueCompare(period, startDate, endDate));
-}
+    public ApiResponse<RevenueCompareResponseDTO> getRevenueCompare(
+            @RequestParam(required = false, defaultValue = "month") String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        return ApiResponse.success(statisticsService.getRevenueCompare(period, startDate, endDate));
+    }
 
     @GetMapping("/pending-orders/count")
     public ApiResponse<Long> countPendingOrders() {
         return ApiResponse.success(statisticsService.countPendingOrders());
+    }
+
+    @GetMapping("/pending-orders")
+    public ApiResponse<List<RecentOrderResponseDTO>> getPendingOrders(
+            @RequestParam(defaultValue = "100") int limit,
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.success(statisticsService.getPendingOrders(limit, keyword));
+    }
+
+    @GetMapping("/payment-stats")
+    public ApiResponse<PaymentStatsDTO> getPaymentStats(
+            @RequestParam(required = false, defaultValue = "today") String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
+        return ApiResponse.success(statisticsService.getPaymentStats(dates[0], dates[1]));
     }
 
     @GetMapping("/users/new")

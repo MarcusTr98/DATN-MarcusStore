@@ -7,32 +7,39 @@
       :to="item.link || undefined"
       class="kpi-card"
       :class="{ warning: item.type === 'warning', clickable: !!item.link || !!item.action }"
+      :style="{ background: item.bg }"
       @click="item.action ? $emit('action', item.action) : undefined"
     >
       <div class="kpi-top">
         <span
           class="kpi-icon"
           :class="item.icon"
-          :style="{
-            background: item.type === 'warning' ? '#ffedd5' : '#fff2f7',
-            color: item.type === 'warning' ? '#c2410c' : '#ff4d8d',
-            width: '46px',
-            height: '46px',
-            minWidth: '46px',
-            borderRadius: '14px',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '20px',
-            flex: 'none',
-          }"
+          :style="{ background: item.iconBg, color: item.iconColor }"
         ></span>
-        <small v-if="item.growth">{{ item.growth }}</small>
+        <!-- Badge cảnh báo (ô warning) -->
+        <small v-if="item.badge" :class="item.badgeClass ?? 'badge-warning'">
+          {{ item.badge }}
+        </small>
       </div>
-      <div>
-        <p>{{ item.title }}</p>
-        <strong>{{ item.value }}</strong>
-        <span>{{ item.note }}</span>
+      <div class="kpi-body">
+        <p class="kpi-title">{{ item.title }}</p>
+        <strong class="kpi-value">{{ item.value }}</strong>
+        <!-- Note gộp % tăng/giảm vào câu -->
+        <span class="kpi-note">
+          <template v-if="item.change !== undefined && item.change !== null">
+            <span :class="item.change >= 0 ? 'trend-up' : 'trend-down'">
+              <i :class="item.change >= 0 ? 'bi bi-arrow-up-short' : 'bi bi-arrow-down-short'"></i>
+              {{ Math.abs(item.change) }}%
+            </span>
+            so với {{ kd.previousLabel }}
+          </template>
+          <template v-else-if="item.change === null">
+            <span class="trend-neutral">— Chưa có dữ liệu kỳ trước</span>
+          </template>
+          <template v-else>
+            {{ item.note }}
+          </template>
+        </span>
       </div>
     </component>
   </section>
@@ -42,10 +49,10 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  kpiSummary:         { type: Object, default: () => ({ totalRevenue: 0, totalOrders: 0, totalProductsSold: 0 }) },
+  kpiCompare:         { type: Object, default: () => ({}) },   // từ /kpi-compare
   pendingOrdersCount: { type: Number, default: 0 },
   lowStockData:       { type: Array,  default: () => [] },
-  periodLabel:        { type: String, default: 'tháng này' },
+  periodLabel:        { type: String, default: 'hôm nay' },
 })
 
 const emit = defineEmits(['action'])
@@ -56,59 +63,115 @@ function formatCurrency(value) {
   }).format(value || 0)
 }
 
-const inventoryAlerts = computed(() =>
-  props.lowStockData.slice(0, 3).map(item => ({
-    title: item.status === 'Hết hàng'
-      ? `Hết hàng: ${item.productName} (${item.skuCode})`
-      : `Sắp hết hàng: ${item.productName} chỉ còn ${item.stockQuantity} sản phẩm`,
-  }))
-)
+function changeBadgeClass(change) {
+  if (change === null || change === undefined) return 'badge-neutral'
+  if (change > 0)  return 'badge-up'
+  if (change < 0)  return 'badge-down'
+  return 'badge-neutral'
+}
+
+const kd = computed(() => props.kpiCompare)
+
+// Label động theo period
+const periodTitle = computed(() => {
+  switch (props.periodLabel) {
+    case 'hôm nay':     return 'hôm nay'
+    case 'hôm qua':     return 'hôm qua'
+    case '7 ngày qua':  return '7 ngày qua'
+    case '30 ngày qua': return '30 ngày qua'
+    case 'tuần này':    return 'tuần này'
+    case 'tháng này':   return 'tháng này'
+    case 'năm nay':     return 'năm nay'
+    default:            return props.periodLabel  // FIX: custom date hiển thị đúng label
+  }
+})
+
+// Helper: bg + iconBg + iconColor theo trend
+function trendStyle(change, icon) {
+  if (change === null || change === undefined) {
+    // Chưa có dữ liệu kỳ trước → vàng
+    return { bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', iconBg: '#fde68a', iconColor: '#92400e', icon }
+  }
+  if (change > 0) {
+    // Tăng → xanh lá
+    return { bg: 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)', iconBg: '#86efac', iconColor: '#14532d', icon }
+  }
+  if (change < 0) {
+    // Giảm → hồng đỏ
+    return { bg: 'linear-gradient(135deg, #fff1f2 0%, #fecdd3 100%)', iconBg: '#fda4af', iconColor: '#881337', icon }
+  }
+  // Bằng 0 → vàng
+  return { bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', iconBg: '#fde68a', iconColor: '#92400e', icon }
+}
 
 const kpiItems = computed(() => [
   {
-    key: 'revenue', title: 'Doanh thu',
-    value: formatCurrency(props.kpiSummary.totalRevenue), growth: '',
-    note: `Tổng doanh thu ${props.periodLabel}`,
-    icon: 'bi bi-currency-dollar', type: 'normal', link: null, action: null,
+    key: 'revenue',
+    title: `Doanh thu ${periodTitle.value}`,
+    value: formatCurrency(kd.value.totalRevenue),
+    change: kd.value.revenueChangePercent ?? null,
+    ...trendStyle(kd.value.revenueChangePercent ?? null, 'bi bi-currency-dollar'),
+    type: 'normal', link: null, action: null,
   },
   {
-    key: 'orders', title: 'Tổng đơn hàng',
-    value: String(props.kpiSummary.totalOrders), growth: '',
-    note: `Đơn hàng đã ghi nhận ${props.periodLabel}`,
-    icon: 'bi bi-bag-check', type: 'normal', link: null, action: null,
+    key: 'orders',
+    title: `Tổng đơn hàng ${periodTitle.value}`,
+    value: String(kd.value.totalOrders ?? 0),
+    change: kd.value.ordersChangePercent ?? null,
+    ...trendStyle(kd.value.ordersChangePercent ?? null, 'bi bi-bag-check'),
+    type: 'normal', link: null, action: null,
   },
   {
-    key: 'soldProducts', title: 'Sản phẩm đã bán',
-    value: String(props.kpiSummary.totalProductsSold), growth: '',
-    note: `Số lượng SKU đã bán ${props.periodLabel}`,
-    icon: 'bi bi-box-seam', type: 'normal', link: null, action: null,
+    key: 'completedOrders',
+    title: `Đơn hoàn thành ${periodTitle.value}`,
+    value: String(kd.value.completedOrders ?? 0),
+    change: kd.value.completedOrdersChangePercent ?? null,
+    ...trendStyle(kd.value.completedOrdersChangePercent ?? null, 'bi bi-patch-check'),
+    type: 'normal', link: null, action: null,
   },
   {
-    key: 'pendingOrders', title: 'Đơn mới chưa xử lý',
+    key: 'soldProducts',
+    title: `Sản phẩm đã bán ${periodTitle.value}`,
+    value: String(kd.value.totalProductsSold ?? 0),
+    change: kd.value.productsSoldChangePercent ?? null,
+    ...trendStyle(kd.value.productsSoldChangePercent ?? null, 'bi bi-box-seam'),
+    type: 'normal', link: null, action: null,
+  },
+  {
+    key: 'pendingOrders',
+    title: 'Đơn chờ xử lý',
     value: String(props.pendingOrdersCount),
-    growth: props.pendingOrdersCount > 0 ? 'Ưu tiên' : '',
-    note: 'Ưu tiên duyệt để tránh trễ SLA',
+    badge: props.pendingOrdersCount > 0 ? 'Cần xử lý' : '',
+    badgeClass: 'badge-warning',
+    note: props.pendingOrdersCount > 0
+      ? 'Cần xử lý ngay để tránh chậm trễ đơn hàng'
+      : 'Không có đơn nào đang chờ xử lý',
     icon: 'bi bi-exclamation-triangle',
     type: props.pendingOrdersCount > 0 ? 'warning' : 'normal',
     link: '/admin/order', action: null,
+    bg: props.pendingOrdersCount > 0
+      ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'
+      : 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+    iconBg: props.pendingOrdersCount > 0 ? '#ffedd5' : '#f3f4f6',
+    iconColor: props.pendingOrdersCount > 0 ? '#c2410c' : '#6b7280',
   },
   {
-    key: 'lowStock', title: 'SP sắp / hết hàng',
+    key: 'lowStock',
+    title: 'Sản phẩm sắp hết / hết hàng',
     value: String(props.lowStockData.length),
-    growth: props.lowStockData.length > 0 ? 'Cần xử lý' : '',
-    note: 'Cần nhập thêm hàng',
+    badge: props.lowStockData.length > 0 ? 'Cần nhập thêm' : '',
+    badgeClass: 'badge-warning',
+    note: props.lowStockData.length > 0
+      ? `${props.lowStockData.filter(i => i.status === 'Hết hàng').length} sản phẩm hết hàng · ${props.lowStockData.filter(i => i.status !== 'Hết hàng').length} sắp hết`
+      : 'Tồn kho đang ở mức an toàn',
     icon: 'bi bi-archive',
     type: props.lowStockData.length > 0 ? 'warning' : 'normal',
     link: null, action: 'lowStock',
-  },
-  {
-    key: 'alerts', title: 'Cảnh báo tồn kho',
-    value: String(inventoryAlerts.value.length),
-    growth: inventoryAlerts.value.length > 0 ? 'Mới' : '',
-    note: inventoryAlerts.value.length > 0 ? inventoryAlerts.value[0].title : 'Không có cảnh báo',
-    icon: 'bi bi-bell',
-    type: inventoryAlerts.value.length > 0 ? 'warning' : 'normal',
-    link: null, action: inventoryAlerts.value.length > 0 ? 'lowStock' : null,
+    bg: props.lowStockData.length > 0
+      ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'
+      : 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)',
+    iconBg: props.lowStockData.length > 0 ? '#ffedd5' : '#86efac',
+    iconColor: props.lowStockData.length > 0 ? '#c2410c' : '#14532d',
   },
 ])
 </script>
@@ -120,11 +183,10 @@ const kpiItems = computed(() => [
   gap: 16px;
 }
 
-.kpi-grid .kpi-card {
-  background: #fff;
-  border: 1px solid #ffe0ec;
-  box-shadow: 0 2px 12px rgba(37, 99, 235, 0.06);
-  min-height: 170px;
+.kpi-card {
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.05);
+  min-height: 160px;
   border-radius: 22px;
   padding: 20px;
   display: flex;
@@ -135,28 +197,20 @@ const kpiItems = computed(() => [
   color: inherit;
 }
 
-.kpi-grid .kpi-card.clickable {
-  cursor: pointer;
-}
-
-.kpi-grid .kpi-card.clickable:hover {
+.kpi-card.clickable { cursor: pointer; }
+.kpi-card.clickable:hover {
   transform: translateY(-4px);
-  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.1);
 }
 
-.kpi-grid .kpi-card.warning {
-  background: #fff7ed;
-  border-color: #fed7aa;
-}
-
-.kpi-grid .kpi-top {
+.kpi-top {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.kpi-grid .kpi-icon {
+.kpi-icon {
   width: 46px;
   height: 46px;
   min-width: 46px;
@@ -164,61 +218,82 @@ const kpiItems = computed(() => [
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: none;
   font-size: 20px;
+  flex: none;
 }
 
-.kpi-grid .kpi-icon::before {
-  display: block;
-  line-height: 1;
-}
+.kpi-icon::before { display: block; line-height: 1; }
 
-.kpi-grid .kpi-top small {
+/* Badge cảnh báo */
+.kpi-top small {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   padding: 5px 10px;
   border-radius: 999px;
-  background: #ecfdf5;
-  color: #047857;
   font-size: 12px;
   font-weight: 900;
 }
 
-.kpi-grid .kpi-card.warning .kpi-top small {
-  background: #ffedd5;
-  color: #c2410c;
-}
+.badge-warning { background: rgba(0,0,0,0.08); color: #c2410c; }
 
-.kpi-grid .kpi-card p {
+/* Body */
+.kpi-body { display: flex; flex-direction: column; gap: 2px; }
+
+.kpi-title {
   margin: 0;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   color: #6b7280;
 }
 
-.kpi-grid .kpi-card strong {
+.kpi-value {
   display: block;
   margin-top: 4px;
   color: #111827;
-  font-size: 20px;
-  line-height: 1.1;
+  font-size: 22px;
+  line-height: 1.15;
   font-weight: 900;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.kpi-grid .kpi-card span {
-  display: block;
-  margin-top: 8px;
+.kpi-note {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
   font-size: 12px;
   font-weight: 700;
   color: #6b7280;
+  flex-wrap: wrap;
 }
 
-@media (max-width: 992px) {
-  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+/* Trend inline */
+.trend-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: #15803d;
+  font-weight: 900;
+  font-size: 13px;
 }
 
-@media (max-width: 600px) {
-  .kpi-grid { grid-template-columns: 1fr; }
+.trend-down {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: #b91c1c;
+  font-weight: 900;
+  font-size: 13px;
 }
+
+.trend-neutral {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+@media (max-width: 992px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .kpi-grid { grid-template-columns: 1fr; } }
 </style>

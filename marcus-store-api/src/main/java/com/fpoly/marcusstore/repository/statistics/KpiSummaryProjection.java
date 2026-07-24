@@ -6,4 +6,5 @@ public interface KpiSummaryProjection {
     BigDecimal getTotalRevenue();
     Long getTotalOrders();
     Long getTotalProductsSold();
+    Long getCompletedOrders();
 }
