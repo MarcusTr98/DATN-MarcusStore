@@ -80,8 +80,9 @@ const periodTitle = computed(() => {
     case '7 ngày qua':  return '7 ngày qua'
     case '30 ngày qua': return '30 ngày qua'
     case 'tuần này':    return 'tuần này'
+    case 'tháng này':   return 'tháng này'
     case 'năm nay':     return 'năm nay'
-    default:            return 'tháng này'
+    default:            return props.periodLabel  // FIX: custom date hiển thị đúng label
   }
 })
 

@@ -274,11 +274,15 @@ const statusOptions = computed(() => {
 
 // ── fetch ────────────────────────────────────────────────────
 async function fetchTableData() {
-  const period = filters.date || props.selectedTime || 'month'
-  const sd = props.customDate || ''
-  const ed = props.customDate || ''
+  // FIX: tách rõ period và customDate
+  // Nếu có customDate → truyền startDate/endDate, period để 'today' (không ảnh hưởng vì backend ưu tiên startDate/endDate)
+  // Nếu không có customDate → dùng filters.date (preset) hoặc selectedTime
+  const hasCustomDate = !!props.customDate
+  const period  = hasCustomDate ? 'today' : (filters.date || props.selectedTime || 'month')
+  const sd      = hasCustomDate ? props.customDate : ''
+  const ed      = hasCustomDate ? props.customDate : ''
 
-  isLoading.value  = true
+  isLoading.value   = true
   currentPage.value = 1
   try {
     let res
@@ -338,8 +342,9 @@ watch(() => props.selectedTime, (val) => {
   fetchTableData()
 })
 
-watch(() => props.customDate, (val) => {
-  filters.date = val || props.selectedTime
+watch(() => props.customDate, () => {
+  // FIX: không gán customDate vào filters.date nữa
+  // fetchTableData sẽ tự đọc props.customDate trực tiếp
   fetchTableData()
 })
 
