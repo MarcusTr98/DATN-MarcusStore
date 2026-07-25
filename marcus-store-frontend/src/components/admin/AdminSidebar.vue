@@ -106,7 +106,15 @@
     <i class="bi bi-clock-history menu-icon"></i>
     <span>Quản lý thao tác</span>
   </router-link>
-
+    <router-link
+    v-if="canAccessRoute('/admin/reviews')"
+    to="/admin/reviews"
+    class="menu-item"
+    active-class="active"
+  >
+    <i class="bi bi-star menu-icon"></i>
+    <span>Quản lý đánh giá & bình luận</span>
+  </router-link>
     </div>
 
     <div v-if="showHeThong" class="menu-section">
@@ -267,7 +275,8 @@ const showNoiDung = computed(() => {
 const showBaoCao = computed(() => {
   return (
     canAccessRoute("/admin/finance-reports") ||
-    canAccessRoute("/admin/activity-log")
+    canAccessRoute("/admin/activity-log") ||
+    canAccessRoute("/admin/reviews")
   );
 });
 
