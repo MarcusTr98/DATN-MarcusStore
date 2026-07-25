@@ -12,9 +12,12 @@
               <p>Theo dõi giao dịch thu hộ, thanh toán và hoàn tiền trong hệ thống.</p>
             </div>
           </div>
-          <div class="d-flex align-items-center gap-3">
-            <div class="dynamic-total" v-if="filteredTotal > 0">
-              Tổng giá trị lọc: <strong>{{ formatCurrency(filteredTotal) }}</strong>
+          <div class="hero-actions">
+            <div class="dynamic-total" v-if="filteredTransactions.length > 0">
+              Dòng tiền ròng theo bộ lọc:
+              <strong :class="filteredTotal < 0 ? 'amount-outflow' : 'amount-inflow'">
+                {{ formatCurrencyVnd(filteredTotal) }}
+              </strong>
             </div>
             <button
               @click="handleExportFilteredExcel"
@@ -40,6 +43,20 @@
             <strong>{{ stats.total }}</strong>
           </div>
         </div>
+        <div class="stat-card stat-card-money-in">
+          <div class="stat-icon stat-icon-green"><i class="bi bi-arrow-down-left-circle"></i></div>
+          <div class="stat-body">
+            <span>Tiền vào thành công</span>
+            <strong class="amount-inflow">{{ formatCurrencyVnd(stats.successfulInflow) }}</strong>
+          </div>
+        </div>
+        <div class="stat-card stat-card-money-out">
+          <div class="stat-icon stat-icon-red"><i class="bi bi-arrow-up-right-circle"></i></div>
+          <div class="stat-body">
+            <span>Đã hoàn thành công</span>
+            <strong class="amount-outflow">-{{ formatCurrencyVnd(stats.successfulRefund) }}</strong>
+          </div>
+        </div>
         <div class="stat-card">
           <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle"></i></div>
           <div class="stat-body">
@@ -57,8 +74,10 @@
         <div class="stat-card">
           <div class="stat-icon stat-icon-navy"><i class="bi bi-cash-stack"></i></div>
           <div class="stat-body">
-            <span>Tổng giá trị (VNĐ)</span>
-            <strong>{{ formatCurrency(stats.totalAmount) }}</strong>
+            <span>Dòng tiền ròng</span>
+            <strong :class="stats.totalAmount < 0 ? 'amount-outflow' : 'amount-inflow'">
+              {{ formatCurrencyVnd(stats.totalAmount) }}
+            </strong>
           </div>
         </div>
       </div>
@@ -66,12 +85,15 @@
       <!-- Mini Chart (Stacked Bar) -->
       <div class="chart-panel" v-if="filteredTransactions.length > 0">
         <div class="chart-header">
-          <i class="bi bi-bar-chart-fill"></i> Phân bổ dòng tiền theo trạng thái
-          <span class="chart-subnote">(theo khoảng ngày đang lọc)</span>
+          <div>
+            <i class="bi bi-bar-chart-fill"></i> Phân bổ dòng tiền
+            <span class="chart-subnote">{{ chartPeriodLabel }}</span>
+          </div>
+          <span class="chart-unit">Đơn vị: VND</span>
         </div>
         <apexchart
           type="bar"
-          height="220"
+          height="280"
           :options="chartOptions"
           :series="chartSeries"
         ></apexchart>
@@ -100,7 +122,7 @@
               <option value="">Tất cả</option>
               <option value="COD_COLLECTION">Thu hộ (COD)</option>
               <option value="VNPAY_PAYMENT">Thanh toán (VNPAY)</option>
-              <option value="REFUND_PENDING">Chờ hoàn tiền</option>
+              <option value="REFUND">Hoàn tiền</option>
             </select>
           </div>
 
@@ -118,13 +140,61 @@
             <div class="d-flex justify-content-between align-items-center mb-1">
               <label class="form-label mb-0">Thời gian</label>
               <div class="quick-dates">
-                <button @click="applyDatePreset('today')" class="btn-quick-date">Hôm nay</button>
-                <button @click="applyDatePreset('7days')" class="btn-quick-date">7 Ngày</button>
-                <button @click="applyDatePreset('thisMonth')" class="btn-quick-date">
+                <button
+                  type="button"
+                  @click="applyDatePreset('yesterday')"
+                  class="btn-quick-date"
+                  :class="{ active: activeDatePreset === 'yesterday' }"
+                >
+                  Hôm qua
+                </button>
+                <button
+                  type="button"
+                  @click="applyDatePreset('today')"
+                  class="btn-quick-date"
+                  :class="{ active: activeDatePreset === 'today' }"
+                >
+                  Hôm nay
+                </button>
+                <button
+                  type="button"
+                  @click="applyDatePreset('7days')"
+                  class="btn-quick-date"
+                  :class="{ active: activeDatePreset === '7days' }"
+                >
+                  7 ngày qua
+                </button>
+                <button
+                  type="button"
+                  @click="applyDatePreset('30days')"
+                  class="btn-quick-date"
+                  :class="{ active: activeDatePreset === '30days' }"
+                >
+                  30 ngày qua
+                </button>
+                <button
+                  type="button"
+                  @click="applyDatePreset('thisMonth')"
+                  class="btn-quick-date"
+                  :class="{ active: activeDatePreset === 'thisMonth' }"
+                >
                   Tháng này
                 </button>
-                <button @click="applyDatePreset('lastMonth')" class="btn-quick-date">
+                <button
+                  type="button"
+                  @click="applyDatePreset('lastMonth')"
+                  class="btn-quick-date"
+                  :class="{ active: activeDatePreset === 'lastMonth' }"
+                >
                   Tháng trước
+                </button>
+                <button
+                  type="button"
+                  @click="applyDatePreset('year')"
+                  class="btn-quick-date"
+                  :class="{ active: activeDatePreset === 'year' }"
+                >
+                  Năm nay
                 </button>
               </div>
             </div>
@@ -133,14 +203,14 @@
                 v-model="filters.fromDate"
                 type="date"
                 class="form-control"
-                @change="onFilterChange"
+                @change="onDateFilterChange"
                 title="Từ ngày"
               />
               <input
                 v-model="filters.toDate"
                 type="date"
                 class="form-control"
-                @change="onFilterChange"
+                @change="onDateFilterChange"
                 title="Đến ngày"
               />
               <button class="btn-soft" @click="resetFilters" title="Đặt lại bộ lọc">
@@ -162,7 +232,7 @@
 
                 <th>Mã Đơn</th>
                 <th>Loại Giao Dịch</th>
-                <th class="text-end">Số Tiền (VNĐ)</th>
+                <th class="text-end">Ảnh hưởng dòng tiền</th>
                 <th>Trạng Thái</th>
                 <th>Thời Gian</th>
                 <th class="text-center">Thao tác</th>
@@ -170,12 +240,12 @@
             </thead>
             <tbody>
               <tr v-if="loading">
-                <td colspan="7" class="text-center py-4">
+                <td colspan="8" class="text-center py-4">
                   <i class="bi bi-arrow-repeat spin"></i> Đang tải dữ liệu...
                 </td>
               </tr>
               <tr v-else-if="pagedTransactions.length === 0">
-                <td colspan="7" class="text-center py-4">
+                <td colspan="8" class="text-center py-4">
                   <i class="bi bi-inbox" style="font-size: 1.6rem; color: #9db8de"></i>
                   <div class="mt-2" style="color: #6b7280">Không có giao dịch nào phù hợp.</div>
                 </td>
@@ -204,7 +274,16 @@
                     {{ formatType(item.type) }}
                   </span>
                 </td>
-                <td class="text-end text-danger fw-bold">{{ formatCurrency(item.amount) }}</td>
+                <td class="text-end">
+                  <!-- Marcus sửa: chỉ SUCCESS mới tác động tiền thật; pending/failed
+                       hiển thị số tiền yêu cầu nhưng không mang dấu cộng/trừ. -->
+                  <strong :class="getAmountClass(item)">
+                    {{ formatTransactionAmount(item) }}
+                  </strong>
+                  <small v-if="item.status !== 'SUCCESS'" class="amount-caption">
+                    {{ getAmountCaption(item) }}
+                  </small>
+                </td>
                 <td>
                   <span :class="['badge', getStatusClass(item.status)]">
                     {{ formatStatus(item.status) }}
@@ -343,8 +422,13 @@
           </div>
 
           <div class="amount-box">
-            <span class="detail-label">Số tiền</span>
-            <strong class="amount-value">{{ formatCurrency(selectedTransaction?.amount) }}</strong>
+            <span class="detail-label">Ảnh hưởng dòng tiền</span>
+            <strong class="amount-value" :class="getAmountClass(selectedTransaction)">
+              {{ formatTransactionAmount(selectedTransaction) }} VND
+            </strong>
+            <small v-if="selectedTransaction?.status !== 'SUCCESS'" class="amount-caption">
+              {{ getAmountCaption(selectedTransaction) }} — chưa ảnh hưởng dòng tiền thực tế
+            </small>
           </div>
 
           <div class="note-box">
@@ -413,6 +497,8 @@ const selectedTransaction = ref(null)
 const keywordInput = ref('')
 let searchTimeout = null
 const filters = reactive({ keyword: '', type: '', status: '', fromDate: '', toDate: '' })
+// Marcus thêm: mặc định trang đối soát mở ở 7 ngày gần nhất.
+const activeDatePreset = ref('7days')
 
 // Phân trang
 const currentPage = ref(1)
@@ -433,7 +519,7 @@ const showToast = (type, title, message) => {
 const fetchTransactions = async () => {
   loading.value = true
   try {
-    const res = await financialApi.getTransactions()
+    const res = await financialApi.getTransactions(filters.fromDate, filters.toDate)
     // Lấy đúng mảng transactions từ response
     const data = res.data?.transactions || res.data || []
 
@@ -463,32 +549,50 @@ const onSearchInput = (e) => {
 
 const applyDatePreset = (preset) => {
   const today = new Date()
-  filters.toDate = today.toISOString().split('T')[0]
+  activeDatePreset.value = preset
+  // Marcus sửa: input type=date phải dùng ngày local, tránh lệch ngày do UTC+7.
+  filters.toDate = formatLocalDateInput(today)
 
-  if (preset === 'today') {
+  if (preset === 'yesterday') {
+    const yesterday = new Date(today)
+    yesterday.setDate(today.getDate() - 1)
+    filters.fromDate = formatLocalDateInput(yesterday)
+    filters.toDate = filters.fromDate
+  } else if (preset === 'today') {
     filters.fromDate = filters.toDate
   } else if (preset === '7days') {
-    const past7 = new Date()
+    const past7 = new Date(today)
     past7.setDate(today.getDate() - 6)
-    filters.fromDate = past7.toISOString().split('T')[0]
+    filters.fromDate = formatLocalDateInput(past7)
+  } else if (preset === '30days') {
+    const past30 = new Date(today)
+    past30.setDate(today.getDate() - 29)
+    filters.fromDate = formatLocalDateInput(past30)
   } else if (preset === 'thisMonth') {
-    // Tháng này: lấy trọn từ ngày 1 đến ngày cuối cùng của tháng (không dừng ở hôm nay)
+    // Marcus sửa: tháng này tính từ ngày 1 đến hôm nay, không bao gồm ngày tương lai.
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-    filters.fromDate = firstDay.toISOString().split('T')[0]
-    filters.toDate = lastDay.toISOString().split('T')[0]
+    filters.fromDate = formatLocalDateInput(firstDay)
   } else if (preset === 'lastMonth') {
-    // Tháng trước: cả fromDate và toDate đều thuộc tháng trước, không phải hôm nay
     const firstDayLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1)
     const lastDayLastMonth = new Date(today.getFullYear(), today.getMonth(), 0)
-    filters.fromDate = firstDayLastMonth.toISOString().split('T')[0]
-    filters.toDate = lastDayLastMonth.toISOString().split('T')[0]
+    filters.fromDate = formatLocalDateInput(firstDayLastMonth)
+    filters.toDate = formatLocalDateInput(lastDayLastMonth)
+  } else if (preset === 'year') {
+    filters.fromDate = formatLocalDateInput(new Date(today.getFullYear(), 0, 1))
   }
   currentPage.value = 1
+  fetchTransactions()
 }
 
 const onFilterChange = () => {
   currentPage.value = 1
+}
+
+const onDateFilterChange = () => {
+  // Marcus thêm: nhập ngày thủ công vẫn giữ nguyên và gọi lại query backend.
+  activeDatePreset.value = ''
+  currentPage.value = 1
+  fetchTransactions()
 }
 
 const resetFilters = () => {
@@ -496,9 +600,8 @@ const resetFilters = () => {
   filters.keyword = ''
   filters.type = ''
   filters.status = ''
-  filters.fromDate = ''
-  filters.toDate = ''
   currentPage.value = 1
+  applyDatePreset('7days')
 }
 
 // COMPUTED: LỌC & TỔNG TIỀN ĐỘNG
@@ -513,10 +616,11 @@ const filteredTransactions = computed(() => {
     if (filters.type && item.type !== filters.type) return false
     if (filters.status && item.status !== filters.status) return false
     if (filters.fromDate) {
-      if (new Date(item.createdAt) < new Date(filters.fromDate)) return false
+      // Marcus sửa: parse ngày bắt đầu theo local để không bỏ sót giao dịch 00:00–06:59.
+      if (new Date(item.createdAt) < parseLocalDate(filters.fromDate)) return false
     }
     if (filters.toDate) {
-      const to = new Date(filters.toDate)
+      const to = parseLocalDate(filters.toDate)
       to.setHours(23, 59, 59, 999)
       if (new Date(item.createdAt) > to) return false
     }
@@ -525,9 +629,13 @@ const filteredTransactions = computed(() => {
 })
 
 const filteredTotal = computed(() => {
-  return filteredTransactions.value
-    .filter((t) => t.status === 'SUCCESS')
-    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  return (
+    filteredTransactions.value
+      .filter((t) => t.status === 'SUCCESS')
+      // Marcus sửa: chỉ SUCCESS mới phát sinh tiền; payment/COD là tiền vào,
+      // REFUND là tiền ra.
+      .reduce((sum, t) => sum + getSuccessfulCashFlowAmount(t), 0)
+  )
 })
 
 // MODAL & UTILS
@@ -562,14 +670,19 @@ const handleExportFilteredExcel = () => {
     }
 
     const BOM = '\uFEFF'
-    let csvContent = BOM + 'STT,Mã Đơn,Loại Giao Dịch,Số Tiền,Trạng Thái,Ghi Chú,Thời Gian\n'
+    // Marcus sửa: tách số tiền yêu cầu và ảnh hưởng dòng tiền để pending/failed
+    // không bị hiểu nhầm là tiền đã cộng hoặc trừ.
+    let csvContent =
+      BOM +
+      'STT,Mã Đơn,Loại Giao Dịch,Số Tiền Yêu Cầu,Ảnh Hưởng Dòng Tiền,Trạng Thái,Ghi Chú,Thời Gian\n'
 
     filteredTransactions.value.forEach((item, index) => {
       const row = [
         index + 1,
         item.orderCode,
         formatType(item.type),
-        item.amount,
+        Number(item.amount) || 0,
+        getSuccessfulCashFlowAmount(item),
         formatStatus(item.status),
         `"${item.note ? item.note.replace(/"/g, '""') : ''}"`,
         formatDate(item.createdAt),
@@ -601,6 +714,44 @@ const parseLocalDate = (str) => {
   return new Date(y, m - 1, d)
 }
 
+// Marcus thêm: định dạng YYYY-MM-DD theo múi giờ máy người dùng, không qua UTC.
+const formatLocalDateInput = (date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// Marcus thêm: chỉ giao dịch thành công mới ảnh hưởng dòng tiền thực tế.
+const getSuccessfulCashFlowAmount = (transaction) => {
+  if (transaction?.status !== 'SUCCESS') return 0
+  const amount = Number(transaction?.amount) || 0
+  return transaction?.type === 'REFUND' ? -amount : amount
+}
+
+// Marcus thêm: phân biệt tiền thật với số tiền đang chờ hoặc đã xử lý thất bại.
+const formatTransactionAmount = (transaction) => {
+  const amount = Number(transaction?.amount) || 0
+  if (transaction?.status !== 'SUCCESS') return formatCurrency(amount)
+  const sign = transaction?.type === 'REFUND' ? '-' : '+'
+  return `${sign}${formatCurrency(amount)}`
+}
+
+const getAmountClass = (transaction) => {
+  if (transaction?.status !== 'SUCCESS') return 'amount-neutral'
+  return transaction?.type === 'REFUND' ? 'amount-outflow' : 'amount-inflow'
+}
+
+const getAmountCaption = (transaction) => {
+  if (transaction?.status === 'PENDING') {
+    return transaction?.type === 'REFUND' ? 'Dự kiến hoàn' : 'Chờ thu tiền'
+  }
+  if (transaction?.status === 'FAILED') {
+    return transaction?.type === 'REFUND' ? 'Không hoàn được' : 'Không thu được'
+  }
+  return ''
+}
+
 const MAX_CONTINUOUS_CHART_DAYS = 31 // đủ cho preset "Tháng này"
 
 // Gom toàn bộ logic group-by-ngày vào MỘT computed duy nhất, dùng chung
@@ -608,20 +759,32 @@ const MAX_CONTINUOUS_CHART_DAYS = 31 // đủ cho preset "Tháng này"
 // và luôn bám sát filteredTransactions (đúng bộ lọc đang chọn).
 const chartData = computed(() => {
   const grouped = {}
+  const isYearView = activeDatePreset.value === 'year'
 
   filteredTransactions.value.forEach((t) => {
-    const dStr = new Date(t.createdAt).toLocaleDateString('vi-VN')
-    if (!grouped[dStr]) grouped[dStr] = { SUCCESS: 0, PENDING: 0, FAILED: 0 }
-    if (grouped[dStr][t.status] !== undefined) {
-      grouped[dStr][t.status] += Number(t.amount) || 0
+    const transactionDate = new Date(t.createdAt)
+    // Marcus sửa: preset Năm nay gom theo tháng; các preset khác vẫn gom theo ngày.
+    const groupKey = isYearView
+      ? `T${transactionDate.getMonth() + 1}`
+      : transactionDate.toLocaleDateString('vi-VN')
+    if (!grouped[groupKey]) {
+      grouped[groupKey] = { INFLOW: 0, REFUND: 0, PENDING: 0, FAILED: 0 }
+    }
+    const amount = Number(t.amount) || 0
+    if (t.status === 'SUCCESS') {
+      if (t.type === 'REFUND') grouped[groupKey].REFUND += amount
+      else grouped[groupKey].INFLOW += amount
+    } else if (grouped[groupKey][t.status] !== undefined) {
+      grouped[groupKey][t.status] += amount
     }
   })
 
-  let categories = null
+  // Marcus thêm: biểu đồ năm luôn hiện đủ T1–T12, kể cả tháng chưa có giao dịch.
+  let categories = isYearView ? Array.from({ length: 12 }, (_, index) => `T${index + 1}`) : null
 
   // Khi có bộ lọc khoảng ngày (kể cả preset Hôm nay / 7 Ngày / Tháng này), hiển thị
   // ĐỦ các ngày trong khoảng đó => ngày không có giao dịch vẫn hiện với giá trị 0
-  if (filters.fromDate && filters.toDate) {
+  if (!isYearView && filters.fromDate && filters.toDate) {
     const start = parseLocalDate(filters.fromDate)
     const end = parseLocalDate(filters.toDate)
     const dayCount = Math.round((end - start) / 86400000) + 1
@@ -644,17 +807,30 @@ const chartData = computed(() => {
 
   return {
     categories,
-    successData: categories.map((d) => grouped[d]?.SUCCESS || 0),
+    inflowData: categories.map((d) => grouped[d]?.INFLOW || 0),
+    refundData: categories.map((d) => grouped[d]?.REFUND || 0),
     pendingData: categories.map((d) => grouped[d]?.PENDING || 0),
     failedData: categories.map((d) => grouped[d]?.FAILED || 0),
   }
 })
 
 const chartSeries = computed(() => [
-  { name: 'Thành công', data: chartData.value.successData },
+  { name: 'Tiền vào thành công', data: chartData.value.inflowData },
+  { name: 'Hoàn tiền thành công', data: chartData.value.refundData },
   { name: 'Đang treo', data: chartData.value.pendingData },
   { name: 'Thất bại/Hủy', data: chartData.value.failedData },
 ])
+
+// Marcus thêm: mô tả đúng cấp thời gian đang hiển thị trên biểu đồ.
+const chartPeriodLabel = computed(() =>
+  activeDatePreset.value === 'year'
+    ? `(theo tháng trong năm ${new Date().getFullYear()})`
+    : `(từ ${formatDisplayDate(filters.fromDate)} đến ${formatDisplayDate(filters.toDate)})`,
+)
+
+// Marcus sửa: trục tung luôn dùng dấu chấm phân cách và ghi rõ đơn vị VND.
+const formatAxisVnd = (value) =>
+  `${new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(Math.round(value || 0))} VND`
 
 const chartOptions = computed(() => {
   const categories = chartData.value.categories
@@ -669,7 +845,7 @@ const chartOptions = computed(() => {
       fontFamily: { family: 'Be Vietnam Pro', fallback: ['sans-serif'] },
     },
     plotOptions: { bar: { columnWidth: '40%', borderRadius: 4 } },
-    colors: ['#1f9d5e', '#f29c1f', '#e0445c'],
+    colors: ['#08783e', '#dc2626', '#f59e0b', '#64748b'],
     xaxis: {
       categories,
       labels: {
@@ -680,19 +856,15 @@ const chartOptions = computed(() => {
     },
     yaxis: {
       labels: {
-        formatter: (val) => {
-          if (val >= 1000000) {
-            return (val / 1000000).toFixed(0) + ' Tr'
-          }
-          return new Intl.NumberFormat('vi-VN').format(val)
-        },
+        minWidth: 110,
+        maxWidth: 160,
+        formatter: formatAxisVnd,
+        style: { colors: ['#64748b'], fontSize: '11px', fontWeight: 600 },
       },
     },
     tooltip: {
       y: {
-        formatter: function (val) {
-          return new Intl.NumberFormat('vi-VN').format(val) + ' VNĐ'
-        },
+        formatter: formatAxisVnd,
       },
     },
     legend: { position: 'top', horizontalAlign: 'right' },
@@ -754,23 +926,35 @@ watch(totalPages, (val) => {
 // Thống kê tổng quan
 const stats = computed(() => {
   const dataset = filteredTransactions.value
+  const successfulInflow = dataset
+    .filter((t) => t.status === 'SUCCESS' && t.type !== 'REFUND')
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+  const successfulRefund = dataset
+    .filter((t) => t.status === 'SUCCESS' && t.type === 'REFUND')
+    .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
   return {
     total: dataset.length,
     success: dataset.filter((t) => t.status === 'SUCCESS').length,
     pending: dataset.filter((t) => t.status === 'PENDING').length,
-    totalAmount: dataset
-      .filter((t) => t.status === 'SUCCESS')
-      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0),
+    successfulInflow,
+    successfulRefund,
+    totalAmount: successfulInflow - successfulRefund,
   }
 })
 
 // UTILS FORMATTING
 const formatCurrency = (value) => new Intl.NumberFormat('vi-VN').format(value || 0)
+const formatCurrencyVnd = (value) => `${formatCurrency(value)} VND`
+const formatDisplayDate = (date) => {
+  if (!date) return '—'
+  const [year, month, day] = date.split('-')
+  return `${day}/${month}/${year}`
+}
 const formatDate = (dateString) => (dateString ? new Date(dateString).toLocaleString('vi-VN') : '')
 const formatType = (type) => {
   if (type === 'COD_COLLECTION') return 'Thu hộ (COD)'
   if (type === 'VNPAY_PAYMENT') return 'Thanh toán (VNPAY)'
-  if (type === 'REFUND_PENDING') return 'Chờ hoàn tiền'
+  if (type === 'REFUND') return 'Hoàn tiền'
   return type
 }
 
@@ -782,7 +966,7 @@ const formatStatus = (status) => {
 }
 
 const getTypeClass = (type) =>
-  type === 'VNPAY_PAYMENT' ? 'bg-primary' : type === 'REFUND_PENDING' ? 'bg-warning' : 'bg-info'
+  type === 'VNPAY_PAYMENT' ? 'bg-primary' : type === 'REFUND' ? 'bg-warning' : 'bg-info'
 
 const getStatusClass = (status) =>
   status === 'SUCCESS' ? 'bg-success' : status === 'PENDING' ? 'bg-warning' : 'bg-danger'
@@ -802,7 +986,8 @@ const confirmReconciliation = async (item) => {
 }
 
 onMounted(() => {
-  fetchTransactions()
+  // Marcus thêm: vào trang luôn hiển thị đúng 7 ngày tính cả hôm nay.
+  applyDatePreset('7days')
 })
 </script>
 
@@ -880,12 +1065,25 @@ onMounted(() => {
 }
 
 /* Dynamic Total & Excel Btn */
+.hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-left: auto;
+}
 .dynamic-total {
   background: rgba(0, 0, 0, 0.15);
   color: #fff;
   padding: 10px 16px;
   border-radius: 8px;
   font-size: 0.9rem;
+}
+.dynamic-total .amount-inflow {
+  color: #bbf7d0;
+}
+.dynamic-total .amount-outflow {
+  color: #fecaca;
 }
 .btn-export-excel {
   display: inline-flex;
@@ -920,7 +1118,7 @@ onMounted(() => {
 /* Stats */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
 }
 .stat-card {
@@ -960,6 +1158,9 @@ onMounted(() => {
 .stat-icon-amber {
   background: linear-gradient(135deg, #ffb547, #f29c1f);
 }
+.stat-icon-red {
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+}
 .stat-icon-navy {
   background: linear-gradient(135deg, #1c64d6, #0b3d91);
 }
@@ -967,6 +1168,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 .stat-body span {
   font-size: 0.8rem;
@@ -977,6 +1179,13 @@ onMounted(() => {
   font-size: 1.4rem;
   font-weight: 800;
   color: #0f2c5c;
+  overflow-wrap: anywhere;
+}
+.stat-body strong.amount-inflow {
+  color: #08783e;
+}
+.stat-body strong.amount-outflow {
+  color: #dc2626;
 }
 .fin-accent {
   color: #1c64d6;
@@ -993,16 +1202,32 @@ onMounted(() => {
 .chart-header {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 16px;
   font-weight: 700;
   color: #1f3a63;
   margin-bottom: 10px;
   font-size: 0.95rem;
 }
+.chart-header > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .chart-subnote {
   font-weight: 500;
   font-size: 0.78rem;
   color: #8ba0c2;
+}
+.chart-unit {
+  flex-shrink: 0;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #1c64d6;
+  font-size: 0.72rem;
+  font-weight: 750;
 }
 
 /* Filters */
@@ -1015,7 +1240,7 @@ onMounted(() => {
 }
 .toolbar-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 2fr;
+  grid-template-columns: 1.4fr 0.75fr 0.75fr 2.4fr;
   gap: 20px;
   align-items: end;
 }
@@ -1081,6 +1306,8 @@ onMounted(() => {
 }
 .quick-dates {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
 }
 .btn-quick-date {
@@ -1095,7 +1322,8 @@ onMounted(() => {
     background-color 0.15s ease,
     color 0.15s ease;
 }
-.btn-quick-date:hover {
+.btn-quick-date:hover,
+.btn-quick-date.active {
   background: #2f80ed;
   color: #ffffff;
 }
@@ -1143,6 +1371,26 @@ onMounted(() => {
   color: #1f3a63;
   white-space: nowrap;
 }
+/* Marcus thêm: màu thể hiện hướng tiền chỉ áp dụng cho giao dịch SUCCESS. */
+.amount-inflow {
+  color: #08783e;
+  font-weight: 800;
+}
+.amount-outflow {
+  color: #dc2626;
+  font-weight: 800;
+}
+.amount-neutral {
+  color: #64748b;
+  font-weight: 750;
+}
+.amount-caption {
+  display: block;
+  margin-top: 3px;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 650;
+}
 .financial-table thead th {
   background: linear-gradient(180deg, #eef6ff, #e3effd);
   color: #1c64d6;
@@ -1150,9 +1398,16 @@ onMounted(() => {
   font-weight: 800;
   text-transform: uppercase;
   border-bottom: 1px solid #d6e6fb;
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 .financial-table tbody tr {
+  background: #ffffff;
   transition: background-color 0.12s ease;
+}
+.financial-table tbody tr:nth-child(even) {
+  background: #f9fbff;
 }
 .financial-table tbody tr:hover {
   background: #f5faff;
@@ -1578,6 +1833,9 @@ onMounted(() => {
   .field-dates {
     grid-column: 1 / -1;
   }
+  .chart-header {
+    align-items: flex-start;
+  }
 }
 @media (max-width: 576px) {
   .stats-grid {
@@ -1585,6 +1843,37 @@ onMounted(() => {
   }
   .fin-hero-content {
     padding: 22px;
+  }
+  .hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+  .dynamic-total,
+  .btn-export-excel {
+    width: 100%;
+    text-align: center;
+  }
+  .chart-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toolbar-row {
+    grid-template-columns: 1fr;
+  }
+  .field,
+  .field-keyword,
+  .field-dates {
+    grid-column: 1;
+  }
+  .quick-dates {
+    justify-content: flex-start;
+  }
+  .field-dates > .d-flex:last-child {
+    flex-wrap: wrap;
+  }
+  .field-dates .form-control {
+    min-width: 135px;
   }
   .id-row,
   .badge-row {

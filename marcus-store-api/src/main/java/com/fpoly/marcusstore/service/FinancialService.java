@@ -12,38 +12,59 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class FinancialService {
+        private static final String REFUND = "REFUND";
+        private static final String SUCCESS = "SUCCESS";
+
         private final OrderTransactionRepository transactionRepository;
 
-        // Lọc và kiểm định tính toàn vẹn của dữ liệu đối soát
+        // Marcus sửa: báo cáo tài chính là sổ giao dịch nên phải giữ cả giao dịch
+        // PENDING/FAILED/REFUND, kể cả khi đơn đã hủy hoặc đã được hoàn tiền.
         private List<TransactionResponse> getProcessedTransactions() {
-                List<OrderTransaction> rawTransactions = transactionRepository.findAllTransactionsWithOrder();
+                return getProcessedTransactions(null, null);
+        }
+
+        private List<TransactionResponse> getProcessedTransactions(LocalDate fromDate, LocalDate toDate) {
+                List<OrderTransaction> rawTransactions;
+                if (fromDate != null && toDate != null) {
+                        if (fromDate.isAfter(toDate)) {
+                                throw new IllegalArgumentException("Từ ngày không được lớn hơn đến ngày");
+                        }
+                        // Marcus thêm: dùng khoảng nửa mở để bao trọn 23:59:59.999999999
+                        // của ngày kết thúc mà không cần ép CAST lên cột created_at.
+                        LocalDateTime fromDateTime = fromDate.atStartOfDay();
+                        LocalDateTime toDateTimeExclusive = toDate.plusDays(1).atStartOfDay();
+                        rawTransactions = transactionRepository.findTransactionsWithOrderBetween(
+                                        fromDateTime, toDateTimeExclusive);
+                } else {
+                        rawTransactions = transactionRepository.findAllTransactionsWithOrder();
+                }
 
                 return rawTransactions.stream()
-                                // 1. ĐIỀU KIỆN XUẤT HIỆN: Chỉ xử lý giao dịch có đơn hàng tồn tại
                                 .filter(t -> t.getOrder() != null)
-                                // Phải là đơn Đã thanh toán (Ví dụ: VNPay) HOẶC Đã hoàn thành/Đã giao (Ví dụ:
-                                // COD)
-                                .filter(t -> "PAID".equals(t.getOrder().getPaymentStatus())
-                                                || "COMPLETED".equals(t.getOrder().getOrderStatus())
-                                                || "DELIVERED".equals(t.getOrder().getOrderStatus()))
                                 .map(t -> {
-                                        String actualStatus = t.getStatus();
                                         String note = t.getNote() != null ? t.getNote() : "";
 
                                         BigDecimal orderFinalAmount = t.getOrder().getFinalAmount();
 
-                                        // 2. ĐỐI CHIẾU: Cảnh báo ngay nếu số tiền giao dịch lệch với hóa đơn
-                                        if (orderFinalAmount != null
+                                        // Marcus sửa: giữ nguyên trạng thái thật của transaction; lệch tiền
+                                        // chỉ là cảnh báo đối soát. REFUND có quy tắc số tiền riêng.
+                                        if (!isRefund(t)
+                                                        && orderFinalAmount != null
+                                                        && t.getAmount() != null
                                                         && t.getAmount().compareTo(orderFinalAmount) != 0) {
-                                                actualStatus = "FAILED";
-                                                note = note.isEmpty() ? "Lệch số tiền (Gốc: " + orderFinalAmount + ")"
-                                                                : note + " | Lệch tiền (Gốc: " + orderFinalAmount + ")";
+                                                note = note.isEmpty()
+                                                                ? "Cảnh báo đối soát: lệch số tiền đơn (Gốc: "
+                                                                                + orderFinalAmount + ")"
+                                                                : note + " | Cảnh báo đối soát: lệch tiền đơn (Gốc: "
+                                                                                + orderFinalAmount + ")";
                                         }
                                         return TransactionResponse.builder()
                                                         .transactionId(t.getTransactionId())
@@ -54,7 +75,7 @@ public class FinancialService {
                                                         .orderCode(t.getOrder().getOrderCode())
                                                         .amount(t.getAmount())
                                                         .type(t.getType())
-                                                        .status(actualStatus)
+                                                        .status(t.getStatus())
                                                         .note(note)
                                                         .createdAt(t.getCreatedAt())
                                                         .recipientName(t.getOrder().getRecipientName())
@@ -98,25 +119,52 @@ public class FinancialService {
         }
 
         public FinancialReportResponse getFinancialReport() {
-                // Đồng bộ toàn bộ thống kê dựa trên dữ liệu ĐÃ LỌC và ĐÃ CHUẨN HOÁ
-                List<TransactionResponse> dtoList = getProcessedTransactions();
+                return getFinancialReport(null, null);
+        }
 
-                BigDecimal success = dtoList.stream().filter(t -> "SUCCESS".equals(t.getStatus()))
+        public FinancialReportResponse getFinancialReport(LocalDate fromDate, LocalDate toDate) {
+                List<TransactionResponse> dtoList = getProcessedTransactions(fromDate, toDate);
+
+                // Marcus thêm: tiền vào chỉ gồm giao dịch thu thành công; hoàn tiền
+                // thành công là tiền ra và phải được trừ khỏi dòng tiền ròng.
+                BigDecimal successfulInflow = dtoList.stream()
+                                .filter(t -> SUCCESS.equals(t.getStatus()) && !REFUND.equals(t.getType()))
                                 .map(TransactionResponse::getAmount)
+                                .filter(java.util.Objects::nonNull)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                BigDecimal successfulRefund = dtoList.stream()
+                                .filter(t -> SUCCESS.equals(t.getStatus()) && REFUND.equals(t.getType()))
+                                .map(TransactionResponse::getAmount)
+                                .filter(java.util.Objects::nonNull)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 BigDecimal pending = dtoList.stream().filter(t -> "PENDING".equals(t.getStatus()))
                                 .map(TransactionResponse::getAmount)
+                                .filter(java.util.Objects::nonNull)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
                 BigDecimal failed = dtoList.stream().filter(t -> "FAILED".equals(t.getStatus()))
                                 .map(TransactionResponse::getAmount)
+                                .filter(java.util.Objects::nonNull)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-                long successCount = dtoList.stream().filter(t -> "SUCCESS".equals(t.getStatus())).count();
+                long successCount = dtoList.stream().filter(t -> SUCCESS.equals(t.getStatus())).count();
                 double rate = dtoList.isEmpty() ? 0 : (double) successCount / dtoList.size() * 100;
 
-                return new FinancialReportResponse(dtoList, dtoList.size(), success, pending, failed, rate);
+                return new FinancialReportResponse(
+                                dtoList,
+                                dtoList.size(),
+                                successfulInflow,
+                                successfulRefund,
+                                successfulInflow.subtract(successfulRefund),
+                                pending,
+                                failed,
+                                rate);
+        }
+
+        private static boolean isRefund(OrderTransaction transaction) {
+                return REFUND.equalsIgnoreCase(transaction.getType());
         }
 
         public void updateReconciliationStatus(Integer transactionId, boolean status) {
