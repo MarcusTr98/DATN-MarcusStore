@@ -27,12 +27,6 @@
         <span>Quản lý danh mục</span>
       </router-link>
 
-      <router-link v-if="canAccessRoute('/admin/inventoryManager')" to="/admin/inventoryManager" class="menu-item"
-        active-class="active">
-        <i class="bi bi-box-seam menu-icon" style="font-size: 16px"></i>
-        <span>Quản lý kho</span>
-      </router-link>
-
       <template v-if="showProductParent">
         <div class="menu-item menu-parent" :class="{ active: isProductMenuActive }" @click="toggleProductMenu">
           <img :src="boxIcon" class="menu-icon" />
@@ -49,6 +43,12 @@
             active-class="active">Tạo SKU</router-link>
         </div>
       </template>
+
+      <router-link v-if="canAccessRoute('/admin/inventoryManager')" to="/admin/inventoryManager" class="menu-item"
+        active-class="active">
+        <i class="bi bi-box-seam menu-icon" style="font-size: 16px"></i>
+        <span>Quản lý kho</span>
+      </router-link>
     </div>
 
     <div v-if="showKenhBanHang" class="menu-section">

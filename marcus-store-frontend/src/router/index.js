@@ -273,6 +273,13 @@ const routes = [
         path: 'inventoryManager',
         name: 'InventoryManager',
         component: () => import('@/views/admin/auth/InventoryManager.vue'),
+        meta: { permission: 'INVENTORY_MANAGE' },
+      },
+      {
+        path: 'inventoryManager/imei/:skuId',
+        name: 'InventoryImeiManager',
+        component: () => import('@/views/admin/auth/InventoryImeiManager.vue'),
+        meta: { permission: 'INVENTORY_MANAGE' },
       },
       {
         path: 'activity-log',
