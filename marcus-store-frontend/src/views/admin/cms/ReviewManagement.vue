@@ -26,21 +26,18 @@
     <div class="stats-grid">
 
       <div class="stat-card">
-        <div class="stat-icon total"><i class="fas fa-comments"></i></div>
-        <p>Tổng đánh giá</p>
-        <h2>{{ totalReviews }}</h2>
+        <span>Tổng đánh giá</span>
+        <strong>{{ totalReviews }}</strong>
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon replied"><i class="fas fa-check-circle"></i></div>
-        <p>Đã trả lời</p>
-        <h2 class="pink">{{ repliedReviews }}</h2>
+        <span>Đã trả lời</span>
+        <strong class="text-accent">{{ repliedReviews }}</strong>
       </div>
 
       <div class="stat-card">
-        <div class="stat-icon waiting"><i class="fas fa-hourglass-half"></i></div>
-        <p>Chưa trả lời</p>
-        <h2>{{ notReplyReviews }}</h2>
+        <span>Chưa trả lời</span>
+        <strong>{{ notReplyReviews }}</strong>
       </div>
 
     </div>
@@ -349,7 +346,9 @@ onMounted(loadReviews);
 
 .review-page{
 
-    padding:25px;
+    padding:20px;
+    max-width:1300px;
+    margin:0 auto;
     font-family: -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
 
 }
@@ -366,11 +365,11 @@ onMounted(loadReviews);
 
     background:white;
 
-    border-radius:18px;
+    border-radius:14px;
 
-    padding:28px;
+    padding:20px 24px;
 
-    margin-bottom:25px;
+    margin-bottom:20px;
 
     border:1px solid #ffd7e5;
 
@@ -388,17 +387,17 @@ onMounted(loadReviews);
 
     align-items:center;
 
-    gap:18px;
+    gap:14px;
 
 }
 
 .icon-box{
 
-    width:60px;
+    width:44px;
 
-    height:60px;
+    height:44px;
 
-    border-radius:14px;
+    border-radius:12px;
 
     background: linear-gradient(135deg, #f55d9b, #ef3f89);
 
@@ -410,11 +409,13 @@ onMounted(loadReviews);
 
     align-items:center;
 
-    font-size:26px;
+    font-size:18px;
 
     box-shadow: 0 6px 16px rgba(245,93,155,.3);
 
     transition: transform .25s ease;
+
+    flex-shrink:0;
 
 }
 
@@ -424,24 +425,21 @@ onMounted(loadReviews);
 
 .header-left h2{
 
-    background: linear-gradient(135deg, #f55d9b, #c24f83);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color:#1f2430;
 
     font-weight:800;
 
-    font-size:28px;
+    font-size:19px;
 
-    letter-spacing:-.3px;
+    letter-spacing:-.2px;
 
 }
 
 .header-left p{
 
-    color:#888;
+    color:#828a97;
 
-    font-size:14.5px;
+    font-size:13px;
 
     margin-top:2px;
 
@@ -453,11 +451,11 @@ onMounted(loadReviews);
 
     display:grid;
 
-    grid-template-columns:repeat(3,1fr);
+    grid-template-columns:repeat(3, 1fr);
 
-    gap:20px;
+    gap:16px;
 
-    margin-bottom:25px;
+    margin-bottom:20px;
 
 }
 
@@ -467,92 +465,55 @@ onMounted(loadReviews);
 
     background:white;
 
-    border-radius:18px;
+    border-radius:14px;
 
-    padding:25px;
+    padding:20px 24px;
 
     border:1px solid #ffd7e5;
 
-    overflow:hidden;
+    display:flex;
+
+    flex-direction:column;
+
+    gap:10px;
 
     transition: transform .25s ease, box-shadow .25s ease;
+
+    min-width:0;
 
 }
 
 .stat-card:hover{
 
-    transform: translateY(-4px);
+    transform: translateY(-3px);
 
-    box-shadow: 0 12px 28px rgba(245,93,155,.14);
-
-}
-
-.stat-icon{
-
-    position:absolute;
-
-    top:18px;
-
-    right:18px;
-
-    width:42px;
-
-    height:42px;
-
-    border-radius:12px;
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:center;
-
-    font-size:18px;
+    box-shadow: 0 12px 24px rgba(245,93,155,.12);
 
 }
 
-.stat-icon.total{
-    background:#eef6ff;
-    color:#3b82f6;
-}
+.stat-card span{
 
-.stat-icon.replied{
-    background:#ffe3ef;
-    color:#f55d9b;
-}
-
-.stat-icon.waiting{
-    background:#fff4d8;
-    color:#d08a00;
-}
-
-.stat-card p{
-
-    color:#999;
+    color:#6b7280;
 
     font-weight:600;
 
     font-size:14px;
 
-    text-transform:uppercase;
+}
 
-    letter-spacing:.5px;
+.stat-card strong{
+
+    font-size:32px;
+
+    font-weight:700;
+
+    letter-spacing:-.3px;
+
+    color:#1f2430;
 
 }
 
-.stat-card h2{
-
-    margin-top:10px;
-
-    font-size:38px;
-
-    font-weight:800;
-
-    letter-spacing:-.5px;
-
-}
-
-.pink{
+.text-accent{
 
     color:#f55d9b;
 
@@ -564,19 +525,19 @@ onMounted(loadReviews);
 
     display:grid;
 
-    grid-template-columns:2fr 1fr 1fr 70px;
+    grid-template-columns:2fr 1fr 1fr 56px;
 
-    gap:18px;
+    gap:16px;
 
     background:white;
 
-    border-radius:18px;
+    border-radius:14px;
 
-    padding:20px;
+    padding:18px 20px;
 
     border:1px solid #ffd7e5;
 
-    margin-bottom:25px;
+    margin-bottom:20px;
 
 }
 
@@ -590,15 +551,15 @@ onMounted(loadReviews);
 
 .filter-item label{
 
-    font-size:12.5px;
+    font-size:12px;
 
     color:#d85d95;
 
     font-weight:700;
 
-    letter-spacing:.6px;
+    letter-spacing:.5px;
 
-    margin-bottom:10px;
+    margin-bottom:8px;
 
 }
 
@@ -610,9 +571,9 @@ onMounted(loadReviews);
 
     border:1.5px solid #f3bfd3;
 
-    border-radius:12px;
+    border-radius:10px;
 
-    padding:12px;
+    padding:10px 12px;
 
     transition: border-color .2s ease, box-shadow .2s ease;
 
@@ -627,7 +588,7 @@ onMounted(loadReviews);
 }
 
 .search-box i{
-    color:#f3a4c4;
+    color:#e8779f;
 }
 
 .search-box input{
@@ -640,21 +601,27 @@ onMounted(loadReviews);
 
     margin-left:10px;
 
-    font-size:14.5px;
+    font-size:14px;
 
+    color:#333;
+
+}
+
+.search-box input::placeholder{
+    color:#a6adb8;
 }
 
 select{
 
-    height:48px;
+    height:40px;
 
-    border-radius:12px;
+    border-radius:10px;
 
     border:1.5px solid #f3bfd3;
 
-    padding:0 15px;
+    padding:0 12px;
 
-    font-size:14.5px;
+    font-size:14px;
 
     color:#333;
 
@@ -682,13 +649,17 @@ select:focus{
 
     color:white;
 
-    border-radius:12px;
+    border-radius:10px;
 
-    padding:12px 22px;
+    padding:0 18px;
+
+    height:40px;
 
     cursor:pointer;
 
     font-weight:700;
+
+    font-size:14px;
 
     box-shadow: 0 6px 16px rgba(245,93,155,.28);
 
@@ -726,16 +697,24 @@ select:focus{
 
 }
 
+.filter-action .btn-refresh{
+
+    width:100%;
+
+    padding:0;
+
+}
+
 /* Table + Pagination — dính liền thành 1 khối */
 .table-card{
     background:white;
-    border-radius:18px;
+    border-radius:14px;
     border:1px solid #ffd6e4;
     overflow:hidden;
 }
 .pagination{
 
-    padding:16px 24px;
+    padding:14px 20px;
 
     display:flex;
 
@@ -745,17 +724,13 @@ select:focus{
 
     border-top:1px solid #ffd6e4;
 
-    border-top-left-radius:0;
-
-    border-top-right-radius:0;
-
 }
 
 .left{
 
-    font-size:15px;
+    font-size:14px;
 
-    color:#555;
+    color:#5b6270;
 
 }
 
@@ -773,27 +748,27 @@ select:focus{
 
     align-items:center;
 
-    gap:12px;
+    gap:10px;
 
-    font-size:14px;
+    font-size:13.5px;
 
-    color:#666;
+    color:#5b6270;
 
 }
 
 .right select{
 
-    width:70px;
+    width:62px;
 
-    height:38px;
+    height:34px;
 
     border:1px solid #ffd6e4;
 
-    border-radius:10px;
+    border-radius:8px;
 
-    padding:0 10px;
+    padding:0 8px;
 
-    font-size:14px;
+    font-size:13.5px;
 
     color:#333;
 
@@ -817,15 +792,15 @@ select:focus{
 
     background:white;
 
-    border-radius:10px;
+    border-radius:8px;
 
-    padding:8px 18px;
+    padding:7px 16px;
 
     cursor:pointer;
 
     font-weight:700;
 
-    font-size:14px;
+    font-size:13.5px;
 
     color:#f55d9b;
 
@@ -843,7 +818,7 @@ select:focus{
 
 .right button:disabled{
 
-    color:#bbb;
+    color:#c3c8d1;
 
     border-color:#eee;
 
@@ -855,7 +830,7 @@ select:focus{
 
     font-weight:600;
 
-    color:#888;
+    color:#5b6270;
 
 }
 </style>

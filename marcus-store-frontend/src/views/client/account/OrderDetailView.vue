@@ -188,35 +188,39 @@
                       </div>
                       <strong class="product-total">{{ formatMoney(item.lineTotal) }}</strong>
                        <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
-                      <div class="review-action">
+                     
+                      <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
+                     <div
+    v-if="selectedOrder.orderStatus === 'COMPLETED'"
+    class="review-action"
+>
+    <!-- Chưa đánh giá -->
+    <button
+        v-if="!item.reviewed"
+        class="review-btn"
+        @click="openReview(item)"
+    >
+        Đánh giá
+    </button>
 
-                        <button
-                          v-if="!item.reviewed"
-                          class="review-btn"
-                          @click="openReview(item)"
-                        >
-                          Đánh giá
-                        </button>
+    <!-- Đã đánh giá -->
+    <template v-else>
+        <button
+            class="review-view-btn"
+            @click="viewReview(item)"
+        >
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+            Xem đánh giá
+        </button>
 
-                        <template v-else>
-
-                          <button
-                            class="review-view-btn"
-                            @click="viewReview(item)"
-                          >
-                            Xem đánh giá
-                          </button>
-
-                          <button
-                            class="review-edit-btn"
-                            @click="editReview(item)"
-                          >
-                            Sửa đánh giá
-                          </button>
-
-                        </template>
-
-                      </div>
+        <button
+            class="review-edit-btn"
+            @click="editReview(item)"
+        >
+            Sửa đánh giá
+        </button>
+    </template>
+</div>
                       <!-- ===== Hết vùng thao tác đánh giá ===== -->
 
                     </article>

@@ -125,6 +125,7 @@ const formatDate=(date)=>{
 }
 table{
     width:100%;
+    table-layout:fixed;
     border-collapse:separate;
     border-spacing:0;
 }
@@ -134,14 +135,24 @@ thead{
 }
 
 th{
-    padding:18px;
+    padding:14px 18px;
     color:#c24f83;
-    font-size:13px;
+    font-size:12.5px;
     font-weight:700;
     text-transform:uppercase;
-    letter-spacing:.6px;
+    letter-spacing:.5px;
     text-align:left;
+    white-space:nowrap;
 }
+
+th:nth-child(1){ width:6%; }
+th:nth-child(2){ width:15%; }
+th:nth-child(3){ width:16%; }
+th:nth-child(4){ width:9%; }
+th:nth-child(5){ width:24%; }
+th:nth-child(6){ width:10%; }
+th:nth-child(7){ width:12%; }
+th:nth-child(8){ width:8%; }
 tbody tr{
     transition: background .2s ease;
 }
@@ -151,14 +162,14 @@ tbody tr:hover{
 }
 
 td{
-    padding:18px;
+    padding:14px 18px;
     border-bottom:1px solid #f2f2f2;
-    font-size:14.5px;
+    font-size:14px;
     color:#333;
 }
 
 .idx{
-    color:#bbb;
+    color:#a6adb8;
     font-weight:700;
 }
 
@@ -169,36 +180,37 @@ td{
 
 .customer strong{
     font-weight:700;
+    color:#1f2430;
 }
 
 .customer small{
-    color:#999;
-    font-size:12.5px;
+    color:#8b93a1;
+    font-size:12px;
     margin-top:2px;
 }
 
 .product{
     font-weight:600;
-    color:#444;
+    color:#333;
 }
 
 .comment{
-    max-width:260px;
+    max-width:220px;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
-    color:#666;
+    color:#555;
     font-style:italic;
 }
 
 .date{
-    color:#888;
-    font-size:13.5px;
+    color:#5b6270;
+    font-size:13px;
 }
 
 .star{
     color:#ffb400;
-    font-size:18px;
+    font-size:16px;
     text-shadow: 0 1px 4px rgba(255,180,0,.3);
 }
 
@@ -206,11 +218,12 @@ td{
     display:inline-flex;
     align-items:center;
     gap:6px;
-    padding:6px 14px;
+    padding:5px 12px;
     border-radius:20px;
-    font-size:12.5px;
+    font-size:12px;
     font-weight:700;
     letter-spacing:.2px;
+    white-space:nowrap;
 }
 
 .replied{
@@ -229,15 +242,15 @@ td{
 }
 
 .btn{
-    width:38px;
-    height:38px;
+    width:34px;
+    height:34px;
     border:none;
-    border-radius:10px;
+    border-radius:9px;
     cursor:pointer;
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:14px;
+    font-size:13px;
     transition: transform .15s ease, box-shadow .15s ease;
 }
 
@@ -265,18 +278,19 @@ td{
 
 .empty{
     text-align:center;
-    padding:60px;
-    color:#bbb;
+    padding:50px;
+    color:#a6adb8;
 }
 
 .empty i{
     display:block;
-    font-size:34px;
+    font-size:30px;
     margin-bottom:10px;
+    color:#c3c8d1;
 }
 
 .empty span{
-    font-size:14.5px;
+    font-size:14px;
 }
 
 </style>

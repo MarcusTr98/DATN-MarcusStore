@@ -6,179 +6,437 @@
       @click.self="close"
     >
       <div class="review-modal">
+      <div class="modal-scroll">
 
-        <!-- Header -->
+        <!-- ================= HEADER ================= -->
+
         <div class="modal-header">
-          <h3>
-            {{ props.viewOnly ? "Đánh giá của bạn" : props.editMode ? "Sửa đánh giá" : "Đánh giá sản phẩm" }}
-          </h3>
-          <button class="close-btn" @click="close">
+
+          <div class="header-left">
+
+            <div class="header-icon">
+              <i class="fa-solid fa-star"></i>
+            </div>
+
+            <div>
+
+              <h3>
+                {{
+                  props.viewOnly
+                    ? "Đánh giá của bạn"
+                    : props.editMode
+                      ? "Chỉnh sửa đánh giá"
+                      : "Đánh giá sản phẩm"
+                }}
+              </h3>
+
+              <p>
+
+                {{
+                  props.viewOnly
+                    ? "Xem đánh giá đã gửi"
+                    : "Chia sẻ trải nghiệm của bạn"
+
+                }}
+
+              </p>
+
+            </div>
+
+          </div>
+
+          <button
+            class="close-btn"
+            @click="close"
+          >
             <i class="fa-solid fa-xmark"></i>
           </button>
+
         </div>
 
-        <!-- Product -->
-        <div class="product-box">
+        <!-- ================= PRODUCT ================= -->
+
+        <div
+          class="product-box"
+          role="button"
+          tabindex="0"
+          @click="goToProductDetail"
+          @keydown.enter="goToProductDetail"
+        >
+
           <img
             :src="orderItem?.thumbnail"
             class="product-image"
           >
+
           <div class="product-info">
+
             <h4>{{ orderItem?.productName }}</h4>
+
+            <small>
+
+              Cảm nhận của bạn sẽ giúp khách hàng khác lựa chọn tốt hơn.
+
+            </small>
+
+            <span class="view-detail-link">
+              Xem chi tiết sản phẩm
+              <i class="fa-solid fa-chevron-right"></i>
+            </span>
+
           </div>
+
         </div>
 
-        <!-- Rating -->
+        <!-- ================= STAR ================= -->
+
         <div
-          class="rating-box"
+          class="rating-section"
           :class="{ readonly: props.viewOnly }"
         >
-          <span
-            v-for="star in 5"
-            :key="star"
-            class="star"
-            :class="{ active: star <= hoverStar || star <= rating }"
-            @mouseenter="!props.viewOnly && (hoverStar = star)"
-            @mouseleave="!props.viewOnly && (hoverStar = 0)"
-            @click="!props.viewOnly && (rating = star)"
+
+          <div class="rating-box">
+
+            <span
+              v-for="star in 5"
+              :key="star"
+              class="star"
+              :class="{ active: star <= hoverStar || star <= rating }"
+              @mouseenter="!props.viewOnly && (hoverStar = star)"
+              @mouseleave="!props.viewOnly && (hoverStar = 0)"
+              @click="!props.viewOnly && (rating = star)"
+            >
+
+              ★
+
+            </span>
+
+          </div>
+
+          <div
+            v-if="rating"
+            class="rating-text"
           >
-            ★
-          </span>
+
+            {{ ratingText }}
+
+          </div>
+
         </div>
 
-        <p
-          class="rating-text"
-          v-if="rating"
+        <!-- ================= COMMENT ================= -->
+
+        <div class="comment-box">
+
+          <label>
+
+            <i class="fa-regular fa-comment"></i>
+
+            Nội dung đánh giá
+
+          </label>
+
+          <textarea
+
+            v-model="commentText"
+
+            rows="5"
+
+            :readonly="props.viewOnly"
+
+            :class="{ readonly: props.viewOnly }"
+
+            placeholder="Hãy chia sẻ trải nghiệm của bạn về sản phẩm..."
+
+          ></textarea>
+
+        </div>
+
+        <!-- ================= UPLOAD ================= -->
+
+        <div
+          v-if="!props.viewOnly"
+          class="image-upload"
         >
-          {{ ratingText }}
-        </p>
 
-        <!-- Comment -->
-        <textarea
-          v-model="commentText"
-          rows="4"
-          :readonly="props.viewOnly"
-          :class="{ readonly: props.viewOnly }"
-          placeholder="Hãy chia sẻ cảm nhận của bạn về sản phẩm..."
-        ></textarea>
-         <div
-    class="image-upload"
-    v-if="!props.viewOnly"
->
+          <label>
 
-    <label>Hình ảnh đánh giá</label>
+            <i class="fa-regular fa-image"></i>
 
-    <input
-        type="file"
-        multiple
-        accept="image/*"
-        @change="handleImageChange"
-    />
+            Hình ảnh đánh giá
 
+            <span>
+
+              ({{ previewImages.length }}/5)
+
+            </span>
+
+          </label>
+
+          <input
+
+            ref="fileInput"
+
+            type="file"
+
+            accept="image/*"
+
+            multiple
+
+            @change="handleImageChange"
+
+            :disabled="loading || uploading"
+
+          >
+
+          <div class="upload-note">
+
+            <div>
+
+              ✓ Tối đa 5 ảnh
+
+            </div>
+
+            <div>
+
+              ✓ Hỗ trợ JPG, PNG, WEBP
+            </div>
+            <div>
+
+              ✓ Dung lượng tối đa 5MB/ảnh
+          </div>
+
+        </div>
 </div>
+        <!-- ================= LOADING ================= -->
 
-<div class="preview-list">
-
-    <div
-        class="preview-item"
-        v-for="(image,index) in previewImages"
-        :key="index"
-    >
-
-        <img
-            :src="image"
-            class="preview-image"
+        <div
+          v-if="uploading"
+          class="upload-loading"
         >
 
-        <button
-            class="remove-image"
-            @click="removeImage(index)"
-        >
-            ×
-        </button>
+          <i class="fa-solid fa-spinner fa-spin"></i>
 
-    </div>
+          Đang tải ảnh...
 
-</div>
-        <p
-          v-if="error"
-          class="error"
-        >
-          {{ error }}
-        </p>
+        </div>
 
-        <!-- Xác nhận xóa đánh giá -->
+        <!-- ================= PREVIEW ================= -->
+
+        <div class="preview-list">
+
+          <template v-if="previewImages.length">
+
+            <div
+
+              class="preview-item"
+
+              v-for="(image,index) in previewImages"
+
+              :key="index"
+
+            >
+
+              <img
+
+                :src="image"
+
+                class="preview-image"
+
+                @click="previewImage(image)"
+
+              >
+
+              <button
+
+                v-if="!props.viewOnly"
+
+                class="remove-image"
+
+                @click="removeImage(index)"
+
+              >
+
+                <i class="fa-solid fa-xmark"></i>
+
+              </button>
+
+            </div>
+
+          </template>
+
+          <div
+
+            v-else
+
+            class="empty-image"
+
+          >
+
+            <i class="fa-regular fa-images"></i>
+
+            <p>
+
+              Chưa có hình ảnh nào
+
+            </p>
+
+          </div>
+
+        </div>
+
+        <!-- ================= ERROR ================= -->
+
+        <transition name="fade">
+
+          <p
+            v-if="error"
+            class="error"
+          >
+
+            <i class="fa-solid fa-circle-exclamation"></i>
+
+            {{ error }}
+
+          </p>
+
+        </transition>
+
+        <!-- ================= DELETE ================= -->
+
         <div
           v-if="confirmingDelete"
           class="delete-confirm-box"
         >
-          <p>Bạn chắc chắn muốn xóa đánh giá này?</p>
+
+          <i class="fa-solid fa-triangle-exclamation"></i>
+
+          <p>
+
+            Bạn chắc chắn muốn xóa đánh giá này?
+
+          </p>
+
           <div class="delete-confirm-actions">
+
             <button
+
               class="btn-ghost-sm"
-              :disabled="deleting"
-              @click="confirmingDelete = false"
+
+              @click="confirmingDelete=false"
+
             >
+
               Không
+
             </button>
+
             <button
+
               class="btn-danger-sm"
+
               :disabled="deleting"
+
               @click="deleteReview"
+
             >
+
               <i
+
                 v-if="deleting"
+
                 class="fa-solid fa-spinner fa-spin"
+
               ></i>
-              {{ deleting ? "Đang xóa..." : "Xóa" }}
+
+              {{ deleting ? "Đang xóa..." : "Xóa đánh giá" }}
+
             </button>
+
           </div>
+
         </div>
 
-        <!-- Footer -->
+        <!-- ================= FOOTER ================= -->
+
         <div
-          class="footer"
           v-else
+          class="footer"
         >
+
           <button
+
             v-if="props.editMode && !props.viewOnly"
-            type="button"
+
             class="delete-link"
+
+            @click="confirmingDelete=true"
+
             :disabled="loading"
-            @click="confirmingDelete = true"
+
           >
-            <i class="fa-solid fa-trash-can"></i>
+
+            <i class="fa-solid fa-trash"></i>
+
             Xóa đánh giá
+
           </button>
+
           <div class="footer-right">
+
             <button
+
               class="cancel-btn"
+
               @click="close"
+
             >
+
               {{ props.viewOnly ? "Đóng" : "Hủy" }}
+
             </button>
 
             <button
+
               v-if="!props.viewOnly"
+
               class="submit-btn"
-              :disabled="loading"
+
               @click="submitReview"
+
+              :disabled="loading || uploading"
+
             >
+
               <i
+
                 v-if="loading"
+
                 class="fa-solid fa-spinner fa-spin"
+
               ></i>
+
               {{
+
                 loading
+
                   ? "Đang lưu..."
+
                   : props.editMode
-                    ? "Cập nhật đánh giá"
+
+                    ? "Cập nhật"
+
                     : "Gửi đánh giá"
+
               }}
+
             </button>
+
           </div>
+
         </div>
 
+      </div>
       </div>
     </div>
   </transition>
@@ -187,27 +445,61 @@
 <script setup>
 import reviewService from "@/stores/reviewService"
 import cloudinaryService from "@/stores/cloudinaryService"
-import { computed, ref, watch } from "vue"
+
+import {
+    computed,
+    ref,
+    watch,
+    onBeforeUnmount
+} from "vue"
+import { useRouter } from "vue-router"
 
 const props = defineProps({
 
-  modelValue:Boolean,
+    modelValue:Boolean,
 
-  orderItem:Object,
+    orderItem:Object,
 
-  editMode:Boolean,
+    editMode:Boolean,
 
-  viewOnly:{ type: Boolean, default: false }   // true = chỉ xem, không cho sửa/gửi
+    viewOnly:{
+        type:Boolean,
+        default:false
+    }
 
 })
 
 const emit = defineEmits([
 
-  "update:modelValue",
+    "update:modelValue",
 
-  "success"
+    "success"
 
 ])
+
+const router = useRouter()
+
+/* ===========================
+        CONSTANT
+=========================== */
+
+const MAX_IMAGES = 5
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024
+
+const ACCEPT_TYPES = [
+
+    "image/jpeg",
+
+    "image/png",
+
+    "image/webp"
+
+]
+
+/* ===========================
+        STATE
+=========================== */
 
 const rating = ref(0)
 
@@ -217,26 +509,35 @@ const commentText = ref("")
 
 const loading = ref(false)
 
+const uploading = ref(false)
+
+const deleting = ref(false)
+
 const error = ref("")
 
-const confirmingDelete = ref(false)   // đang hỏi xác nhận xóa
+const confirmingDelete = ref(false)
 
-const deleting = ref(false)           // đang gọi API xóa
-const existingImages = ref([])     // ảnh đã có trên Cloudinary
+const existingImages = ref([])
 
-const selectedImages = ref([])     // File mới
+const selectedImages = ref([])
 
 const previewImages = ref([])
 
-const uploading = ref(false)
-// Đổ dữ liệu đánh giá đã có (dùng chung cho cả chế độ Xem và Sửa)
+const fileInput = ref(null)
+
+/* ===========================
+        WATCH
+=========================== */
+
 watch(
+
     () => props.orderItem,
-    (item) => {
 
-        if (!item) return
+    (item)=>{
 
-        if (item.review) {
+        clearPreview()
+
+        if(item?.review){
 
             rating.value = item.review.rating
 
@@ -244,11 +545,11 @@ watch(
 
             existingImages.value = [...(item.review.images || [])]
 
-            selectedImages.value = []
-
             previewImages.value = [...existingImages.value]
 
-        } else {
+        }
+
+        else{
 
             rating.value = 0
 
@@ -256,55 +557,152 @@ watch(
 
             existingImages.value = []
 
-            selectedImages.value = []
-
             previewImages.value = []
 
         }
 
-        confirmingDelete.value = false
+        selectedImages.value=[]
+
+        confirmingDelete.value=false
+
+        error.value=""
 
     },
-    { immediate: true }
+
+    {immediate:true}
+
 )
+
+/* ===========================
+        COMPUTED
+=========================== */
 
 const ratingText = computed(()=>{
 
-  switch(rating.value){
+    switch(rating.value){
 
-    case 1:return "Rất tệ"
+        case 1:return "Rất tệ 😠"
 
-    case 2:return "Tệ"
+        case 2:return "Chưa hài lòng 😕"
 
-    case 3:return "Bình thường"
+        case 3:return "Bình thường 🙂"
 
-    case 4:return "Tốt"
+        case 4:return "Tốt 😊"
 
-    case 5:return "Rất tốt"
+        case 5:return "Tuyệt vời 🤩"
 
-    default:return ""
+        default:return ""
 
-  }
+    }
 
 })
-const handleImageChange = (event) => {
 
-    const files = [...event.target.files]
+/* ===========================
+        NAVIGATE TO PRODUCT DETAIL
+=========================== */
 
-    files.forEach(file => {
+// LƯU Ý: item ở OrderDetailView hiện chưa có productId, chỉ có skuId/skuCode.
+// Đổi query bên dưới cho khớp với route thật của bạn khi đã bổ sung field.
+function goToProductDetail() {
 
-        selectedImages.value.push(file)
+    const slug = props.orderItem?.productSlug
 
-        previewImages.value.push(URL.createObjectURL(file))
+    if (!slug) return
 
+    close()
+
+    router.push({
+        name: "ProductDetail",
+        params: {
+            slug
+        }
     })
 
 }
-const removeImage = (index) => {
 
-    // Nếu là ảnh cũ
+/* ===========================
+        IMAGE
+=========================== */
 
-    if (index < existingImages.value.length) {
+function handleImageChange(event){
+
+    const files=[...event.target.files]
+
+    if(!files.length){
+
+        return
+
+    }
+
+    for(const file of files){
+
+        if(existingImages.value.length+
+
+            selectedImages.value.length>=MAX_IMAGES){
+
+            error.value=`Chỉ được tải tối đa ${MAX_IMAGES} ảnh.`
+
+            break
+
+        }
+
+        if(!ACCEPT_TYPES.includes(file.type)){
+
+            error.value="Chỉ hỗ trợ JPG, PNG, WEBP."
+
+            continue
+
+        }
+
+        if(file.size>MAX_FILE_SIZE){
+
+            error.value=`${file.name} vượt quá 5MB.`
+
+            continue
+
+        }
+
+        const duplicated=
+
+            selectedImages.value.some(
+
+                f=>
+
+                    f.name===file.name &&
+
+                    f.size===file.size
+
+            )
+
+        if(duplicated){
+
+            continue
+
+        }
+
+        selectedImages.value.push(file)
+
+        previewImages.value.push(
+
+            URL.createObjectURL(file)
+
+        )
+
+    }
+
+    event.target.value=""
+
+}
+
+function removeImage(index){
+
+    if(props.viewOnly){
+
+        return
+
+    }
+
+    if(index<existingImages.value.length){
 
         existingImages.value.splice(index,1)
 
@@ -314,9 +712,15 @@ const removeImage = (index) => {
 
     }
 
-    // Nếu là ảnh mới
+    const newIndex=
 
-    const newIndex = index - existingImages.value.length
+        index-existingImages.value.length
+
+    URL.revokeObjectURL(
+
+        previewImages.value[index]
+
+    )
 
     selectedImages.value.splice(newIndex,1)
 
@@ -324,26 +728,74 @@ const removeImage = (index) => {
 
 }
 
-function close(){
+function clearPreview(){
 
-  emit("update:modelValue",false)
+    previewImages.value.forEach(url=>{
 
-  rating.value=0
+        if(url.startsWith("blob:")){
 
-  hoverStar.value=0
+            URL.revokeObjectURL(url)
 
-  commentText.value=""
+        }
 
-  error.value=""
-
-  confirmingDelete.value=false
+    })
 
 }
 
+function previewImage(url){
+
+    window.open(url,"_blank")
+
+}
+
+/* ===========================
+        CLOSE
+=========================== */
+
+function close(){
+
+    clearPreview()
+
+    emit("update:modelValue",false)
+
+    rating.value=0
+
+    hoverStar.value=0
+
+    commentText.value=""
+
+    existingImages.value=[]
+
+    selectedImages.value=[]
+
+    previewImages.value=[]
+
+    confirmingDelete.value=false
+
+    error.value=""
+
+}
+
+/* ===========================
+        DESTROY
+=========================== */
+
+onBeforeUnmount(()=>{
+
+    clearPreview()
+
+})
+/* ===========================
+        SUBMIT REVIEW
+=========================== */
+
 async function submitReview(){
 
-    // Chặn an toàn: chế độ chỉ xem thì không được submit
-    if(props.viewOnly) return
+    if(props.viewOnly){
+
+        return
+
+    }
 
     error.value=""
 
@@ -356,72 +808,64 @@ async function submitReview(){
     }
 
     loading.value=true
-    uploading.value = true
 
-const uploadedUrls = []
+    uploading.value=true
 
-uploading.value = true
-
-for (const file of selectedImages.value) {
-
-    const url = await cloudinaryService.upload(file)
-
-    uploadedUrls.push(url)
-
-}
-
-uploading.value = false
-
-const imageUrls = [
-
-    ...existingImages.value,
-
-    ...uploadedUrls
-
-]
-
-uploading.value = false
     try{
 
+        /* Upload ảnh mới song song */
+
+        const uploadedUrls = await Promise.all(
+
+            selectedImages.value.map(file=>
+
+                cloudinaryService.upload(file)
+
+            )
+
+        )
+
+        /* Ghép ảnh cũ + ảnh mới */
+
+        const imageUrls=[
+
+            ...existingImages.value,
+
+            ...uploadedUrls
+
+        ]
+
+        const payload={
+
+            rating:rating.value,
+
+            commentText:commentText.value.trim(),
+
+            imageUrls:imageUrls
+
+        }
+
         if(props.editMode){
-console.log("existingImages =", existingImages.value)
 
-console.log("selectedImages =", selectedImages.value)
+            await reviewService.update(
 
-console.log("imageUrls =", imageUrls)
-await reviewService.update(
+                props.orderItem.review.reviewId,
 
-    props.orderItem.review.reviewId,
+                payload
 
-    {
+            )
 
-        rating: rating.value,
+        }
 
-        commentText: commentText.value,
+        else{
 
-        imageUrls: imageUrls
+            await reviewService.create(
 
-    }
+                props.orderItem.orderItemId,
 
-)
+                payload
 
-        }else{
-
-await reviewService.create(
-
-    props.orderItem.orderItemId,
-
-    {
-
-        rating: rating.value,
-
-        commentText: commentText.value,
-
-        imageUrls: imageUrls
-
-    }
-
-)
+            )
 
         }
 
@@ -433,7 +877,13 @@ await reviewService.create(
 
     catch(e){
 
-        error.value=e.response?.data?.message || "Có lỗi xảy ra."
+        console.error(e)
+
+        error.value=
+
+            e.response?.data?.message ||
+
+            "Không thể gửi đánh giá."
 
     }
 
@@ -441,676 +891,869 @@ await reviewService.create(
 
         loading.value=false
 
+        uploading.value=false
+
     }
 
 }
 
-// Xóa đánh giá hiện tại (chỉ dùng khi đang ở chế độ Sửa)
-// LƯU Ý: đổi tên hàm reviewService.remove(...) thành đúng tên hàm xóa
-// thực tế trong file @/stores/reviewService.js của bạn nếu khác (vd: .delete(), .deleteReview()...)
+/* ===========================
+        DELETE REVIEW
+=========================== */
+
 async function deleteReview(){
 
-    if(!props.orderItem?.review?.reviewId) return
+    if(!props.orderItem?.review?.reviewId){
 
-    deleting.value = true
+        return
 
-    error.value = ""
+    }
+
+    deleting.value=true
+
+    error.value=""
 
     try{
 
-        await reviewService.remove(props.orderItem.review.reviewId)
+        await reviewService.remove(
+
+            props.orderItem.review.reviewId
+
+        )
 
         emit("success")
 
         close()
 
-        existingImages.value = []
-
-selectedImages.value = []
-
-previewImages.value = []
-
     }
 
     catch(e){
 
-        error.value = e.response?.data?.message || "Xóa đánh giá thất bại."
+        console.error(e)
 
-        confirmingDelete.value = false
+        error.value=
+
+            e.response?.data?.message ||
+
+            "Xóa đánh giá thất bại."
+
+        confirmingDelete.value=false
 
     }
 
     finally{
 
-        deleting.value = false
+        deleting.value=false
+
+    }
+
+}
+</script>
+<style scoped>
+
+/* ===========================
+        Overlay
+=========================== */
+
+.modal-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(15,23,42,.55);
+    backdrop-filter:blur(6px);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    z-index:9999;
+    padding:24px;
+}
+
+.fade-enter-active,
+.fade-leave-active{
+    transition:.25s;
+}
+
+.fade-enter-from,
+.fade-leave-to{
+    opacity:0;
+}
+
+.fade-enter-from .review-modal{
+    transform:translateY(30px) scale(.96);
+}
+
+.fade-leave-to .review-modal{
+    transform:translateY(20px);
+}
+
+/* ===========================
+        Modal
+=========================== */
+
+.review-modal{
+
+    width:100%;
+    max-width:620px;
+    max-height:90vh;
+
+    /* overflow:hidden ở đây (thay vì auto) để 4 góc luôn bo đều,
+       phần cuộn thật sự nằm ở .modal-scroll bên trong */
+    overflow:hidden;
+
+    background:white;
+
+    border-radius:22px;
+
+    box-shadow:
+        0 30px 80px rgba(0,0,0,.18);
+
+    animation:popup .25s;
+}
+
+.modal-scroll{
+
+    max-height:90vh;
+
+    overflow-y:auto;
+
+}
+
+.modal-scroll::-webkit-scrollbar{
+
+    width:6px;
+
+}
+
+.modal-scroll::-webkit-scrollbar-track{
+
+    background:transparent;
+
+}
+
+.modal-scroll::-webkit-scrollbar-thumb{
+
+    background:#f1a9c2;
+
+    border-radius:10px;
+
+}
+
+.modal-scroll::-webkit-scrollbar-thumb:hover{
+
+    background:#e60012;
+
+}
+
+@keyframes popup{
+
+    from{
+
+        opacity:0;
+        transform:translateY(25px) scale(.95);
+
+    }
+
+    to{
+
+        opacity:1;
+        transform:none;
 
     }
 
 }
 
-</script>
-
-<style scoped>
-
-.modal-overlay{
-
-position:fixed;
-
-inset:0;
-
-background:rgba(0,0,0,.5);
-
-display:flex;
-
-justify-content:center;
-
-align-items:center;
-
-z-index:9999;
-
-padding:16px;
-
-}
-
-.review-modal{
-
-width:100%;
-
-max-width:400px;
-
-background:#fff;
-
-border-radius:16px;
-
-padding:20px 22px 22px;
-
-animation:show .22s ease;
-
-box-shadow:0 20px 50px rgba(0,0,0,.25);
-
-}
-
-@keyframes show{
-
-from{
-
-transform:translateY(16px);
-
-opacity:0;
-
-}
-
-to{
-
-transform:translateY(0);
-
-opacity:1;
-
-}
-
-}
+/* ===========================
+        Header
+=========================== */
 
 .modal-header{
 
-display:flex;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
 
-justify-content:space-between;
+    padding:22px 26px;
 
-align-items:center;
+    border-bottom:1px solid #f1f1f1;
 
-margin-bottom:14px;
-
-padding-bottom:12px;
-
-border-bottom:1px solid #f0f0f0;
+    background:linear-gradient(135deg,#fff,#fff5f5);
 
 }
 
 .modal-header h3{
 
-font-size:17px;
+    font-size:22px;
+    font-weight:800;
 
-font-weight:800;
-
-color:#1f1f1f;
-
-margin:0;
+    color:#e60012;
 
 }
 
 .close-btn{
 
-background:#f5f5f5;
+    width:40px;
+    height:40px;
 
-border:none;
+    border:none;
+    border-radius:50%;
 
-width:28px;
+    background:#fff0f5;
 
-height:28px;
+    cursor:pointer;
 
-border-radius:50%;
-
-font-size:13px;
-
-color:#666;
-
-cursor:pointer;
-
-display:flex;
-
-align-items:center;
-
-justify-content:center;
-
-transition:.15s;
-
+    transition:.25s;
 }
 
 .close-btn:hover{
 
-background:#ffe3e3;
+    transform:rotate(90deg);
 
-color:#e60012;
+    background:#e60012;
+
+    color:white;
 
 }
 
+/* ===========================
+        Product
+=========================== */
+
 .product-box{
 
-display:flex;
+    display:flex;
 
-gap:12px;
+    gap:18px;
 
-align-items:center;
+    padding:16px 26px;
 
-margin-bottom:16px;
+    margin:0 26px 0;
+
+    align-items:center;
+
+    border-radius:18px;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+    border:1px solid transparent;
+
+}
+
+.product-box:hover{
+
+    background:#fff5f5;
+
+    border-color:#ffd4d4;
+
+    transform:translateY(-2px);
+
+    box-shadow:0 10px 24px rgba(230,0,18,.12);
 
 }
 
 .product-image{
 
-width:56px;
+    width:85px;
+    height:85px;
 
-height:56px;
+    border-radius:16px;
 
-object-fit:cover;
+    object-fit:cover;
 
-border-radius:8px;
+    border:1px solid #eee;
 
-border:1px solid #eee;
+    flex-shrink:0;
 
-flex-shrink:0;
+}
+
+.product-info{
+
+    flex:1;
+
+    min-width:0;
 
 }
 
 .product-info h4{
 
-font-size:14px;
+    font-size:18px;
 
-font-weight:700;
+    font-weight:700;
 
-color:#1f1f1f;
+    line-height:1.5;
 
-margin:0;
+    color:#000;
+
+    margin:0;
 
 }
+
+.product-info small{
+
+    color:#000;
+
+    opacity:.6;
+
+}
+
+.view-detail-link{
+
+    display:inline-flex;
+
+    align-items:center;
+
+    gap:6px;
+
+    margin-top:6px;
+
+    font-size:13px;
+
+    font-weight:700;
+
+    color:#000;
+
+    transition:.2s;
+
+}
+
+.view-detail-link i{
+
+    font-size:11px;
+
+}
+
+.product-box:hover .view-detail-link{
+
+    color:#e60012;
+
+    gap:8px;
+
+}
+
+/* ===========================
+        Rating
+=========================== */
 
 .rating-box{
 
-display:flex;
+    display:flex;
 
-justify-content:center;
+    justify-content:center;
 
-gap:4px;
+    gap:10px;
 
-margin:14px 0 4px;
-
-}
-
-.rating-box.readonly .star{
-
-cursor:default;
+    margin-top:5px;
 
 }
 
 .star{
 
-font-size:30px;
+    font-size:42px;
 
-line-height:1;
+    color:#ddd;
 
-cursor:pointer;
+    cursor:pointer;
 
-color:#e2e2e2;
+    transition:.25s;
 
-transition:.15s;
+}
+
+.star:hover{
+
+    transform:scale(1.25) rotate(-10deg);
 
 }
 
 .star.active{
 
-color:#e60012;
+    color:#FFC107;
 
-transform:scale(1.08);
+    text-shadow:
+
+        0 0 12px rgba(255,193,7,.45);
 
 }
 
 .rating-text{
 
-text-align:center;
+    text-align:center;
 
-font-weight:700;
+    font-size:15px;
 
-font-size:13px;
+    color:#e60012;
 
-margin:0 0 12px;
+    font-weight:700;
 
-color:#e60012;
+    margin:12px 0 22px;
+
+}
+
+/* ===========================
+        Textarea
+=========================== */
+
+.comment-box{
+
+    padding:20px 26px 0;
+
+}
+
+.comment-box label{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:8px;
+
+    font-weight:700;
+
+    color:#555;
+
+    margin-bottom:10px;
 
 }
 
 textarea{
 
-width:100%;
+    width:100%;
 
-resize:none;
+    min-height:130px;
 
-padding:10px 12px;
+    resize:none;
 
-border-radius:10px;
+    border:2px solid #ececec;
 
-border:1px solid #e5e5e5;
+    border-radius:16px;
 
-font-size:13px;
+    padding:18px;
 
-font-family:inherit;
+    font-size:15px;
 
-outline:none;
+    transition:.25s;
 
-box-sizing:border-box;
-
-transition:.15s;
+    font-family:inherit;
 
 }
 
 textarea:focus{
 
-border-color:#e60012;
+    outline:none;
 
-box-shadow:0 0 0 3px rgba(230,0,18,.08);
+    border-color:#e60012;
+
+    box-shadow:
+
+        0 0 0 5px rgba(230,0,18,.12);
 
 }
 
 textarea.readonly{
 
-background:#fafafa;
+    background:#fafafa;
 
-color:#444;
-
-cursor:default;
+    cursor:default;
 
 }
 
-textarea.readonly:focus{
-
-border-color:#e5e5e5;
-
-box-shadow:none;
-
-}
-
-.footer{
-
-display:flex;
-
-justify-content:space-between;
-
-align-items:center;
-
-margin-top:18px;
-
-gap:10px;
-
-}
-
-.footer-right{
-
-display:flex;
-
-gap:8px;
-
-margin-left:auto;
-
-}
-
-.delete-link{
-
-display:inline-flex;
-
-align-items:center;
-
-gap:6px;
-
-background:none;
-
-border:none;
-
-color:#e60012;
-
-font-size:12.5px;
-
-font-weight:600;
-
-cursor:pointer;
-
-padding:6px 4px;
-
-}
-
-.delete-link:hover{
-
-text-decoration:underline;
-
-}
-
-.delete-link:disabled{
-
-opacity:.5;
-
-cursor:not-allowed;
-
-}
-
-.cancel-btn{
-
-padding:9px 16px;
-
-border:1px solid #e5e5e5;
-
-background:#fff;
-
-color:#444;
-
-cursor:pointer;
-
-border-radius:8px;
-
-font-size:13px;
-
-font-weight:600;
-
-transition:.15s;
-
-}
-
-.cancel-btn:hover{
-
-background:#f7f7f7;
-
-}
-
-.submit-btn{
-
-padding:9px 18px;
-
-background:#e60012;
-
-color:#fff;
-
-border:none;
-
-border-radius:8px;
-
-cursor:pointer;
-
-font-size:13px;
-
-font-weight:700;
-
-display:inline-flex;
-
-align-items:center;
-
-gap:6px;
-
-transition:.15s;
-
-}
-
-.submit-btn:hover{
-
-background:#c40010;
-
-}
-
-.submit-btn:disabled{
-
-opacity:.6;
-
-cursor:not-allowed;
-
-}
-
-.error{
-
-color:#e60012;
-
-margin-top:8px;
-
-font-size:12.5px;
-
-}
-
-/* Khối xác nhận xóa đánh giá */
-.delete-confirm-box{
-
-margin-top:16px;
-
-padding:12px 14px;
-
-background:#fff5f5;
-
-border:1px solid #ffd4d4;
-
-border-radius:10px;
-
-text-align:center;
-
-}
-
-.delete-confirm-box p{
-
-margin:0 0 10px;
-
-font-size:13px;
-
-font-weight:600;
-
-color:#7a0009;
-
-}
-
-.delete-confirm-actions{
-
-display:flex;
-
-justify-content:center;
-
-gap:8px;
-
-}
-
-.btn-ghost-sm{
-
-padding:7px 14px;
-
-border:1px solid #e5e5e5;
-
-background:#fff;
-
-color:#444;
-
-cursor:pointer;
-
-border-radius:8px;
-
-font-size:12.5px;
-
-font-weight:600;
-
-}
-
-.btn-ghost-sm:hover{
-
-background:#f7f7f7;
-
-}
-
-.btn-danger-sm{
-
-padding:7px 14px;
-
-border:none;
-
-background:#e60012;
-
-color:#fff;
-
-cursor:pointer;
-
-border-radius:8px;
-
-font-size:12.5px;
-
-font-weight:700;
-
-display:inline-flex;
-
-align-items:center;
-
-gap:6px;
-
-}
-
-.btn-danger-sm:hover{
-
-background:#c40010;
-
-}
-
-.btn-ghost-sm:disabled,
-.btn-danger-sm:disabled{
-
-opacity:.6;
-
-cursor:not-allowed;
-
-}
-
-.fade-enter-active,
-
-.fade-leave-active{
-
-transition:.2s;
-
-}
-
-.fade-enter-from,
-
-.fade-leave-to{
-
-opacity:0;
-
-}
-
-
+/* ===========================
+        Upload
+=========================== */
 
 .image-upload{
 
-margin-top:16px;
+    margin:22px 26px 10px;
 
 }
 
 .image-upload label{
 
-display:block;
+    display:flex;
 
-margin-bottom:8px;
+    justify-content:space-between;
 
-font-weight:600;
+    align-items:center;
 
-font-size:13px;
+    font-weight:700;
 
-color:#555;
+    margin-bottom:12px;
+
+    color:#555;
 
 }
 
 .image-upload input{
 
-width:100%;
+    width:100%;
 
-padding:10px;
+    padding:12px;
 
-border:1px solid #ddd;
+    border-radius:12px;
 
-border-radius:8px;
+    border:2px dashed #e60012;
 
-background:white;
+    background:#fff5f5;
+
+    cursor:pointer;
 
 }
 
+/* ===========================
+        Preview
+=========================== */
+
 .preview-list{
 
-display:flex;
+    display:flex;
 
-flex-wrap:wrap;
+    flex-wrap:wrap;
 
-gap:10px;
+    gap:14px;
 
-margin-top:14px;
+    margin:16px 26px;
+
+}
+
+.preview-item{
+
+    position:relative;
 
 }
 
 .preview-image{
 
-width:90px;
+    width:110px;
 
-height:90px;
+    height:110px;
 
-border-radius:10px;
+    object-fit:cover;
 
-object-fit:cover;
+    border-radius:16px;
 
-border:1px solid #ddd;
+    transition:.25s;
+
+    border:2px solid #eee;
 
 }
-.preview-item{
-    position: relative;
+
+.preview-image:hover{
+
+    transform:scale(1.06);
+
+    box-shadow:
+
+        0 12px 28px rgba(0,0,0,.18);
+
 }
 
 .remove-image{
-    position: absolute;
-    top: -6px;
-    right: -6px;
 
-    width: 22px;
-    height: 22px;
+    position:absolute;
 
-    border: none;
-    border-radius: 50%;
+    top:-8px;
 
-    background: #e60012;
-    color: white;
+    right:-8px;
 
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: bold;
+    width:28px;
 
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    height:28px;
+
+    border:none;
+
+    border-radius:50%;
+
+    background:#ff4d4f;
+
+    color:white;
+
+    cursor:pointer;
+
+    font-size:15px;
+
+    transition:.25s;
+
+    display:flex;
+    justify-content:center;
+    align-items:center;
+
 }
 
 .remove-image:hover{
-    background: #b4000e;
+
+    transform:scale(1.15);
+
+    background:#e53935;
+
 }
+
+/* ===========================
+        Error
+=========================== */
+
+.error{
+
+    margin:0 26px;
+
+    color:#ff4d4f;
+
+    font-size:14px;
+
+    font-weight:600;
+
+}
+
+/* ===========================
+        Delete confirm
+=========================== */
+
+.delete-confirm-box{
+
+    margin:22px 26px;
+
+    padding:18px;
+
+    border-radius:16px;
+
+    background:#fff5f5;
+
+    border:1px solid #ffd5d5;
+
+    text-align:center;
+
+}
+
+.delete-confirm-box p{
+
+    font-weight:700;
+
+    color:#d63031;
+
+    margin-bottom:15px;
+
+}
+
+.delete-confirm-actions{
+
+    display:flex;
+
+    justify-content:center;
+
+    gap:12px;
+
+}
+
+.btn-ghost-sm,
+.btn-danger-sm{
+
+    padding:11px 22px;
+
+    border-radius:10px;
+
+    cursor:pointer;
+
+    font-weight:700;
+
+}
+
+.btn-ghost-sm{
+
+    background:white;
+
+    border:1px solid #ddd;
+
+}
+
+.btn-danger-sm{
+
+    background:#ff4d4f;
+
+    color:white;
+
+    border:none;
+
+}
+
+/* ===========================
+        Footer
+=========================== */
+
+.footer{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    padding:22px 26px;
+
+    border-top:1px solid #f2f2f2;
+
+}
+
+.footer-right{
+
+    display:flex;
+
+    gap:12px;
+
+}
+
+.delete-link{
+
+    background:none;
+
+    border:none;
+
+    color:#ff4d4f;
+
+    font-weight:700;
+
+    cursor:pointer;
+
+}
+
+.cancel-btn{
+
+    padding:12px 24px;
+
+    border-radius:12px;
+
+    border:1px solid #ddd;
+
+    background:white;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+}
+
+.cancel-btn:hover{
+
+    background:#f6f6f6;
+
+}
+
+.submit-btn{
+
+    padding:12px 28px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:linear-gradient(135deg,#e60012,#ff4d4f);
+
+    color:white;
+
+    font-weight:700;
+
+    cursor:pointer;
+
+    transition:.25s;
+
+}
+
+.submit-btn:hover{
+
+    transform:translateY(-2px);
+
+    box-shadow:
+
+        0 12px 28px rgba(230,0,18,.35);
+
+}
+
+.submit-btn:disabled{
+
+    opacity:.65;
+
+    cursor:not-allowed;
+
+}
+
+/* ===========================
+        Responsive
+=========================== */
+
+@media(max-width:640px){
+
+.review-modal{
+
+    max-width:100%;
+
+    border-radius:18px;
+
+}
+
+.product-box{
+
+    flex-direction:column;
+
+    text-align:center;
+
+}
+
+.product-image{
+
+    width:100px;
+    height:100px;
+
+}
+
+.preview-image{
+
+    width:90px;
+    height:90px;
+
+}
+
+.star{
+
+    font-size:36px;
+
+}
+
+.comment-box{
+
+    padding:16px 18px 0;
+
+}
+
+.preview-list{
+
+    margin:16px 18px;
+
+}
+
+.image-upload{
+
+    margin:20px 18px;
+
+}
+
+.footer{
+
+    flex-direction:column;
+
+    gap:14px;
+
+}
+
+.footer-right{
+
+    width:100%;
+
+}
+
+.cancel-btn,
+.submit-btn{
+
+    flex:1;
+
+}
+
+}
+
 </style>

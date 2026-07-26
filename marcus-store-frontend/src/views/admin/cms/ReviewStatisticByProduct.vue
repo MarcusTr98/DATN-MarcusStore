@@ -106,11 +106,11 @@ onMounted(loadProducts);
 
     border:1px solid #ffd6e4;
 
-    border-radius:18px;
+    border-radius:14px;
 
-    padding:24px;
+    padding:18px 20px;
 
-    margin-bottom:25px;
+    margin-bottom:20px;
 
 }
 
@@ -120,35 +120,55 @@ onMounted(loadProducts);
 
     align-items:center;
 
-    gap:10px;
+    gap:8px;
 
-    font-size:20px;
+    font-size:15px;
 
     font-weight:700;
 
     color:#f55d9b;
 
-    margin-bottom:20px;
+    margin-bottom:16px;
 
 }
 
 .select-box{
 
-    margin-bottom:25px;
+    margin-bottom:18px;
 
 }
 
 .select-box select{
 
-    width:420px;
+    width:320px;
 
-    height:48px;
+    max-width:100%;
 
-    border-radius:12px;
+    height:40px;
 
-    border:1px solid #f3bfd3;
+    border-radius:10px;
 
-    padding:0 15px;
+    border:1.5px solid #f3bfd3;
+
+    padding:0 12px;
+
+    font-size:14px;
+
+    color:#333;
+
+    cursor:pointer;
+
+    transition: border-color .2s ease, box-shadow .2s ease;
+
+}
+
+.select-box select:focus{
+
+    border-color:#f55d9b;
+
+    box-shadow: 0 0 0 4px rgba(245,93,155,.12);
+
+    outline:none;
 
 }
 
@@ -158,7 +178,7 @@ onMounted(loadProducts);
 
     grid-template-columns:repeat(5,1fr);
 
-    gap:18px;
+    gap:14px;
 
 }
 
@@ -168,11 +188,11 @@ onMounted(loadProducts);
 
     border:1px solid #ffd6e4;
 
-    border-radius:15px;
+    border-radius:12px;
 
     text-align:center;
 
-    padding:20px;
+    padding:14px;
 
     transition:.25s;
 
@@ -180,23 +200,23 @@ onMounted(loadProducts);
 
 .star-card:hover{
 
-    transform:translateY(-4px);
+    transform:translateY(-3px);
 
-    box-shadow:0 8px 20px rgba(245,93,155,.15);
+    box-shadow:0 8px 18px rgba(245,93,155,.14);
 
 }
 
 .star-title{
 
-    font-size:22px;
+    font-size:15px;
 
 }
 
 .star-count{
 
-    margin-top:12px;
+    margin-top:8px;
 
-    font-size:32px;
+    font-size:22px;
 
     font-weight:800;
 

@@ -11,6 +11,7 @@ import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+import com.fpoly.marcusstore.repository.statistics.CommentEvaluationRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.EmailService;
 import com.fpoly.marcusstore.service.OrderCancellationService;
@@ -42,7 +43,7 @@ public class OrderServiceImpl implements OrderService {
     private final OrderPaymentService orderPaymentService;
     private final OrderCancellationService orderCancellationService;
     private final EmailService emailService;
-
+    private final CommentEvaluationRepository commentEvaluationRepository;
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED",
             "READY_FOR_PICKUP");
 
@@ -313,6 +314,9 @@ public class OrderServiceImpl implements OrderService {
                 .voucherMaxDiscount(order.getVoucher() != null ? order.getVoucher().getMaxDiscountAmount() : null)
                 .items(
                         order.getOrderItems().stream().map(orderItem -> {
+                                                        boolean reviewed =
+        commentEvaluationRepository.existsByOrderItemOrderItemId(
+                orderItem.getOrderItemId());
                             ProductSku sku = orderItem.getSku();
                             Product product = sku.getProduct();
                             // Lấy SKU có fetch variants từ map (tránh N+1 và LazyInit)
@@ -334,9 +338,11 @@ public class OrderServiceImpl implements OrderService {
                                                             .build())
                                                     .toList();
                             return OrderItemDetailResponse.builder()
+                                    .orderItemId(orderItem.getOrderItemId())
                                     .skuId(sku.getSkuId())
                                     .skuCode(sku.getSkuCode())
                                     .productId(product.getProductId())
+                                    .productSlug(product.getSlug()) // Marcus thêm productSlug vào response
                                     .productName(product.getProductName())
                                     .productImage(product.getThumbnailUrl())
                                     .quantity(orderItem.getQuantity())
@@ -350,6 +356,7 @@ public class OrderServiceImpl implements OrderService {
                                     .imeis(orderItem.getProductItems().stream()
                                             .map(item -> ImeiResponse.builder().imeiCode(item.getImeiCode()).build())
                                             .toList())
+                                            .reviewed(reviewed) 
                                     .build();
                         }).toList())
                 .history(historyResponses)

@@ -6,12 +6,14 @@ import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+import com.fpoly.marcusstore.repository.statistics.CommentEvaluationRepository;
 import com.fpoly.marcusstore.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 // Marcus thêm test: admin không thể xác nhận đơn VNPAY khi tiền chưa được IPN xác nhận.
@@ -35,7 +37,8 @@ class OrderServicePaymentGuardTest {
                 mock(OrderShippingService.class),
                 mock(OrderPaymentService.class),
                 mock(OrderCancellationService.class),
-                mock(EmailService.class));
+                mock(EmailService.class),
+                mock(CommentEvaluationRepository.class));
 
         UpdateOrderStatusRequest request = new UpdateOrderStatusRequest();
         request.setStatus("CONFIRMED");
