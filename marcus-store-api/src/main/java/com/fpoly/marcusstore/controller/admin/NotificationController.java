@@ -10,7 +10,8 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/notifications")
-@PreAuthorize("hasRole('ADMIN')")
+// Marcus sửa: chuông nằm trong layout dùng chung của ADMIN và STAFF.
+@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
 @RequiredArgsConstructor
 public class NotificationController {
 
@@ -18,8 +19,11 @@ public class NotificationController {
 
     // Lấy danh sách thông báo
     @GetMapping
-    public ApiResponse<Map<String, Object>> getNotifications() {
-        return ApiResponse.success(notificationService.getNotificationsForAdmin());
+    public ApiResponse<Map<String, Object>> getNotifications(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "false") boolean unreadOnly) {
+        return ApiResponse.success(notificationService.getNotificationsForAdmin(page, size, unreadOnly));
     }
 
     // Đánh dấu đọc 1 thông báo

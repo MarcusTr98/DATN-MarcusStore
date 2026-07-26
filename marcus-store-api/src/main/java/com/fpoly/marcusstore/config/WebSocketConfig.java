@@ -15,6 +15,7 @@ import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -71,6 +72,22 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         // Khách Guest => Chặn ngay lập tức
                         throw new AccessDeniedException(
                                 "Truy cập bị từ chối! Chưa đăng nhập không được sử dụng Live Chat của hệ thống!");
+                    }
+                }
+
+                // Marcus thêm: topic thông báo admin chứa dữ liệu đơn hàng/liên hệ,
+                // không cho tài khoản khách hàng subscribe chỉ bằng cách đoán URL.
+                if (accessor != null && StompCommand.SUBSCRIBE.equals(accessor.getCommand())
+                        && accessor.getDestination() != null
+                        && accessor.getDestination().startsWith("/topic/admin/")) {
+                    Authentication authentication = (Authentication) accessor.getUser();
+                    boolean isAdminOrStaff = authentication != null
+                            && authentication.getAuthorities().stream()
+                                    .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority())
+                                            || "ROLE_STAFF".equals(authority.getAuthority()));
+
+                    if (!isAdminOrStaff) {
+                        throw new AccessDeniedException("Bạn không có quyền nhận thông báo quản trị.");
                     }
                 }
                 return message;
