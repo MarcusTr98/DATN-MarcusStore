@@ -83,8 +83,47 @@
           <i class="fas fa-arrow-left"></i> Quay lại giỏ hàng
         </router-link>
 
+        <!-- Marcus thêm: lựa chọn cách khách nhận đơn trước khi nhập địa chỉ. -->
+        <div class="checkout-card fulfillment-card mb-3">
+          <div class="checkout-card__title fulfillment-card__heading">
+            <span class="checkout-card__icon"><i class="fas fa-box-open"></i></span>
+            <span>
+              <strong>Cách thức nhận hàng</strong>
+              <small>Chọn phương án thuận tiện nhất cho bạn</small>
+            </span>
+          </div>
+          <div class="fulfillment-selector" role="radiogroup" aria-label="Cách thức nhận hàng">
+            <label
+              class="fulfillment-option"
+              :class="{ 'fulfillment-option--active': !isStorePickup }"
+            >
+              <input v-model="fulfillmentMethod" type="radio" value="DELIVERY" />
+              <span class="fulfillment-option__icon"><i class="fas fa-truck-fast"></i></span>
+              <span class="fulfillment-option__content">
+                <strong>Giao tận nơi</strong>
+                <small>Nhận hàng tại địa chỉ của bạn</small>
+              </span>
+              <span class="fulfillment-option__meta">Tính phí GHN</span>
+              <i class="fas fa-circle-check fulfillment-option__check"></i>
+            </label>
+            <label
+              class="fulfillment-option"
+              :class="{ 'fulfillment-option--active': isStorePickup }"
+            >
+              <input v-model="fulfillmentMethod" type="radio" value="STORE_PICKUP" />
+              <span class="fulfillment-option__icon"><i class="fas fa-store"></i></span>
+              <span class="fulfillment-option__content">
+                <strong>Nhận tại cửa hàng</strong>
+                <small>Đến lấy sau khi cửa hàng xác nhận</small>
+              </span>
+              <span class="fulfillment-option__meta fulfillment-option__meta--free">Miễn phí</span>
+              <i class="fas fa-circle-check fulfillment-option__check"></i>
+            </label>
+          </div>
+        </div>
+
         <!-- Danh sách địa chỉ đã lưu -->
-        <div class="checkout-card mb-3" v-if="savedAddresses.length > 0">
+        <div class="checkout-card mb-3" v-if="!isStorePickup && savedAddresses.length > 0">
           <div class="checkout-card__title">
             <span class="checkout-card__icon"><i class="fas fa-address-book"></i></span>
             Sổ địa chỉ nhận hàng
@@ -116,7 +155,7 @@
         <div class="checkout-card">
           <div class="checkout-card__title">
             <span class="checkout-card__icon"><i class="fas fa-map-marker-alt"></i></span>
-            Địa chỉ giao hàng
+            {{ isStorePickup ? 'Thông tin người nhận' : 'Thông tin giao hàng' }}
           </div>
 
           <form @submit.prevent="handleCheckout" id="checkoutForm">
@@ -162,7 +201,7 @@
               </div>
             </div>
 
-            <div class="address-display-box" v-if="selectedAddress">
+            <div class="address-display-box" v-if="!isStorePickup && selectedAddress">
               <div class="address-display-box__row">
                 <i class="fas fa-map-pin text-danger me-2" style="margin-top: 3px"></i>
                 <span>
@@ -178,7 +217,7 @@
               </div>
             </div>
 
-            <template v-else>
+            <template v-else-if="!isStorePickup">
               <div class="form-row form-row--3col">
                 <div class="form-group">
                   <label class="form-label">Tỉnh / Thành phố <span class="req">*</span></label>
@@ -254,10 +293,41 @@
               </div>
             </template>
 
+            <div v-else class="store-pickup-panel">
+              <div class="store-pickup-panel__top">
+                <span class="store-pickup-panel__icon"><i class="fas fa-store"></i></span>
+                <div>
+                  <span class="store-pickup-panel__eyebrow">ĐỊA ĐIỂM NHẬN HÀNG</span>
+                  <strong>Marcus Store</strong>
+                </div>
+                <span class="store-pickup-panel__free">0₫</span>
+              </div>
+              <div class="store-pickup-panel__details">
+                <p>
+                  <i class="fas fa-location-dot"></i><span>{{ storeInfo.ADDRESS }}</span>
+                </p>
+                <p v-if="storeInfo.WORKING_HOURS">
+                  <i class="far fa-clock"></i><span>{{ storeInfo.WORKING_HOURS }}</span>
+                </p>
+                <p v-if="storeInfo.HOTLINE">
+                  <i class="fas fa-phone"></i
+                  ><a :href="`tel:${storeInfo.HOTLINE}`">{{ storeInfo.HOTLINE }}</a>
+                </p>
+              </div>
+              <div class="store-pickup-panel__notice">
+                <i class="fas fa-circle-info"></i>
+                <span
+                  >Cửa hàng sẽ liên hệ khi đơn sẵn sàng. Bạn chỉ cần đến nhận sau khi có thông
+                  báo.</span
+                >
+              </div>
+            </div>
+
             <div class="form-row">
               <div class="form-group form-group--full">
                 <label class="form-label"
-                  >Ghi chú cho shipper <span class="optional">(Tùy chọn)</span></label
+                  >{{ isStorePickup ? 'Ghi chú cho cửa hàng' : 'Ghi chú cho shipper' }}
+                  <span class="optional">(Tùy chọn)</span></label
                 >
                 <textarea v-model="orderForm.note" class="form-textarea" rows="2"></textarea>
               </div>
@@ -266,7 +336,7 @@
         </div>
 
         <!-- Phương thức vận chuyển -->
-        <div class="checkout-card mt-3">
+        <div v-if="!isStorePickup" class="checkout-card mt-3">
           <div class="checkout-card__title">
             <span class="checkout-card__icon"><i class="fas fa-truck"></i></span>
             Phương thức vận chuyển
@@ -335,8 +405,16 @@
                 <i class="fas fa-hand-holding-usd"></i>
               </div>
               <div class="payment-option__body">
-                <span class="payment-option__name">Thanh toán khi nhận hàng (COD)</span>
-                <span class="payment-option__desc">Trả tiền mặt khi shipper giao đến tay bạn</span>
+                <span class="payment-option__name">
+                  {{ isStorePickup ? 'Thanh toán tại cửa hàng' : 'Thanh toán khi nhận hàng (COD)' }}
+                </span>
+                <span class="payment-option__desc">
+                  {{
+                    isStorePickup
+                      ? 'Thanh toán khi đến nhận sản phẩm'
+                      : 'Trả tiền mặt khi shipper giao đến tay bạn'
+                  }}
+                </span>
               </div>
               <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
             </label>
@@ -420,6 +498,26 @@
             <span class="order-summary__badge">{{ cartData.totalQuantity }} sản phẩm</span>
           </div>
 
+          <!-- Marcus thêm: nhắc lại lựa chọn giao nhận ngay trong phần tổng kết. -->
+          <div
+            class="fulfillment-summary"
+            :class="{ 'fulfillment-summary--pickup': isStorePickup }"
+          >
+            <span class="fulfillment-summary__icon">
+              <i :class="isStorePickup ? 'fas fa-store' : 'fas fa-truck-fast'"></i>
+            </span>
+            <span>
+              <small>Phương thức nhận hàng</small>
+              <strong>{{ isStorePickup ? 'Nhận tại Marcus Store' : 'Giao hàng tận nơi' }}</strong>
+            </span>
+            <button
+              type="button"
+              @click="fulfillmentMethod = isStorePickup ? 'DELIVERY' : 'STORE_PICKUP'"
+            >
+              Đổi
+            </button>
+          </div>
+
           <div class="order-items">
             <div v-for="item in cartData.items" :key="item.cartItemId" class="order-item">
               <!-- Cột trái: Ảnh + Badge số lượng -->
@@ -439,7 +537,6 @@
                 <span v-if="item.isFlashSale" class="order-item__flash-sale-badge">
                   ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
                 </span>
-
               </div>
 
               <!-- Cột phải: Giá tiền -->
@@ -447,10 +544,12 @@
                 <div class="order-item__current-price">
                   {{ item.totalPrice?.toLocaleString('vi-VN') }}₫
                 </div>
-                <s v-if="item.originalPrice && item.originalPrice > item.price" class="order-item__original-price">
+                <s
+                  v-if="item.originalPrice && item.originalPrice > item.price"
+                  class="order-item__original-price"
+                >
                   {{ item.originalPrice?.toLocaleString('vi-VN') }}₫
                 </s>
-
               </div>
             </div>
           </div>
@@ -497,8 +596,11 @@
             </div>
 
             <div class="order-totals__row align-items-center">
-              <span>Phí vận chuyển (GHN)</span>
-              <span v-if="isFeeLoading" class="text-muted" style="font-size: 12px">
+              <span>{{ isStorePickup ? 'Phí nhận tại cửa hàng' : 'Phí vận chuyển (GHN)' }}</span>
+              <span v-if="isStorePickup" class="text-success fw-bold">
+                <i class="fas fa-store me-1"></i>Miễn phí
+              </span>
+              <span v-else-if="isFeeLoading" class="text-muted" style="font-size: 12px">
                 <i class="fas fa-spinner fa-spin"></i>
               </span>
               <div v-else-if="toWardCode" class="d-flex align-items-center gap-2">
@@ -575,8 +677,8 @@
             :disabled="
               isProcessing ||
               !cartData.items?.length ||
-              isFeeLoading ||
-              (!shippingData.isAllowedToOrder && !!toWardCode)
+              (!isStorePickup && isFeeLoading) ||
+              (!isStorePickup && !shippingData.isAllowedToOrder && !!toWardCode)
             "
           >
             <span v-if="!isProcessing"><i class="fas fa-lock me-2"></i>Đặt hàng ngay</span>
@@ -599,17 +701,56 @@ import '@/assets/css/cart.css'
 
 // Marcus refactor: Checkout.vue chỉ còn nhiệm vụ kết nối giao diện với luồng checkout.
 const {
-  modal, handleModalConfirm, showCancelledModal, handleCancelledConfirm,
-  isVoucherInvalidModalOpen, voucherInvalidMessage, closeVoucherInvalidModal,
-  handleVoucherInvalidConfirm, isReSelectVoucherModalOpen, availableVouchers, cartData,
-  isAvailableVouchersLoading, reSelectVoucherMessage, closeReSelectVoucherModal,
-  handleVoucherModalConfirm, isCheckoutVoucherModalOpen, v2SelectedId,
-  closeCheckoutVoucherModal, handleCheckoutVoucherConfirm, savedAddresses, activeAddressId,
-  applySavedAddress, orderForm, selectedAddress, clearSelectedAddress, manualProvinceId,
-  onManualProvinceChange, ghnProvinces, manualDistrictId, onManualDistrictChange,
-  ghnDistricts, manualWardCode, onManualWardChange, ghnWards, detailAddress,
-  estimatedDelivery, isFeeLoading, toWardCode, hasFreeshipVoucher, shippingData,
-  appliedVoucherCode, voucherError, isVoucherLoading, discountAmount,
-  openVoucherModal, finalAmount, isProcessing, handleCheckout,
+  modal,
+  handleModalConfirm,
+  showCancelledModal,
+  handleCancelledConfirm,
+  fulfillmentMethod,
+  isStorePickup,
+  storeInfo,
+  isVoucherInvalidModalOpen,
+  voucherInvalidMessage,
+  closeVoucherInvalidModal,
+  handleVoucherInvalidConfirm,
+  isReSelectVoucherModalOpen,
+  availableVouchers,
+  cartData,
+  isAvailableVouchersLoading,
+  reSelectVoucherMessage,
+  closeReSelectVoucherModal,
+  handleVoucherModalConfirm,
+  isCheckoutVoucherModalOpen,
+  v2SelectedId,
+  closeCheckoutVoucherModal,
+  handleCheckoutVoucherConfirm,
+  savedAddresses,
+  activeAddressId,
+  applySavedAddress,
+  orderForm,
+  selectedAddress,
+  clearSelectedAddress,
+  manualProvinceId,
+  onManualProvinceChange,
+  ghnProvinces,
+  manualDistrictId,
+  onManualDistrictChange,
+  ghnDistricts,
+  manualWardCode,
+  onManualWardChange,
+  ghnWards,
+  detailAddress,
+  estimatedDelivery,
+  isFeeLoading,
+  toWardCode,
+  hasFreeshipVoucher,
+  shippingData,
+  appliedVoucherCode,
+  voucherError,
+  isVoucherLoading,
+  discountAmount,
+  openVoucherModal,
+  finalAmount,
+  isProcessing,
+  handleCheckout,
 } = useCheckoutPage()
 </script>

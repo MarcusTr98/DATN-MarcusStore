@@ -20,6 +20,9 @@ public class OrderDetailResponse {
     private String recipientName;
     private String recipientPhone;
     private String shippingAddress;
+    // Marcus thêm: client/admin chọn đúng giao diện giao tận nơi hoặc nhận tại
+    // quầy.
+    private String fulfillmentMethod;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;
     private BigDecimal shippingFee;

@@ -14,6 +14,10 @@ export function useCheckoutPage() {
   const cartStore = useCartStore()
   const flashSaleStore = useFlashSaleStore()
   const isProcessing = ref(false)
+  // Marcus thêm: DELIVERY mặc định để tương thích luồng checkout hiện tại.
+  const fulfillmentMethod = ref('DELIVERY')
+  const storeInfo = ref({ ADDRESS: '', HOTLINE: '', WORKING_HOURS: '' })
+  const isStorePickup = computed(() => fulfillmentMethod.value === 'STORE_PICKUP')
   const isFeeLoading = ref(false)
   const feeError = ref('')
 
@@ -331,9 +335,10 @@ export function useCheckoutPage() {
   // ─── Computed
   const finalAmount = computed(() => {
     const total = (cartData.value.totalAmount ?? 0) - discountAmount.value
-    const finalShippingFee = hasFreeshipVoucher.value
-      ? 0
-      : shippingData.value.discountedShippingFee || 0
+    const finalShippingFee =
+      isStorePickup.value || hasFreeshipVoucher.value
+        ? 0
+        : shippingData.value.discountedShippingFee || 0
     const finalTotal = total + finalShippingFee
     return finalTotal > 0 ? finalTotal : 0
   })
@@ -588,7 +593,7 @@ export function useCheckoutPage() {
       return
     }
 
-    if (!selectedAddress.value) {
+    if (!isStorePickup.value && !selectedAddress.value) {
       if (!manualProvinceId.value) {
         showModal('Thiếu địa chỉ', 'Vui lòng chọn <strong>Tỉnh / Thành phố</strong> giao hàng.')
         return
@@ -607,7 +612,7 @@ export function useCheckoutPage() {
       }
     }
 
-    if (!isAddressReady.value) {
+    if (!isStorePickup.value && !isAddressReady.value) {
       showModal(
         'Lỗi hệ thống',
         'Chưa nhận diện được mã địa chỉ giao hàng. Vui lòng tải lại trang hoặc chọn lại địa chỉ.',
@@ -615,7 +620,7 @@ export function useCheckoutPage() {
       return
     }
 
-    if (feeError.value || isFeeLoading.value) {
+    if (!isStorePickup.value && (feeError.value || isFeeLoading.value)) {
       showModal(
         'Lỗi phí vận chuyển',
         'Không thể tính phí giao hàng. Vui lòng đợi trong giây lát hoặc chọn địa chỉ khác.',
@@ -630,10 +635,11 @@ export function useCheckoutPage() {
       email: orderForm.value.email,
       paymentMethod: orderForm.value.paymentMethod,
       note: orderForm.value.note,
-      shippingAddress: buildShippingAddress(),
+      fulfillmentMethod: fulfillmentMethod.value,
+      shippingAddress: isStorePickup.value ? storeInfo.value.ADDRESS : buildShippingAddress(),
       // ÉP LẤY DỮ LIỆU: Ưu tiên địa chỉ sổ (toDistrictId) => nếu không có thì lấy địa chỉ chọn tay
-      toDistrictId: toDistrictId.value || manualDistrictId.value,
-      toWardCode: toWardCode.value || manualWardCode.value,
+      toDistrictId: isStorePickup.value ? null : toDistrictId.value || manualDistrictId.value,
+      toWardCode: isStorePickup.value ? null : toWardCode.value || manualWardCode.value,
       voucherCode: appliedVoucherCode.value || null,
     }
 
@@ -684,6 +690,17 @@ export function useCheckoutPage() {
   }
 
   onMounted(async () => {
+    // Marcus thêm: lấy thông tin cửa hàng từ cấu hình chung, không hard-code trên giao diện.
+    api
+      .get('/public/settings')
+      .then(({ data }) => {
+        storeInfo.value = {
+          ADDRESS: data?.ADDRESS || 'Marcus Store',
+          HOTLINE: data?.HOTLINE || '',
+          WORKING_HOURS: data?.WORKING_HOURS || '',
+        }
+      })
+      .catch(() => {})
     await prefillUserEmail()
     await Promise.allSettled([
       fetchGhnProvinces(),
@@ -733,12 +750,21 @@ export function useCheckoutPage() {
     }
   })
 
+  watch(fulfillmentMethod, (method) => {
+    // Marcus thêm: nhận tại quầy không giữ lại phí GHN của địa chỉ đã chọn trước đó.
+    if (method === 'STORE_PICKUP') resetShippingState()
+    else if (isAddressReady.value) calculateShippingFee()
+  })
+
   // Marcus refactor: chỉ public state và action được template Checkout sử dụng.
   return {
     modal,
     handleModalConfirm,
     showCancelledModal,
     handleCancelledConfirm,
+    fulfillmentMethod,
+    isStorePickup,
+    storeInfo,
     isVoucherInvalidModalOpen,
     voucherInvalidMessage,
     closeVoucherInvalidModal,

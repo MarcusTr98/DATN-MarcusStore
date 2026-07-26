@@ -77,7 +77,13 @@
                   <strong class="info-value">{{ orderDetail.email }}</strong>
                 </div>
                 <div class="info-box full">
-                  <span class="info-label">Địa chỉ giao hàng</span>
+                  <span class="info-label">
+                    {{
+                      orderDetail.fulfillmentMethod === 'STORE_PICKUP'
+                        ? 'Nhận tại cửa hàng'
+                        : 'Địa chỉ giao hàng'
+                    }}
+                  </span>
                   <strong class="info-value">{{ orderDetail.shippingAddress }}</strong>
                 </div>
               </div>
@@ -513,6 +519,7 @@ const orderStatusMap = {
   PENDING: { label: 'Chờ xác nhận', className: 'pending' },
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
   PROCESSING: { label: 'Đang chuẩn bị', className: 'processing' },
+  READY_FOR_PICKUP: { label: 'Sẵn sàng nhận tại cửa hàng', className: 'confirmed' },
   PACKED: { label: 'Đã đóng gói', className: 'processing' },
   SHIPPING: { label: 'Đang giao', className: 'shipping' },
   DELIVERED: { label: 'Giao thành công', className: 'shipping' },
@@ -551,6 +558,10 @@ const allowedTransitions = {
     { value: 'PACKED', label: 'Đã đóng gói' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
   ],
+  READY_FOR_PICKUP: [
+    { value: 'COMPLETED', label: 'Xác nhận khách đã nhận hàng' },
+    { value: 'CANCELLED', label: 'Hủy đơn' },
+  ],
   PACKED: [
     { value: 'SHIPPING', label: 'Bắt đầu giao hàng' },
     { value: 'CANCELLED', label: 'Hủy đơn' },
@@ -571,9 +582,20 @@ const allowedTransitions = {
 
 const statusesRequiringNote = ['CANCELLED', 'FAILED']
 
-const nextStatuses = computed(() =>
-  orderDetail.value ? allowedTransitions[orderDetail.value.orderStatus] || [] : [],
-)
+const nextStatuses = computed(() => {
+  if (!orderDetail.value) return []
+  // Marcus thêm: đơn tại quầy bỏ qua đóng gói/vận chuyển GHN.
+  if (
+    orderDetail.value.fulfillmentMethod === 'STORE_PICKUP' &&
+    orderDetail.value.orderStatus === 'PROCESSING'
+  ) {
+    return [
+      { value: 'READY_FOR_PICKUP', label: 'Sẵn sàng nhận tại cửa hàng' },
+      { value: 'CANCELLED', label: 'Hủy đơn' },
+    ]
+  }
+  return allowedTransitions[orderDetail.value.orderStatus] || []
+})
 // Marcus lam them refund
 const canManageRefund = computed(() => {
   const order = orderDetail.value

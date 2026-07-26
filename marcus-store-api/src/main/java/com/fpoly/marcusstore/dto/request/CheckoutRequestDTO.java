@@ -17,14 +17,15 @@ public class CheckoutRequestDTO {
     @NotBlank(message = "Số điện thoại không được để trống")
     private String recipientPhone;
 
-    @NotBlank(message = "Địa chỉ chi tiết không được để trống")
     private String shippingAddress;
 
-    @NotNull(message = "ID Quận/Huyện không được để trống")
     private Integer toDistrictId;
 
-    @NotBlank(message = "Mã Phường/Xã không được để trống")
     private String toWardCode;
+
+    // Marcus thêm: DELIVERY hoặc STORE_PICKUP; mặc định DELIVERY để tương thích
+    // client cũ.
+    private String fulfillmentMethod = "DELIVERY";
 
     @NotBlank(message = "Phương thức thanh toán không được để trống")
     private String paymentMethod;

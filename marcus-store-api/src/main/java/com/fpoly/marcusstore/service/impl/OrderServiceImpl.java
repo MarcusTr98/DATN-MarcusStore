@@ -43,8 +43,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderCancellationService orderCancellationService;
     private final EmailService emailService;
 
-
-    private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED");
+    private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED",
+            "READY_FOR_PICKUP");
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -83,14 +83,19 @@ public class OrderServiceImpl implements OrderService {
                 .itemCount(orderRepository.countItemsByOrderId(order.getOrderId()))
                 .paymentStatus(order.getPaymentStatus())
                 .orderStatus(order.getOrderStatus())
+                .fulfillmentMethod(order.getFulfillmentMethod())
                 .createdAt(order.getCreatedAt()).build();
     }
 
-    private boolean canChangeStatus(String currentStatus, String newStatus) {
+    private boolean canChangeStatus(Order order, String currentStatus, String newStatus) {
+        boolean storePickup = "STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod());
         return switch (currentStatus) {
             case "PENDING" -> newStatus.equals("CONFIRMED") || newStatus.equals("CANCELLED");
             case "CONFIRMED" -> newStatus.equals("PROCESSING") || newStatus.equals("CANCELLED");
-            case "PROCESSING" -> newStatus.equals("PACKED") || newStatus.equals("CANCELLED");
+            case "PROCESSING" -> storePickup
+                    ? newStatus.equals("READY_FOR_PICKUP") || newStatus.equals("CANCELLED")
+                    : newStatus.equals("PACKED") || newStatus.equals("CANCELLED");
+            case "READY_FOR_PICKUP" -> newStatus.equals("COMPLETED") || newStatus.equals("CANCELLED");
             case "PACKED" -> newStatus.equals("SHIPPING") || newStatus.equals("CANCELLED");
             case "SHIPPING" -> newStatus.equals("DELIVERED") || newStatus.equals("FAILED");
             case "DELIVERED" -> newStatus.equals("COMPLETED");
@@ -110,6 +115,7 @@ public class OrderServiceImpl implements OrderService {
             case "CONFIRMED" -> "Đơn hàng đã được xác nhận";
             case "PROCESSING" -> "Đơn hàng đang được chuẩn bị";
             case "PACKED" -> "Đơn hàng đã đóng gói";
+            case "READY_FOR_PICKUP" -> "Đơn hàng sẵn sàng nhận tại cửa hàng";
             case "SHIPPING" -> "Đơn hàng đang được giao";
             case "DELIVERED" -> "Giao hàng thành công";
             case "COMPLETED" -> "Đơn hàng hoàn thành";
@@ -144,12 +150,13 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Trạng thái mới không hợp lệ");
         }
 
-        if (!canChangeStatus(currentStatus, newStatus)) {
+        if (!canChangeStatus(order, currentStatus, newStatus)) {
             throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
         }
 
         // Tạo vận đơn GHN đúng lúc admin đóng gói đơn hàng
-        boolean isPackingNow = "PACKED".equals(newStatus) && !"PACKED".equals(currentStatus);
+        boolean isPackingNow = "PACKED".equals(newStatus) && !"PACKED".equals(currentStatus)
+                && !"STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod());
 
         if (isPackingNow) {
             try {
@@ -203,10 +210,10 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus,
-                                             LocalDate fromDate, LocalDate toDate, Pageable pageable) {
+            LocalDate fromDate, LocalDate toDate, Pageable pageable) {
         return orderRepository.searchOrders(
-                        normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
-                        fromDate, toDate, pageable)
+                normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
+                fromDate, toDate, pageable)
                 .map(this::toResponse);
     }
 
@@ -252,7 +259,7 @@ public class OrderServiceImpl implements OrderService {
         Map<Integer, ProductSku> skuVariantMap = skuIds.isEmpty()
                 ? Map.of()
                 : productSkuRepository.findBySkuIdIn(skuIds).stream()
-                .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
+                        .collect(Collectors.toMap(ProductSku::getSkuId, sku -> sku));
 
         List<OrderStatusHistoryResponse> historyResponses = histories.stream()
                 .map(history -> OrderStatusHistoryResponse.builder()
@@ -272,6 +279,7 @@ public class OrderServiceImpl implements OrderService {
                 .recipientName(order.getRecipientName())
                 .recipientPhone(order.getRecipientPhone())
                 .shippingAddress(order.getShippingAddress())
+                .fulfillmentMethod(order.getFulfillmentMethod())
                 .totalAmount(order.getTotalAmount())
                 .discountAmount(order.getDiscountAmount())
                 .shippingFee(order.getShippingFee())
@@ -299,20 +307,20 @@ public class OrderServiceImpl implements OrderService {
                             ProductSku skuWithVariants = skuVariantMap.getOrDefault(sku.getSkuId(), sku);
                             List<ClientSkuAttributeValueResponse> variants = skuWithVariants
                                     .getAttributeValues() == null
-                                    ? List.of()
-                                    : skuWithVariants.getAttributeValues().stream()
-                                    .map(av -> ClientSkuAttributeValueResponse.builder()
-                                            .valueId(av.getValueId())
-                                            .attributeId(av.getAttribute() != null
-                                                    ? av.getAttribute().getAttributeId()
-                                                    : null)
-                                            .attributeName(av.getAttribute() != null
-                                                    ? av.getAttribute().getAttributeName()
-                                                    : null)
-                                            .valueString(av.getValueString())
-                                            .valueMeta(av.getValueMeta())
-                                            .build())
-                                    .toList();
+                                            ? List.of()
+                                            : skuWithVariants.getAttributeValues().stream()
+                                                    .map(av -> ClientSkuAttributeValueResponse.builder()
+                                                            .valueId(av.getValueId())
+                                                            .attributeId(av.getAttribute() != null
+                                                                    ? av.getAttribute().getAttributeId()
+                                                                    : null)
+                                                            .attributeName(av.getAttribute() != null
+                                                                    ? av.getAttribute().getAttributeName()
+                                                                    : null)
+                                                            .valueString(av.getValueString())
+                                                            .valueMeta(av.getValueMeta())
+                                                            .build())
+                                                    .toList();
                             return OrderItemDetailResponse.builder()
                                     .skuId(sku.getSkuId())
                                     .skuCode(sku.getSkuCode())

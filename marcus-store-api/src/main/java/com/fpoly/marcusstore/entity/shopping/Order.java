@@ -40,6 +40,10 @@ public class Order {
     @Column(name = "shipping_address", nullable = false, length = 500)
     private String shippingAddress;
 
+    // Marcus thêm: phân biệt giao tận nơi và khách nhận trực tiếp tại cửa hàng.
+    @Column(name = "fulfillment_method", nullable = false, length = 30)
+    private String fulfillmentMethod = "DELIVERY";
+
     @Column(name = "total_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal totalAmount;
 
