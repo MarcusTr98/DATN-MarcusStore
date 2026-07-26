@@ -45,13 +45,12 @@ spring.servlet.multipart.max-file-size=5MB
 # Giới hạn dung lượng tối đa cho 1 request chứa nhiều file
 spring.servlet.multipart.max-request-size=20MB
 
-
 # CẤU HÌNH VNPAY SANDBOX
 vnpay.tmnCode=35MNCPPT
 vnpay.hashSecret=PL1CWRM8WRSLHCA0LCIOECIR08Z87TBV
 vnpay.payUrl=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 vnpay.returnUrl=http://localhost:5173/order-success
-# Marcus thêm: tự hủy đơn VNPAY còn PENDING quá thời gian và hoàn kho/voucher/flash sale.
+# Marcus thêm: VNPAY hết hạn 15 phút; chờ thêm 5 phút cho IPN đến chậm rồi mới tự hủy.
 vnpay.paymentTimeoutMinutes=20
 vnpay.expiryInitialDelayMs=60000
 vnpay.expiryScanDelayMs=60000

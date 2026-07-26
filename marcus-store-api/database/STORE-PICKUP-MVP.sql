@@ -7,7 +7,7 @@ BEGIN
             CONSTRAINT DF_Orders_FulfillmentMethod DEFAULT 'DELIVERY';
 END;
 
--- Marcus thêm: giới hạn dữ liệu theo hai phương thức nhận hàng của MVP.
+-- kiểm tra 2 phương thức nhận hàng
 IF NOT EXISTS (
     SELECT 1
     FROM sys.check_constraints
