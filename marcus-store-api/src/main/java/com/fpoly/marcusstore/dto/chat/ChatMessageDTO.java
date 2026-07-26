@@ -13,9 +13,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class ChatMessageDTO {
     private Integer id;
-    private String roomId; // Tên phòng (Ví dụ: username của khách)
+    private String roomId; // Marcus sửa: mã UUID ngẫu nhiên, không dùng username làm mã phòng.
     private String sender; // Người gửi (username)
     private String senderRole; // CUSTOMER hoặc ADMIN
-    private String content; // Nội dung tin nhắn
+    private String content; // Nội dung tin nhắn, tối đa 1000 ký tự.
     private LocalDateTime timestamp;
 }

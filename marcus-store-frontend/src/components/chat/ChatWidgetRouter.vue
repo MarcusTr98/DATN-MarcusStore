@@ -9,7 +9,6 @@ const chatStore = useChatStore()
 // Biến reactive để kiểm tra token
 const isLoggedIn = computed(() => !!localStorage.getItem('ACCESS_TOKEN'))
 const token = localStorage.getItem('ACCESS_TOKEN')
-const username = localStorage.getItem('USERNAME')
 
 onMounted(async () => {
   injectFallbackScript()
@@ -19,7 +18,7 @@ onMounted(async () => {
 
   // Chỉ Kết nối STOMP khi đã đăng nhập (Guest không cần socket)
   if (isLoggedIn.value) {
-    chatStore.connectSocket(token, username)
+    chatStore.connectSocket(token)
   }
 })
 
@@ -30,5 +29,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ChatWidget v-if="chatStore.isAdminOnline" :is-logged-in="isLoggedIn" />
+  <ChatWidget
+    v-if="chatStore.isAdminOnline || chatStore.hasActiveSession"
+    :is-logged-in="isLoggedIn"
+  />
 </template>

@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 
@@ -19,6 +20,7 @@ public class AdminPresenceService {
 
     // Key: SessionID của WebSocket, Value: Username của Admin
     private final Map<String, String> activeAdminSessions = new ConcurrentHashMap<>();
+    private final Set<String> availableAdmins = ConcurrentHashMap.newKeySet();
 
     // Đánh dấu các Username đang trong trạng thái chờ rớt mạng
     private final Map<String, ScheduledFuture<?>> pendingOfflineTasks = new ConcurrentHashMap<>();
@@ -29,7 +31,11 @@ public class AdminPresenceService {
     private static final long GRACE_PERIOD_SECONDS = 5;
 
     public void registerAdminOnline(String sessionId, String username) {
+        boolean wasOnline = hasAnyAdminOnline();
         activeAdminSessions.put(sessionId, username);
+        // Marcus thêm: khi mở Admin Panel, nhân viên mặc định sẵn sàng và có thể chủ
+        // động tạm dừng.
+        availableAdmins.add(username);
 
         // Hủy lệnh set Offline nếu Admin reconnect kịp thời
         ScheduledFuture<?> pendingTask = pendingOfflineTasks.remove(username);
@@ -39,8 +45,8 @@ public class AdminPresenceService {
         }
 
         // Nếu hệ thống vừa chuyển từ 0 => 1 Admin Online, báo cho toàn bộ KH biết
-        if (countDistinctOnlineAdmins() == 1) {
-            broadcastPresence(true);
+        if (!wasOnline && hasAnyAdminOnline()) {
+            broadcastPresence();
         }
     }
 
@@ -56,10 +62,11 @@ public class AdminPresenceService {
         // đếm ngược 5s trước khi thực sự báo Offline
         ScheduledFuture<?> task = taskScheduler.schedule(() -> {
             pendingOfflineTasks.remove(username);
-            // Sau 5s, nếu không còn ai online, mới báo tắt Chat UI
-            if (countDistinctOnlineAdmins() == 0) {
-                broadcastPresence(false);
-                log.info("Toàn bộ Admin đã offline, đóng kênh Chat nội bộ.");
+            if (!activeAdminSessions.containsValue(username)) {
+                boolean wasAvailable = availableAdmins.remove(username);
+                if (wasAvailable) {
+                    broadcastPresence();
+                }
             }
         }, Instant.now().plusSeconds(GRACE_PERIOD_SECONDS));
 
@@ -67,15 +74,31 @@ public class AdminPresenceService {
     }
 
     public boolean hasAnyAdminOnline() {
-        return countDistinctOnlineAdmins() > 0;
+        return activeAdminSessions.values().stream().anyMatch(availableAdmins::contains);
     }
 
-    private long countDistinctOnlineAdmins() {
-        return activeAdminSessions.values().stream().distinct().count();
+    public boolean isAdminAvailable(String username) {
+        return availableAdmins.contains(username) && activeAdminSessions.containsValue(username);
     }
 
-    private void broadcastPresence(boolean isOnline) {
+    public boolean setAvailability(String username, boolean available) {
+        if (!activeAdminSessions.containsValue(username)) {
+            throw new IllegalStateException("Kết nối Live Chat chưa sẵn sàng.");
+        }
+        boolean before = hasAnyAdminOnline();
+        if (available) {
+            availableAdmins.add(username);
+        } else {
+            availableAdmins.remove(username);
+        }
+        if (before != hasAnyAdminOnline()) {
+            broadcastPresence();
+        }
+        return isAdminAvailable(username);
+    }
+
+    private void broadcastPresence() {
         messagingTemplate.convertAndSend("/topic/chat.presence",
-                ApiResponse.success(Map.of("isAdminOnline", isOnline)));
+                ApiResponse.success(Map.of("isAdminOnline", hasAnyAdminOnline())));
     }
 }

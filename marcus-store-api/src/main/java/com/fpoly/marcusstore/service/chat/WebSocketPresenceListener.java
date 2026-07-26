@@ -1,6 +1,5 @@
 package com.fpoly.marcusstore.service.chat;
 
-import com.fpoly.marcusstore.security.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -21,9 +20,9 @@ public class WebSocketPresenceListener {
         Authentication auth = (Authentication) accessor.getUser();
 
         if (auth != null && isAdminRole(auth)) {
-            CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
-            // Lấy SessionID và Username đẩy vào service
-            adminPresenceService.registerAdminOnline(accessor.getSessionId(), userDetails.getUsername());
+            // Marcus sửa: dùng Principal chuẩn, không phụ thuộc kiểu CustomUserDetails cụ
+            // thể.
+            adminPresenceService.registerAdminOnline(accessor.getSessionId(), auth.getName());
         }
     }
 
