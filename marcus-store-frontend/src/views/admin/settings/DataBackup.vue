@@ -335,7 +335,8 @@ const downloadBackup = async (item) => {
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
-    URL.revokeObjectURL(url)
+    // Marcus sửa: chờ trình duyệt nhận tác vụ tải rồi mới giải phóng Blob URL.
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
   } catch (error) {
     errorMessage.value = error.response?.data?.message || 'Không thể tải file sao lưu.'
   } finally {

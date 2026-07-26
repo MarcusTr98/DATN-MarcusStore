@@ -27,7 +27,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
@@ -53,6 +52,12 @@ import java.util.stream.Stream;
 @Slf4j
 public class BackupService {
 
+    private static final String TYPE_BAK = "BAK";
+    private static final String TYPE_EXCEL = "EXCEL";
+    private static final String STATUS_PROCESSING = "PROCESSING";
+    private static final String STATUS_SUCCESS = "SUCCESS";
+    private static final String STATUS_FAILED = "FAILED";
+    private static final int EXCEL_MAX_ROWS = 1_048_576;
     private static final DateTimeFormatter FILE_TIME = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final Set<String> SENSITIVE_COLUMN_MARKERS = Set.of(
             "password", "otp", "secret", "token", "credential", "hash");
@@ -70,11 +75,12 @@ public class BackupService {
 
     @PostConstruct
     void recoverInterruptedJobs() {
-        // Marcus thêm: nếu backend tắt giữa chừng, job cũ không được treo PROCESSING mãi.
+        // Marcus thêm: nếu backend tắt giữa chừng, job cũ không được treo PROCESSING
+        // mãi.
         try {
             for (BackupRecordResponse record : listBackups()) {
-                if ("PROCESSING".equals(record.getStatus())) {
-                    record.setStatus("FAILED");
+                if (STATUS_PROCESSING.equals(record.getStatus())) {
+                    record.setStatus(STATUS_FAILED);
                     record.setCompletedAt(LocalDateTime.now());
                     record.setErrorMessage("Tác vụ bị gián đoạn do backend đã dừng hoặc khởi động lại.");
                     writeMetadata(record);
@@ -99,7 +105,7 @@ public class BackupService {
                 .databaseName(currentDatabaseName())
                 .tableCount(tables.size())
                 .totalRecords(tables.stream().mapToLong(BackupOverviewResponse.TableOverview::getRecords).sum())
-                .successfulBackups(records.stream().filter(item -> "SUCCESS".equals(item.getStatus())).count())
+                .successfulBackups(records.stream().filter(item -> STATUS_SUCCESS.equals(item.getStatus())).count())
                 .storageBytes(storageBytes)
                 .tables(tables)
                 .build();
@@ -120,16 +126,25 @@ public class BackupService {
         }
     }
 
-    public BackupRecordResponse initializeBackup(String type, String note, String username, String ipAddress) {
+    public synchronized BackupRecordResponse initializeBackup(
+            String type, String note, String username, String ipAddress) {
+        // Marcus thêm: frontend đã khóa nút nhưng backend vẫn phải chặn request gọi
+        // thẳng tạo nhiều file cùng lúc.
+        boolean hasRunningJob = listBackups().stream()
+                .anyMatch(item -> STATUS_PROCESSING.equals(item.getStatus()));
+        if (hasRunningJob) {
+            throw new IllegalStateException("Hệ thống đang tạo một bản sao lưu khác. Vui lòng chờ hoàn tất.");
+        }
+
         String id = UUID.randomUUID().toString();
-        String extension = "BAK".equals(type) ? ".bak" : ".xlsx";
+        String extension = TYPE_BAK.equals(type) ? ".bak" : ".xlsx";
         String fileName = "MarcusStore-" + type + "-" + LocalDateTime.now().format(FILE_TIME)
                 + "-" + id.substring(0, 8) + extension;
 
         BackupRecordResponse record = BackupRecordResponse.builder()
                 .id(id)
                 .type(type)
-                .status("PROCESSING")
+                .status(STATUS_PROCESSING)
                 .fileName(fileName)
                 .fileSize(0L)
                 .note(note == null ? "" : note.trim())
@@ -145,12 +160,13 @@ public class BackupService {
         BackupRecordResponse record = getRecord(id);
         try {
             Path output = safeResolve(record.getFileName());
-            if ("BAK".equals(record.getType())) {
-                generateSqlServerBackup(output);
-            } else {
-                generateExcelBackup(output);
+            // Marcus sửa: metadata bị chỉnh tay không được tự động rơi vào nhánh Excel.
+            switch (record.getType()) {
+                case TYPE_BAK -> generateSqlServerBackup(output);
+                case TYPE_EXCEL -> generateExcelBackup(output);
+                default -> throw new IllegalArgumentException("Loại bản sao lưu không hợp lệ.");
             }
-            record.setStatus("SUCCESS");
+            record.setStatus(STATUS_SUCCESS);
             record.setFileSize(Files.size(output));
             record.setChecksum(sha256(output));
             record.setCompletedAt(LocalDateTime.now());
@@ -159,9 +175,9 @@ public class BackupService {
             writeAudit("BACKUP_COMPLETED", record, username, ipAddress);
         } catch (Exception exception) {
             log.error("Tạo backup {} thất bại", id, exception);
-            record.setStatus("FAILED");
+            record.setStatus(STATUS_FAILED);
             record.setCompletedAt(LocalDateTime.now());
-            record.setErrorMessage(toSafeErrorMessage(record.getType(), exception));
+            record.setErrorMessage(toSafeErrorMessage(record.getType()));
             writeMetadata(record);
             writeAudit("BACKUP_FAILED", record, username, ipAddress);
             deleteFileQuietly(record.getFileName());
@@ -170,7 +186,7 @@ public class BackupService {
 
     public Resource getDownload(String id, String username, String ipAddress) {
         BackupRecordResponse record = getRecord(id);
-        if (!"SUCCESS".equals(record.getStatus())) {
+        if (!STATUS_SUCCESS.equals(record.getStatus())) {
             throw new IllegalStateException("Bản sao lưu chưa sẵn sàng để tải.");
         }
         try {
@@ -191,7 +207,7 @@ public class BackupService {
 
     public void deleteBackup(String id, String username, String ipAddress) {
         BackupRecordResponse record = getRecord(id);
-        if ("PROCESSING".equals(record.getStatus())) {
+        if (STATUS_PROCESSING.equals(record.getStatus())) {
             throw new IllegalStateException("Không thể xóa khi bản sao lưu đang được tạo.");
         }
         try {
@@ -221,7 +237,7 @@ public class BackupService {
     private void generateExcelBackup(Path output) throws IOException {
         List<BackupOverviewResponse.TableOverview> tables = loadTables();
         try (SXSSFWorkbook workbook = new SXSSFWorkbook(100);
-             OutputStream stream = Files.newOutputStream(output, StandardOpenOption.CREATE_NEW)) {
+                OutputStream stream = Files.newOutputStream(output, StandardOpenOption.CREATE_NEW)) {
             workbook.setCompressTempFiles(true);
             CellStyle headerStyle = createHeaderStyle(workbook);
             Set<String> usedSheetNames = new HashSet<>();
@@ -247,7 +263,8 @@ public class BackupService {
 
                     int rowIndex = 1;
                     while (resultSet.next()) {
-                        if (rowIndex >= 1_048_576) break;
+                        if (rowIndex >= EXCEL_MAX_ROWS)
+                            break;
                         Row row = sheet.createRow(rowIndex++);
                         for (int index = 1; index <= columnCount; index++) {
                             String columnName = metadata.getColumnLabel(index);
@@ -299,7 +316,8 @@ public class BackupService {
         List<BackupOverviewResponse.TableOverview> tables = new ArrayList<>();
         for (String qualifiedName : tableNames) {
             String[] parts = qualifiedName.split("\\.", 2);
-            if (parts.length != 2 || !isSafeIdentifier(parts[0]) || !isSafeIdentifier(parts[1])) continue;
+            if (parts.length != 2 || !isSafeIdentifier(parts[0]) || !isSafeIdentifier(parts[1]))
+                continue;
             Long count = jdbcTemplate.queryForObject(
                     "SELECT COUNT_BIG(*) FROM " + quoteIdentifier(parts[0]) + "." + quoteIdentifier(parts[1]),
                     Long.class);
@@ -344,8 +362,6 @@ public class BackupService {
             cell.setCellValue(date.toString());
         } else if (value instanceof byte[] bytes) {
             cell.setCellValue("[DỮ LIỆU NHỊ PHÂN " + bytes.length + " bytes]");
-        } else if (value instanceof BigDecimal decimal) {
-            cell.setCellValue(decimal.doubleValue());
         } else {
             String text = String.valueOf(value);
             cell.setCellValue(text.length() > 32_767 ? text.substring(0, 32_767) : text);
@@ -438,8 +454,8 @@ public class BackupService {
         }
     }
 
-    private String toSafeErrorMessage(String type, Exception exception) {
-        if ("BAK".equals(type)) {
+    private String toSafeErrorMessage(String type) {
+        if (TYPE_BAK.equals(type)) {
             return "SQL Server không thể tạo hoặc xác minh file .bak. Kiểm tra quyền thư mục và quyền BACKUP DATABASE.";
         }
         return "Không thể tạo file Excel. Kiểm tra dung lượng ổ đĩa và quyền ghi thư mục backup.";
@@ -458,7 +474,8 @@ public class BackupService {
     }
 
     private String quoteIdentifier(String value) {
-        if (!isSafeIdentifier(value)) throw new IllegalArgumentException("Tên SQL không hợp lệ.");
+        if (!isSafeIdentifier(value))
+            throw new IllegalArgumentException("Tên SQL không hợp lệ.");
         return "[" + value + "]";
     }
 }
