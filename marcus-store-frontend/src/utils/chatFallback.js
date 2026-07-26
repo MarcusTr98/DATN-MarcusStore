@@ -23,19 +23,22 @@ function ensureContainer() {
       display: flex;
       flex-direction: column; /* Xếp dọc từ trên xuống dưới */
       align-items: center;
-      gap: 16px;
+      gap: 12px;
     }
 
     .marcus-float-btn {
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
+      width: 56px;
+      height: 56px;
+      border: 3px solid #fff;
+      border-radius: 18px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
       text-decoration: none;
       position: relative;
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18), 0 2px 6px rgba(15, 23, 42, 0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
 
     /* Hiệu ứng Tooltip */
@@ -64,26 +67,17 @@ function ensureContainer() {
       right: 70px;
     }
 
-    /* Hiệu ứng Rung (Shake) khi di chuột */
-    @keyframes float-shake {
-      0% { transform: translateY(0) rotate(0deg); }
-      25% { transform: translateY(-4px) rotate(-6deg); }
-      50% { transform: translateY(-4px) rotate(6deg); }
-      75% { transform: translateY(-4px) rotate(-6deg); }
-      100% { transform: translateY(0) rotate(0deg); }
-    }
     .marcus-float-btn:hover {
-      animation: float-shake 0.4s ease-in-out infinite;
+      transform: translateY(-3px);
+      box-shadow: 0 14px 28px rgba(15, 23, 42, 0.22), 0 3px 8px rgba(15, 23, 42, 0.12);
     }
 
     .zalo-float-btn {
-      background: #0068ff;
-      box-shadow: 0 4px 15px rgba(0, 104, 255, 0.35);
+      background: linear-gradient(145deg, #087cff, #0068e8);
     }
 
     .fb-float-btn {
       background: linear-gradient(135deg, #00c6ff, #0078ff);
-      box-shadow: 0 4px 15px rgba(0, 120, 255, 0.35);
     }
   `
   document.head.appendChild(style)

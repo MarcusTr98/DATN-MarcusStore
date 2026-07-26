@@ -274,25 +274,31 @@ watch(
 .chat-widget-container {
   font-family: 'Be Vietnam Pro', sans-serif;
   position: fixed;
-  bottom: 176px;
+  bottom: 160px;
   right: 24px;
   z-index: 1050;
 }
 
 /* Nút Trigger */
 .chat-trigger-btn {
-  width: 60px;
-  height: 60px;
-  background: #d70018;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(145deg, #ef233c, #c90019);
   color: #fff;
-  border: none;
-  border-radius: 50%;
-  font-size: 24px;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  font-size: 22px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  box-shadow:
+    0 10px 24px rgba(215, 0, 24, 0.28),
+    0 2px 6px rgba(15, 23, 42, 0.12);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 /* Tooltip cho nút Chat Live */
@@ -320,27 +326,12 @@ watch(
   right: 70px;
 }
 
-/* Hiệu ứng Rung (Shake) */
-@keyframes float-shake {
-  0% {
-    transform: translateY(0) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-4px) rotate(-6deg);
-  }
-  50% {
-    transform: translateY(-4px) rotate(6deg);
-  }
-  75% {
-    transform: translateY(-4px) rotate(-6deg);
-  }
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-}
 .chat-trigger-btn:hover {
-  animation: float-shake 0.4s ease-in-out infinite;
-  background: #b80014;
+  transform: translateY(-3px);
+  background: linear-gradient(145deg, #f43f5e, #b80014);
+  box-shadow:
+    0 14px 28px rgba(215, 0, 24, 0.35),
+    0 3px 8px rgba(15, 23, 42, 0.14);
 }
 
 .chat-trigger-btn.is-hidden {
@@ -353,8 +344,8 @@ watch(
   position: absolute;
   width: 100%;
   height: 100%;
-  border-radius: 50%;
-  border: 2px solid #d70018;
+  border-radius: 20px;
+  border: 2px solid rgba(215, 0, 24, 0.5);
   animation: pulse 2s infinite;
 }
 
@@ -372,7 +363,7 @@ watch(
 /* Cửa sổ Chat */
 .chat-window {
   position: absolute;
-  bottom: -152px;
+  bottom: -136px;
   right: 0;
   width: 350px;
   height: 480px;

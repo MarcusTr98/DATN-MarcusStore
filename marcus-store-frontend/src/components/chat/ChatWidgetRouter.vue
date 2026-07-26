@@ -3,6 +3,7 @@ import { onMounted, onBeforeUnmount, computed } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import { injectFallbackScript, removeFallbackScript } from '@/utils/chatFallback'
 import ChatWidget from './ChatWidget.vue'
+import AiAdvisorWidget from './AiAdvisorWidget.vue'
 
 const chatStore = useChatStore()
 
@@ -29,8 +30,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <AiAdvisorWidget />
   <ChatWidget
-    v-if="chatStore.isAdminOnline || chatStore.hasActiveSession"
-    :is-logged-in="isLoggedIn"
-  />
+      v-if="chatStore.isAdminOnline || chatStore.hasActiveSession"
+      :is-logged-in="isLoggedIn"
+    />
 </template>
