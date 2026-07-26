@@ -252,12 +252,21 @@
                     <div class="info-line">
                       <i class="fa-solid fa-map-location-dot"></i>
                       <div>
-                        <div class="info-label">Địa chỉ nhận hàng</div>
+                        <div class="info-label">
+                          {{
+                            selectedOrder.fulfillmentMethod === 'STORE_PICKUP'
+                              ? 'Nhận tại cửa hàng'
+                              : 'Địa chỉ nhận hàng'
+                          }}
+                        </div>
                         <div class="info-value">{{ selectedOrder.shippingAddress }}</div>
                       </div>
                     </div>
 
-                    <div class="info-line">
+                    <div
+                      class="info-line"
+                      v-if="selectedOrder.fulfillmentMethod !== 'STORE_PICKUP'"
+                    >
                       <i class="fa-solid fa-truck-ramp-box"></i>
                       <div>
                         <div class="info-label">Mã vận đơn</div>
@@ -478,7 +487,7 @@ onMounted(() => {
   fetchOrderDetail()
   // Marcus thêm polling khi refund chưa kết thúc và refresh ngay khi khách quay lại tab.
   refundPollingTimer = window.setInterval(() => {
-  if (refund.value && !['SUCCESS', 'FAILED', 'MANUAL_REVIEW'].includes(refund.value.status)) {
+    if (refund.value && !['SUCCESS', 'FAILED', 'MANUAL_REVIEW'].includes(refund.value.status)) {
       refreshRefundStatus()
     }
   }, 10000)
@@ -490,7 +499,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', refreshRefundStatus)
 })
 
-const USER_CANCELLABLE_STATUSES = ['PENDING', 'PROCESSING', 'PACKED']
+// Marcus sửa: đơn tại quầy vẫn có thể hủy trước khi nhân viên xác nhận đã giao.
+const USER_CANCELLABLE_STATUSES = ['PENDING', 'PROCESSING', 'PACKED', 'READY_FOR_PICKUP']
 
 // Marcus thêm nội dung thân thiện với khách thay cho response code kỹ thuật của VNPAY.
 const refundStatusConfig = {
@@ -621,6 +631,11 @@ const statusConfig = {
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed', icon: 'fa-circle-check' },
   PROCESSING: { label: 'Đang chuẩn bị', className: 'processing', icon: 'fa-boxes-packing' },
   PACKED: { label: 'Đã đóng gói', className: 'processing', icon: 'fa-box' },
+  READY_FOR_PICKUP: {
+    label: 'Sẵn sàng nhận tại cửa hàng',
+    className: 'delivered',
+    icon: 'fa-store',
+  },
   SHIPPING: { label: 'Đang giao', className: 'shipping', icon: 'fa-truck-fast' },
   DELIVERED: { label: 'Giao thành công', className: 'delivered', icon: 'fa-circle-check' },
   CANCELLED: { label: 'Đã hủy', className: 'cancelled', icon: 'fa-ban' },
@@ -636,6 +651,13 @@ const defaultTimelineSteps = [
   { status: 'DELIVERED' },
 ]
 
+const pickupTimelineSteps = [
+  { status: 'PENDING' },
+  { status: 'CONFIRMED' },
+  { status: 'PROCESSING' },
+  { status: 'READY_FOR_PICKUP' },
+]
+
 const visibleTimelineSteps = computed(() => {
   if (!selectedOrder.value) return []
 
@@ -644,19 +666,24 @@ const visibleTimelineSteps = computed(() => {
     (selectedOrder.value.history || []).map((item) => [item.status, item]),
   )
 
-  const currentIndex = defaultTimelineSteps.findIndex((step) => step.status === currentStatus)
+  // Marcus thêm: timeline tại quầy không hiển thị đóng gói, giao hàng và GHN.
+  const timelineSteps =
+    selectedOrder.value.fulfillmentMethod === 'STORE_PICKUP'
+      ? pickupTimelineSteps
+      : defaultTimelineSteps
+  const currentIndex = timelineSteps.findIndex((step) => step.status === currentStatus)
   const isTerminalStatus = currentStatus === 'CANCELLED' || currentStatus === 'FAILED'
   const isCompletedStatus = currentStatus === 'COMPLETED'
 
   let flowStatuses
   if (isTerminalStatus) {
-    flowStatuses = defaultTimelineSteps
+    flowStatuses = timelineSteps
       .filter((step) => historyByStatus.has(step.status))
       .map((step) => step.status)
     flowStatuses.push(currentStatus)
   } else if (currentIndex >= 0 || isCompletedStatus) {
     // COMPLETED: hiển thị đầy đủ flow như DELIVERED (không hiện COMPLETED trên timeline)
-    flowStatuses = [...defaultTimelineSteps.map((step) => step.status)]
+    flowStatuses = [...timelineSteps.map((step) => step.status)]
   } else {
     flowStatuses = ['PENDING', currentStatus]
   }
@@ -673,7 +700,12 @@ const visibleTimelineSteps = computed(() => {
     )
 
     timelineStep.isCurrent =
-      currentStatus === status || (currentStatus === 'COMPLETED' && status === 'DELIVERED')
+      currentStatus === status ||
+      (currentStatus === 'COMPLETED' &&
+        status ===
+          (selectedOrder.value.fulfillmentMethod === 'STORE_PICKUP'
+            ? 'READY_FOR_PICKUP'
+            : 'DELIVERED'))
     return timelineStep
   })
 })

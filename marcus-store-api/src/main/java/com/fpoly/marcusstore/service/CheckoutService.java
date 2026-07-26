@@ -14,6 +14,7 @@ import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.cms.SystemSettingRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleSlotRepository;
@@ -36,6 +37,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -71,6 +73,8 @@ public class CheckoutService {
         private FlashSaleItemRepository flashSaleItemRepository;
         @Autowired
         private FlashSaleSlotRepository flashSaleSlotRepository;
+        @Autowired
+        private SystemSettingRepository systemSettingRepository;
 
         @Transactional(readOnly = true)
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -98,11 +102,25 @@ public class CheckoutService {
 
         @Transactional
         public Order processCheckout(CheckoutRequestDTO req) {
+                // Marcus thêm: client cũ không gửi fulfillmentMethod vẫn được xem là giao tận
+                // nơi.
+                String fulfillmentMethod = req.getFulfillmentMethod() == null
+                                ? "DELIVERY"
+                                : req.getFulfillmentMethod().trim().toUpperCase();
+                if (!Set.of("DELIVERY", "STORE_PICKUP").contains(fulfillmentMethod)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Phương thức nhận hàng không hợp lệ.");
+                }
+                boolean isStorePickup = "STORE_PICKUP".equals(fulfillmentMethod);
+
                 log.info("📥 [CHECKOUT API] Dữ liệu Frontend gửi lên: Name={}, Phone={}, District={}, Ward={}",
                                 req.getRecipientName(), req.getRecipientPhone(), req.getToDistrictId(),
                                 req.getToWardCode());
 
-                if (req.getToDistrictId() == null || req.getToWardCode() == null || req.getToWardCode().isBlank()) {
+                if (!isStorePickup
+                                && (req.getShippingAddress() == null || req.getShippingAddress().isBlank()
+                                                || req.getToDistrictId() == null || req.getToWardCode() == null
+                                                || req.getToWardCode().isBlank())) {
                         throw new RuntimeException(
                                         "Lỗi hệ thống: Dữ liệu Quận/Huyện hoặc Phường/Xã bị trống từ Frontend gửi lên!");
                 }
@@ -135,9 +153,16 @@ public class CheckoutService {
                 order.setUser(user);
                 order.setRecipientName(req.getRecipientName());
                 order.setRecipientPhone(req.getRecipientPhone());
-                order.setShippingAddress(req.getShippingAddress());
-                order.setToDistrictId(req.getToDistrictId());
-                order.setToWardCode(req.getToWardCode());
+                order.setFulfillmentMethod(fulfillmentMethod);
+                // Marcus sửa: địa chỉ nhận tại quầy do server lấy từ cấu hình, không tin dữ
+                // liệu client.
+                String storeAddress = systemSettingRepository.findById("ADDRESS")
+                                .map(setting -> setting.getSettingValue())
+                                .filter(value -> !value.isBlank())
+                                .orElse("Marcus Store");
+                order.setShippingAddress(isStorePickup ? storeAddress : req.getShippingAddress());
+                order.setToDistrictId(isStorePickup ? null : req.getToDistrictId());
+                order.setToWardCode(isStorePickup ? null : req.getToWardCode());
                 order.setPaymentMethod(req.getPaymentMethod());
                 order.setPaymentStatus("COD".equalsIgnoreCase(req.getPaymentMethod()) ? "UNPAID" : "PENDING");
                 order.setOrderStatus("PENDING");
@@ -285,13 +310,20 @@ public class CheckoutService {
                         totalWeightGram += itemWeight;
                 }
 
-                Integer rawShippingFee = ghnService.calculateShippingFee(
-                                req.getToDistrictId(), req.getToWardCode(), totalWeightGram, totalAmount.intValue());
-                BigDecimal ghnStandardFee = BigDecimal.valueOf(rawShippingFee);
-
-                var shippingCalc = shippingService.calculateFinalShipping(totalAmount, ghnStandardFee);
-                BigDecimal discountedShippingFee = shippingCalc.getDiscountedShippingFee(); // Phí khách thực trả
-                BigDecimal shopShippingSubsidy = ghnStandardFee.subtract(discountedShippingFee); // Tiền shop bù
+                // Marcus thêm: nhận tại cửa hàng không gọi GHN và không phát sinh phí/trợ giá
+                // ship.
+                BigDecimal ghnStandardFee = BigDecimal.ZERO;
+                BigDecimal discountedShippingFee = BigDecimal.ZERO;
+                BigDecimal shopShippingSubsidy = BigDecimal.ZERO;
+                if (!isStorePickup) {
+                        Integer rawShippingFee = ghnService.calculateShippingFee(
+                                        req.getToDistrictId(), req.getToWardCode(), totalWeightGram,
+                                        totalAmount.intValue());
+                        ghnStandardFee = BigDecimal.valueOf(rawShippingFee);
+                        var shippingCalc = shippingService.calculateFinalShipping(totalAmount, ghnStandardFee);
+                        discountedShippingFee = shippingCalc.getDiscountedShippingFee();
+                        shopShippingSubsidy = ghnStandardFee.subtract(discountedShippingFee);
+                }
 
                 BigDecimal discountAmount = BigDecimal.ZERO;
                 BigDecimal freeshipAmount = BigDecimal.ZERO;
@@ -379,17 +411,21 @@ public class CheckoutService {
 
                 cartItemRepository.deleteAll(cartItems);
 
-                try {
-                        String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
-                        java.text.NumberFormat formatVN = java.text.NumberFormat
-                                        .getInstance(new java.util.Locale("vi", "VN"));
-                        String notifMessage = "Khách hàng " + savedOrder.getRecipientName()
-                                        + " vừa đặt một đơn hàng trị giá "
-                                        + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
-                        notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage,
-                                        savedOrder.getOrderCode());
-                } catch (Exception e) {
-                        log.error("[Cảnh báo] Lỗi khi bắn thông báo WebSocket", e);
+                // Marcus sửa lỗi chuông: VNPAY chưa thu tiền không được báo là đơn mới cho
+                // admin.
+                if (!"VNPAY".equalsIgnoreCase(savedOrder.getPaymentMethod())) {
+                        try {
+                                String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
+                                java.text.NumberFormat formatVN = java.text.NumberFormat
+                                                .getInstance(new java.util.Locale("vi", "VN"));
+                                String notifMessage = "Khách hàng " + savedOrder.getRecipientName()
+                                                + " vừa đặt một đơn hàng trị giá "
+                                                + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
+                                notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage,
+                                                savedOrder.getOrderCode());
+                        } catch (Exception e) {
+                                log.error("[Cảnh báo] Lỗi khi bắn thông báo WebSocket", e);
+                        }
                 }
 
                 return savedOrder;

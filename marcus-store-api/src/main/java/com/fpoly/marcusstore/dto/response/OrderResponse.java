@@ -21,6 +21,8 @@ public class OrderResponse {
     private String paymentMethod;
     private String paymentStatus;
     private String orderStatus;
+    // Marcus thêm: hiển thị badge nhận tại cửa hàng trong danh sách đơn.
+    private String fulfillmentMethod;
     private Integer itemCount;
 
     // Marcus bổ sung

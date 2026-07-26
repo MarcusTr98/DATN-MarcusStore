@@ -48,6 +48,7 @@ public class RefundService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final VnPayConfig vnPayConfig;
+    private final AdminNotificationService notificationService;
 
     @Transactional
     public RefundResponse requestManualRefund(String orderCode, String reason) {
@@ -326,6 +327,14 @@ public class RefundService {
         order.setPaymentStatus("REFUND_PENDING");
         orderRepository.save(order);
         RefundRequest saved = refundRepository.save(refund);
+        // Marcus thêm: báo realtime ngay khi phát sinh yêu cầu hoàn tiền cần admin xử
+        // lý.
+        notificationService.createAndSendNotification(
+                "REFUND",
+                "Yêu cầu hoàn tiền mới",
+                "Đơn " + order.getOrderCode() + " đang chờ duyệt hoàn "
+                        + refundAmount.stripTrailingZeros().toPlainString() + " VND",
+                order.getOrderCode());
         // Marcus sửa: không gửi mail đồng bộ lúc hủy đơn để giảm độ trễ màn hình admin.
         return saved;
     }

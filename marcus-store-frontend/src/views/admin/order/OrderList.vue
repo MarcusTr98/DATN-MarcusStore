@@ -74,22 +74,12 @@
 
           <div class="col-6 col-md-3 col-lg">
             <label class="form-label">Từ ngày</label>
-            <input
-              v-model="fromDate"
-              type="date"
-              class="form-control"
-              :max="toDate || undefined"
-            />
+            <input v-model="fromDate" type="date" class="form-control" :max="toDate || undefined" />
           </div>
 
           <div class="col-6 col-md-3 col-lg">
             <label class="form-label">Đến ngày</label>
-            <input
-              v-model="toDate"
-              type="date"
-              class="form-control"
-              :min="fromDate || undefined"
-            />
+            <input v-model="toDate" type="date" class="form-control" :min="fromDate || undefined" />
           </div>
 
           <div class="col-12 col-md-6 col-lg-auto">
@@ -104,59 +94,67 @@
         <div class="table-responsive">
           <table class="table align-middle order-table mb-0">
             <thead>
-            <tr>
-              <th>ID</th>
-              <th>Mã đơn</th>
-              <th>Người nhận</th>
-              <th>Thành tiền</th>
-              <th>Thanh toán</th>
-              <th>Trạng thái TT</th>
-              <th>Trạng thái đơn</th>
-              <th>Ngày tạo</th>
-              <th class="text-end">Thao tác</th>
-            </tr>
+              <tr>
+                <th>ID</th>
+                <th>Mã đơn</th>
+                <th>Người nhận</th>
+                <th>Thành tiền</th>
+                <th>Thanh toán</th>
+                <th>Trạng thái TT</th>
+                <th>Trạng thái đơn</th>
+                <th>Ngày tạo</th>
+                <th class="text-end">Thao tác</th>
+              </tr>
             </thead>
 
             <tbody>
-            <tr v-for="(orders, index) in filteredOrders" :key="orders.orderId">
-              <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
-              <td>
-                <div class="order-code">{{ orders.orderCode }}</div>
-                <small>{{ orders.itemCount }} sản phẩm</small>
-              </td>
-              <td>
-                <div class="order-code">{{ orders.recipientName }}</div>
-                <small>{{ orders.recipientPhone }}</small>
-              </td>
-              <td class="fw-semibold">{{ formatCurrency(orders.finalAmount) }}</td>
-              <td>{{ paymentMethodMap[orders.paymentMethod] || orders.paymentMethod }}</td>
-              <td>
-                <span class="status-badge" :class="paymentStatusMap[orders.paymentStatus]?.className">
-                  {{ paymentStatusMap[orders.paymentStatus]?.label || orders.paymentStatus }}
-                </span>
-              </td>
-              <td>
-                <span class="status-badge" :class="orderStatusMap[orders.orderStatus]?.className">
-                  {{ orderStatusMap[orders.orderStatus]?.label || orders.orderStatus }}
-                </span>
-              </td>
-              <td>
-                <div class="date-line">Ngày: {{ formatDate1(orders.createdAt) }}</div>
-                <div class="date-line">Giờ: {{ formatTime1(orders.createdAt) }}</div>
-              </td>
-              <td>
-                <div class="d-flex justify-content-end gap-2">
-                  <button
-                    type="button"
-                    class="icon-button"
-                    title="Xem chi tiết"
-                    @click="showOrderDetail(orders)"
+              <tr v-for="(orders, index) in filteredOrders" :key="orders.orderId">
+                <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
+                <td>
+                  <div class="order-code">{{ orders.orderCode }}</div>
+                  <small>{{ orders.itemCount }} sản phẩm</small>
+                </td>
+                <td>
+                  <div class="order-code">{{ orders.recipientName }}</div>
+                  <small>{{ orders.recipientPhone }}</small>
+                </td>
+                <td class="fw-semibold">{{ formatCurrency(orders.finalAmount) }}</td>
+                <td>
+                  <div>{{ paymentMethodMap[orders.paymentMethod] || orders.paymentMethod }}</div>
+                  <small v-if="orders.fulfillmentMethod === 'STORE_PICKUP'" class="text-success">
+                    <i class="bi bi-shop"></i> Nhận tại cửa hàng
+                  </small>
+                </td>
+                <td>
+                  <span
+                    class="status-badge"
+                    :class="paymentStatusMap[orders.paymentStatus]?.className"
                   >
-                    <i class="bi bi-eye"></i>
-                  </button>
-                </div>
-              </td>
-            </tr>
+                    {{ paymentStatusMap[orders.paymentStatus]?.label || orders.paymentStatus }}
+                  </span>
+                </td>
+                <td>
+                  <span class="status-badge" :class="orderStatusMap[orders.orderStatus]?.className">
+                    {{ orderStatusMap[orders.orderStatus]?.label || orders.orderStatus }}
+                  </span>
+                </td>
+                <td>
+                  <div class="date-line">Ngày: {{ formatDate1(orders.createdAt) }}</div>
+                  <div class="date-line">Giờ: {{ formatTime1(orders.createdAt) }}</div>
+                </td>
+                <td>
+                  <div class="d-flex justify-content-end gap-2">
+                    <button
+                      type="button"
+                      class="icon-button"
+                      title="Xem chi tiết"
+                      @click="showOrderDetail(orders)"
+                    >
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -239,7 +237,7 @@ const orderStats = ref({
   completed: 0,
   cancelled: 0,
 })
-async function fetchGetAllOrder(){
+async function fetchGetAllOrder() {
   try {
     loading.value = true
     error.value = null
@@ -255,19 +253,18 @@ async function fetchGetAllOrder(){
     orders.value = response.data.content || []
     totalPages.value = response.data.totalPages
     totalElements.value = response.data.totalElements
-
-  }catch (e) {
+  } catch (e) {
     error.value = 'Không thể tải được đơn hàng'
     console.error(e)
-  }finally {
+  } finally {
     loading.value = false
   }
 }
-async function fetchOrderStats(){
+async function fetchOrderStats() {
   const response = await OrderListApi.getOrderStats()
   orderStats.value = response.data
 }
-onMounted(()=> {
+onMounted(() => {
   fetchGetAllOrder()
   fetchOrderStats()
   getFilterOption()
@@ -291,11 +288,10 @@ function goToPage(page) {
   fetchGetAllOrder()
 }
 
-async function getFilterOption(){
+async function getFilterOption() {
   const response = await OrderListApi.getFilterOption()
   paymentOptions.value = response.data.paymentMethods || []
   orderOptions.value = response.data.orderStatuses || []
-
 }
 const formatDate1 = (value) => {
   if (!value) return ''
@@ -307,15 +303,17 @@ const formatTime1 = (value) => {
   return String(value).split(' ')[1] || ''
 }
 const orderStatusMap = {
-  PENDING:   { label: 'Chờ xác nhận',    className: 'pending' },
-  CONFIRMED: { label: 'Đã xác nhận',     className: 'confirmed' },
-  PROCESSING:{ label: 'Đang chuẩn bị',   className: 'processing' },
-  PACKED:    { label: 'Đã đóng gói',     className: 'processing' },
-  SHIPPING:  { label: 'Đang giao',       className: 'shipping' },
+  // Marcus thêm: trạng thái riêng cho đơn khách đến nhận tại cửa hàng.
+  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
+  CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
+  PROCESSING: { label: 'Đang chuẩn bị', className: 'processing' },
+  READY_FOR_PICKUP: { label: 'Sẵn sàng nhận tại cửa hàng', className: 'confirmed' },
+  PACKED: { label: 'Đã đóng gói', className: 'processing' },
+  SHIPPING: { label: 'Đang giao', className: 'shipping' },
   DELIVERED: { label: 'Giao thành công', className: 'shipping' },
-  COMPLETED: { label: 'Hoàn thành',      className: 'completed' },
-  CANCELLED: { label: 'Đã hủy',         className: 'cancelled' },
-  FAILED:    { label: 'Giao thất bại',   className: 'failed' },
+  COMPLETED: { label: 'Hoàn thành', className: 'completed' },
+  CANCELLED: { label: 'Đã hủy', className: 'cancelled' },
+  FAILED: { label: 'Giao thất bại', className: 'failed' },
 }
 
 const paymentStatusMap = {
@@ -364,6 +362,4 @@ const resetFilters = () => {
 }
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

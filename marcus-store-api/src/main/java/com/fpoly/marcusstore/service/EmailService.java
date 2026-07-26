@@ -365,6 +365,7 @@ public class EmailService {
       case "PENDING" -> "Lấy hàng thành công";
       case "SHIPPING" -> "Đang vận chuyển";
       case "DELIVERED" -> "Giao hàng thành công";
+      case "READY_FOR_PICKUP" -> "Sẵn sàng nhận tại cửa hàng";
       default -> status;
     };
   }
@@ -374,13 +375,18 @@ public class EmailService {
       case "PENDING" -> "Đơn vị vận chuyển đã lấy hàng thành công, đơn hàng của bạn sẽ sớm được giao đi.";
       case "SHIPPING" -> "Đơn hàng đang trên đường đến với bạn. Vui lòng để ý điện thoại nhé!";
       case "DELIVERED" -> "Đơn hàng đã được giao thành công. Cảm ơn bạn đã mua sắm cùng MarcusStore!";
+      // Marcus thêm: nội dung riêng, tránh bảo khách đến cửa hàng trước khi hàng sẵn
+      // sàng.
+      case "READY_FOR_PICKUP" -> "Đơn hàng đã sẵn sàng. Bạn có thể đến Marcus Store để nhận hàng.";
       default -> "Trạng thái đơn hàng của bạn vừa được cập nhật.";
     };
   }
 
   private String buildOrderStatusHtml(String customerName, Order order, String status) {
     boolean isNegative = "CANCELLED".equals(status) || "FAILED".equals(status);
-    String timelineHtml = isNegative ? buildNegativeTimeline(status) : buildTimeline(status);
+    String timelineHtml = isNegative
+        ? buildNegativeTimeline(status)
+        : buildTimeline(status, "STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod()));
 
     BigDecimal shippingFee = order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO;
     BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
@@ -583,19 +589,15 @@ public class EmailService {
     return sb.toString();
   }
 
-  private String buildTimeline(String currentStatus) {
+  private String buildTimeline(String currentStatus, boolean storePickup) {
+    // Marcus thêm: email đơn tại quầy không hiển thị các bước vận chuyển.
+    String[] flow = storePickup
+        ? new String[] { "PENDING", "PROCESSING", "READY_FOR_PICKUP" }
+        : new String[] { "PENDING", "SHIPPING", "DELIVERED" };
 
-    String[] flow = {
-        "PENDING",
-        "SHIPPING",
-        "DELIVERED"
-    };
-
-    String[] labels = {
-        "Lấy hàng",
-        "Vận chuyển",
-        "Đã giao"
-    };
+    String[] labels = storePickup
+        ? new String[] { "Đã đặt", "Chuẩn bị", "Sẵn sàng nhận" }
+        : new String[] { "Lấy hàng", "Vận chuyển", "Đã giao" };
 
     int currentIndex = Arrays.asList(flow).indexOf(currentStatus);
 

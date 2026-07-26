@@ -1,8 +1,14 @@
 import api from '@/utils/api'
 
 const financialApi = {
-  getTransactions() {
-    return api.get('/admin/finance-reports/list')
+  // Marcus thêm: truyền bộ lọc ngày xuống query backend để lấy đúng khoảng đối soát.
+  getTransactions(fromDate = '', toDate = '') {
+    return api.get('/admin/finance-reports/list', {
+      params: {
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
+      },
+    })
   },
 
   exportExcel() {

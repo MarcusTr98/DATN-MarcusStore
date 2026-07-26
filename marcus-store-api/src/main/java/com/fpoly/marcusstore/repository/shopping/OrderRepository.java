@@ -25,6 +25,12 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode")
   Optional<Order> findByOrderCodeForUpdate(@Param("orderCode") String orderCode);
 
+  // Marcus thêm: scheduler khóa đúng một đơn trước khi quyết định hủy thanh toán
+  // treo.
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM Order o WHERE o.orderId = :orderId")
+  Optional<Order> findByIdForUpdate(@Param("orderId") Integer orderId);
+
   // Được thêm từ nhánh GHN Webhook
   Optional<Order> findByTrackingCode(String trackingCode);
 

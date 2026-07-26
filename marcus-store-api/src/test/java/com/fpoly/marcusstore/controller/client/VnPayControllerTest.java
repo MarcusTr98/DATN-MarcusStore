@@ -5,6 +5,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderTransactionService;
+import com.fpoly.marcusstore.service.AdminNotificationService;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -20,7 +21,8 @@ class VnPayControllerTest {
             mock(OrderRepository.class),
             mock(OrderStatusHistoryRepository.class),
             mock(OrderCancellationService.class),
-            mock(OrderTransactionService.class));
+            mock(OrderTransactionService.class),
+            mock(AdminNotificationService.class));
 
     @Test
     void parsesVnPayAmountWithoutLongOverflowOrTruncation() {
