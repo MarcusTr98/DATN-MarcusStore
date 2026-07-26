@@ -100,6 +100,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/user/**").authenticated() // Checkout, Giỏ hàng, Wishlist, Đgiá
                         // Thêm quyền cho nhánh finance-reports
                         .requestMatchers("/api/admin/finance-reports/**").hasAnyRole("ADMIN", "STAFF")
+                        // Marcus thêm: dữ liệu toàn hệ thống chỉ ADMIN được tạo và tải.
+                        .requestMatchers("/api/admin/backups/**").hasRole("ADMIN")
                         // 3. Nhóm API dành riêng cho Quản trị viên
                         .requestMatchers("/api/admin/roles/**").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "STAFF") // Quản lý User, Thống kê
