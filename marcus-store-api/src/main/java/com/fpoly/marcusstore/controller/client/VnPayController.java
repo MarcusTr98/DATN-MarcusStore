@@ -7,6 +7,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderTransactionService;
+import com.fpoly.marcusstore.service.AdminNotificationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class VnPayController {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final OrderCancellationService orderCancellationService;
     private final OrderTransactionService orderTransactionService;
+    private final AdminNotificationService notificationService;
 
     @Transactional
     @GetMapping("/ipn")
@@ -143,6 +145,12 @@ public class VnPayController {
             order.setTransactionId(transactionId);
             order.setPaymentDate(LocalDateTime.now());
             orderTransactionService.markVnPayPaymentSuccess(order, transactionId, responseCode);
+            // Marcus sửa lỗi chuông: chỉ IPN thành công mới đưa đơn VNPAY tới admin.
+            notificationService.createAndSendNotification(
+                    "ORDER",
+                    "Đơn VNPAY đã thanh toán: " + orderCode,
+                    "Thanh toán đã được VNPAY xác nhận. Đơn hàng sẵn sàng để admin xử lý.",
+                    orderCode);
 
             log.info("[VNPAY IPN] Thanh toán thành công. Đơn hàng {} chuyển sang PENDING để Admin xác nhận.",
                     orderCode);

@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { useLoadingStore } from '@/stores/useLoadingStore'
 
+// Marcus sửa: dùng cùng cấu hình môi trường với WebSocket, tránh REST bị gọi cứng về localhost.
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api').replace(/\/+$/, '')
+
 const api = axios.create({
-  baseURL: 'http://localhost:8080/api',
+  baseURL: API_BASE_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -12,7 +15,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     // 1. Kích hoạt hiệu ứng loading khi bắt đầu gọi API
-    useLoadingStore().show()
+    if (!config.skipGlobalLoading) useLoadingStore().show()
 
     // 2. Đảm bảo lấy đúng key ACCESS_TOKEN
     const token = localStorage.getItem('ACCESS_TOKEN')
@@ -23,7 +26,7 @@ api.interceptors.request.use(
   },
   (error) => {
     // Tắt loading nếu request bị lỗi ngay từ client
-    useLoadingStore().hide()
+    if (!error.config?.skipGlobalLoading) useLoadingStore().hide()
     return Promise.reject(error)
   },
 )
@@ -31,12 +34,12 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     // Tắt loading khi API trả về kết quả thành công
-    useLoadingStore().hide()
+    if (!response.config.skipGlobalLoading) useLoadingStore().hide()
     return response
   },
   (error) => {
     // Tắt loading khi API trả về lỗi (4xx, 5xx)
-    useLoadingStore().hide()
+    if (!error.config?.skipGlobalLoading) useLoadingStore().hide()
 
     if (error.response) {
       const status = error.response.status

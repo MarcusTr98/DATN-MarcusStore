@@ -5,6 +5,7 @@ import api from '@/utils/api'
 
 const PAGE_SIZE = 10
 const WS_ENDPOINT_URL = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws-endpoint'
+const INITIAL_RETRY_DELAY_MS = 1200
 
 // Marcus thêm: quản lý API + realtime chuông ở một nơi, tránh AdminHeader ôm toàn bộ nghiệp vụ.
 export function useAdminNotifications() {
@@ -18,6 +19,8 @@ export function useAdminNotifications() {
   const errorMessage = ref('')
   const connectionState = ref('CONNECTING')
   let stompClient = null
+  let hasConnectedOnce = false
+  let retryTimer = null
 
   const displayUnreadCount = computed(() =>
     unreadCount.value > 99 ? '99+' : String(unreadCount.value),
@@ -25,7 +28,13 @@ export function useAdminNotifications() {
 
   const isUnreadOnly = computed(() => activeFilter.value === 'UNREAD')
 
-  const fetchNotifications = async ({ append = false } = {}) => {
+  const fetchNotifications = async ({ append = false, retryAttempt = 0 } = {}) => {
+    // Marcus sửa: header và thao tác mở chuông có thể gọi cùng lúc; chỉ giữ một request đầu tiên.
+    if (!append && isLoading.value) return
+    if (retryAttempt === 0 && retryTimer) {
+      window.clearTimeout(retryTimer)
+      retryTimer = null
+    }
     if (append) isLoadingMore.value = true
     else isLoading.value = true
     errorMessage.value = ''
@@ -37,6 +46,8 @@ export function useAdminNotifications() {
           size: PAGE_SIZE,
           unreadOnly: isUnreadOnly.value,
         },
+        // Marcus thêm: chuông có skeleton riêng nên không bật loading toàn trang cho request nền.
+        skipGlobalLoading: true,
       })
       const data = response.data?.data ?? {}
       const incoming = Array.isArray(data.list) ? data.list : []
@@ -52,8 +63,21 @@ export function useAdminNotifications() {
 
       unreadCount.value = Number(data.unreadCount) || 0
       hasMore.value = Boolean(data.hasMore)
-    } catch {
-      errorMessage.value = 'Không thể tải thông báo. Vui lòng thử lại.'
+    } catch (error) {
+      const status = error.response?.status
+      const canRetry = !append && retryAttempt === 0 && (!status || status >= 500)
+
+      // Marcus thêm: phục hồi một lần khi backend vừa khởi động hoặc mạng chập chờn, không polling.
+      if (canRetry) {
+        retryTimer = window.setTimeout(() => {
+          retryTimer = null
+          fetchNotifications({ retryAttempt: 1 })
+        }, INITIAL_RETRY_DELAY_MS)
+      } else if (status === 403) {
+        errorMessage.value = 'Tài khoản hiện tại không có quyền xem thông báo.'
+      } else {
+        errorMessage.value = 'Không thể tải thông báo. Vui lòng thử lại.'
+      }
     } finally {
       isLoading.value = false
       isLoadingMore.value = false
@@ -153,6 +177,9 @@ export function useAdminNotifications() {
             fetchNotifications()
           }
         })
+        // Marcus sửa lỗi chuông: sau khi mất mạng/reconnect phải bù các event WebSocket đã lỡ.
+        if (hasConnectedOnce) fetchNotifications()
+        hasConnectedOnce = true
       },
       onWebSocketClose: () => {
         connectionState.value = 'DISCONNECTED'
@@ -165,6 +192,10 @@ export function useAdminNotifications() {
   }
 
   const disconnectRealtime = () => {
+    if (retryTimer) {
+      window.clearTimeout(retryTimer)
+      retryTimer = null
+    }
     stompClient?.deactivate()
     stompClient = null
     connectionState.value = 'DISCONNECTED'

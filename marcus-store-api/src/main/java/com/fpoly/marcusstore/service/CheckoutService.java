@@ -411,17 +411,21 @@ public class CheckoutService {
 
                 cartItemRepository.deleteAll(cartItems);
 
-                try {
-                        String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
-                        java.text.NumberFormat formatVN = java.text.NumberFormat
-                                        .getInstance(new java.util.Locale("vi", "VN"));
-                        String notifMessage = "Khách hàng " + savedOrder.getRecipientName()
-                                        + " vừa đặt một đơn hàng trị giá "
-                                        + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
-                        notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage,
-                                        savedOrder.getOrderCode());
-                } catch (Exception e) {
-                        log.error("[Cảnh báo] Lỗi khi bắn thông báo WebSocket", e);
+                // Marcus sửa lỗi chuông: VNPAY chưa thu tiền không được báo là đơn mới cho
+                // admin.
+                if (!"VNPAY".equalsIgnoreCase(savedOrder.getPaymentMethod())) {
+                        try {
+                                String notifTitle = "Đơn hàng mới: " + savedOrder.getOrderCode();
+                                java.text.NumberFormat formatVN = java.text.NumberFormat
+                                                .getInstance(new java.util.Locale("vi", "VN"));
+                                String notifMessage = "Khách hàng " + savedOrder.getRecipientName()
+                                                + " vừa đặt một đơn hàng trị giá "
+                                                + formatVN.format(savedOrder.getFinalAmount()) + "đ.";
+                                notificationService.createAndSendNotification("ORDER", notifTitle, notifMessage,
+                                                savedOrder.getOrderCode());
+                        } catch (Exception e) {
+                                log.error("[Cảnh báo] Lỗi khi bắn thông báo WebSocket", e);
+                        }
                 }
 
                 return savedOrder;

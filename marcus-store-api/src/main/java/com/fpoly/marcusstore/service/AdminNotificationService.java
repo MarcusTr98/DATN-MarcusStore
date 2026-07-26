@@ -6,7 +6,6 @@ import com.fpoly.marcusstore.repository.contact.AdminNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +32,9 @@ public class AdminNotificationService {
     public Map<String, Object> getNotificationsForAdmin(int page, int size, boolean unreadOnly) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
-        PageRequest pageable = PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+        // Marcus sửa: repository đã khai báo OrderByCreatedAtDesc, không chồng thêm
+        // ORDER BY từ Pageable.
+        PageRequest pageable = PageRequest.of(safePage, safeSize);
 
         Page<AdminNotification> result = unreadOnly
                 ? notificationRepository.findByIsReadFalseOrderByCreatedAtDesc(pageable)

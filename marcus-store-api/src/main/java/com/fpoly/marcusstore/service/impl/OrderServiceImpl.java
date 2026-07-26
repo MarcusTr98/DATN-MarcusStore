@@ -150,6 +150,13 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("Trạng thái mới không hợp lệ");
         }
 
+        // Marcus thêm: admin chỉ được hủy, không được xác nhận/chuẩn bị đơn VNPAY chưa
+        // thu tiền.
+        if (isAwaitingVnPayPayment(order) && !"CANCELLED".equals(newStatus)) {
+            throw new RuntimeException(
+                    "Đơn VNPAY chưa thanh toán; không thể xác nhận hoặc chuẩn bị hàng");
+        }
+
         if (!canChangeStatus(order, currentStatus, newStatus)) {
             throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang " + newStatus);
         }
@@ -206,6 +213,11 @@ public class OrderServiceImpl implements OrderService {
         orderStatusHistoryRepository.save(history);
 
         return getOrderDetailResponse(orderCode);
+    }
+
+    private boolean isAwaitingVnPayPayment(Order order) {
+        return "VNPAY".equalsIgnoreCase(order.getPaymentMethod())
+                && !"PAID".equalsIgnoreCase(order.getPaymentStatus());
     }
 
     @Override

@@ -390,103 +390,11 @@
             Phương thức thanh toán
           </div>
 
-          <div class="payment-options">
-            <label
-              class="payment-option"
-              :class="{ 'payment-option--active': orderForm.paymentMethod === 'COD' }"
-            >
-              <input
-                type="radio"
-                v-model="orderForm.paymentMethod"
-                value="COD"
-                class="payment-option__radio"
-              />
-              <div class="payment-option__icon payment-option__icon--cod">
-                <i class="fas fa-hand-holding-usd"></i>
-              </div>
-              <div class="payment-option__body">
-                <span class="payment-option__name">
-                  {{ isStorePickup ? 'Thanh toán tại cửa hàng' : 'Thanh toán khi nhận hàng (COD)' }}
-                </span>
-                <span class="payment-option__desc">
-                  {{
-                    isStorePickup
-                      ? 'Thanh toán khi đến nhận sản phẩm'
-                      : 'Trả tiền mặt khi shipper giao đến tay bạn'
-                  }}
-                </span>
-              </div>
-              <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
-            </label>
-
-            <label
-              class="payment-option flex-column align-items-stretch"
-              :class="{ 'payment-option--active': orderForm.paymentMethod === 'BANKING' }"
-            >
-              <div class="d-flex align-items-center gap-3 w-100">
-                <input
-                  type="radio"
-                  v-model="orderForm.paymentMethod"
-                  value="BANKING"
-                  class="payment-option__radio"
-                />
-                <div class="payment-option__icon payment-option__icon--qr">
-                  <i class="fas fa-qrcode"></i>
-                </div>
-                <div class="payment-option__body">
-                  <span class="payment-option__name">Chuyển khoản mã QR</span>
-                  <span class="payment-option__desc"
-                    >Quét mã QR bằng ngân hàng (Tự động duyệt)</span
-                  >
-                </div>
-                <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
-              </div>
-              <div
-                class="qr-code-box mt-3 pt-3 border-top"
-                v-if="orderForm.paymentMethod === 'BANKING'"
-              >
-                <div class="qr-bank-info">
-                  <img
-                    :src="`https://img.vietqr.io/image/mbbank-0901234567-compact2.png?amount=${finalAmount}&addInfo=DH${orderForm.recipientPhone}&accountName=MARCUS%20TRAN`"
-                    class="qr-bank-info__img"
-                  />
-                  <div class="qr-bank-info__details">
-                    <div class="qr-bank-info__bank">
-                      <i class="fas fa-university me-1"></i>MB Bank
-                    </div>
-                    <div>STK: <strong>0901234567</strong></div>
-                    <div>Chủ TK: <strong>MARCUS TRAN</strong></div>
-                    <div class="qr-bank-info__amount">
-                      {{ finalAmount.toLocaleString('vi-VN') }}₫
-                    </div>
-                    <div class="qr-bank-info__note">
-                      ND: <strong>DH{{ orderForm.recipientPhone || 'SDT' }}</strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </label>
-
-            <label
-              class="payment-option"
-              :class="{ 'payment-option--active': orderForm.paymentMethod === 'VNPAY' }"
-            >
-              <input
-                type="radio"
-                v-model="orderForm.paymentMethod"
-                value="VNPAY"
-                class="payment-option__radio"
-              />
-              <div class="payment-option__icon payment-option__icon--vnpay">
-                <i class="fas fa-credit-card"></i>
-              </div>
-              <div class="payment-option__body">
-                <span class="payment-option__name">Ví điện tử / Thẻ quốc tế (VNPAY)</span>
-                <span class="payment-option__desc">Thanh toán qua cổng VNPAY an toàn</span>
-              </div>
-              <div class="payment-option__check"><i class="fas fa-check-circle"></i></div>
-            </label>
-          </div>
+          <!-- Marcus tách: Checkout chỉ giữ state; component con trình bày hai phương thức hợp lệ. -->
+          <CheckoutPaymentMethods
+            v-model="orderForm.paymentMethod"
+            :is-store-pickup="isStorePickup"
+          />
         </div>
       </div>
 
@@ -681,7 +589,17 @@
               (!isStorePickup && !shippingData.isAllowedToOrder && !!toWardCode)
             "
           >
-            <span v-if="!isProcessing"><i class="fas fa-lock me-2"></i>Đặt hàng ngay</span>
+            <span v-if="!isProcessing">
+              <i
+                :class="
+                  orderForm.paymentMethod === 'VNPAY'
+                    ? 'fas fa-arrow-up-right-from-square'
+                    : 'fas fa-lock'
+                "
+                class="me-2"
+              ></i>
+              {{ orderForm.paymentMethod === 'VNPAY' ? 'Tiếp tục đến VNPAY' : 'Đặt hàng ngay' }}
+            </span>
             <span v-else><i class="fas fa-spinner fa-spin me-2"></i>Đang xử lý...</span>
           </button>
         </div>
@@ -693,6 +611,7 @@
 <script setup>
 import BaseModal from '@/components/BaseModal.vue'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
+import CheckoutPaymentMethods from '@/components/client/checkout/CheckoutPaymentMethods.vue'
 import VoucherModal from '@/components/VoucherModal.vue'
 import { expandColorName } from '@/utils/colorUtils'
 import { useCheckoutPage } from '@/composables/useCheckoutPage'
