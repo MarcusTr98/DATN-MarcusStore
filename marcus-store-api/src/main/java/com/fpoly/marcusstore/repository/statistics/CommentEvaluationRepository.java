@@ -45,25 +45,48 @@ List<CommentEvaluation> findAllByOrderByCreatedAtDesc();
         "reply.staff"
 })
 Page<CommentEvaluation> findAllByOrderByCreatedAtDesc(Pageable pageable);
+@EntityGraph(attributePaths = {
+        "user",
+        "product",
+        "orderItem",
+        "images",
+        "reply",
+        "reply.staff"
+})
 @Query("""
 SELECT r
 FROM CommentEvaluation r
 WHERE
-(:keyword IS NULL
-OR LOWER(r.user.fullName) LIKE LOWER(CONCAT('%',:keyword,'%'))
-OR LOWER(r.product.productName) LIKE LOWER(CONCAT('%',:keyword,'%')))
-AND (:rating IS NULL OR r.rating=:rating)
-AND (
-    :replied IS NULL
-    OR (:replied=true AND r.reply IS NOT NULL)
-    OR (:replied=false AND r.reply IS NULL)
+(
+    :keyword IS NULL
+    OR LOWER(r.user.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+    OR LOWER(r.product.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))
 )
+AND
+(
+    :productId IS NULL
+    OR r.product.productId = :productId
+)
+AND
+(
+    :rating IS NULL
+    OR r.rating = :rating
+)
+AND
+(
+    :replied IS NULL
+    OR (:replied = true AND r.reply IS NOT NULL)
+    OR (:replied = false AND r.reply IS NULL)
+)
+ORDER BY r.createdAt DESC
 """)
 Page<CommentEvaluation> search(
         @Param("keyword") String keyword,
+        @Param("productId") Integer productId,
         @Param("rating") Integer rating,
         @Param("replied") Boolean replied,
-        Pageable pageable);
+        Pageable pageable
+);
 
    @Query("""
 SELECT r.rating, COUNT(r)

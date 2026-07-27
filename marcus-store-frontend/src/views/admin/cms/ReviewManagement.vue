@@ -41,7 +41,9 @@
       </div>
 
     </div>
-    <ReviewStatisticByProduct />
+    <ReviewStatisticByProduct
+    @changeProduct="changeProductFilter"
+/>
     <!-- Filter -->
     <div class="filter-card">
 
@@ -195,7 +197,7 @@ const detailVisible = ref(false)
 
 const selectedReview = ref({})
 const reviews = ref([]);
-
+const selectedProductId = ref(null);
 const filters = ref({
 
   keyword: "",
@@ -252,6 +254,15 @@ const deleteReview = async (review) => {
   }
 
 }
+const changeProductFilter = (productId) => {
+
+    selectedProductId.value = productId
+
+    page.value = 0
+
+    search()
+
+}
 const totalReviews = computed(() => reviews.value.length);
 
 const repliedReviews = computed(() =>
@@ -289,6 +300,8 @@ const search = async () => {
 
       keyword: filters.value.keyword || null,
 
+      productId: selectedProductId.value || null,
+
       rating: filters.value.rating || null,
 
       replied:
@@ -301,9 +314,7 @@ const search = async () => {
   })
 
   reviews.value = res.data.data.content
-
   totalPages.value = res.data.data.totalPages
-
   totalElements.value = res.data.data.totalElements
 
 }

@@ -73,7 +73,9 @@ const loadProducts = async () => {
     products.value = res.data.data;
 
 }
-
+const emit = defineEmits([
+    "changeProduct"
+])
 const loadStatistic = async () => {
 
     if(!selectedProduct.value){

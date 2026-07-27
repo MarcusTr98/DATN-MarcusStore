@@ -28,9 +28,16 @@
         <td class="product">
           {{ review.productName }}
         </td>
+
+        <!-- FIX: trước đây span.star luôn được tô màu vàng (#ffb400) bất kể
+             sao đó là "★" hay "☆", khiến các review 1-2 sao trông như vẫn
+             đầy sao (rất dễ hiểu nhầm). Giờ tách class active/inactive:
+             - sao được chọn: vàng đậm (#ffb400)
+             - sao rỗng: xám rõ ràng (#E0E0E0) thay vì mờ nhạt -->
         <td>
           <span
               class="star"
+              :class="n <= review.rating ? 'star-active' : 'star-empty'"
               v-for="n in 5"
               :key="n"
           >
@@ -43,6 +50,10 @@
         <td class="date">
           {{ formatDate(review.createdAt) }}
         </td>
+
+        <!-- Badge trạng thái: đổi màu theo yêu cầu để tương phản rõ hơn
+             - Chưa trả lời: nền vàng nhạt #FEF3C7 / chữ nâu đậm #92400E
+             - Đã trả lời:  nền hồng nhạt #FCE7F3 / chữ hồng đậm #9D174D -->
         <td>
           <span
               class="badge replied"
@@ -67,6 +78,8 @@
                 <i class="fas fa-eye"></i>
             </button>
 
+            <!-- Không gọi confirm() của trình duyệt nữa, chỉ emit sự kiện.
+                 Component cha (ReviewManagement) sẽ mở ConfirmModal riêng. -->
             <button
                 class="btn danger"
                 @click="$emit('delete',review)"
@@ -96,7 +109,6 @@ const emit = defineEmits([
 ])
 
 const showDetail = (review) => {
-  console.log("emit detail", review)
   emit("detail", review)
 }
 
@@ -209,9 +221,18 @@ td{
 }
 
 .star{
-    color:#ffb400;
     font-size:16px;
+}
+
+/* Sao được chọn: vàng đậm, có shadow nhẹ cho nổi bật */
+.star-active{
+    color:#ffb400;
     text-shadow: 0 1px 4px rgba(255,180,0,.3);
+}
+
+/* Sao rỗng: xám rõ ràng, KHÔNG dùng màu quá nhạt để tránh trông như lỗi UI */
+.star-empty{
+    color:#E0E0E0;
 }
 
 .badge{
@@ -227,13 +248,13 @@ td{
 }
 
 .replied{
-    background:#ffe3ef;
-    color:#f55d9b;
+    background:#FCE7F3;
+    color:#9D174D;
 }
 
 .waiting{
-    background:#fff4d8;
-    color:#d08a00;
+    background:#FEF3C7;
+    color:#92400E;
 }
 
 .actions{

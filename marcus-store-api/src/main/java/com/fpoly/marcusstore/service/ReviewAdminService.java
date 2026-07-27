@@ -139,15 +139,21 @@ public void updateReply(
 }
 public Page<ReviewAdminResponse> search(
         String keyword,
+        Integer productId,
         Integer rating,
         Boolean replied,
         Pageable pageable){
 
-    return reviewRepository
-            .search(keyword,rating,replied,pageable)
-            .map(this::mapToResponse);
-}
-
+return reviewRepository
+        .search(
+                keyword,    
+                productId,
+                rating,
+                replied,
+                pageable
+        )
+        .map(this::mapToResponse);
+    }
 public List<RatingStatisticResponse> getRatingStatistics(Integer productId){
 
     List<Object[]> result =

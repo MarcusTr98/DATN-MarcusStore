@@ -82,21 +82,24 @@ public ApiResponse<?> search(
 
         @RequestParam(required = false) String keyword,
 
+        @RequestParam(required = false) Integer productId,
+
         @RequestParam(required = false) Integer rating,
 
         @RequestParam(required = false) Boolean replied,
 
-        @RequestParam(defaultValue="0") int page,
+        @RequestParam(defaultValue = "0") int page,
 
-        @RequestParam(defaultValue="10") int size){
+        @RequestParam(defaultValue = "10") int size) {
 
     return ApiResponse.success(
 
             reviewAdminService.search(
                     keyword,
+                    productId,
                     rating,
                     replied,
-                    PageRequest.of(page,size)
+                    PageRequest.of(page, size)
             )
 
     );

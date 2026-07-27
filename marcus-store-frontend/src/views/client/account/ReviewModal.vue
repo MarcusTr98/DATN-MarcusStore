@@ -54,253 +54,304 @@
 
         </div>
 
-        <!-- ================= PRODUCT ================= -->
+        <!-- ================= BODY: 2 COLUMN GRID ================= -->
 
-        <div
-          class="product-box"
-          role="button"
-          tabindex="0"
-          @click="goToProductDetail"
-          @keydown.enter="goToProductDetail"
-        >
+        <div class="modal-body-grid">
 
-          <img
-            :src="orderItem?.thumbnail"
-            class="product-image"
-          >
-
-          <div class="product-info">
-
-            <h4>{{ orderItem?.productName }}</h4>
-
-            <small>
-
-              Cảm nhận của bạn sẽ giúp khách hàng khác lựa chọn tốt hơn.
-
-            </small>
-
-            <span class="view-detail-link">
-              Xem chi tiết sản phẩm
-              <i class="fa-solid fa-chevron-right"></i>
-            </span>
-
-          </div>
-
-        </div>
-
-        <!-- ================= STAR ================= -->
-
-        <div
-          class="rating-section"
-          :class="{ readonly: props.viewOnly }"
-        >
-
-          <div class="rating-box">
-
-            <span
-              v-for="star in 5"
-              :key="star"
-              class="star"
-              :class="{ active: star <= hoverStar || star <= rating }"
-              @mouseenter="!props.viewOnly && (hoverStar = star)"
-              @mouseleave="!props.viewOnly && (hoverStar = 0)"
-              @click="!props.viewOnly && (rating = star)"
-            >
-
-              ★
-
-            </span>
-
-          </div>
-
-          <div
-            v-if="rating"
-            class="rating-text"
-          >
-
-            {{ ratingText }}
-
-          </div>
-
-        </div>
-
-        <!-- ================= COMMENT ================= -->
-
-        <div class="comment-box">
-
-          <label>
-
-            <i class="fa-regular fa-comment"></i>
-
-            Nội dung đánh giá
-
-          </label>
-
-          <textarea
-
-            v-model="commentText"
-
-            rows="5"
-
-            :readonly="props.viewOnly"
-
-            :class="{ readonly: props.viewOnly }"
-
-            placeholder="Hãy chia sẻ trải nghiệm của bạn về sản phẩm..."
-
-          ></textarea>
-
-        </div>
-
-        <!-- ================= UPLOAD ================= -->
-
-        <div
-          v-if="!props.viewOnly"
-          class="image-upload"
-        >
-
-          <label>
-
-            <i class="fa-regular fa-image"></i>
-
-            Hình ảnh đánh giá
-
-            <span>
-
-              ({{ previewImages.length }}/5)
-
-            </span>
-
-          </label>
-
-          <input
-
-            ref="fileInput"
-
-            type="file"
-
-            accept="image/*"
-
-            multiple
-
-            @change="handleImageChange"
-
-            :disabled="loading || uploading"
-
-          >
-
-          <div class="upload-note">
-
-            <div>
-
-              ✓ Tối đa 5 ảnh
-
-            </div>
-
-            <div>
-
-              ✓ Hỗ trợ JPG, PNG, WEBP
-            </div>
-            <div>
-
-              ✓ Dung lượng tối đa 5MB/ảnh
-          </div>
-
-        </div>
-</div>
-        <!-- ================= LOADING ================= -->
-
-        <div
-          v-if="uploading"
-          class="upload-loading"
-        >
-
-          <i class="fa-solid fa-spinner fa-spin"></i>
-
-          Đang tải ảnh...
-
-        </div>
-
-        <!-- ================= PREVIEW ================= -->
-
-        <div class="preview-list">
-
-          <template v-if="previewImages.length">
+          <!-- ---------- LEFT: PRODUCT + RATING ---------- -->
+          <div class="modal-left">
 
             <div
-
-              class="preview-item"
-
-              v-for="(image,index) in previewImages"
-
-              :key="index"
-
+              class="product-box"
+              role="button"
+              tabindex="0"
+              @click="goToProductDetail"
+              @keydown.enter="goToProductDetail"
             >
 
               <img
+                v-if="orderItem?.productImage"
+                :src="orderItem.productImage"
+                :alt="orderItem.productName"
+                class="product-image"
+              />
 
-                :src="image"
+              <div v-else class="no-image">
+                <i class="fa-solid fa-image"></i>
+              </div>
 
-                class="preview-image"
+              <div class="product-info">
 
-                @click="previewImage(image)"
+                <h4>{{ orderItem?.productName }}</h4>
 
-              >
+                <small>
 
-              <button
+                  Cảm nhận của bạn sẽ giúp khách hàng khác lựa chọn tốt hơn.
 
-                v-if="!props.viewOnly"
+                </small>
 
-                class="remove-image"
+                <span class="view-detail-link">
+                  Xem chi tiết sản phẩm
+                  <i class="fa-solid fa-chevron-right"></i>
+                </span>
 
-                @click="removeImage(index)"
-
-              >
-
-                <i class="fa-solid fa-xmark"></i>
-
-              </button>
+              </div>
 
             </div>
 
-          </template>
+            <div
+              class="rating-section"
+              :class="{ readonly: props.viewOnly }"
+            >
 
-          <div
+              <div class="rating-box">
 
-            v-else
+                <span
+                  v-for="star in 5"
+                  :key="star"
+                  class="star"
+                  :class="{ active: star <= hoverStar || star <= rating }"
+                  @mouseenter="!props.viewOnly && (hoverStar = star)"
+                  @mouseleave="!props.viewOnly && (hoverStar = 0)"
+                  @click="!props.viewOnly && (rating = star)"
+                >
 
-            class="empty-image"
+                  ★
 
-          >
+                </span>
 
-            <i class="fa-regular fa-images"></i>
+              </div>
 
-            <p>
+              <div
+                v-if="rating"
+                class="rating-text"
+              >
 
-              Chưa có hình ảnh nào
+                {{ ratingText }}
 
-            </p>
+              </div>
+
+            </div>
+
+          </div>
+
+          <!-- ---------- RIGHT: COMMENT + UPLOAD ---------- -->
+          <div class="modal-right">
+
+            <div class="comment-box">
+
+              <label>
+
+                <i class="fa-regular fa-comment"></i>
+
+                Nội dung đánh giá
+
+              </label>
+
+              <!-- ============ QUICK COMMENT CHIPS (đổi theo số sao) ============ -->
+              <div
+                v-if="!props.viewOnly"
+                class="quick-comments"
+              >
+
+                <button
+                  v-for="(text, idx) in quickComments"
+                  :key="idx"
+                  type="button"
+                  class="chip"
+                  :class="{ 'chip-active': selectedQuickComment === text }"
+                  @click="applyQuickComment(text)"
+                >
+                  {{ text }}
+                </button>
+
+              </div>
+
+              <textarea
+
+                v-model="commentText"
+
+                rows="5"
+
+                :readonly="props.viewOnly"
+
+                :class="{ readonly: props.viewOnly }"
+
+                placeholder="Hãy chia sẻ trải nghiệm của bạn về sản phẩm..."
+
+                @input="onCommentManualInput"
+
+              ></textarea>
+
+            </div>
+
+            <!-- ================= ERROR ================= -->
+
+            <transition name="fade">
+
+              <p
+                v-if="error"
+                class="error"
+              >
+
+                <i class="fa-solid fa-circle-exclamation"></i>
+
+                {{ error }}
+
+              </p>
+
+            </transition>
+
+            <!-- ================= UPLOAD ================= -->
+
+            <div
+              v-if="!props.viewOnly"
+              class="image-upload"
+            >
+
+              <label>
+
+                <i class="fa-regular fa-image"></i>
+
+                Hình ảnh đánh giá
+
+                <span>
+
+                  ({{ previewImages.length }}/5)
+
+                </span>
+
+              </label>
+
+              <div class="upload-control">
+
+                <button
+                  type="button"
+                  class="upload-choose-btn"
+                  :disabled="loading || uploading"
+                  @click="fileInput?.click()"
+                >
+                  <i class="fa-solid fa-image"></i>
+                  Chọn ảnh
+                </button>
+
+                <span
+                  v-if="selectedImages.length"
+                  class="upload-status-text"
+                >
+
+                  Đã chọn {{ selectedImages.length }} ảnh mới
+
+                </span>
+
+                <input
+
+                  ref="fileInput"
+
+                  type="file"
+
+                  accept="image/*"
+
+                  multiple
+
+                  class="upload-native-input"
+
+                  @change="handleImageChange"
+
+                  :disabled="loading || uploading"
+
+                >
+
+              </div>
+
+              <div class="upload-note">
+
+                Tối đa 5 ảnh · JPG, PNG, WEBP · ≤ 5MB/ảnh
+
+              </div>
+
+            </div>
+
+            <!-- ================= LOADING ================= -->
+
+            <div
+              v-if="uploading"
+              class="upload-loading"
+            >
+
+              <i class="fa-solid fa-spinner fa-spin"></i>
+
+              Đang tải ảnh...
+
+            </div>
+
+            <!-- ================= PREVIEW ================= -->
+
+            <div class="preview-list">
+
+              <template v-if="previewImages.length">
+
+                <div
+
+                  class="preview-item"
+
+                  v-for="(image,index) in previewImages"
+
+                  :key="index"
+
+                >
+
+                  <img
+
+                    :src="image"
+
+                    class="preview-image"
+
+                    @click="previewImage(image)"
+
+                  >
+
+                  <button
+
+                    v-if="!props.viewOnly"
+
+                    class="remove-image"
+
+                    @click="removeImage(index)"
+
+                  >
+
+                    <i class="fa-solid fa-xmark"></i>
+
+                  </button>
+
+                </div>
+
+              </template>
+
+              <div
+
+                v-else-if="!props.viewOnly"
+
+                class="empty-image"
+
+              >
+
+                <i class="fa-regular fa-images"></i>
+
+                <p>
+
+                  Chưa có hình ảnh nào
+
+                </p>
+
+              </div>
+
+            </div>
 
           </div>
 
         </div>
-
-        <!-- ================= ERROR ================= -->
-
-        <transition name="fade">
-
-          <p
-            v-if="error"
-            class="error"
-          >
-
-            <i class="fa-solid fa-circle-exclamation"></i>
-
-            {{ error }}
-
-          </p>
-
-        </transition>
 
         <!-- ================= DELETE ================= -->
 
@@ -497,6 +548,61 @@ const ACCEPT_TYPES = [
 
 ]
 
+// Gợi ý bình luận nhanh cho khách - đổi theo số sao để khớp cảm xúc thật của khách
+const quickCommentsByRating = {
+
+    1: [
+
+        "Sản phẩm không như mô tả",
+
+        "Chất lượng kém, rất thất vọng",
+
+        "Giao hàng chậm, đóng gói sơ sài"
+
+    ],
+
+    2: [
+
+        "Chưa hài lòng về chất lượng sản phẩm",
+
+        "Sản phẩm chưa như kỳ vọng",
+
+        "Cần cải thiện thêm về đóng gói/giao hàng"
+
+    ],
+
+    3: [
+
+        "Sản phẩm tạm ổn, chưa có gì nổi bật",
+
+        "Chất lượng ở mức trung bình",
+
+        "Đóng gói bình thường, giao hàng đúng hẹn"
+
+    ],
+
+    4: [
+
+        "Chất lượng tốt, đúng như mô tả sản phẩm",
+
+        "Giao hàng nhanh, nhân viên tư vấn nhiệt tình",
+
+        "Hài lòng với sản phẩm, sẽ cân nhắc mua lại"
+
+    ],
+
+    5: [
+
+        "Hàng chính hãng, giao nhanh đảm bảo",
+
+        "Hàng chuẩn, đóng gói cẩn thận, rất hài lòng",
+
+        "Sẽ tiếp tục ủng hộ shop dài dài"
+
+    ]
+
+}
+
 /* ===========================
         STATE
 =========================== */
@@ -506,6 +612,9 @@ const rating = ref(0)
 const hoverStar = ref(0)
 
 const commentText = ref("")
+
+// Mẫu đánh giá đang được áp dụng (để biết cần thay thế hay nối thêm)
+const selectedQuickComment = ref("")
 
 const loading = ref(false)
 
@@ -563,6 +672,8 @@ watch(
 
         selectedImages.value=[]
 
+        selectedQuickComment.value=""
+
         confirmingDelete.value=false
 
         error.value=""
@@ -597,6 +708,90 @@ const ratingText = computed(()=>{
 
 })
 
+// Gợi ý hiển thị theo số sao đang chọn; chưa chọn sao thì tạm dùng bộ trung tính (3 sao)
+const quickComments = computed(()=>{
+
+    return quickCommentsByRating[rating.value] || quickCommentsByRating[3]
+
+})
+
+/* ===========================
+        QUICK COMMENT
+=========================== */
+
+// Nếu khách tự gõ tay thì bỏ trạng thái "đang dùng mẫu",
+// để lần bấm mẫu tiếp theo sẽ nối vào thay vì thay thế nhầm.
+function onCommentManualInput(){
+
+    if(
+
+        selectedQuickComment.value &&
+
+        commentText.value.trim() !== selectedQuickComment.value
+
+    ){
+
+        selectedQuickComment.value = ""
+
+    }
+
+}
+
+function applyQuickComment(text){
+
+    if(props.viewOnly){
+
+        return
+
+    }
+
+    const current = commentText.value.trim()
+
+    // Nếu nội dung hiện tại chính là mẫu vừa chọn trước đó
+    // (khách chưa gõ thêm gì khác) -> THAY THẾ bằng mẫu mới.
+    if(
+
+        selectedQuickComment.value &&
+
+        current === selectedQuickComment.value
+
+    ){
+
+        commentText.value = text
+
+    }
+
+    // Nếu khách có gõ thêm nội dung riêng trước/sau mẫu cũ,
+    // thì bỏ phần mẫu cũ ở cuối, giữ lại phần khách tự viết, rồi nối mẫu mới.
+    else if(
+
+        selectedQuickComment.value &&
+
+        current.endsWith(selectedQuickComment.value)
+
+    ){
+
+        const base = current
+
+            .slice(0, current.length - selectedQuickComment.value.length)
+
+            .trim()
+
+        commentText.value = base ? base + " " + text : text
+
+    }
+
+    // Chưa từng chọn mẫu nào -> nối vào cuối nội dung hiện có (nếu có)
+    else{
+
+        commentText.value = current ? current + " " + text : text
+
+    }
+
+    selectedQuickComment.value = text
+
+}
+
 /* ===========================
         NAVIGATE TO PRODUCT DETAIL
 =========================== */
@@ -607,16 +802,14 @@ function goToProductDetail() {
 
     const slug = props.orderItem?.productSlug
 
-    if (!slug) return
+    if (!slug) {
+        console.warn("[ReviewModal] Thiếu productSlug", props.orderItem)
+        return
+    }
 
     close()
 
-    router.push({
-        name: "ProductDetail",
-        params: {
-            slug
-        }
-    })
+    router.push({ name: "ProductDetail", params: { slug } })
 
 }
 
@@ -763,6 +956,8 @@ function close(){
     hoverStar.value=0
 
     commentText.value=""
+
+    selectedQuickComment.value=""
 
     existingImages.value=[]
 
@@ -964,7 +1159,7 @@ async function deleteReview(){
     justify-content:center;
     align-items:center;
     z-index:9999;
-    padding:24px;
+    padding:20px;
 }
 
 .fade-enter-active,
@@ -992,16 +1187,14 @@ async function deleteReview(){
 .review-modal{
 
     width:100%;
-    max-width:620px;
-    max-height:90vh;
+    max-width:920px;
+    max-height:92vh;
 
-    /* overflow:hidden ở đây (thay vì auto) để 4 góc luôn bo đều,
-       phần cuộn thật sự nằm ở .modal-scroll bên trong */
     overflow:hidden;
 
     background:white;
 
-    border-radius:22px;
+    border-radius:20px;
 
     box-shadow:
         0 30px 80px rgba(0,0,0,.18);
@@ -1011,7 +1204,7 @@ async function deleteReview(){
 
 .modal-scroll{
 
-    max-height:90vh;
+    max-height:92vh;
 
     overflow-y:auto;
 
@@ -1071,7 +1264,7 @@ async function deleteReview(){
     justify-content:space-between;
     align-items:center;
 
-    padding:22px 26px;
+    padding:16px 22px;
 
     border-bottom:1px solid #f1f1f1;
 
@@ -1079,19 +1272,67 @@ async function deleteReview(){
 
 }
 
+.header-left{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:14px;
+
+}
+
+.header-icon{
+
+    width:42px;
+
+    height:42px;
+
+    flex-shrink:0;
+
+    border-radius:50%;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    background:#fff0f2;
+
+    color:#e60012;
+
+    font-size:17px;
+
+}
+
 .modal-header h3{
 
-    font-size:22px;
+    font-size:20px;
     font-weight:800;
 
     color:#e60012;
+
+    line-height:1.3;
+
+}
+
+.modal-header p{
+
+    font-size:13px;
+
+    color:#777;
+
+    margin-top:2px;
 
 }
 
 .close-btn{
 
-    width:40px;
-    height:40px;
+    width:38px;
+    height:38px;
+
+    flex-shrink:0;
 
     border:none;
     border-radius:50%;
@@ -1099,6 +1340,12 @@ async function deleteReview(){
     background:#fff0f5;
 
     cursor:pointer;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
 
     transition:.25s;
 }
@@ -1114,6 +1361,50 @@ async function deleteReview(){
 }
 
 /* ===========================
+        Body grid (2 cột)
+=========================== */
+
+.modal-body-grid{
+
+    display:flex;
+
+    gap:22px;
+
+    padding:14px 22px 0;
+
+    align-items:flex-start;
+
+}
+
+/* Cột trái giờ chỉ còn sản phẩm + rating -> gọn, không còn chật chội */
+.modal-left{
+
+    flex:0 0 240px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:14px;
+
+}
+
+/* Cột phải giờ gánh thêm phần upload/preview -> lấp đầy khoảng trống dọc */
+.modal-right{
+
+    flex:1;
+
+    min-width:0;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:14px;
+
+}
+
+/* ===========================
         Product
 =========================== */
 
@@ -1121,15 +1412,13 @@ async function deleteReview(){
 
     display:flex;
 
-    gap:18px;
+    gap:14px;
 
-    padding:16px 26px;
-
-    margin:0 26px 0;
+    padding:10px;
 
     align-items:center;
 
-    border-radius:18px;
+    border-radius:16px;
 
     cursor:pointer;
 
@@ -1153,16 +1442,42 @@ async function deleteReview(){
 
 .product-image{
 
-    width:85px;
-    height:85px;
+    width:68px;
+    height:68px;
 
-    border-radius:16px;
+    border-radius:14px;
 
     object-fit:cover;
 
     border:1px solid #eee;
 
     flex-shrink:0;
+
+}
+
+.no-image{
+
+    width:68px;
+
+    height:68px;
+
+    flex-shrink:0;
+
+    border-radius:14px;
+
+    border:1px solid #eee;
+
+    background:#fafafa;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+    color:#cbd5e1;
+
+    font-size:22px;
 
 }
 
@@ -1176,11 +1491,11 @@ async function deleteReview(){
 
 .product-info h4{
 
-    font-size:18px;
+    font-size:15px;
 
     font-weight:700;
 
-    line-height:1.5;
+    line-height:1.35;
 
     color:#000;
 
@@ -1190,9 +1505,15 @@ async function deleteReview(){
 
 .product-info small{
 
+    display:block;
+
+    font-size:12px;
+
     color:#000;
 
     opacity:.6;
+
+    margin-top:3px;
 
 }
 
@@ -1202,11 +1523,11 @@ async function deleteReview(){
 
     align-items:center;
 
-    gap:6px;
+    gap:5px;
 
-    margin-top:6px;
+    margin-top:5px;
 
-    font-size:13px;
+    font-size:12px;
 
     font-weight:700;
 
@@ -1218,7 +1539,7 @@ async function deleteReview(){
 
 .view-detail-link i{
 
-    font-size:11px;
+    font-size:10px;
 
 }
 
@@ -1226,7 +1547,7 @@ async function deleteReview(){
 
     color:#e60012;
 
-    gap:8px;
+    gap:7px;
 
 }
 
@@ -1234,27 +1555,35 @@ async function deleteReview(){
         Rating
 =========================== */
 
+.rating-section{
+
+    padding:6px 4px;
+
+}
+
 .rating-box{
 
     display:flex;
 
     justify-content:center;
 
-    gap:10px;
+    gap:8px;
 
-    margin-top:5px;
+    margin-top:2px;
 
 }
 
 .star{
 
-    font-size:42px;
+    font-size:32px;
 
     color:#ddd;
 
     cursor:pointer;
 
     transition:.25s;
+
+    line-height:1;
 
 }
 
@@ -1278,13 +1607,13 @@ async function deleteReview(){
 
     text-align:center;
 
-    font-size:15px;
+    font-size:13px;
 
     color:#e60012;
 
     font-weight:700;
 
-    margin:12px 0 22px;
+    margin:10px 0 0;
 
 }
 
@@ -1294,7 +1623,7 @@ async function deleteReview(){
 
 .comment-box{
 
-    padding:20px 26px 0;
+    padding:0;
 
 }
 
@@ -1308,9 +1637,73 @@ async function deleteReview(){
 
     font-weight:700;
 
+    font-size:14px;
+
     color:#555;
 
-    margin-bottom:10px;
+    margin-bottom:8px;
+
+}
+
+/* ===========================
+        Quick comments (tông trung tính, không dùng đỏ)
+=========================== */
+
+.quick-comments{
+
+    display:flex;
+
+    flex-wrap:wrap;
+
+    gap:8px 8px;
+
+    row-gap:10px;
+
+    margin-bottom:12px;
+
+}
+
+.chip{
+
+    padding:7px 13px;
+
+    border-radius:20px;
+
+    border:1px solid #e2e8f0;
+
+    background:#f8fafc;
+
+    color:#475569;
+
+    font-size:12.5px;
+
+    font-weight:600;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+    white-space:nowrap;
+
+}
+
+.chip:hover{
+
+    background:#eef2ff;
+
+    color:#3b4b6b;
+
+    border-color:#c7d2fe;
+
+}
+
+.chip-active{
+
+    background:#e0e7ff;
+
+    color:#3730a3;
+
+    border-color:#a5b4fc;
 
 }
 
@@ -1318,17 +1711,17 @@ textarea{
 
     width:100%;
 
-    min-height:130px;
+    min-height:150px;
 
     resize:none;
 
     border:2px solid #ececec;
 
-    border-radius:16px;
+    border-radius:14px;
 
-    padding:18px;
+    padding:14px;
 
-    font-size:15px;
+    font-size:14px;
 
     transition:.25s;
 
@@ -1362,7 +1755,7 @@ textarea.readonly{
 
 .image-upload{
 
-    margin:22px 26px 10px;
+    margin:0;
 
 }
 
@@ -1376,25 +1769,139 @@ textarea.readonly{
 
     font-weight:700;
 
-    margin-bottom:12px;
+    font-size:14px;
+
+    margin-bottom:8px;
 
     color:#555;
 
 }
 
-.image-upload input{
+.upload-control{
 
-    width:100%;
+    display:flex;
 
-    padding:12px;
+    align-items:center;
 
-    border-radius:12px;
+    gap:10px;
+
+    padding:9px 12px;
+
+    border-radius:10px;
 
     border:2px dashed #e60012;
 
     background:#fff5f5;
 
+    position:relative;
+
+}
+
+.upload-native-input{
+
+    /* Ẩn hoàn toàn input gốc của trình duyệt, chỉ dùng để mở hộp thoại chọn file */
+
+    position:absolute;
+
+    inset:0;
+
+    width:100%;
+
+    height:100%;
+
+    opacity:0;
+
     cursor:pointer;
+
+    z-index:-1;
+
+}
+
+.upload-choose-btn{
+
+    flex-shrink:0;
+
+    display:inline-flex;
+
+    align-items:center;
+
+    gap:6px;
+
+    padding:7px 14px;
+
+    border:none;
+
+    border-radius:8px;
+
+    background:#e60012;
+
+    color:#fff;
+
+    font-size:13px;
+
+    font-weight:700;
+
+    cursor:pointer;
+
+    transition:.2s;
+
+    white-space:nowrap;
+
+}
+
+.upload-choose-btn:hover{
+
+    background:#c40010;
+
+}
+
+.upload-choose-btn:disabled{
+
+    opacity:.6;
+
+    cursor:not-allowed;
+
+}
+
+.upload-status-text{
+
+    font-size:13px;
+
+    color:#777;
+
+    overflow:hidden;
+
+    text-overflow:ellipsis;
+
+    white-space:nowrap;
+
+    min-width:0;
+
+}
+
+.upload-note{
+
+    margin-top:6px;
+
+    font-size:11.5px;
+
+    color:#999;
+
+}
+
+.upload-loading{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:8px;
+
+    font-size:13px;
+
+    color:#e60012;
+
+    font-weight:600;
 
 }
 
@@ -1408,9 +1915,9 @@ textarea.readonly{
 
     flex-wrap:wrap;
 
-    gap:14px;
+    gap:10px;
 
-    margin:16px 26px;
+    margin:0;
 
 }
 
@@ -1422,13 +1929,13 @@ textarea.readonly{
 
 .preview-image{
 
-    width:110px;
+    width:72px;
 
-    height:110px;
+    height:72px;
 
     object-fit:cover;
 
-    border-radius:16px;
+    border-radius:12px;
 
     transition:.25s;
 
@@ -1450,13 +1957,13 @@ textarea.readonly{
 
     position:absolute;
 
-    top:-8px;
+    top:-6px;
 
-    right:-8px;
+    right:-6px;
 
-    width:28px;
+    width:20px;
 
-    height:28px;
+    height:20px;
 
     border:none;
 
@@ -1468,7 +1975,7 @@ textarea.readonly{
 
     cursor:pointer;
 
-    font-size:15px;
+    font-size:11px;
 
     transition:.25s;
 
@@ -1486,17 +1993,47 @@ textarea.readonly{
 
 }
 
+.empty-image{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+    gap:4px;
+
+    color:#bbb;
+
+    font-size:12px;
+
+    padding:10px 0;
+
+}
+
+.empty-image i{
+
+    font-size:20px;
+
+}
+
+.empty-image p{
+
+    margin:0;
+
+}
+
 /* ===========================
         Error
 =========================== */
 
 .error{
 
-    margin:0 26px;
+    margin:0;
 
     color:#ff4d4f;
 
-    font-size:14px;
+    font-size:13px;
 
     font-weight:600;
 
@@ -1508,11 +2045,11 @@ textarea.readonly{
 
 .delete-confirm-box{
 
-    margin:22px 26px;
+    margin:16px 22px;
 
-    padding:18px;
+    padding:16px;
 
-    border-radius:16px;
+    border-radius:14px;
 
     background:#fff5f5;
 
@@ -1526,9 +2063,11 @@ textarea.readonly{
 
     font-weight:700;
 
+    font-size:14px;
+
     color:#d63031;
 
-    margin-bottom:15px;
+    margin-bottom:12px;
 
 }
 
@@ -1538,20 +2077,22 @@ textarea.readonly{
 
     justify-content:center;
 
-    gap:12px;
+    gap:10px;
 
 }
 
 .btn-ghost-sm,
 .btn-danger-sm{
 
-    padding:11px 22px;
+    padding:10px 20px;
 
     border-radius:10px;
 
     cursor:pointer;
 
     font-weight:700;
+
+    font-size:13px;
 
 }
 
@@ -1585,7 +2126,7 @@ textarea.readonly{
 
     align-items:center;
 
-    padding:22px 26px;
+    padding:16px 22px;
 
     border-top:1px solid #f2f2f2;
 
@@ -1595,7 +2136,7 @@ textarea.readonly{
 
     display:flex;
 
-    gap:12px;
+    gap:10px;
 
 }
 
@@ -1609,21 +2150,25 @@ textarea.readonly{
 
     font-weight:700;
 
+    font-size:13px;
+
     cursor:pointer;
 
 }
 
 .cancel-btn{
 
-    padding:12px 24px;
+    padding:11px 22px;
 
-    border-radius:12px;
+    border-radius:10px;
 
     border:1px solid #ddd;
 
     background:white;
 
     cursor:pointer;
+
+    font-size:14px;
 
     transition:.25s;
 
@@ -1637,17 +2182,19 @@ textarea.readonly{
 
 .submit-btn{
 
-    padding:12px 28px;
+    padding:11px 26px;
 
     border:none;
 
-    border-radius:12px;
+    border-radius:10px;
 
     background:linear-gradient(135deg,#e60012,#ff4d4f);
 
     color:white;
 
     font-weight:700;
+
+    font-size:14px;
 
     cursor:pointer;
 
@@ -1677,13 +2224,37 @@ textarea.readonly{
         Responsive
 =========================== */
 
-@media(max-width:640px){
+@media(max-width:768px){
 
 .review-modal{
 
     max-width:100%;
 
-    border-radius:18px;
+    max-height:96vh;
+
+    border-radius:16px;
+
+}
+
+.modal-scroll{
+
+    max-height:96vh;
+
+}
+
+.modal-body-grid{
+
+    flex-direction:column;
+
+    padding:12px 16px 0;
+
+    gap:16px;
+
+}
+
+.modal-left{
+
+    flex:none;
 
 }
 
@@ -1693,43 +2264,28 @@ textarea.readonly{
 
     text-align:center;
 
+    padding:10px 0;
+
 }
 
-.product-image{
+.product-image,
+.no-image{
 
-    width:100px;
-    height:100px;
+    width:88px;
+    height:88px;
 
 }
 
 .preview-image{
 
-    width:90px;
-    height:90px;
+    width:70px;
+    height:70px;
 
 }
 
 .star{
 
-    font-size:36px;
-
-}
-
-.comment-box{
-
-    padding:16px 18px 0;
-
-}
-
-.preview-list{
-
-    margin:16px 18px;
-
-}
-
-.image-upload{
-
-    margin:20px 18px;
+    font-size:32px;
 
 }
 
@@ -1737,7 +2293,9 @@ textarea.readonly{
 
     flex-direction:column;
 
-    gap:14px;
+    gap:12px;
+
+    padding:14px 16px;
 
 }
 

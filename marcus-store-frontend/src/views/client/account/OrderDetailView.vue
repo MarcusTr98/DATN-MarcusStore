@@ -190,11 +190,12 @@
                        <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
                      
                       <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
-                     <div
+                <div
     v-if="selectedOrder.orderStatus === 'COMPLETED'"
     class="review-action"
 >
-    <!-- Chưa đánh giá -->
+
+    <!-- chưa đánh giá -->
     <button
         v-if="!item.reviewed"
         class="review-btn"
@@ -203,15 +204,16 @@
         Đánh giá
     </button>
 
-    <!-- Đã đánh giá -->
+    <!-- đã đánh giá -->
     <template v-else>
-        <button
-            class="review-view-btn"
-            @click="viewReview(item)"
-        >
-            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-            Xem đánh giá
-        </button>
+<button
+    type="button"
+    class="review-view-btn"
+    @click="goToProduct(item)"
+>
+    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+    Xem đánh giá
+</button>
 
         <button
             class="review-edit-btn"
@@ -220,6 +222,7 @@
             Sửa đánh giá
         </button>
     </template>
+
 </div>
                       <!-- ===== Hết vùng thao tác đánh giá ===== -->
 
@@ -472,7 +475,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import UserOrderApi from '@/api/userOrder.js'
 import '@/assets/css/OrderDetailView.css'
@@ -492,11 +495,17 @@ const route = useRoute()
 let refundPollingTimer = null
 
 // ===== Mở modal để TẠO MỚI đánh giá =====
+// ===== Mở modal để TẠO MỚI đánh giá =====
 function openReview(item){
     editMode.value = false
     viewOnly.value = false
     selectedOrderItem.value = item
-    showReviewModal.value = true
+
+    // Trì hoãn 1 tick để tránh hiện tượng "click xuyên" khi modal
+    // được chèn vào DOM ngay dưới vị trí vừa chạm/click.
+    setTimeout(() => {
+        showReviewModal.value = true
+    }, 0)
 }
 
 // ===== Mở modal để SỬA đánh giá đã có =====
@@ -504,7 +513,6 @@ async function editReview(item){
     try{
         const res = await reviewService.getMyReview(item.orderItemId)
 
-        // API bọc thêm 1 lớp {code, message, data}, review thật nằm ở res.data.data
         selectedOrderItem.value = {
             ...item,
             review: res.data.data
@@ -512,7 +520,10 @@ async function editReview(item){
 
         editMode.value = true
         viewOnly.value = false
-        showReviewModal.value = true
+
+        setTimeout(() => {
+            showReviewModal.value = true
+        }, 0)
     }
     catch(e){
         console.log(e)
@@ -520,25 +531,24 @@ async function editReview(item){
 }
 
 // ===== Mở modal chỉ để XEM đánh giá đã có (không cho chỉnh sửa) =====
-async function viewReview(item){
-    try{
-        const res = await reviewService.getMyReview(item.orderItemId)
+const router = useRouter()
+function goToProduct(item) {
 
-        // API bọc thêm 1 lớp {code, message, data}, review thật nằm ở res.data.data
-        selectedOrderItem.value = {
-            ...item,
-            review: res.data.data
+    if (!item.productSlug) {
+        console.warn("Thiếu productSlug", item)
+        return
+    }
+
+    router.push({
+        name: "ProductDetail",
+        params: {
+            slug: item.productSlug
+        },
+        query: {
+            review: true
         }
-
-        editMode.value = false
-        viewOnly.value = true
-        showReviewModal.value = true
-    }
-    catch(e){
-        console.log(e)
-    }
+    })
 }
-
 async function reviewSuccess(){
   showReviewModal.value = false
   await fetchOrderDetail()
