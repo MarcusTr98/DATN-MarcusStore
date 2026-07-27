@@ -138,6 +138,12 @@
         <img :src="gearIcon" class="menu-icon" />
         <span>Cấu hình chung</span>
       </router-link>
+
+      <router-link v-if="canAccessRoute('/admin/data-backup')" to="/admin/data-backup" class="menu-item"
+        active-class="active">
+        <i class="bi bi-database-down menu-icon"></i>
+        <span>Sao lưu dữ liệu</span>
+      </router-link>
     </div>
   </aside>
 </template>
@@ -269,7 +275,8 @@ const showHeThong = computed(() => {
   return (
     showAccountParent.value ||
     canAccessRoute("/admin/role") ||
-    canAccessRoute("/admin/settings")
+    canAccessRoute("/admin/settings") ||
+    canAccessRoute("/admin/data-backup")
   );
 });
 

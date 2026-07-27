@@ -85,3 +85,8 @@ google.oauth2.client-id=YOUR_GOOGLE_CLIENT_ID
 google.oauth2.client-secret=YOUR_GOOGLE_CLIENT_SECRET
 spring.security.oauth2.client.registration.google.scope=email,profile
 frontend.url=http://localhost:5173
+
+# TRUNG TÂM SAO LƯU (chỉ ROLE_ADMIN)
+# Thư mục phải là đường dẫn tuyệt đối, SQL Server service và backend đều có quyền đọc/ghi.
+backup.storage-path=D:/MarcusStoreBackups
+backup.sqlserver-directory=D:/MarcusStoreBackups

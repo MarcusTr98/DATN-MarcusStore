@@ -229,6 +229,13 @@ const routes = [
         meta: { permission: 'SYSTEM_VIEW' },
       },
       {
+        path: 'data-backup',
+        name: 'DataBackup',
+        component: () => import('@/views/admin/settings/DataBackup.vue'),
+        // Marcus thêm: chỉ ADMIN được vào trang tải toàn bộ dữ liệu.
+        meta: { roles: ['ROLE_ADMIN'] },
+      },
+      {
         path: 'employee',
         name: 'EmployeeManagement',
         component: () => import('@/views/admin/auth/EmployeeManagement.vue'),

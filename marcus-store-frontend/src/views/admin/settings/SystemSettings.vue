@@ -1,17 +1,28 @@
 <template>
-  <div class="container-fluid px-4 py-3">
-    <h3 class="fw-bold text-dark mb-4">
-      <i class="fas fa-cogs me-2 text-primary"></i>Cấu hình hệ thống Website
-    </h3>
+  <div class="system-settings-page">
+    <AdminPageHeader
+      eyebrow="Thiết lập cửa hàng"
+      eyebrow-icon="bi bi-sliders"
+      title="Cấu hình hệ thống Website"
+      description="Quản lý thông tin liên hệ, nội dung hiển thị, vị trí cửa hàng và Hero trang chủ."
+      icon="bi bi-gear-wide-connected"
+    >
+      <template #actions>
+        <button type="submit" form="system-settings-form" :disabled="isLoading || isSaving">
+          <i class="fas" :class="isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'"></i>
+          {{ isSaving ? 'Đang lưu...' : 'Lưu thay đổi' }}
+        </button>
+      </template>
+    </AdminPageHeader>
 
-    <div class="card shadow-sm border-0 rounded-4">
+    <div class="card settings-card shadow-sm border-0 rounded-4">
       <div class="card-body p-4">
         <div v-if="isLoading" class="text-center py-5 text-muted">
           <div class="spinner-border text-primary" role="status"></div>
           <p class="mt-2">Đang tải cấu hình...</p>
         </div>
 
-        <form v-else @submit.prevent="saveSettings">
+        <form v-else id="system-settings-form" @submit.prevent="saveSettings">
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
             1. Thông tin liên hệ (Header & Footer)
           </h5>
@@ -259,6 +270,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -386,15 +398,31 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.system-settings-page {
+  min-height: 100%;
+  padding: 28px;
+  background: #f4f7fb;
+}
+
+.settings-card {
+  margin-top: 20px;
+  border: 1px solid #c7dcef !important;
+  box-shadow: 0 8px 24px rgba(15, 35, 64, 0.05) !important;
+}
+
 .form-control {
   border-radius: 8px;
   padding: 12px 15px;
-  border: 1px solid #dee2e6;
+  border: 1px solid #c7dcef;
   font-size: 14px;
 }
 .form-control:focus {
   border-color: #ff6b00;
   box-shadow: 0 0 0 0.25rem rgba(255, 107, 0, 0.15);
+}
+
+.system-settings-page :deep(.border) {
+  border-color: #c7dcef !important;
 }
 .btn-save-custom {
   background: linear-gradient(135deg, #ff6b00, #ff8e3c);
@@ -404,5 +432,11 @@ onMounted(() => {
 .btn-save-custom:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 15px rgba(255, 107, 0, 0.4) !important;
+}
+
+@media (max-width: 760px) {
+  .system-settings-page {
+    padding: 16px;
+  }
 }
 </style>
