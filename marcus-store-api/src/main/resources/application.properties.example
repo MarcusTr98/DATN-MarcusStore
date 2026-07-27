@@ -79,7 +79,6 @@ ghn.store.ward-code=20310
 # Nếu chưa có thì để trống, webhook sẽ không verify (dùng khi test Ngrok)
 ghn.webhook.token=MARCUS_GHN_TEST_2026_SECRET
 
-
 # cấu hình đăng nhập đăng ký GG
 google.oauth2.client-id=YOUR_GOOGLE_CLIENT_ID
 google.oauth2.client-secret=YOUR_GOOGLE_CLIENT_SECRET
@@ -91,9 +90,7 @@ frontend.url=http://localhost:5173
 backup.storage-path=D:/MarcusStoreBackups
 backup.sqlserver-directory=D:/MarcusStoreBackups
 
-# MARCUS AI TƯ VẤN BÁN HÀNG
-# tạo API key tại OpenAI Platform rồi cấu hình biến môi trường,
-# không ghi key thật trực tiếp vào file được commit.
-openai.api-key=${OPENAI_API_KEY:}
-openai.model=${OPENAI_MODEL:gpt-5-mini}
-openai.base-url=${OPENAI_BASE_URL:https://api.openai.com/v1}
+# Marcus AI - Gemini Free Tier
+gemini.api-key=
+gemini.model=gemini-3.5-flash-lite
+gemini.base-url=https://generativelanguage.googleapis.com

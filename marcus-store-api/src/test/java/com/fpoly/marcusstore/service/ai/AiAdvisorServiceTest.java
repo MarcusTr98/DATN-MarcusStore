@@ -22,8 +22,8 @@ class AiAdvisorServiceTest {
         repository = mock(HomeProductRepository.class);
         service = new AiAdvisorService(repository);
         ReflectionTestUtils.setField(service, "apiKey", "");
-        ReflectionTestUtils.setField(service, "model", "gpt-5-mini");
-        ReflectionTestUtils.setField(service, "baseUrl", "https://api.openai.com/v1");
+        ReflectionTestUtils.setField(service, "model", "gemini-3.5-flash-lite");
+        ReflectionTestUtils.setField(service, "baseUrl", "https://generativelanguage.googleapis.com");
     }
 
     @Test

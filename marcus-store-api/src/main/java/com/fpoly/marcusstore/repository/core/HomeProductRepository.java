@@ -252,35 +252,73 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
             """, nativeQuery = true)
     List<HomeProductRawProjection> findNewestProducts();
 
-    // Marcus thêm: lấy ngữ cảnh sản phẩm gọn cho AI, chỉ gồm SKU active và giá thấp
-    // nhất.
+    // Marcus thêm: AI lọc theo đúng cây danh mục, hãng/dòng máy, ngân sách và chỉ
+    // tư vấn sản phẩm thực sự còn hàng
     @Query(value = """
-            SELECT TOP 6
+            SELECT TOP 8
                 p.product_id AS productId,
                 p.product_name AS productName,
                 p.slug AS slug,
                 p.thumbnail_url AS thumbnailUrl,
+                p.brand AS brand,
+                p.description AS description,
+                c.category_name AS categoryName,
+                parent.category_name AS parentCategoryName,
                 sku.price AS price,
                 sku.stock_quantity AS stockQuantity
             FROM Products p
             INNER JOIN (
-                SELECT s.*,
-                       ROW_NUMBER() OVER (PARTITION BY s.product_id ORDER BY s.price ASC) AS rn
+                SELECT s.product_id,
+                       MIN(s.price) AS price,
+                       SUM(COALESCE(s.stock_quantity, 0)) AS stock_quantity
                 FROM Product_Skus s
                 WHERE s.is_active = 1
-            ) sku ON sku.product_id = p.product_id AND sku.rn = 1
+                GROUP BY s.product_id
+            ) sku ON sku.product_id = p.product_id
+            INNER JOIN Categories c ON c.category_id = p.category_id
+            LEFT JOIN Categories parent ON parent.category_id = c.parent_id
             WHERE p.status = 1
+              AND sku.stock_quantity > 0
+              AND (:categoryKeyword = ''
+                   OR LOWER(c.category_name) LIKE LOWER(CONCAT('%', :categoryKeyword, '%'))
+                   OR LOWER(COALESCE(parent.category_name, '')) LIKE LOWER(CONCAT('%', :categoryKeyword, '%')))
               AND (:keyword = '' OR LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%'))
                    OR LOWER(COALESCE(p.brand, '')) LIKE LOWER(CONCAT('%', :keyword, '%')))
+              AND (:minPrice IS NULL OR sku.price >= :minPrice)
+              AND (:maxPrice IS NULL OR sku.price <= :maxPrice)
             ORDER BY
                 CASE WHEN LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 0 ELSE 1 END,
+                CASE WHEN :targetPrice IS NULL THEN 0 ELSE ABS(sku.price - :targetPrice) END,
+                sku.price DESC,
                 p.created_at DESC
             """, nativeQuery = true)
-    List<AiProductProjection> findProductsForAiAdvisor(@Param("keyword") String keyword);
+    List<AiProductProjection> findProductsForAiAdvisor(
+            @Param("keyword") String keyword,
+            @Param("categoryKeyword") String categoryKeyword,
+            @Param("minPrice") BigDecimal minPrice,
+            @Param("maxPrice") BigDecimal maxPrice,
+            @Param("targetPrice") BigDecimal targetPrice);
+
+    // Marcus thêm: cung cấp thông số thật để AI so sánh có căn cứ, không tự bịa
+    // cấu hình sản phẩm
+    @Query(value = """
+            SELECT
+                psv.product_id AS productId,
+                sa.name AS specName,
+                psv.value_text AS specValue,
+                sa.unit AS unit
+            FROM Product_Spec_Values psv
+            INNER JOIN Spec_Attributes sa
+                ON sa.spec_attribute_id = psv.spec_attribute_id
+            WHERE psv.product_id IN :productIds
+            ORDER BY psv.product_id, sa.display_order, sa.spec_attribute_id
+            """, nativeQuery = true)
+    List<AiProductSpecProjection> findProductSpecsForAiAdvisor(
+            @Param("productIds") List<Integer> productIds);
 
     /**
      * Lấy SKU rẻ nhất còn active cho danh sách productIds (dùng cho Wishlist, tránh
-     * query phức tạp + ORDER BY duplicate column của findHomeProductRawData).
+     * query phức tạp + ORDER BY duplicate column của findHomeProductRawData)
      */
     @Query(value = """
             SELECT
@@ -341,8 +379,26 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
 
         String getThumbnailUrl();
 
+        String getBrand();
+
+        String getDescription();
+
+        String getCategoryName();
+
+        String getParentCategoryName();
+
         BigDecimal getPrice();
 
         Integer getStockQuantity();
+    }
+
+    interface AiProductSpecProjection {
+        Integer getProductId();
+
+        String getSpecName();
+
+        String getSpecValue();
+
+        String getUnit();
     }
 }

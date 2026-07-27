@@ -812,7 +812,7 @@ const visibleTimelineSteps = computed(() => {
     flowStatuses.push(currentStatus)
   } else if (currentIndex >= 0 || isCompletedStatus) {
     // COMPLETED: hiển thị đầy đủ flow như DELIVERED (không hiện COMPLETED trên timeline)
-    flowStatuses = [...timelineSteps.map((step) => step.status)]
+    flowStatuses = timelineSteps.map((step) => step.status)
   } else {
     flowStatuses = ['PENDING', currentStatus]
   }
