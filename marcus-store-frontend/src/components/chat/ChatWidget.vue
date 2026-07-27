@@ -184,9 +184,13 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import BaseModal from '@/components/BaseModal.vue'
+import {
+  clearFloatingContactPanel,
+  setFloatingContactPanelOpen,
+} from '@/utils/floatingContactVisibility'
 
 const props = defineProps({
   isLoggedIn: {
@@ -263,9 +267,12 @@ watch(
 watch(
   () => chatStore.isOpen,
   (newVal) => {
+    setFloatingContactPanelOpen('live', newVal)
     if (newVal) scrollToBottom()
   },
 )
+
+onBeforeUnmount(() => clearFloatingContactPanel('live'))
 </script>
 
 <style scoped>

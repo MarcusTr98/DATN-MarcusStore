@@ -83,9 +83,7 @@
           </article>
 
           <div v-if="isLoading && !isStreamingText" class="ai-message-row is-assistant">
-            <div class="ai-message typing">
-              <span></span><span></span><span></span>
-            </div>
+            <div class="ai-message typing"><span></span><span></span><span></span></div>
           </div>
         </div>
 
@@ -118,8 +116,12 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { streamAiAdvisor, trackAiProductClick } from '@/api/aiAdvisorApi'
+import {
+  clearFloatingContactPanel,
+  setFloatingContactPanelOpen,
+} from '@/utils/floatingContactVisibility'
 
 const isOpen = ref(false)
 const isLoading = ref(false)
@@ -228,6 +230,9 @@ const scrollToBottom = async () => {
 
 const formatPrice = (price) =>
   price == null ? 'Liên hệ' : `${Number(price).toLocaleString('vi-VN')} ₫`
+
+watch(isOpen, (opened) => setFloatingContactPanelOpen('ai', opened))
+onBeforeUnmount(() => clearFloatingContactPanel('ai'))
 </script>
 
 <style scoped>
