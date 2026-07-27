@@ -241,6 +241,42 @@
             </div>
           </div>
 
+          <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
+            7. Chính sách tư vấn Marcus AI
+          </h5>
+          <div class="mb-4 rounded-3 border bg-light p-3">
+            <label class="form-label fw-semibold">Hướng dẫn bổ sung cho AI</label>
+            <textarea
+              v-model="settings.AI_ADVISOR_POLICY"
+              class="form-control"
+              rows="4"
+              maxlength="1000"
+              placeholder="VD: Ưu tiên sản phẩm còn hàng, giải thích dễ hiểu cho sinh viên..."
+            ></textarea>
+            <div class="form-text">
+              Chỉ dùng để chỉnh giọng điệu và ưu tiên tư vấn. Quy tắc bảo mật trong backend không thể bị ghi đè.
+            </div>
+            <div v-if="aiClickStats.length" class="mt-3">
+              <div class="fw-semibold mb-2">Sản phẩm được mở nhiều nhất từ Marcus AI</div>
+              <div class="table-responsive rounded-3 border bg-white">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Sản phẩm</th>
+                      <th class="text-end">Lượt mở</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in aiClickStats" :key="item.productId">
+                      <td>{{ item.productName }}</td>
+                      <td class="text-end fw-bold">{{ item.clickCount }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
           <div class="text-end mt-5">
             <button
               type="submit"
@@ -274,6 +310,7 @@ import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 
 const isLoading = ref(true)
 const isSaving = ref(false)
+const aiClickStats = ref([])
 
 // State Modal
 const localModal = reactive({
@@ -308,6 +345,7 @@ const settings = ref({
   HOME_HERO_TITLE_ACCENT: '',
   HOME_HERO_LEAD: '',
   HOME_HERO_SLIDES: '',
+  AI_ADVISOR_POLICY: '',
 })
 
 // Slide gốc dùng làm mặc định khi DB chưa có dữ liệu HOME_HERO_SLIDES
@@ -340,13 +378,26 @@ const removeSlide = (idx) => {
 const loadSettings = async () => {
   try {
     isLoading.value = true
-    const res = await api.get('/public/settings')
+    // Marcus sửa: trang quản trị đọc endpoint nội bộ; prompt AI không xuất hiện ở
+    // API cấu hình công khai.
+    const res = await api.get('/admin/settings')
 
     Object.keys(settings.value).forEach((key) => {
       if (res.data[key] !== undefined) {
         settings.value[key] = res.data[key]
       }
     })
+
+    // Marcus thêm: thống kê chỉ chứa số click theo sản phẩm, không có dữ liệu chat
+    // hay thông tin định danh khách hàng.
+    try {
+      const statsRes = await api.get('/admin/ai-advisor/top-clicked-products', {
+        skipGlobalLoading: true,
+      })
+      aiClickStats.value = statsRes.data?.data ?? []
+    } catch {
+      aiClickStats.value = []
+    }
 
     if (settings.value.STORE_LOCATION) {
       const parsedMap = JSON.parse(settings.value.STORE_LOCATION)

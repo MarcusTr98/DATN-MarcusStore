@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.dto.ai;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -22,6 +23,7 @@ public class AiAdvisorRequest {
     @Data
     public static class ConversationTurn {
         @NotBlank
+        @Pattern(regexp = "user|assistant", message = "Vai trò hội thoại không hợp lệ.")
         private String role;
 
         @NotBlank

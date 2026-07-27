@@ -261,7 +261,6 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
                 p.slug AS slug,
                 p.thumbnail_url AS thumbnailUrl,
                 p.brand AS brand,
-                p.description AS description,
                 c.category_name AS categoryName,
                 parent.category_name AS parentCategoryName,
                 sku.price AS price,
@@ -380,8 +379,6 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
         String getThumbnailUrl();
 
         String getBrand();
-
-        String getDescription();
 
         String getCategoryName();
 

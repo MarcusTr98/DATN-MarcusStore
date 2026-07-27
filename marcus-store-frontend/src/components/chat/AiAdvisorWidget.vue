@@ -63,7 +63,7 @@
                   :key="product.productId"
                   :to="`/product/${product.slug}`"
                   class="ai-product"
-                  @click="isOpen = false"
+                  @click="handleProductClick(product)"
                 >
                   <img
                     :src="product.thumbnailUrl || '/images/product-placeholder.png'"
@@ -82,7 +82,7 @@
             </div>
           </article>
 
-          <div v-if="isLoading" class="ai-message-row is-assistant">
+          <div v-if="isLoading && !isStreamingText" class="ai-message-row is-assistant">
             <div class="ai-message typing">
               <span></span><span></span><span></span>
             </div>
@@ -119,15 +119,33 @@
 
 <script setup>
 import { nextTick, ref } from 'vue'
-import { askAiAdvisor } from '@/api/aiAdvisorApi'
+import { streamAiAdvisor, trackAiProductClick } from '@/api/aiAdvisorApi'
 
 const isOpen = ref(false)
 const isLoading = ref(false)
+const isStreamingText = ref(false)
 const inputMessage = ref('')
 const messageBody = ref(null)
 const messageInput = ref(null)
 const messages = ref([])
 let messageId = 0
+
+const getTrackingSessionId = () => {
+  const storageKey = 'MARCUS_AI_TRACKING_SESSION'
+  let sessionId = sessionStorage.getItem(storageKey)
+  if (!sessionId) {
+    sessionId = crypto.randomUUID()
+    sessionStorage.setItem(storageKey, sessionId)
+  }
+  return sessionId
+}
+
+const handleProductClick = (product) => {
+  isOpen.value = false
+  // Marcus sửa: tracking không được cản trở thao tác mở sản phẩm nếu API thống kê
+  // tạm thời lỗi.
+  trackAiProductClick(product.productId, getTrackingSessionId()).catch(() => {})
+}
 
 // Marcus thêm: AI và Live Chat có bộ câu hỏi riêng, không trộn trạng thái hai kênh.
 const suggestions = [
@@ -167,13 +185,24 @@ const sendMessage = async () => {
   await scrollToBottom()
 
   try {
-    const response = await askAiAdvisor(content, history)
-    const data = response.data?.data
-    messages.value.push({
+    const assistantMessage = {
       id: ++messageId,
       role: 'assistant',
-      content: data?.answer || 'Mình chưa tìm được câu trả lời phù hợp.',
-      products: data?.products ?? [],
+      content: '',
+      products: [],
+    }
+    messages.value.push(assistantMessage)
+    await streamAiAdvisor(content, history, {
+      onToken: (token) => {
+        isStreamingText.value = true
+        assistantMessage.content += token
+        scrollToBottom()
+      },
+      onDone: (data) => {
+        assistantMessage.content =
+          data?.answer || assistantMessage.content || 'Mình chưa tìm được câu trả lời phù hợp.'
+        assistantMessage.products = data?.products ?? []
+      },
     })
   } catch (error) {
     messages.value.push({
@@ -181,11 +210,13 @@ const sendMessage = async () => {
       role: 'assistant',
       content:
         error.response?.data?.message ||
+        error.message ||
         'Marcus AI đang gián đoạn. Bạn có thể thử lại hoặc dùng Live Chat với Admin.',
       isError: true,
     })
   } finally {
     isLoading.value = false
+    isStreamingText.value = false
     await scrollToBottom()
   }
 }
