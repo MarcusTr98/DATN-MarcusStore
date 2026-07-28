@@ -10,7 +10,14 @@ import com.fpoly.marcusstore.dto.request.UpdateUserRequest;
 import com.fpoly.marcusstore.dto.response.UserResponse;
 
 public interface UserService {
-    Page<UserResponse> getALL(String keyWord, List<String> roles, Pageable page);
+
+    Page<UserResponse> getALL(
+            String keyword,
+            List<String> roles,
+            Boolean status,
+            Boolean emailVerified,
+            Pageable pageable
+    );
 
     UserResponse getById(Integer Id);
 

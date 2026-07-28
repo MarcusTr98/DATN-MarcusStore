@@ -55,7 +55,7 @@
 
           <input
               v-model="filters.keyword"
-              placeholder="Tìm khách hàng hoặc sản phẩm">
+              placeholder="Tìm theo tên khách hàng">
         </div>
       </div>
 

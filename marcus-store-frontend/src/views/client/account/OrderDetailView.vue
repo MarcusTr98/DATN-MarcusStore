@@ -550,8 +550,24 @@ function goToProduct(item) {
     })
 }
 async function reviewSuccess(){
+  // Chỉ đóng modal và âm thầm cập nhật lại dữ liệu đơn hàng (vd: item.reviewed),
+  // không bật loading.value để tránh cả trang phía sau modal bị che lại
+  // bởi màn hình "Đang tải chi tiết đơn hàng...".
   showReviewModal.value = false
-  await fetchOrderDetail()
+  await quietRefreshOrder()
+}
+
+// Cập nhật lại chi tiết đơn hàng mà không hiện trạng thái loading toàn trang,
+// dùng sau khi tạo/sửa/xóa đánh giá trong modal.
+async function quietRefreshOrder() {
+  const orderCode = route.params.id
+  if (!orderCode) return
+  try {
+    const response = await UserOrderApi.userOrderDetail(orderCode)
+    selectedOrder.value = response.data
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 // Marcus thêm hàm đồng bộ nhẹ để trạng thái khách cập nhật sau khi admin refund,
@@ -1171,12 +1187,12 @@ function getVariantText(item) {
 }
 
 .review-btn{
-  background:#ff4d94;
+  background:#df062d;
   color:#fff;
 }
 
 .review-btn:hover{
-  background:#e63d82;
+  background:#c00526;
 }
 
 .review-view-btn{
@@ -1189,12 +1205,12 @@ function getVariantText(item) {
 }
 
 .review-edit-btn{
-  background:#f59e0b;
+  background:#22d0ee;
   color:#fff;
 }
 
 .review-edit-btn:hover{
-  background:#d97706;
+  background:#12b4d1;
 }
 /* ===== Hết vùng nút đánh giá ===== */
 </style>

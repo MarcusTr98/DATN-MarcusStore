@@ -33,16 +33,27 @@ public class AdminUserController {
 
     private final UserServiceImpl userServiceImpl;
 
-    @GetMapping
-    public ApiResponse<Page<UserResponse>> getAll(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) List<String> roles,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+@GetMapping
+public ApiResponse<Page<UserResponse>> getAll(
+        @RequestParam(required = false) String keyword,
+        @RequestParam(required = false) List<String> roles,
+        @RequestParam(required = false) Boolean status,
+        @RequestParam(required = false) Boolean emailVerified,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "10") int size) {
 
-        Pageable pageable = PageRequest.of(page, size);
-        return ApiResponse.success(userServiceImpl.getALL(keyword, roles, pageable));
-    }
+    Pageable pageable = PageRequest.of(page, size);
+
+    return ApiResponse.success(
+            userServiceImpl.getALL(
+                    keyword,
+                    roles,
+                    status,
+                    emailVerified,
+                    pageable
+            )
+    );
+}
 
     @PostMapping
     @PreAuthorize("hasAuthority('USER_CREATE')")
@@ -100,7 +111,7 @@ public class AdminUserController {
         Pageable pageable = PageRequest.of(page, size);
 
         return ApiResponse.success(
-                userServiceImpl.getALL(keyword, List.of("CUSTOMER"), pageable)
+                userServiceImpl.getALL(keyword, List.of("CUSTOMER"), null,null, pageable)
         );
     }
 }

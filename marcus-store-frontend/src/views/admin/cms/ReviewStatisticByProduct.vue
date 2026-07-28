@@ -61,10 +61,12 @@ import {ref,onMounted} from "vue";
 import api from "@/utils/api";
 
 const products = ref([]);
-
 const statistics = ref([]);
-
 const selectedProduct = ref("");
+
+const emit = defineEmits([
+    "changeProduct"
+])
 
 const loadProducts = async () => {
 
@@ -73,14 +75,15 @@ const loadProducts = async () => {
     products.value = res.data.data;
 
 }
-const emit = defineEmits([
-    "changeProduct"
-])
+
 const loadStatistic = async () => {
 
     if(!selectedProduct.value){
 
-        statistics.value=[];
+        statistics.value = [];
+
+        // Bỏ chọn sản phẩm => bỏ filter, bảng bên dưới hiện lại tất cả
+        emit("changeProduct", null);
 
         return;
 
@@ -92,7 +95,10 @@ const loadStatistic = async () => {
 
     );
 
-    statistics.value=res.data.data;
+    statistics.value = res.data.data;
+
+    // Bắn productId lên component cha để lọc bảng review theo đúng sản phẩm này
+    emit("changeProduct", selectedProduct.value);
 
 }
 

@@ -45,36 +45,45 @@ public class UserServiceImpl implements UserService {
             if (totalSpent == null)
                 totalSpent = BigDecimal.ZERO;
         }
-        return UserResponse.builder()
-                .userId(user.getUserId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .phoneNumber(user.getPhoneNumber())
-                .active(user.getIsActive())
-                .roleName(user.getRole().getRoleName())
-                .emailVerified(user.getEmailVerified())
-                .createdAt(user.getCreatedAt())
-                .totalSpent(totalSpent)
-                .build();
+return UserResponse.builder()
+        .userId(user.getUserId())
+        .username(user.getUsername())
+        .email(user.getEmail())
+        .fullName(user.getFullName())
+        .phoneNumber(user.getPhoneNumber())
+        .active(user.getIsActive())
+        .roleName(user.getRole().getRoleName())
+        .emailVerified(user.getEmailVerified())
+        .createdAt(user.getCreatedAt())
+        .totalSpent(totalSpent)
+        .build();
     }
 
-    @Override
-    @Transactional
-    public Page<UserResponse> getALL(String keyword, List<String> roles, Pageable pageable) {
-        String normalizedKeyword = normalizeKeyword(keyword);
-        List<String> normalizedRoles = normalizeRoles(roles);
-        boolean rolesEmpty = normalizedRoles.isEmpty();
-        List<String> queryRoles = rolesEmpty ? List.of("__NO_ROLE__") : normalizedRoles;
+@Override
+@Transactional
+public Page<UserResponse> getALL(
+        String keyword,
+        List<String> roles,
+        Boolean status,
+        Boolean emailVerified,
+        Pageable pageable) {
 
-        return userRepository
-                .findAllByKeywordAndRoles(
-                        normalizedKeyword,
-                        queryRoles,
-                        rolesEmpty,
-                        pageable)
-                .map(this::toResponse);
-    }
+    String normalizedKeyword = normalizeKeyword(keyword);
+    List<String> normalizedRoles = normalizeRoles(roles);
+
+    boolean rolesEmpty = normalizedRoles.isEmpty();
+    List<String> queryRoles =
+            rolesEmpty ? List.of("__NO_ROLE__") : normalizedRoles;
+
+    return userRepository.findAllByKeywordAndRoles(
+            normalizedKeyword,
+            queryRoles,
+            rolesEmpty,
+            status,
+            emailVerified,
+            pageable
+    ).map(this::toResponse);
+}
 
     private String normalizeKeyword(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
@@ -237,4 +246,25 @@ public class UserServiceImpl implements UserService {
 
         System.out.println("After: " + user.getEmailVerified());
     }
+
+    private String getMemberRank(BigDecimal totalSpent) {
+
+    if (totalSpent == null) {
+        return "Đồng";
+    }
+
+    if (totalSpent.compareTo(new BigDecimal("300000000")) >= 0) {
+        return "Kim Cương";
+    }
+
+    if (totalSpent.compareTo(new BigDecimal("150000000")) >= 0) {
+        return "Vàng";
+    }
+
+    if (totalSpent.compareTo(new BigDecimal("50000000")) >= 0) {
+        return "Bạc";
+    }
+
+    return "Đồng";
+}
 }

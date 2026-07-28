@@ -60,7 +60,6 @@ WHERE
 (
     :keyword IS NULL
     OR LOWER(r.user.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-    OR LOWER(r.product.productName) LIKE LOWER(CONCAT('%', :keyword, '%'))
 )
 AND
 (

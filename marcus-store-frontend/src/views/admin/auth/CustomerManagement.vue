@@ -45,23 +45,70 @@
       </div>
     </div>
 
+<div class="filter-card">
+  <div class="row g-3 align-items-end">
+
     <!-- Search -->
-    <div class="filter-card">
-      <div class="row g-3 align-items-end">
-        <div class="col-12">
-          <label class="filter-label">Tìm kiếm</label>
-          <div class="input-wrapper">
-            <i class="bi bi-search search-icon"></i>
-            <input
-              class="form-control f-input"
-              placeholder="Tìm theo tên, email hoặc số điện thoại"
-              v-model="keyword"
-            />
-          </div>
-        </div>
+    <div class="col-lg-5 col-md-12">
+      <label class="filter-label">Tìm kiếm</label>
+
+      <div class="input-wrapper">
+        <i class="bi bi-search search-icon"></i>
+
+        <input
+          v-model="keyword"
+          class="form-control f-input"
+          placeholder="Tìm theo tên, email hoặc số điện thoại"
+        />
       </div>
     </div>
 
+    <!-- Trạng thái -->
+    <div class="col-lg-2 col-md-4">
+      <label class="filter-label">Trạng thái</label>
+
+      <select
+        class="form-select f-input"
+        v-model="status"
+      >
+        <option value="">Tất cả</option>
+        <option value="true">Hoạt động</option>
+        <option value="false">Đã khóa</option>
+      </select>
+    </div>
+
+    <!-- Email -->
+    <div class="col-lg-2 col-md-4">
+      <label class="filter-label">Email</label>
+
+      <select
+        class="form-select f-input"
+        v-model="emailVerified"
+      >
+        <option value="">Tất cả</option>
+        <option value="true">Đã xác thực</option>
+        <option value="false">Chưa xác thực</option>
+      </select>
+    </div>
+
+    <!-- Hạng -->
+    <div class="col-lg-3 col-md-4">
+      <label class="filter-label">Hạng thành viên</label>
+
+      <select
+        class="form-select f-input"
+        v-model="membership"
+      >
+        <option value="">Tất cả</option>
+        <option value="bronze">🥉 Đồng</option>
+        <option value="silver">🥈 Bạc</option>
+        <option value="gold">🥇 Vàng</option>
+        <option value="diamond">💎 Kim Cương</option>
+      </select>
+    </div>
+
+  </div>
+</div>
     <CustomerTable
       :users="users"
       :can-edit="canEdit"
@@ -105,46 +152,66 @@ import adminUserApi from '@/api/adminUserApi.js'
 import UserFormModal from '@/components/UserFormModal.vue'
 import BaseModal from '@/components/BaseModal.vue'
 
-// ── Data ───────────────────────────────────────────────
-const users = ref([])
-const keyword = ref('')
+/* =========================
+   DATA
+========================= */
 
-// ── Pagination ─────────────────────────────────────────
+const users = ref([])
+
+const keyword = ref('')
+const status = ref('')
+const emailVerified = ref('')
+const membership = ref('')
+
 const currentPage = ref(0)
 const pageSize = ref(5)
-const pageInfo = ref({ totalElements: 0, totalPages: 0 })
 
-// ── Stats (toàn bộ, không phụ thuộc trang) ────────────
-const stats = ref({ verified: 0, active: 0, locked: 0 })
+const pageInfo = ref({
+  totalElements: 0,
+  totalPages: 0,
+})
 
-// ── Modal form ─────────────────────────────────────────
+const stats = ref({
+  verified: 0,
+  active: 0,
+  locked: 0,
+})
+
 const isModalOpen = ref(false)
 const isEdit = ref(false)
 const saving = ref(false)
 const editForm = ref({})
 
-// ── Modal thông báo ────────────────────────────────────
 const modalVisible = ref(false)
 const modalType = ref('success')
 const modalTitle = ref('')
 const modalMessage = ref('')
 
-// ── Helpers: check theo PERMISSION cụ thể, không hardcode role ──
-// ADMIN luôn được bypass toàn bộ (giống logic trong router.js)
+/* =========================
+   PERMISSION
+========================= */
+
 const isAdmin = computed(() => {
   const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
   return roles.includes('ROLE_ADMIN')
 })
+
 const permissions = computed(() =>
   JSON.parse(localStorage.getItem('USER_PERMISSIONS') || '[]'),
 )
-const hasPermission = (perm) => isAdmin.value || permissions.value.includes(perm)
+
+const hasPermission = (perm) =>
+  isAdmin.value || permissions.value.includes(perm)
 
 const canCreate = computed(() => hasPermission('USER_CREATE'))
 const canEdit = computed(() => hasPermission('USER_UPDATE'))
 const canLock = computed(() => hasPermission('USER_LOCK'))
 const canUnlock = computed(() => hasPermission('USER_UNLOCK'))
 const canSendVerify = computed(() => hasPermission('USER_SEND_EMAIL'))
+
+/* =========================
+   MODAL
+========================= */
 
 const showModal = (type, title, message) => {
   modalType.value = type
@@ -153,67 +220,122 @@ const showModal = (type, title, message) => {
   modalVisible.value = true
 }
 
-// ── Load trang hiện tại ────────────────────────────────
+/* =========================
+   LOAD DATA
+========================= */
+
 const loadData = async () => {
   try {
     const res = await adminUserApi.getAll({
       keyword: keyword.value || undefined,
       roles: ['CUSTOMER'],
+
+      status:
+        status.value === ''
+          ? undefined
+          : status.value === 'true',
+
+      emailVerified:
+        emailVerified.value === ''
+          ? undefined
+          : emailVerified.value === 'true',
+
       page: currentPage.value,
       size: pageSize.value,
     })
+
     const pageData = res.data.data
-    users.value = pageData.content || []
-    pageInfo.value = {
-      totalElements: pageData.totalElements || 0,
-      totalPages: pageData.totalPages || 0,
+
+    let list = pageData.content || []
+
+    // ===== Lọc hạng thành viên ở FE =====
+    if (membership.value) {
+      list = list.filter((u) => {
+        const spent = Number(u.totalSpent || 0)
+
+        switch (membership.value) {
+          case 'diamond':
+            return spent >= 300000000
+
+          case 'gold':
+            return spent >= 150000000 && spent < 300000000
+
+          case 'silver':
+            return spent >= 50000000 && spent < 150000000
+
+          case 'bronze':
+            return spent < 50000000
+
+          default:
+            return true
+        }
+      })
     }
-  } catch {
-    showModal('error', 'Lỗi tải dữ liệu', 'Không thể lấy danh sách khách hàng.')
+
+    users.value = list
+
+    pageInfo.value = {
+      totalElements: pageData.totalElements,
+      totalPages: pageData.totalPages,
+    }
+  } catch (e) {
+    showModal(
+      'error',
+      'Lỗi',
+      e.response?.data?.message || 'Không tải được danh sách khách hàng',
+    )
   }
 }
 
-// ── Load stats toàn bộ hệ thống ───────────────────────
-// Dùng size=1 để backend chỉ cần trả totalElements, không tốn băng thông
+/* =========================
+   LOAD STATS
+========================= */
+
 const loadStats = async () => {
   try {
-    const [allRes, activeRes] = await Promise.all([
-      adminUserApi.getAll({ roles: ['CUSTOMER'], page: 0, size: 1 }),
-      adminUserApi.getAll({ roles: ['CUSTOMER'], page: 0, size: 1000 }),
-      // ↑ Tạm lấy để đếm active/verified — khi backend thêm filter active/emailVerified thì bỏ
-    ])
-    const all = activeRes.data.data.content || []
-    const total = allRes.data.data.totalElements || 0
+    const res = await adminUserApi.getAll({
+      roles: ['CUSTOMER'],
+      page: 0,
+      size: 1000,
+    })
+
+    const list = res.data.data.content || []
+
     stats.value = {
-      verified: all.filter((x) => x.emailVerified).length,
-      active: all.filter((x) => x.active).length,
-      locked: all.filter((x) => !x.active).length,
+      verified: list.filter((x) => x.emailVerified).length,
+      active: list.filter((x) => x.active).length,
+      locked: list.filter((x) => !x.active).length,
     }
-    // Đảm bảo totalElements đúng kể cả khi keyword đang lọc
-    pageInfo.value.totalElements = pageInfo.value.totalElements || total
-  } catch {
-    /* stats lỗi không block UI */
-  }
+  } catch {}
 }
 
-onMounted(() => {
-  loadData()
-  loadStats()
+/* =========================
+   INIT
+========================= */
+
+onMounted(async () => {
+  await loadData()
+  await loadStats()
 })
 
-watch(keyword, () => {
-  currentPage.value = 0
-  loadData()
-})
+watch(
+  [keyword, status, emailVerified, membership],
+  () => {
+    currentPage.value = 0
+    loadData()
+  },
+)
 
-// ── Pagination ─────────────────────────────────────────
+/* =========================
+   PAGINATION
+========================= */
+
 const pagination = computed(() => ({
   totalElements: pageInfo.value.totalElements,
   totalPages: pageInfo.value.totalPages,
 }))
 
 const goToPage = (page) => {
-  if (page < 0 || page >= pagination.value.totalPages) return
   currentPage.value = page
   loadData()
 }
@@ -228,51 +350,84 @@ const onPageSizeChange = (size) => {
 const sendVerifyEmail = async (id) => {
   try {
     await adminUserApi.sendVerifyEmail(id)
+
     showModal(
       'success',
       'Đã gửi email xác thực',
-      'Email xác thực đã được gửi đến khách hàng. Khách hàng cần kiểm tra hộp thư và làm theo hướng dẫn.',
+      'Email xác thực đã được gửi đến khách hàng.',
     )
+
+    await loadData()
+    await loadStats()
   } catch (e) {
     showModal(
       'error',
       'Gửi email thất bại',
-      e.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại.',
+      e.response?.data?.message || 'Có lỗi xảy ra.',
     )
   }
 }
 
-// ── Lock / Unlock ──────────────────────────────────────
+// =========================
+// Khóa tài khoản
+// =========================
 const lockUser = async (id) => {
   try {
     await adminUserApi.lock(id)
-    showModal('success', 'Khóa tài khoản thành công', 'Tài khoản khách hàng đã được khóa.')
+
+    showModal(
+      'success',
+      'Khóa tài khoản thành công',
+      'Tài khoản khách hàng đã được khóa.',
+    )
+
     await loadData()
     await loadStats()
   } catch (e) {
-    showModal('error', 'Khóa tài khoản thất bại', e.response?.data?.message || 'Có lỗi xảy ra.')
+    showModal(
+      'error',
+      'Khóa tài khoản thất bại',
+      e.response?.data?.message || 'Có lỗi xảy ra.',
+    )
   }
 }
 
+// =========================
+// Mở khóa
+// =========================
 const unlockUser = async (id) => {
   try {
     await adminUserApi.unlock(id)
-    showModal('success', 'Mở khóa thành công', 'Tài khoản khách hàng đã được kích hoạt lại.')
+
+    showModal(
+      'success',
+      'Mở khóa thành công',
+      'Tài khoản khách hàng đã được kích hoạt.',
+    )
+
     await loadData()
     await loadStats()
   } catch (e) {
-    showModal('error', 'Mở khóa thất bại', e.response?.data?.message || 'Có lỗi xảy ra.')
+    showModal(
+      'error',
+      'Mở khóa thất bại',
+      e.response?.data?.message || 'Có lỗi xảy ra.',
+    )
   }
 }
 
-// ── Modal form ─────────────────────────────────────────
+// =========================
+// Modal
+// =========================
 const openCreate = () => {
   isEdit.value = false
   editForm.value = {}
   isModalOpen.value = true
 }
+
 const openEdit = (user) => {
   isEdit.value = true
+
   editForm.value = {
     userId: user.userId,
     fullName: user.fullName,
@@ -282,6 +437,7 @@ const openEdit = (user) => {
     roleName: user.roleName,
     password: '',
   }
+
   isModalOpen.value = true
 }
 
@@ -289,8 +445,12 @@ const closeModal = () => {
   isModalOpen.value = false
 }
 
+// =========================
+// Lưu
+// =========================
 const saveUser = async (payload) => {
   saving.value = true
+
   try {
     if (isEdit.value) {
       await adminUserApi.update(payload.userId, {
@@ -299,7 +459,12 @@ const saveUser = async (payload) => {
         phoneNumber: payload.phoneNumber,
         roleId: 3,
       })
-      showModal('success', 'Cập nhật thành công', 'Thông tin khách hàng đã được cập nhật.')
+
+      showModal(
+        'success',
+        'Cập nhật thành công',
+        'Thông tin khách hàng đã được cập nhật.',
+      )
     } else {
       await adminUserApi.create({
         username: payload.username,
@@ -309,16 +474,23 @@ const saveUser = async (payload) => {
         fullName: payload.fullName,
         roleId: 3,
       })
-      showModal('success', 'Thêm thành công', 'Khách hàng mới đã được tạo.')
+
+      showModal(
+        'success',
+        'Thêm thành công',
+        'Khách hàng mới đã được tạo.',
+      )
     }
+
     closeModal()
+
     await loadData()
     await loadStats()
   } catch (e) {
     showModal(
       'error',
       'Thao tác thất bại',
-      e.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại',
+      e.response?.data?.message || 'Có lỗi xảy ra.',
     )
   } finally {
     saving.value = false
@@ -389,21 +561,22 @@ const saveUser = async (payload) => {
   font-size: 26px;
 }
 .filter-card {
-  background: #ffffff;
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  background: #fff;
+  border: 1px solid #f1d7e2;
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.04);
 }
+
 .filter-label {
   display: block;
+  margin-bottom: 8px;
   font-size: 12px;
   font-weight: 700;
+  color: #c15d87;
   text-transform: uppercase;
-  color: #b4557d;
-  letter-spacing: 0.3px;
-  margin-bottom: 8px;
+  letter-spacing: .5px;
 }
 
 .input-wrapper {
@@ -412,45 +585,36 @@ const saveUser = async (payload) => {
 
 .search-icon {
   position: absolute;
-  left: 0;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
-  width: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #b4557d;
-  font-size: 15px;
-  pointer-events: none;
-  z-index: 2;
+  color: #d26a95;
+  font-size: 16px;
 }
+
 .search-icon::after {
-  content: '';
+  content: "";
   position: absolute;
-  right: -1px;
+  right: -14px;
   top: 50%;
   transform: translateY(-50%);
   width: 1px;
   height: 20px;
-  background: #f3d6e3;
+  background: #f2d7e3;
 }
+
 .f-input {
-  border: 1px solid #f3d6e3;
-  background: #fffafd;
-  border-radius: 10px;
-  padding: 11px 14px;
-  color: #344054;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #f2d7e3;
+  background: #fff;
+  color: #333;
   font-size: 14px;
-  width: 100%;
-  box-sizing: border-box;
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    background-color 0.18s ease;
+  transition: all .25s ease;
 }
 
 .input-wrapper .f-input {
-  padding-left: 50px;
+  padding-left: 52px;
 }
 
 .f-input::placeholder {
@@ -458,14 +622,32 @@ const saveUser = async (payload) => {
 }
 
 .f-input:hover {
-  border-color: #efbdd2;
-  background: #ffffff;
+  border-color: #f4a8c6;
 }
+
 .f-input:focus {
   border-color: #f55d9b;
-  background: #ffffff;
-  box-shadow: 0 0 0 4px rgba(245, 93, 155, 0.1);
-  outline: none;
+  box-shadow: 0 0 0 4px rgba(245,93,155,.12);
+}
+
+.form-select.f-input {
+  cursor: pointer;
+  padding-left: 14px;
+  font-weight: 500;
+}
+
+.form-select.f-input:focus {
+  background-color: #fff;
+}
+
+@media (max-width: 992px) {
+  .filter-card {
+    padding: 18px;
+  }
+
+  .f-input {
+    height: 44px;
+  }
 }
 .btn-pink {
   background: #f55d9b;
