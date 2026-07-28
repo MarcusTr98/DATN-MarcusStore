@@ -90,6 +90,48 @@
           <span v-if="errors.thumbnailUrl" class="error-msg">{{ errors.thumbnailUrl }}</span>
           <div v-if="uploadError" class="error-msg">{{ uploadError }}</div>
         </div>
+
+        <!-- ── Liên kết sản phẩm ── -->
+        <div class="page-card pad">
+          <p class="section-title">Liên kết sản phẩm</p>
+          <p class="section-sub">Không bắt buộc — nếu điền, sẽ hiện nút "🛒 Mua ngay" ở cuối bài viết.</p>
+
+          <div v-for="(link, i) in productLinks" :key="i" class="product-link-row">
+            <input
+              class="form-input"
+              type="text"
+              v-model="link.label"
+              placeholder="Tên sản phẩm (vd: iPhone 18 Pro Max)"
+              style="margin-bottom: 6px;"
+            />
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input
+                class="form-input"
+                type="url"
+                v-model="link.href"
+                placeholder="URL sản phẩm (vd: /products/iphone-18-pro-max)"
+                style="flex:1;"
+              />
+              <button type="button" class="btn-remove-link" @click="removeProductLink(i)" title="Xoá">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="toggle-row" style="margin-bottom: 12px;">
+            <span class="toggle-label">
+              <i class="bi bi-fire"></i> Hiện badge "Bán chạy"
+            </span>
+            <label class="toggle">
+              <input type="checkbox" v-model="showHotBadge" />
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <button type="button" class="btn-add-link" @click="addProductLink">
+            <i class="bi bi-plus-circle me-1"></i>Thêm sản phẩm
+          </button>
+        </div>
       </div>
 
       <div class="side-col">
@@ -137,7 +179,7 @@
       </div>
     </div>
 
-    <!-- Thanh Lưu/Hủy ở cuối form — đỡ phải kéo lên đầu trang -->
+    <!-- Thanh Lưu/Hủy ở cuối form -->
     <div class="bottom-bar">
       <span class="status-pill" :class="form.isPublished ? 'live' : 'draft'">
         {{ form.isPublished ? 'Sẽ xuất bản' : 'Lưu nháp' }}
@@ -189,8 +231,6 @@ import { reactive, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { postApi } from '@/api/PostApi';
 import PostEditor from './Posteditor.vue';
 
-// Không dùng route nữa — nhận post (null = tạo mới, object = đang sửa) và
-// categories (đã có sẵn ở PostManager) qua props, báo kết quả qua emit.
 const props = defineProps({
   post: { type: Object, default: null },
   categories: { type: Array, default: () => [] },
@@ -199,8 +239,6 @@ const emit = defineEmits(['saved', 'cancel']);
 
 const isEdit = computed(() => !!props.post);
 
-// author_id ẩn khỏi UI — tạo mới lấy USERNAME từ localStorage (api.js đã lưu khi login),
-// sửa thì lấy authorName thật từ post đang chỉnh.
 const authorName = computed(() => props.post?.authorName || localStorage.getItem('USERNAME') || 'Admin');
 const authorInitial = computed(() => authorName.value?.trim()?.slice(-1)?.toUpperCase() || 'A');
 
@@ -223,6 +261,43 @@ const imgBroken = ref(false);
 const uploading = ref(false);
 const uploadPercent = ref(0);
 const uploadError = ref('');
+
+const productLinks = ref([]) // [{ label: '', href: '' }]
+const showHotBadge = ref(false)
+
+function addProductLink() {
+  productLinks.value.push({ label: '', href: '' })
+}
+
+function removeProductLink(i) {
+  productLinks.value.splice(i, 1)
+}
+
+function parseProductLinksFromContent(html) {
+  if (!html) return { links: [], cleanContent: html, hotBadge: false }
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  const badgeEl = doc.querySelector('span[data-hot-badge="true"]')
+  const hotBadge = !!badgeEl
+  badgeEl?.remove()
+  const anchors = doc.querySelectorAll('a[data-product-link="true"]')
+  const links = []
+  anchors.forEach(a => {
+    links.push({ label: a.textContent.trim(), href: a.getAttribute('href') || '' })
+    a.remove()
+  })
+  return { links, cleanContent: doc.body.innerHTML, hotBadge }
+}
+
+function injectProductLinksIntoContent(html, links, hotBadge) {
+  const validLinks = links.filter(l => l.label.trim() && l.href.trim())
+  if (!validLinks.length) return html
+  const badgeTag = hotBadge ? '<span data-hot-badge="true"></span>' : ''
+  const linkTags = validLinks
+    .map(l => `<a href="${l.href.trim()}" data-product-link="true">${l.label.trim()}</a>`)
+    .join('')
+  return (html || '') + badgeTag + linkTags
+}
 
 const toasts = ref([]);
 function pushToast(type, message) {
@@ -335,20 +410,24 @@ function onDrop(e) {
   if (file && file.type.startsWith('image/')) uploadFile(file);
 }
 
-// Khởi tạo form từ props.post (nếu sửa) — list đã có sẵn đầy đủ dữ liệu,
-// không cần gọi lại API getById.
 function initFromProps() {
   if (props.post) {
+    // Tách product links + badge ra khỏi content trước khi đưa vào editor
+    const { links, cleanContent, hotBadge } = parseProductLinksFromContent(props.post.content || '')
+    productLinks.value = links
+    showHotBadge.value = hotBadge
     Object.assign(form, {
       title: props.post.title || '',
       postCategoryId: props.post.postCategoryId ?? '',
-      content: props.post.content || '',
+      content: cleanContent,
       excerpt: props.post.excerpt || '',
       thumbnailUrl: props.post.thumbnailUrl || '',
       isPublished: !!props.post.isPublished,
       publishedAt: props.post.publishedAt ? props.post.publishedAt.slice(0, 16) : '',
     });
   } else {
+    productLinks.value = []
+    showHotBadge.value = false
     Object.assign(form, emptyForm());
   }
   initialSnapshot.value = JSON.stringify(form);
@@ -356,7 +435,6 @@ function initFromProps() {
 
 onMounted(initFromProps);
 
-// Cảnh báo khi đóng tab / F5 lúc đang có thay đổi chưa lưu
 function handleBeforeUnload(e) {
   if (isDirty.value) {
     e.preventDefault();
@@ -388,7 +466,8 @@ async function onSave() {
     const payload = {
       title: form.title,
       postCategoryId: form.postCategoryId,
-      content: form.content,
+      // Inject product links vào cuối content trước khi gửi lên BE
+      content: injectProductLinksIntoContent(form.content, productLinks.value, showHotBadge.value),
       excerpt: form.excerpt || autoExcerpt(form.content),
       thumbnailUrl: form.thumbnailUrl || null,
       isPublished: form.isPublished,
@@ -495,7 +574,7 @@ function cancelLeaveNav() {
 .form-input {
   width: 100%; padding: 9px 12px; border: 1px solid #f3d6e3; border-radius: 8px;
   font-size: 13.5px; color: #202636; background: #fffafd; outline: none; transition: border 0.15s;
-  font-family: inherit;
+  font-family: inherit; box-sizing: border-box;
 }
 .form-input:focus { border-color: #efbdd2; box-shadow: 0 0 0 3px rgba(245,93,155,0.12); background: #fff; }
 .form-input:disabled { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
@@ -514,19 +593,6 @@ function cancelLeaveNav() {
 .mono { font-family: 'JetBrains Mono', 'Courier New', monospace; }
 .badge-unique { display: inline-flex; align-items: center; gap: 4px; background: #f0fdf4; color: #15803d; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-left: 8px; }
 .badge-dup { display: inline-flex; align-items: center; gap: 4px; background: #f8d7da; color: #dc3545; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; margin-left: 8px; }
-
-.rte-toolbar { display: flex; gap: 4px; background: #fff0f7; border: 1px solid #f3d6e3; border-bottom: none; border-radius: 8px 8px 0 0; padding: 6px; }
-.rte-btn {
-  width: 30px; height: 30px; border-radius: 6px; border: none; background: transparent;
-  color: #b4557d; font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-}
-.rte-btn:hover { background: #ffe4ef; }
-.content-area {
-  width: 100%; min-height: 220px; border: 1px solid #f3d6e3; border-radius: 0 0 8px 8px;
-  padding: 12px; font-size: 13.5px; line-height: 1.6; color: #202636; background: #fffafd;
-  outline: none; resize: vertical; font-family: inherit;
-}
-.content-area:focus { border-color: #efbdd2; box-shadow: 0 0 0 3px rgba(245,93,155,0.12); background: #fff; }
 
 .upload-dropzone {
   border: 2px dashed #f3d6e3; border-radius: 10px; background: #fffafd; min-height: 110px;
@@ -571,6 +637,38 @@ function cancelLeaveNav() {
 .preview-title { font-size: 14px; font-weight: 700; color: #111827; margin: 0 0 6px; line-height: 1.4; }
 .preview-excerpt { font-size: 12.5px; color: #6b7280; line-height: 1.55; margin: 0; }
 .preview-excerpt.auto { color: #b4557d; font-style: italic; }
+
+/* ── Product links ── */
+.product-link-row {
+  background: #fffafd;
+  border: 1px solid #f3d6e3;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+.btn-add-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #f55d9b;
+  background: #fff0f7;
+  border: 1px dashed #f3d6e3;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-weight: 500;
+}
+.btn-add-link:hover { background: #ffe4ef; border-color: #efbdd2; }
+.btn-remove-link {
+  width: 36px; height: 38px; flex-shrink: 0;
+  background: #fff5f6; border: 1px solid #f5c2c7;
+  border-radius: 8px; color: #dc3545;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background 0.15s;
+}
+.btn-remove-link:hover { background: #f8d7da; }
 
 .bn-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.46); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
 .banner-modal-box { background: #fff; border-radius: 14px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18); }

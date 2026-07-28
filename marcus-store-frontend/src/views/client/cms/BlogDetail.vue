@@ -28,7 +28,27 @@
             <span><i class="far fa-clock me-1"></i>Ngày đăng: {{ formatDate(post.publishedAt) }}</span>
           </div>
 
-          <div class="blog-rich-content lh-base text-secondary" v-html="post.content"></div>
+          <div class="blog-rich-content lh-base text-secondary" v-html="sanitizedContent"></div>
+
+          <!-- Nút Mua ngay — chỉ render khi bài có product links -->
+          <div v-if="productLinks.length" class="product-links-section">
+            <div v-if="showHotBadge" class="hot-badge">
+              <i class="bi bi-fire"></i> Bán chạy
+            </div>
+            <div class="product-links-wrap">
+              <a
+                v-for="(link, i) in productLinks"
+                :key="i"
+                :href="link.href"
+                class="btn-buy-now"
+              >
+                <i class="bi bi-cart2 btn-buy-icon"></i>
+                <span class="btn-buy-divline"></span>
+                <span class="btn-buy-text">Mua ngay</span>
+                <span class="btn-buy-name">{{ link.label }}</span>
+              </a>
+            </div>
+          </div>
         </template>
       </div>
     </div>
@@ -36,7 +56,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { postPublicApi } from '@/api/PostApi'
 
@@ -49,11 +69,40 @@ function formatDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+const productLinks = ref([])
+const showHotBadge = ref(false)
+
+const sanitizedContent = computed(() => {
+  if (!post.value?.content) return ''
+
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(post.value.content, 'text/html')
+
+  // Đọc trạng thái badge
+  const badgeEl = doc.querySelector('span[data-hot-badge="true"]')
+  showHotBadge.value = !!badgeEl
+  badgeEl?.remove()
+
+  const anchors = doc.querySelectorAll('a[data-product-link="true"]')
+  const links = []
+
+  anchors.forEach(a => {
+    links.push({
+      href: a.getAttribute('href') || '#',
+      label: a.textContent.trim() || 'Sản phẩm'
+    })
+    a.remove()
+  })
+
+  productLinks.value = links
+  return doc.body.innerHTML
+})
 
 async function loadPost(slug) {
   loading.value = true
   loadError.value = ''
   post.value = null
+  productLinks.value = []
   try {
     post.value = await postPublicApi.getBySlug(slug)
   } catch (err) {
@@ -65,19 +114,13 @@ async function loadPost(slug) {
 
 onMounted(() => loadPost(route.params.slug))
 
-// Hỗ trợ trường hợp chuyển từ bài viết này sang bài viết khác (slug đổi) mà không unmount component
+// Hỗ trợ chuyển bài mà không unmount component
 watch(() => route.params.slug, (newSlug) => {
   if (newSlug) loadPost(newSlug)
 })
 </script>
 
 <style scoped>
-.post-detail-thumb {
-  width: 100%;
-  max-height: 420px;
-  object-fit: cover;
-  border-radius: 12px;
-}
 .post-detail-thumb-wrap {
   position: relative;
   width: 100%;
@@ -117,4 +160,73 @@ watch(() => route.params.slug, (newSlug) => {
 .blog-rich-content :deep(a) {
   color: #e1121c;
 }
+
+/* ── Khu vực Mua ngay ── */
+.product-links-section {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #dee2e6;
+}
+.hot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 11px;
+  margin-bottom: 12px;
+}
+.product-links-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.btn-buy-now {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 13px 22px;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  box-shadow: 0 2px 0 #991b1b, 0 4px 12px rgba(220, 38, 38, 0.25);
+  transition: background 0.18s, transform 0.15s, box-shadow 0.18s;
+}
+.btn-buy-now:hover {
+  background: #b91c1c;
+  color: #fff;
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 0 #7f1d1d, 0 8px 20px rgba(220, 38, 38, 0.35);
+}
+.btn-buy-now:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #991b1b, 0 2px 6px rgba(220, 38, 38, 0.2);
+}
+.btn-buy-icon {
+  font-size: 18px;
+}
+.btn-buy-divline {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.3);
+  flex-shrink: 0;
+}
+.btn-buy-text {
+  font-weight: 400;
+  opacity: 0.9;
+}
+.btn-buy-name {
+  font-weight: 700;
+}
+
 </style>
