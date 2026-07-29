@@ -61,17 +61,26 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate")   LocalDate endDate);
 
-    // KPI mới có completedOrders — tính theo Order_Transactions SUCCESS, chỉ COMPLETED orders
+    // KPI mới có completedOrders — tính doanh thu theo tất cả transaction SUCCESS
     @Query(value = """
         SELECT
             ISNULL(SUM(ot.amount), 0)                                                             AS totalRevenue,
             COUNT(DISTINCT o.order_id)                                                            AS totalOrders,
-            COUNT(DISTINCT o.order_id)                                                            AS completedOrders,
-            0                                                                                      AS totalProductsSold
+            COUNT(DISTINCT CASE WHEN o.order_status = 'COMPLETED' THEN o.order_id END)           AS completedOrders,
+            ISNULL((
+                SELECT SUM(oi.quantity)
+                FROM Order_Items oi
+                INNER JOIN Orders o2 ON oi.order_id = o2.order_id
+                INNER JOIN Order_Transactions ot2 ON o2.order_id = ot2.order_id
+                WHERE ot2.status = 'SUCCESS'
+                  AND o2.order_status = 'COMPLETED'
+                  AND CAST(ot2.created_at AS DATE) >= :startDate
+                  AND CAST(ot2.created_at AS DATE) <= :endDate
+            ), 0)                                                                                  AS totalProductsSold
         FROM Order_Transactions ot
         INNER JOIN Orders o ON ot.order_id = o.order_id
-            AND o.order_status = 'COMPLETED'
         WHERE ot.status = 'SUCCESS'
+            AND o.order_status != 'CANCELLED'
             AND CAST(ot.created_at AS DATE) >= :startDate
             AND CAST(ot.created_at AS DATE) <= :endDate
         """, nativeQuery = true)
@@ -261,15 +270,14 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             o.final_amount     AS totalAmount,
             o.created_at       AS createdAt
         FROM Orders o
-        WHERE o.order_status IN ('PENDING', 'CONFIRMED', 'PROCESSING')
+        WHERE o.order_status IN ('PENDING', 'PROCESSING')
             AND (:keyword IS NULL OR o.order_code      LIKE '%' + :keyword + '%'
                                   OR o.recipient_name  LIKE '%' + :keyword + '%'
                                   OR o.recipient_phone LIKE '%' + :keyword + '%')
         ORDER BY
             CASE o.order_status
                 WHEN 'PENDING'    THEN 1
-                WHEN 'CONFIRMED'  THEN 2
-                WHEN 'PROCESSING' THEN 3
+                WHEN 'PROCESSING' THEN 2
             END,
             o.created_at ASC
         """, nativeQuery = true)
@@ -320,7 +328,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate")   LocalDate endDate);
 
-    @Query(value = "SELECT COUNT(*) FROM Orders WHERE order_status = 'PENDING'",
+    @Query(value = "SELECT COUNT(*) FROM Orders WHERE order_status IN ('PENDING', 'PROCESSING')",
            nativeQuery = true)
     Long countPendingOrders();
 

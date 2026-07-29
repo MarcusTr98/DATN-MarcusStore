@@ -143,7 +143,7 @@ const props = defineProps({
 const tabs = [
   { label: 'Đơn hàng gần nhất',         value: 'recentOrders'  },
   { label: 'Đơn cần xử lý',             value: 'pendingOrders' },
-  { label: 'Top sản phẩm bán chạy',     value: 'topProducts'   },
+  { label: 'Sản phẩm đã bán ra',             value: 'topProducts'   },
   { label: 'Sản phẩm sắp hết kho',      value: 'lowStock'      },
   { label: 'Khách hàng mua nhiều nhất', value: 'topCustomers'  },
 ]
@@ -274,15 +274,11 @@ const statusOptions = computed(() => {
 
 // ── fetch ────────────────────────────────────────────────────
 async function fetchTableData() {
-  // FIX: tách rõ period và customDate
-  // Nếu có customDate → truyền startDate/endDate, period để 'today' (không ảnh hưởng vì backend ưu tiên startDate/endDate)
-  // Nếu không có customDate → dùng filters.date (preset) hoặc selectedTime
-  const hasCustomDate = !!props.customDate
-  const period  = hasCustomDate ? 'today' : (filters.date || props.selectedTime || 'month')
-  const sd      = hasCustomDate ? props.customDate : ''
-  const ed      = hasCustomDate ? props.customDate : ''
+  const period = filters.date || props.selectedTime || 'month'
+  const sd = props.customDate || ''
+  const ed = props.customDate || ''
 
-  isLoading.value   = true
+  isLoading.value  = true
   currentPage.value = 1
   try {
     let res
@@ -342,9 +338,8 @@ watch(() => props.selectedTime, (val) => {
   fetchTableData()
 })
 
-watch(() => props.customDate, () => {
-  // FIX: không gán customDate vào filters.date nữa
-  // fetchTableData sẽ tự đọc props.customDate trực tiếp
+watch(() => props.customDate, (val) => {
+  filters.date = val || props.selectedTime
   fetchTableData()
 })
 
