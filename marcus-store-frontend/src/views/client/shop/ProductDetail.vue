@@ -115,12 +115,13 @@
 
       <!-- Reviews (panel riêng bên dưới) -->
       <div class="pd-reviews-section">
-        <ProductReviews
-          :product-name="product.productName"
-          :rating="product.rating || 0"
-          :review-count="product.reviewCount || 0"
-          :review-distribution="product.reviewDistribution || []"
-        />
+<ProductReviews
+  :product-id="product.productId"
+  :product-name="product.productName"
+  :rating="product.rating || 0"
+  :review-count="product.reviewCount || 0"
+  :review-distribution="product.reviewDistribution || []"
+/>
       </div>
     </div>
 

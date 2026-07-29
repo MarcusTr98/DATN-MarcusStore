@@ -17,7 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import com.fpoly.marcusstore.security.OAuth2SuccessHandler;
-
+import org.springframework.http.HttpMethod;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -95,7 +95,7 @@ public class SecurityConfig {
                         // Mở khóa toàn bộ nhánh GHN và mở endpoint báo lỗi của Spring Boot
                         .requestMatchers("/api/ghn/**").permitAll()
                         .requestMatchers("/error").permitAll()
-
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập
                         .requestMatchers("/api/user/**").authenticated() // Checkout, Giỏ hàng, Wishlist, Đgiá
                         // Thêm quyền cho nhánh finance-reports

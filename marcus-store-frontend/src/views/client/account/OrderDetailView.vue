@@ -187,6 +187,45 @@
                         </div>
                       </div>
                       <strong class="product-total">{{ formatMoney(item.lineTotal) }}</strong>
+                       <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
+                     
+                      <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
+                <div
+    v-if="selectedOrder.orderStatus === 'COMPLETED'"
+    class="review-action"
+>
+
+    <!-- chưa đánh giá -->
+    <button
+        v-if="!item.reviewed"
+        class="review-btn"
+        @click="openReview(item)"
+    >
+        Đánh giá
+    </button>
+
+    <!-- đã đánh giá -->
+    <template v-else>
+<button
+    type="button"
+    class="review-view-btn"
+    @click="goToProduct(item)"
+>
+    <i class="fa-solid fa-arrow-up-right-from-square"></i>
+    Xem đánh giá
+</button>
+
+        <button
+            class="review-edit-btn"
+            @click="editReview(item)"
+        >
+            Sửa đánh giá
+        </button>
+    </template>
+
+</div>
+                      <!-- ===== Hết vùng thao tác đánh giá ===== -->
+
                     </article>
                   </div>
                 </section>
@@ -423,23 +462,113 @@
         </div>
       </div>
     </section>
+        <!-- ===== Modal đánh giá: tạo mới / xem / sửa ===== -->
+    <review-modal
+        v-model="showReviewModal"
+        :order-item="selectedOrderItem"
+        :edit-mode="editMode"
+        :view-only="viewOnly"
+        @success="reviewSuccess"
+    />
   </main>
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 import UserOrderApi from '@/api/userOrder.js'
 import '@/assets/css/OrderDetailView.css'
-
+import ReviewModal from './ReviewModal.vue'
+import reviewService from "@/stores/reviewService"
 const selectedOrder = ref(null)
+
+const showReviewModal = ref(false)
+const editMode = ref(false)
+const viewOnly = ref(false)          // true khi chỉ đang XEM đánh giá (không cho sửa)
+const selectedOrderItem = ref(null)
 // Marcus thêm state refund tách khỏi chi tiết đơn để không ảnh hưởng API cũ của thành viên.
 const refund = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const route = useRoute()
 let refundPollingTimer = null
+
+// ===== Mở modal để TẠO MỚI đánh giá =====
+// ===== Mở modal để TẠO MỚI đánh giá =====
+function openReview(item){
+    editMode.value = false
+    viewOnly.value = false
+    selectedOrderItem.value = item
+
+    // Trì hoãn 1 tick để tránh hiện tượng "click xuyên" khi modal
+    // được chèn vào DOM ngay dưới vị trí vừa chạm/click.
+    setTimeout(() => {
+        showReviewModal.value = true
+    }, 0)
+}
+
+// ===== Mở modal để SỬA đánh giá đã có =====
+async function editReview(item){
+    try{
+        const res = await reviewService.getMyReview(item.orderItemId)
+
+        selectedOrderItem.value = {
+            ...item,
+            review: res.data.data
+        }
+
+        editMode.value = true
+        viewOnly.value = false
+
+        setTimeout(() => {
+            showReviewModal.value = true
+        }, 0)
+    }
+    catch(e){
+        console.log(e)
+    }
+}
+
+// ===== Mở modal chỉ để XEM đánh giá đã có (không cho chỉnh sửa) =====
+const router = useRouter()
+function goToProduct(item) {
+
+    if (!item.productSlug) {
+        console.warn("Thiếu productSlug", item)
+        return
+    }
+
+    router.push({
+        name: "ProductDetail",
+        params: {
+            slug: item.productSlug
+        },
+        query: {
+            review: true
+        }
+    })
+}
+async function reviewSuccess(){
+  // Chỉ đóng modal và âm thầm cập nhật lại dữ liệu đơn hàng (vd: item.reviewed),
+  // không bật loading.value để tránh cả trang phía sau modal bị che lại
+  // bởi màn hình "Đang tải chi tiết đơn hàng...".
+  showReviewModal.value = false
+  await quietRefreshOrder()
+}
+
+// Cập nhật lại chi tiết đơn hàng mà không hiện trạng thái loading toàn trang,
+// dùng sau khi tạo/sửa/xóa đánh giá trong modal.
+async function quietRefreshOrder() {
+  const orderCode = route.params.id
+  if (!orderCode) return
+  try {
+    const response = await UserOrderApi.userOrderDetail(orderCode)
+    selectedOrder.value = response.data
+  } catch (e) {
+    console.error(e)
+  }
+}
 
 // Marcus thêm hàm đồng bộ nhẹ để trạng thái khách cập nhật sau khi admin refund,
 // không bật lại loading toàn trang và không làm nháy giao diện.
@@ -977,4 +1106,111 @@ function getVariantText(item) {
     grid-template-columns: 1fr;
   }
 }
+
+.product-item {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  grid-template-areas:
+    "thumb name total"
+    "action action action";
+  align-items: center;
+  gap: 12px 16px;
+  padding: 16px;
+  border: 1px solid #f1f1f1;
+  border-radius: 12px;
+  position: relative;
+}
+
+.product-thumb {
+  grid-area: thumb;
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  flex-shrink: 0;
+}
+
+.product-thumb i {
+  font-size: 24px;
+  color: #cbd5e1;
+}
+
+.product-name {
+  grid-area: name;
+  margin: 0 0 4px;
+  font-weight: 700;
+}
+
+.product-meta {
+  grid-area: name;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 22px;
+}
+
+.product-total {
+  grid-area: total;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* ===== Vùng nút Đánh giá / Xem đánh giá / Sửa đánh giá ===== */
+.review-action{
+  grid-area: action;
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.review-btn,
+.review-view-btn,
+.review-edit-btn{
+  min-width:140px;
+  height:38px;
+  padding:0 16px;
+  border:none;
+  border-radius:8px;
+  font-weight:600;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:.2s;
+}
+
+.review-btn{
+  background:#df062d;
+  color:#fff;
+}
+
+.review-btn:hover{
+  background:#c00526;
+}
+
+.review-view-btn{
+  background:#3b82f6;
+  color:#fff;
+}
+
+.review-view-btn:hover{
+  background:#2563eb;
+}
+
+.review-edit-btn{
+  background:#22d0ee;
+  color:#fff;
+}
+
+.review-edit-btn:hover{
+  background:#12b4d1;
+}
+/* ===== Hết vùng nút đánh giá ===== */
 </style>

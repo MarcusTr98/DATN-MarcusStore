@@ -89,6 +89,15 @@
         <i class="fa-solid fa-headset menu-icon" style="font-size: 16px"></i>
         <span>Quản lý liên hệ</span>
       </router-link>
+          <router-link
+    v-if="canAccessRoute('/admin/reviews')"
+    to="/admin/reviews"
+    class="menu-item"
+    active-class="active"
+  >
+    <i class="bi bi-star menu-icon"></i>
+    <span>Quản lý đánh giá & bình luận</span>
+  </router-link>
     </div>
     <div v-if="showBaoCao" class="menu-section">
       <p class="menu-title">BÁO CÁO</p>
@@ -106,7 +115,6 @@
     <i class="bi bi-clock-history menu-icon"></i>
     <span>Quản lý thao tác</span>
   </router-link>
-
     </div>
 
     <div v-if="showHeThong" class="menu-section">
@@ -260,7 +268,8 @@ const showNoiDung = computed(() => {
   return (
     canAccessRoute("/admin/post") ||
     canAccessRoute("/admin/banner") ||
-    canAccessRoute("/admin/contact-management")
+    canAccessRoute("/admin/contact-management")||
+     canAccessRoute("/admin/reviews")
   );
 });
 

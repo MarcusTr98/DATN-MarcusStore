@@ -160,7 +160,15 @@ public class ClientProductDetailService {
         res.setIsWished(isWished);
 
         Integer pid = product.getProductId();
+        System.out.println("========== PRODUCT ==========");
+System.out.println("Product ID = " + pid);
         ClientProductDetailRepository.RatingSummaryProjection ratingSummary = productDetailRepository.findRatingSummaryByProductId(pid);
+        System.out.println("Summary = " + ratingSummary);
+
+if (ratingSummary != null) {
+    System.out.println("AVG = " + ratingSummary.getAvgRating());
+    System.out.println("COUNT = " + ratingSummary.getReviewCount());
+}
         double avgRating = ratingSummary != null && ratingSummary.getAvgRating() != null
                 ? ratingSummary.getAvgRating()
                 : 0.0;

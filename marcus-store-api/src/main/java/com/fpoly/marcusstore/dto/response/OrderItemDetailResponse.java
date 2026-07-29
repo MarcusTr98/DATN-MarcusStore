@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @Builder
 public class OrderItemDetailResponse {
+    private Integer orderItemId;
     private Integer skuId;
     private String skuCode;
     private Integer productId;
@@ -28,4 +29,6 @@ public class OrderItemDetailResponse {
     private BigDecimal originalPrice;
     private String flashSaleSlotName;
     private List<ClientSkuAttributeValueResponse> variants;
+    private String productSlug;
+    private Boolean reviewed;
 }

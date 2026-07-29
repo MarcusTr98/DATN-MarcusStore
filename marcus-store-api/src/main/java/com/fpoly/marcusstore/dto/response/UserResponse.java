@@ -33,5 +33,5 @@ public class UserResponse {
     private LocalDateTime createdAt;
 
     private BigDecimal totalSpent;
-
+    
 }
