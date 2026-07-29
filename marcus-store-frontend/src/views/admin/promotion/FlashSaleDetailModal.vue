@@ -18,9 +18,7 @@
             </p>
           </div>
         </div>
-        <button class="close-btn fs-close-btn" aria-label="Đóng" @click="onClose">
-          <i class="bi bi-x-lg"></i>
-        </button>
+        <!-- Đã bỏ nút X góc phải theo yêu cầu: đóng modal bằng nút "Đóng" footer hoặc click overlay -->
       </header>
 
       <!-- ====== BODY (scrollable) ====== -->

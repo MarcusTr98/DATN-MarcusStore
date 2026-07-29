@@ -8,6 +8,14 @@ const bannerApi = {
     return api.get(BASE).then((res) => res.data.data);
   },
 
+  // Dùng cho HomeBanner.vue (public, không cần token)
+    getPublicPositions() {
+      return api.get('/public/banners/positions').then((res) => res.data?.data ?? res.data);
+    },
+    getPublicBanners() {
+      return api.get('/public/banners').then((res) => res.data?.data ?? res.data);
+    },
+
   getPositions() {
     return api.get(`${BASE}/positions`).then((res) => res.data.data);
   },

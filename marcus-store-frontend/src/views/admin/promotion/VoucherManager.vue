@@ -135,8 +135,15 @@
                 </span>
               </td>
               <td>
-                <span class="status-badge" :class="{ inactive: !voucher.isActive }">
-                  {{ voucher.isActive ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
+                <span
+                  class="status-badge"
+                  :class="{
+                    inactive: !voucher.isActive || (voucher.endDate && new Date(voucher.endDate) < new Date())
+                  }"
+                >
+                  {{ voucher.isActive && (!voucher.endDate || new Date(voucher.endDate) >= new Date())
+                      ? 'Đang sử dụng'
+                      : 'Ngừng sử dụng' }}
                 </span>
               </td>
               <td>
@@ -1004,16 +1011,31 @@ const previewVoucher = computed(() => {
 })
 
 const filteredVouchers = computed(() => {
+  // Helper: voucher coi như ngừng sử dụng nếu isActive=false HOẶC đã quá hạn (endDate < now)
+  const isConsideredInactive = (voucher) => {
+    if (voucher.isActive === false) return true
+    if (voucher.endDate && new Date(voucher.endDate) < new Date()) return true
+    return false
+  }
+
   // Tôn trọng bộ lọc status của UI - không double-filter cứng isActive=true
   // BE đã trả về đúng dữ liệu theo filters.status rồi
+  let result
   if (filters.status === 'ACTIVE') {
-    return vouchers.value.filter((voucher) => voucher.isActive === true)
+    result = vouchers.value.filter((voucher) => !isConsideredInactive(voucher))
+  } else if (filters.status === 'INACTIVE') {
+    result = vouchers.value.filter(isConsideredInactive)
+  } else {
+    // ALL: hiển thị tất cả
+    result = vouchers.value
   }
-  if (filters.status === 'INACTIVE') {
-    return vouchers.value.filter((voucher) => voucher.isActive === false)
-  }
-  // ALL: hiển thị tất cả
-  return vouchers.value
+
+  // Đẩy các voucher ngừng sử dụng / hết hạn xuống cuối danh sách
+  return [...result].sort((a, b) => {
+    const aInactive = isConsideredInactive(a) ? 1 : 0
+    const bInactive = isConsideredInactive(b) ? 1 : 0
+    return aInactive - bInactive
+  })
 })
 const filteredUsers = computed(() => {
   if (!userSearchQuery.value) {

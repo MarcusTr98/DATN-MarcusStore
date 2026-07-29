@@ -86,4 +86,5 @@ public class AdminBannerController {
             throw new RuntimeException("Chỉ chấp nhận file ảnh (JPG, PNG, WEBP...)");
         return ApiResponse.<String>success(cloudinaryService.uploadImage(file));
     }
+
 }

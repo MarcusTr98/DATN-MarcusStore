@@ -78,6 +78,10 @@ public class VoucherServiceImpl implements VoucherService {
         Page<Voucher> pageResult = voucherRepository
                 .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, pageable);
 
+        // Auto deactivate các voucher đã quá hạn / hết quantity trong page hiện tại
+        // -> Đồng bộ isActive = false trong DB cho các voucher hết hạn
+        pageResult.forEach(this::deactivateIfExpired);
+
         // FE sẽ tự xử lý logic lùi trang khi currentPage vượt quá totalPages
         // (không fallback ở BE nữa để tránh nhầm lẫn giữa 2 tầng xử lý)
         return pageResult.map(this::toResponse);

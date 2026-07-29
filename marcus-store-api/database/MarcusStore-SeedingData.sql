@@ -1,4 +1,4 @@
-﻿USE MarcusStoreDB;
+USE MarcusStoreDB;
 GO
 
 -- Tắt cảnh báo số dòng ảnh hưởng để script chạy nhanh hơn
@@ -234,7 +234,9 @@ SET IDENTITY_INSERT Posts OFF;
 SET IDENTITY_INSERT Banner_Positions ON;
 INSERT INTO Banner_Positions (position_id, position_code, description) VALUES
 (1, 'HOME_HERO_SLIDER', N'Slider chính ngoài trang chủ'),
-(2, 'CATEGORY_RIGHT', N'Cột bên phải trang danh mục');
+(2, 'HOME_HERO_SECOND', N'Banner phụ trên trang chủ'),
+(3, 'HOME_HERO_THIRD', N'Banner phụ dưới trang chủ'),
+(4, 'CATEGORY_RIGHT', N'Cột bên phải trang danh mục');
 SET IDENTITY_INSERT Banner_Positions OFF;
 
 SET IDENTITY_INSERT Banners ON;

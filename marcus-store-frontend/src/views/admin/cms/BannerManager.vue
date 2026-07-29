@@ -82,6 +82,14 @@
       @save="handleSave"
     />
 
+    <!-- Modal xác nhận thay thế banner đang hiển thị -->
+    <BannerReplaceConfirm
+      :visible="conflictModal.visible"
+      :existing="conflictModal.existingBanner"
+      @confirm="confirmReplace"
+      @cancel="cancelReplace"
+    />
+
   </div>
 </template>
 
@@ -90,6 +98,7 @@ import { reactive, ref, computed, onMounted } from 'vue';
 import BannerFilter from './Bannerfilter.vue';
 import BannerTable from './Bannertable.vue';
 import BannerModal from './Bannermodal.vue';
+import BannerReplaceConfirm from './BannerReplaceConfirm.vue';
 import { bannerApi } from '@/api/BannerApi';
 
 // ---- State ----
@@ -99,6 +108,14 @@ const loading    = ref(true);
 const loadError  = ref('');
 const modalVisible  = ref(false);
 const editingBanner = ref(null);
+
+// State cho modal xác nhận thay thế banner (áp dụng cho vị trí 1-slot: HOME_MIDDLE, CATEGORY_TOP...)
+const conflictModal = reactive({
+  visible: false,
+  existingBanner: null,    // banner đang chiếm vị trí (sẽ bị tạm ẩn nếu người dùng đồng ý)
+  pendingPayload: null,    // payload chuẩn bị gửi lên API
+  pendingForm: null,       // form đầy đủ (giữ id để phân biệt create vs update)
+});
 
 // positionOptions: lấy từ API /banners/positions → đủ tất cả vị trí kể cả chưa có banner
 const positionOptions = computed(() =>
@@ -216,21 +233,115 @@ function openEditModal(banner) {
   modalVisible.value = true;
 }
 
+/**
+ * Kiểm tra vị trí có phải dạng "1 banner duy nhất" hay không.
+ * Dựa vào flag allowsOrder do API trả về:
+ *   - allowsOrder = true  → vị trí cho phép nhiều banner chạy tuần tự (vd: HOME_HERO_SLIDER)
+ *   - allowsOrder = false → vị trí chỉ hiển thị 1 banner (vd: HOME_MIDDLE, CATEGORY_TOP)
+ */
+function isSingleSlotPosition(positionId) {
+  const position = positionOptions.value.find(
+    p => String(p.value) === String(positionId)
+  );
+  return position ? !position.allowsOrder : false;
+}
+
+/**
+ * Tìm banner đang hiển thị (isActive = true) ở 1 vị trí, ngoại trừ chính banner đang edit.
+ * Trả về null nếu không có banner nào đang dùng vị trí đó.
+ */
+function findActiveBannerInPosition(positionId, excludeBannerId) {
+  return banners.value.find(b =>
+    String(b.positionId) === String(positionId) &&
+    b.isActive &&
+    b.id !== excludeBannerId
+  ) || null;
+}
+
+function resetConflictModal() {
+  conflictModal.visible = false;
+  conflictModal.existingBanner = null;
+  conflictModal.pendingPayload = null;
+  conflictModal.pendingForm = null;
+}
+
+/** Thực hiện gọi API create/update, không hỏi xung đột */
+async function doSave(formData, payload) {
+  if (formData.id) {
+    const updated = await bannerApi.update(formData.id, payload);
+    const idx = banners.value.findIndex(b => b.id === formData.id);
+    if (idx > -1) banners.value[idx] = mapFromApi(updated);
+  } else {
+    const created = await bannerApi.create(payload);
+    banners.value.unshift(mapFromApi(created));
+  }
+  modalVisible.value = false;
+}
+
+/** Lưu banner — nếu vị trí 1-slot đã có banner đang hiển thị thì hỏi trước khi save */
 async function handleSave(formData) {
   try {
     const payload = mapToApi(formData);
-    if (formData.id) {
-      const updated = await bannerApi.update(formData.id, payload);
-      const idx = banners.value.findIndex(b => b.id === formData.id);
-      if (idx > -1) banners.value[idx] = mapFromApi(updated);
-    } else {
-      const created = await bannerApi.create(payload);
-      banners.value.unshift(mapFromApi(created));
+
+    // Chỉ cần kiểm tra xung đột khi vị trí chỉ cho phép hiển thị 1 banner
+    if (isSingleSlotPosition(formData.positionId)) {
+      const existing = findActiveBannerInPosition(formData.positionId, formData.id);
+
+      if (existing) {
+        // Lưu thông tin pending, mở modal xác nhận, return ở đây
+        conflictModal.existingBanner = existing;
+        conflictModal.pendingPayload = payload;
+        conflictModal.pendingForm = formData;
+        conflictModal.visible = true;
+        return;
+      }
     }
-    modalVisible.value = false;
+
+    // Vị trí nhiều-slot (slider) hoặc vị trí 1-slot chưa có banner → lưu bình thường
+    await doSave(formData, payload);
   } catch (err) {
+    console.error('Save banner error:', err);
     alert(err?.response?.data?.message || 'Lưu banner thất bại. Vui lòng thử lại.');
   }
+}
+
+/** Người dùng đồng ý thay thế: tạm ẩn banner cũ, sau đó lưu banner mới */
+async function confirmReplace() {
+  const { pendingPayload, pendingForm, existingBanner } = conflictModal;
+  if (!pendingForm || !existingBanner) {
+    resetConflictModal();
+    return;
+  }
+
+  const originalActive = existingBanner.isActive;
+  try {
+    // Bước 1: tạm ẩn banner cũ (giữ nguyên nội dung, chỉ đổi isActive = false)
+    const hiddenPayload = {
+      ...mapToApi(existingBanner),
+      isActive: false,
+    };
+    await bannerApi.update(existingBanner.id, hiddenPayload);
+
+    // Cập nhật UI ngay để phản hồi tức thì
+    const idx = banners.value.findIndex(b => b.id === existingBanner.id);
+    if (idx > -1) banners.value[idx].isActive = false;
+
+    // Bước 2: lưu banner mới (create hoặc update)
+    await doSave(pendingForm, pendingPayload);
+
+    resetConflictModal();
+  } catch (err) {
+    console.error('Replace banner error:', err);
+    // Rollback trạng thái banner cũ nếu bước 1 đã thành công nhưng bước 2 lỗi
+    const idx = banners.value.findIndex(b => b.id === existingBanner.id);
+    if (idx > -1) banners.value[idx].isActive = originalActive;
+    alert(err?.response?.data?.message || 'Thay thế banner thất bại. Vui lòng thử lại.');
+  }
+}
+
+/** Người dùng chọn giữ nguyên: hủy modal, không lưu gì */
+function cancelReplace() {
+  resetConflictModal();
 }
 
 // Toggle isActive trực tiếp không cần confirm

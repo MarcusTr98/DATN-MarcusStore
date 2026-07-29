@@ -17,19 +17,6 @@
     </Teleport>
 
     <div class="tech-panel">
-      <nav class="folder-tabs" aria-label="Danh mục sản phẩm">
-        <button
-          v-for="tab in tabs"
-          :key="tab.label"
-          type="button"
-          class="folder-tab"
-          :class="{ active: tab.active }"
-        >
-          <i :class="tab.icon"></i>
-          <span v-if="tab.label">{{ tab.label }}</span>
-        </button>
-      </nav>
-
       <header class="section-header section-header--center">
         <div class="fire-header-wrapper">
           <!-- Floating ember particles -->

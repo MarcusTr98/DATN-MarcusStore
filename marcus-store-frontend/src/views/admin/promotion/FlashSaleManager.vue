@@ -246,8 +246,14 @@
       <div class="flashsale-modal">
         <div class="modal-head">
           <div>
-            <h2>{{ isEditing ? 'Chỉnh sửa Flash Sale' : 'Tạo Flash Sale mới' }}</h2>
-            <p>Thiết lập thông tin chiến dịch và các sản phẩm áp dụng.</p>
+            <h2>
+              {{ isEditing && !formLocked
+                  ? 'Chỉnh sửa Flash Sale'
+                  : (isEditing ? 'Chi tiết Flash Sale' : 'Tạo Flash Sale mới') }}
+            </h2>
+            <p>{{ isEditing && formLocked
+                ? 'Xem thông tin chi tiết của chiến dịch Flash Sale.'
+                : 'Thiết lập thông tin chiến dịch và các sản phẩm áp dụng.' }}</p>
           </div>
           <button type="button" class="icon-button" title="Đóng" @click="closeModal">
             <i class="bi bi-x-lg"></i>

@@ -11,7 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.stream.Collectors;
-
+import java.util.LinkedHashMap;
+import java.util.Map;
 @Service
 public class BannerService {
 
@@ -107,4 +108,28 @@ private BannerRepository bannerRepository;
         banner.setIsActive(false);
         bannerRepository.save(banner);
     }
+    // Chỉ lấy banner đang active - dùng cho phía Home (public)
+    @Transactional(readOnly = true)
+    public List<BannerResponseDTO> getActiveBanners() {
+        return bannerRepository.findAll().stream()
+                .filter(b -> Boolean.TRUE.equals(b.getIsActive()))
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    // Lấy tất cả position (dùng cho cả admin và public)
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getAllPositions() {
+        return positionRepository.findAll().stream()
+                .map(p -> {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("positionId", p.getPositionId());
+                    map.put("positionCode", p.getPositionCode());
+                    map.put("description", p.getDescription());
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
+
+
 }
