@@ -267,10 +267,12 @@ const triggerLiveChat = () => {
   top: 50%;
   right: -5px;
   transform: translateY(-50%);
-  background-color: #212529;
+  background: linear-gradient(180deg, #1e293b, #111827);
   color: #ffffff;
   border: none;
-  border-radius: 8px 0 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-right: 0;
+  border-radius: 14px 0 0 14px;
   padding: 12px 10px;
   display: flex;
   flex-direction: column;
@@ -279,11 +281,12 @@ const triggerLiveChat = () => {
   cursor: pointer;
   z-index: 1040;
   transition: all 0.3s ease;
-  width: 50px;
+  width: 48px;
+  box-shadow: -6px 8px 22px rgba(15, 23, 42, 0.22) !important;
 }
 
 .btn-floating-faq:hover {
-  background-color: #d70018;
+  background: linear-gradient(180deg, #ef233c, #c90019);
   right: 0;
   padding-right: 15px;
 }

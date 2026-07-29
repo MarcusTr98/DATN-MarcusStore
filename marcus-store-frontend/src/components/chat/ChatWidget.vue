@@ -27,22 +27,61 @@
           <div class="d-flex align-items-center gap-2">
             <div class="admin-avatar">
               <i class="fas fa-user-tie"></i>
-              <span class="status-dot"></span>
+              <span class="status-dot" :class="{ 'is-offline': !chatStore.isAdminOnline }"></span>
             </div>
             <div>
               <h6 class="mb-0 fw-bold text-white">CSKH Marcus Store</h6>
-              <span class="status-text">Đang trực tuyến</span>
+              <span class="status-text">
+                {{ chatStore.isAdminOnline ? 'Đang trực tuyến' : 'Tạm ngoại tuyến' }}
+              </span>
             </div>
           </div>
-          <button class="close-btn" @click="chatStore.toggleChat">
-            <i class="fas fa-times"></i>
-          </button>
+          <div class="header-actions">
+            <button
+              v-if="chatStore.hasActiveSession"
+              class="end-chat-btn"
+              title="Kết thúc phiên hỗ trợ"
+              @click="handleEndSession"
+            >
+              Kết thúc
+            </button>
+            <button class="close-btn" @click="chatStore.closeChat">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
         </div>
 
         <!-- Body (Danh sách tin nhắn) -->
         <div class="chat-body" ref="chatBody">
           <div class="chat-welcome">
-            <p>Xin chào! Chúng tôi có thể giúp gì cho bạn hôm nay?</p>
+            <p>
+              {{
+                chatStore.claimedBy
+                  ? `${chatStore.claimedBy} đang hỗ trợ bạn.`
+                  : 'Tin nhắn đã được gửi tới đội ngũ CSKH.'
+              }}
+            </p>
+          </div>
+
+          <p v-if="chatStore.errorMessage" class="chat-error">{{ chatStore.errorMessage }}</p>
+
+          <!-- Marcus thêm: câu hỏi phổ biến giúp khách bắt đầu hội thoại nhanh hơn. -->
+          <div class="suggestion-section">
+            <span class="suggestion-label">
+              <i class="fas fa-lightbulb"></i>
+              Bạn có thể hỏi
+            </span>
+            <div class="suggestion-list">
+              <button
+                v-for="question in suggestedQuestions"
+                :key="question"
+                type="button"
+                class="suggestion-chip"
+                @click="selectSuggestedQuestion(question)"
+              >
+                {{ question }}
+              </button>
+            </div>
           </div>
 
           <div
@@ -52,6 +91,7 @@
             :class="{
               'is-mine': msg.senderRole === 'CUSTOMER',
               'is-admin': msg.senderRole === 'ADMIN',
+              'is-system': msg.senderRole === 'SYSTEM',
             }"
           >
             <div class="message-bubble">
@@ -65,16 +105,32 @@
           <input
             type="text"
             v-model="inputMsg"
+            ref="chatInput"
             @keyup.enter="handleSend"
             placeholder="Nhập tin nhắn..."
+            maxlength="1000"
+            :disabled="!chatStore.isConnected"
             class="chat-input"
           />
-          <button class="send-btn" @click="handleSend" :disabled="!inputMsg.trim()">
+          <button
+            class="send-btn"
+            @click="handleSend"
+            :disabled="!inputMsg.trim() || !chatStore.isConnected"
+          >
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
       </div>
     </transition>
+
+    <BaseModal
+      :visible="showEndConfirm"
+      type="confirm"
+      title="Kết thúc phiên hỗ trợ?"
+      message="Nội dung trò chuyện chỉ đang lưu tạm thời và sẽ được xóa khỏi hệ thống sau khi kết thúc."
+      @close="showEndConfirm = false"
+      @confirm="confirmEndSession"
+    />
 
     <!-- Modal Yêu cầu đăng nhập (Hiện khi Guest click) -->
     <transition name="fade">
@@ -128,8 +184,13 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
+import BaseModal from '@/components/BaseModal.vue'
+import {
+  clearFloatingContactPanel,
+  setFloatingContactPanelOpen,
+} from '@/utils/floatingContactVisibility'
 
 const props = defineProps({
   isLoggedIn: {
@@ -142,11 +203,23 @@ const props = defineProps({
 const chatStore = useChatStore()
 const inputMsg = ref('')
 const chatBody = ref(null)
+const chatInput = ref(null)
 const showLoginPrompt = ref(false)
+const showEndConfirm = ref(false)
 
-const handleChatTriggerClick = () => {
+// Marcus sửa: giữ gợi ý đặc trưng của cửa hàng trong suốt cuộc trò chuyện.
+const suggestedQuestions = [
+  'Địa chỉ Marcus Store ở đâu?',
+  'Tôi có thể nhận hàng trực tiếp tại cửa hàng không?',
+  'Marcus Store kiểm tra giúp tôi sản phẩm này còn hàng không?',
+  'Chính sách bảo hành sản phẩm tại Marcus Store như thế nào?',
+  'Marcus Store có hỗ trợ mua trả góp không?',
+  'Marcus Store kiểm tra giúp tôi tình trạng đơn hàng',
+]
+
+const handleChatTriggerClick = async () => {
   if (props.isLoggedIn) {
-    chatStore.toggleChat()
+    await chatStore.openChat()
   } else {
     // Nếu là Guest, hiện prompt yêu cầu login
     showLoginPrompt.value = true
@@ -159,8 +232,22 @@ const closeLoginPrompt = () => {
 
 const handleSend = () => {
   if (!inputMsg.value.trim()) return
-  chatStore.sendMessage(inputMsg.value.trim())
-  inputMsg.value = '' // Tự động xóa input sau khi ấn gửi
+  if (chatStore.sendMessage(inputMsg.value.trim())) inputMsg.value = ''
+}
+
+const handleEndSession = () => {
+  showEndConfirm.value = true
+}
+
+const confirmEndSession = async () => {
+  showEndConfirm.value = false
+  await chatStore.endSession()
+}
+
+const selectSuggestedQuestion = async (question) => {
+  inputMsg.value = question
+  await nextTick()
+  chatInput.value?.focus()
 }
 
 const scrollToBottom = async () => {
@@ -180,9 +267,12 @@ watch(
 watch(
   () => chatStore.isOpen,
   (newVal) => {
+    setFloatingContactPanelOpen('live', newVal)
     if (newVal) scrollToBottom()
   },
 )
+
+onBeforeUnmount(() => clearFloatingContactPanel('live'))
 </script>
 
 <style scoped>
@@ -191,25 +281,31 @@ watch(
 .chat-widget-container {
   font-family: 'Be Vietnam Pro', sans-serif;
   position: fixed;
-  bottom: 176px;
+  bottom: 160px;
   right: 24px;
   z-index: 1050;
 }
 
 /* Nút Trigger */
 .chat-trigger-btn {
-  width: 60px;
-  height: 60px;
-  background: #d70018;
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(145deg, #ef233c, #c90019);
   color: #fff;
-  border: none;
-  border-radius: 50%;
-  font-size: 24px;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  font-size: 22px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  box-shadow:
+    0 10px 24px rgba(215, 0, 24, 0.28),
+    0 2px 6px rgba(15, 23, 42, 0.12);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 /* Tooltip cho nút Chat Live */
@@ -237,27 +333,12 @@ watch(
   right: 70px;
 }
 
-/* Hiệu ứng Rung (Shake) */
-@keyframes float-shake {
-  0% {
-    transform: translateY(0) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-4px) rotate(-6deg);
-  }
-  50% {
-    transform: translateY(-4px) rotate(6deg);
-  }
-  75% {
-    transform: translateY(-4px) rotate(-6deg);
-  }
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-}
 .chat-trigger-btn:hover {
-  animation: float-shake 0.4s ease-in-out infinite;
-  background: #b80014;
+  transform: translateY(-3px);
+  background: linear-gradient(145deg, #f43f5e, #b80014);
+  box-shadow:
+    0 14px 28px rgba(215, 0, 24, 0.35),
+    0 3px 8px rgba(15, 23, 42, 0.14);
 }
 
 .chat-trigger-btn.is-hidden {
@@ -270,8 +351,8 @@ watch(
   position: absolute;
   width: 100%;
   height: 100%;
-  border-radius: 50%;
-  border: 2px solid #d70018;
+  border-radius: 20px;
+  border: 2px solid rgba(215, 0, 24, 0.5);
   animation: pulse 2s infinite;
 }
 
@@ -289,7 +370,7 @@ watch(
 /* Cửa sổ Chat */
 .chat-window {
   position: absolute;
-  bottom: -152px;
+  bottom: -136px;
   right: 0;
   width: 350px;
   height: 480px;
@@ -345,6 +426,9 @@ watch(
   border: 2px solid #d70018;
   border-radius: 50%;
 }
+.status-dot.is-offline {
+  background: #cbd5e1;
+}
 
 .status-text {
   font-size: 11px;
@@ -361,6 +445,23 @@ watch(
 }
 .close-btn:hover {
   color: #fff;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.end-chat-btn {
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 /* Body */
@@ -382,6 +483,68 @@ watch(
   background: #f1f5f9;
   padding: 8px;
   border-radius: 12px;
+}
+
+.chat-error {
+  margin: 0;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #fff1f2;
+  color: #b91c1c;
+  font-size: 12px;
+  text-align: center;
+}
+
+.suggestion-section {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.suggestion-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.suggestion-label i {
+  color: #f59e0b;
+}
+
+.suggestion-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+}
+
+.suggestion-chip {
+  flex: 0 0 auto;
+  max-width: 245px;
+  overflow: hidden;
+  border: 1px solid #fecdd3;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #fff;
+  color: #9f1239;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.suggestion-chip:hover {
+  border-color: #d70018;
+  background: #fff1f2;
+  transform: translateY(-1px);
 }
 
 .message-wrapper {
@@ -418,6 +581,20 @@ watch(
   border-radius: 16px 16px 16px 0;
   border: 1px solid #e2e8f0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.is-system {
+  justify-content: center;
+}
+
+.is-system .message-bubble {
+  max-width: 90%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  font-size: 11px;
+  text-align: center;
 }
 
 /* Footer */

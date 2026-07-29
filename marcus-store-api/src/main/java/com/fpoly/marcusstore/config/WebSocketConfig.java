@@ -1,6 +1,5 @@
 package com.fpoly.marcusstore.config;
 
-import com.fpoly.marcusstore.security.CustomUserDetails;
 import com.fpoly.marcusstore.security.CustomUserDetailsService;
 import com.fpoly.marcusstore.security.jwt.JwtUtils;
 import lombok.RequiredArgsConstructor;
@@ -75,19 +74,28 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     }
                 }
 
-                // Marcus thêm: topic thông báo admin chứa dữ liệu đơn hàng/liên hệ,
-                // không cho tài khoản khách hàng subscribe chỉ bằng cách đoán URL.
-                if (accessor != null && StompCommand.SUBSCRIBE.equals(accessor.getCommand())
-                        && accessor.getDestination() != null
-                        && accessor.getDestination().startsWith("/topic/admin/")) {
+                if (accessor != null && accessor.getDestination() != null
+                        && (StompCommand.SUBSCRIBE.equals(accessor.getCommand())
+                                || StompCommand.SEND.equals(accessor.getCommand()))) {
                     Authentication authentication = (Authentication) accessor.getUser();
                     boolean isAdminOrStaff = authentication != null
                             && authentication.getAuthorities().stream()
                                     .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority())
                                             || "ROLE_STAFF".equals(authority.getAuthority()));
 
-                    if (!isAdminOrStaff) {
-                        throw new AccessDeniedException("Bạn không có quyền nhận thông báo quản trị.");
+                    String destination = accessor.getDestination();
+                    // Marcus thêm: topic quản trị và từng phòng chat chỉ dành cho Admin/Staff.
+                    boolean adminOnlyDestination = destination.startsWith("/topic/admin/")
+                            || destination.startsWith("/topic/chat.incoming")
+                            || destination.startsWith("/topic/chat.room.")
+                            || destination.equals("/app/chat.admin.send");
+                    if (adminOnlyDestination && !isAdminOrStaff) {
+                        throw new AccessDeniedException("Bạn không có quyền truy cập kênh quản trị.");
+                    }
+
+                    // Marcus thêm: Admin không được giả lập tin nhắn khách hàng.
+                    if (destination.equals("/app/chat.customer.send") && isAdminOrStaff) {
+                        throw new AccessDeniedException("Tài khoản quản trị không được gửi qua kênh khách hàng.");
                     }
                 }
                 return message;

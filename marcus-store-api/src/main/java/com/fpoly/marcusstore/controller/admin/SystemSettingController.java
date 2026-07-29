@@ -15,6 +15,11 @@ public class SystemSettingController {
 
     @GetMapping("/public/settings")
     public Map<String, String> getPublicSettings() {
+        return service.getPublicSettingsAsMap();
+    }
+
+    @GetMapping("/admin/settings")
+    public Map<String, String> getAdminSettings() {
         return service.getAllSettingsAsMap();
     }
 

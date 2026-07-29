@@ -8,7 +8,7 @@
 
     <ClientFooter />
     <ChatWidgetRouter />
-    <WelcomeVoucherModal/>
+    <WelcomeVoucherModal />
   </div>
 </template>
 
@@ -17,5 +17,16 @@ import ClientHeader from '@/components/client/ClientHeader.vue'
 import ClientFooter from '@/components/client/ClientFooter.vue'
 import FaqOffcanvas from '@/components/client/FaqOffcanvas.vue'
 import ChatWidgetRouter from '@/components/chat/ChatWidgetRouter.vue'
-import WelcomeVoucherModal from '@/components/WelcomeVoucherModal.vue';
+import WelcomeVoucherModal from '@/components/WelcomeVoucherModal.vue'
 </script>
+
+<style>
+body.marcus-contact-panel-open .ai-trigger,
+body.marcus-contact-panel-open .chat-trigger-btn,
+body.marcus-contact-panel-open #marcus-floating-actions,
+body.marcus-contact-panel-open .btn-floating-faq {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+</style>

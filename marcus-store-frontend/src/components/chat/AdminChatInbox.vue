@@ -18,10 +18,31 @@
       <div v-show="chatStore.isOpen" class="chat-panel shadow-lg">
         <!-- Header panel -->
         <div class="panel-header">
-          <h6 class="mb-0 fw-bold">Hỗ trợ khách hàng</h6>
-          <button class="close-btn" @click="chatStore.toggleChatPanel">
-            <i class="fas fa-times"></i>
-          </button>
+          <div>
+            <h6 class="mb-0 fw-bold">Hỗ trợ khách hàng</h6>
+            <small>{{
+              chatStore.isConnected ? 'Realtime đã kết nối' : 'Đang kết nối lại...'
+            }}</small>
+          </div>
+          <div class="panel-actions">
+            <button
+              class="availability-btn"
+              :class="{ 'is-ready': chatStore.isAvailable }"
+              :disabled="!chatStore.isConnected"
+              @click="chatStore.toggleAvailability"
+            >
+              <span class="availability-dot"></span>
+              {{ chatStore.isAvailable ? 'Sẵn sàng nhận chat' : 'Tạm dừng nhận chat' }}
+            </button>
+            <button class="close-btn" @click="chatStore.toggleChatPanel">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="chatStore.errorMessage" class="panel-error">
+          {{ chatStore.errorMessage }}
+          <button @click="chatStore.errorMessage = ''"><i class="fas fa-times"></i></button>
         </div>
 
         <div class="panel-body">
@@ -43,13 +64,13 @@
               @click="chatStore.openRoom(room.roomId)"
             >
               <div class="room-avatar">
-                {{ room.roomId.charAt(0).toUpperCase() }}
+                {{ (room.customerUsername || '?').charAt(0).toUpperCase() }}
                 <span v-if="room.unclaimed || room.hasNewMessage" class="ping-dot"></span>
               </div>
 
               <div class="room-info">
                 <div class="room-top-line">
-                  <span class="room-name">{{ room.roomId }}</span>
+                  <span class="room-name">{{ room.customerUsername || 'Khách hàng' }}</span>
                   <span class="room-time">{{ formatTime(room.lastTimestamp) }}</span>
                 </div>
                 <p class="room-preview">{{ room.lastMessage }}</p>
@@ -62,7 +83,9 @@
             <template v-if="chatStore.activeRoomId">
               <div class="conv-header">
                 <div>
-                  <h6 class="mb-0 fw-bold">{{ chatStore.activeRoomId }}</h6>
+                  <h6 class="mb-0 fw-bold">
+                    {{ chatStore.activeRoom?.customerUsername || 'Khách hàng' }}
+                  </h6>
                   <span class="conv-sub">
                     {{
                       activeRoomClaimedBy
@@ -78,6 +101,9 @@
                   @click="chatStore.claimRoom(chatStore.activeRoomId)"
                 >
                   <i class="fas fa-hand-paper"></i> Nhận hỗ trợ
+                </button>
+                <button v-else-if="chatStore.canReply" class="end-room-btn" @click="handleEndRoom">
+                  Kết thúc phiên
                 </button>
               </div>
 
@@ -99,20 +125,45 @@
                 </div>
               </div>
 
+              <!-- Marcus thêm: Admin chọn mẫu rồi chỉnh lại trước khi gửi cho khách. -->
+              <div v-if="chatStore.canReply" class="quick-reply-section">
+                <div class="quick-reply-heading">
+                  <i class="fas fa-bolt"></i>
+                  Trả lời nhanh
+                </div>
+                <div class="quick-reply-list">
+                  <button
+                    v-for="reply in quickReplies"
+                    :key="reply"
+                    type="button"
+                    class="quick-reply-chip"
+                    @click="selectQuickReply(reply)"
+                  >
+                    {{ reply }}
+                  </button>
+                </div>
+              </div>
+
               <div class="conv-footer">
                 <input
                   v-model="inputMsg"
+                  ref="convInput"
                   type="text"
                   :placeholder="
-                    activeRoomClaimedBy ? 'Nhập phản hồi...' : 'Bạn cần nhận hỗ trợ để nhắn tin...'
+                    chatStore.canReply
+                      ? 'Nhập phản hồi...'
+                      : activeRoomClaimedBy
+                        ? `Phiên do ${activeRoomClaimedBy} phụ trách`
+                        : 'Bạn cần nhận hỗ trợ để nhắn tin...'
                   "
-                  :disabled="!activeRoomClaimedBy"
+                  maxlength="1000"
+                  :disabled="!chatStore.canReply"
                   class="conv-input"
                   @keyup.enter="handleSend"
                 />
                 <button
                   class="conv-send-btn"
-                  :disabled="!inputMsg.trim() || !activeRoomClaimedBy"
+                  :disabled="!inputMsg.trim() || !chatStore.canReply"
                   @click="handleSend"
                 >
                   <i class="fas fa-paper-plane"></i>
@@ -128,16 +179,41 @@
         </div>
       </div>
     </transition>
+
+    <BaseModal
+      :visible="showEndConfirm"
+      type="confirm"
+      title="Kết thúc phiên hỗ trợ?"
+      message="Phiên sẽ đóng ở cả hai phía và toàn bộ nội dung đang lưu tạm trong RAM sẽ được xóa."
+      @close="showEndConfirm = false"
+      @confirm="confirmEndRoom"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { useAdminChatStore } from '@/stores/adminChatStore'
+import BaseModal from '@/components/BaseModal.vue'
 
 const chatStore = useAdminChatStore()
 const inputMsg = ref('')
 const convBody = ref(null)
+const convInput = ref(null)
+const showEndConfirm = ref(false)
+
+// Marcus thêm: mẫu phản hồi chung, không tự gửi để Admin có thể bổ sung thông tin cụ thể.
+const quickReplies = [
+  'Chào bạn, Marcus Store có thể hỗ trợ gì cho bạn?',
+  'Dạ, 118 Cát Bi, Hải An, Hải Phòng ạ.',
+  'Dạ, bạn có thể chọn nhận hàng tại cửa hàng và đến Marcus Store nhận trực tiếp ạ.',
+  'Bạn gửi giúp mình tên hoặc đường link sản phẩm, mình kiểm tra tồn kho ngay nhé.',
+  'Bạn vui lòng cung cấp mã đơn hàng giúp mình nhé.',
+  'Mình đang kiểm tra thông tin, bạn chờ mình một chút nhé.',
+  'Bạn gửi giúp mình tên sản phẩm để mình kiểm tra chính sách bảo hành cụ thể nhé.',
+  'Bạn gửi giúp mình sản phẩm và phương thức trả góp mong muốn để mình tư vấn chính xác nhé.',
+  'Cảm ơn bạn đã liên hệ Marcus Store!',
+]
 
 const activeRoomClaimedBy = computed(() => {
   const room = chatStore.rooms.find((r) => r.roomId === chatStore.activeRoomId)
@@ -146,8 +222,22 @@ const activeRoomClaimedBy = computed(() => {
 
 const handleSend = () => {
   if (!inputMsg.value.trim()) return
-  chatStore.sendMessage(inputMsg.value)
-  inputMsg.value = ''
+  if (chatStore.sendMessage(inputMsg.value)) inputMsg.value = ''
+}
+
+const handleEndRoom = () => {
+  showEndConfirm.value = true
+}
+
+const confirmEndRoom = async () => {
+  showEndConfirm.value = false
+  await chatStore.endActiveRoom()
+}
+
+const selectQuickReply = async (reply) => {
+  inputMsg.value = reply
+  await nextTick()
+  convInput.value?.focus()
 }
 
 const scrollToBottom = async () => {
@@ -297,6 +387,39 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
 }
+.panel-header small {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+}
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.availability-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(15, 23, 42, 0.2);
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+}
+.availability-btn.is-ready {
+  background: rgba(22, 163, 74, 0.3);
+}
+.availability-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+.availability-btn.is-ready .availability-dot {
+  background: #4ade80;
+}
 
 .close-btn {
   background: none;
@@ -313,6 +436,23 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   min-height: 0;
+}
+.panel-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 11px;
+}
+.panel-error button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }
 
 /* CỘT TRÁI (DANH SÁCH PHÒNG) */
@@ -453,6 +593,17 @@ onBeforeUnmount(() => {
   opacity: 0.9;
 }
 
+.end-room-btn {
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 6px 11px;
+  background: #fff1f2;
+  color: #be123c;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .conv-body {
   flex: 1;
   overflow-y: auto;
@@ -500,6 +651,57 @@ onBeforeUnmount(() => {
   background: #dbeafe;
   padding: 4px 10px;
   border-radius: 999px;
+}
+
+.quick-reply-section {
+  padding: 9px 12px 0;
+  border-top: 1px solid #dbeafe;
+  background: #fff;
+}
+
+.quick-reply-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 7px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.35px;
+}
+
+.quick-reply-heading i {
+  color: #f59e0b;
+}
+
+.quick-reply-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 7px;
+  scrollbar-width: thin;
+}
+
+.quick-reply-chip {
+  max-width: 210px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.quick-reply-chip:hover {
+  border-color: #3b82f6;
+  background: #dbeafe;
 }
 
 .conv-footer {

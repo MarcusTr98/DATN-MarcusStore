@@ -1,16 +1,12 @@
 package com.fpoly.marcusstore.controller.chat;
 
 import com.fpoly.marcusstore.dto.chat.ChatMessageDTO;
-import com.fpoly.marcusstore.security.CustomUserDetails;
 import com.fpoly.marcusstore.service.chat.ChatSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
-
-import java.time.LocalDateTime;
 
 @Controller
 @RequiredArgsConstructor
@@ -18,25 +14,21 @@ public class ChatMessageController {
 
     private final ChatSessionService chatSessionService;
 
-    @MessageMapping("/chat.send")
-    public void sendMessage(@Payload ChatMessageDTO message, StompHeaderAccessor accessor) {
-        Authentication auth = (Authentication) accessor.getUser();
-        if (auth == null)
-            return;
-
-        CustomUserDetails userDetails = (CustomUserDetails) auth.getPrincipal();
-
-        // Gắn thông tin bảo mật vào tin nhắn trước khi lưu
-        message.setSender(userDetails.getUsername());
-        message.setSenderRole(determineRole(auth));
-        message.setTimestamp(LocalDateTime.now());
-
-        chatSessionService.saveAndBroadcastMessage(message);
+    // Marcus sửa: khách không được tự khai roomId hay vai trò trong payload.
+    @MessageMapping("/chat.customer.send")
+    public void sendCustomerMessage(@Payload ChatMessageDTO message, Authentication authentication) {
+        if (authentication != null) {
+            chatSessionService.sendCustomerMessage(authentication.getName(), message.getContent());
+        }
     }
 
-    private String determineRole(Authentication auth) {
-        boolean isAdmin = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_STAFF"));
-        return isAdmin ? "ADMIN" : "CUSTOMER";
+    // Marcus sửa: backend kiểm tra Admin có đúng là người đã claim phòng trước khi
+    // gửi.
+    @MessageMapping("/chat.admin.send")
+    public void sendAdminMessage(@Payload ChatMessageDTO message, Authentication authentication) {
+        if (authentication != null) {
+            chatSessionService.sendAdminMessage(
+                    message.getRoomId(), authentication.getName(), message.getContent());
+        }
     }
 }

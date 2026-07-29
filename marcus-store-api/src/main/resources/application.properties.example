@@ -79,7 +79,6 @@ ghn.store.ward-code=20310
 # Nếu chưa có thì để trống, webhook sẽ không verify (dùng khi test Ngrok)
 ghn.webhook.token=MARCUS_GHN_TEST_2026_SECRET
 
-
 # cấu hình đăng nhập đăng ký GG
 google.oauth2.client-id=YOUR_GOOGLE_CLIENT_ID
 google.oauth2.client-secret=YOUR_GOOGLE_CLIENT_SECRET
@@ -90,3 +89,8 @@ frontend.url=http://localhost:5173
 # Thư mục phải là đường dẫn tuyệt đối, SQL Server service và backend đều có quyền đọc/ghi.
 backup.storage-path=D:/MarcusStoreBackups
 backup.sqlserver-directory=D:/MarcusStoreBackups
+
+# Marcus AI - Gemini Free Tier
+gemini.api-key=
+gemini.model=gemini-3.5-flash-lite
+gemini.base-url=https://generativelanguage.googleapis.com

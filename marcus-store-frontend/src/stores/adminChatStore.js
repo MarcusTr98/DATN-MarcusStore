@@ -1,7 +1,14 @@
 import { defineStore } from 'pinia'
 import { Client } from '@stomp/stompjs'
 import SockJS from 'sockjs-client'
-import { getActiveRooms, getChatHistory, claimRoomChat } from '@/api/adminChatApi'
+import {
+  claimRoomChat,
+  endRoomChat,
+  getActiveRooms,
+  getChatAvailability,
+  getChatHistory,
+  updateChatAvailability,
+} from '@/api/adminChatApi'
 
 export const useAdminChatStore = defineStore('adminChat', {
   state: () => ({
@@ -11,88 +18,99 @@ export const useAdminChatStore = defineStore('adminChat', {
     messages: [],
     currentAdmin: null,
     currentRoomSubscription: null,
-    isOpen: false, // Biến duy nhất quản lý trạng thái Đóng/Mở Panel
+    endedSubscription: null,
+    isOpen: false,
+    isConnected: false,
+    isAvailable: false,
+    errorMessage: '',
   }),
 
   getters: {
-    notificationCount: (state) => state.rooms.filter((r) => r.unclaimed || r.hasNewMessage).length,
+    notificationCount: (state) =>
+      state.rooms.filter((room) => room.unclaimed || room.hasNewMessage).length,
+    activeRoom: (state) => state.rooms.find((room) => room.roomId === state.activeRoomId) ?? null,
+    canReply() {
+      return Boolean(this.activeRoom?.claimedBy === this.currentAdmin)
+    },
   },
 
   actions: {
-    // Hàm mới: Đóng mở panel và reset thông báo
     toggleChatPanel() {
       this.isOpen = !this.isOpen
-      if (this.isOpen && this.activeRoomId) {
-        const room = this.rooms.find((r) => r.roomId === this.activeRoomId)
-        if (room) room.hasNewMessage = false
-      }
+      if (this.isOpen && this.activeRoom) this.activeRoom.hasNewMessage = false
     },
 
     async initInbox() {
       try {
-        const res = await getActiveRooms()
-        this.rooms = (res.data.data ?? []).map((room) => ({
-          ...room,
-          hasNewMessage: false,
-        }))
-      } catch (err) {
-        console.error('Không tải được danh sách phòng:', err)
+        const response = await getActiveRooms()
+        this.rooms = (response.data?.data ?? []).map((room) => ({ ...room, hasNewMessage: false }))
+      } catch (error) {
+        this.errorMessage = error.response?.data?.message || 'Không tải được danh sách hỗ trợ.'
+      }
+    },
+
+    async loadAvailability() {
+      try {
+        const response = await getChatAvailability()
+        this.isAvailable = Boolean(response.data?.data?.available)
+      } catch {
+        this.isAvailable = false
+      }
+    },
+
+    async toggleAvailability() {
+      if (!this.isConnected) return
+      try {
+        const response = await updateChatAvailability(!this.isAvailable)
+        this.isAvailable = Boolean(response.data?.data?.available)
+      } catch (error) {
+        this.errorMessage = error.response?.data?.message || 'Không thể đổi trạng thái nhận chat.'
       }
     },
 
     connectSocket(token, username) {
-      if (this.stompClient?.active) return
+      if (!token || this.stompClient?.active) return
       this.currentAdmin = username
       const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws-endpoint'
-
       this.stompClient = new Client({
         webSocketFactory: () => new SockJS(socketUrl),
         connectHeaders: { Authorization: `Bearer ${token}` },
         reconnectDelay: 5000,
-        onConnect: () => {
-          this.stompClient.subscribe('/topic/chat.incoming', (msg) => {
-            this.upsertRoomSummary(JSON.parse(msg.body))
+        onConnect: async () => {
+          this.isConnected = true
+          await this.loadAvailability()
+          this.stompClient.subscribe('/topic/chat.incoming', (frame) => {
+            this.upsertRoomSummary(JSON.parse(frame.body))
           })
-
-          this.stompClient.subscribe('/topic/chat.incoming.claimed', (msg) => {
-            const { roomId, claimedBy } = JSON.parse(msg.body)
-            const room = this.rooms.find((r) => r.roomId === roomId)
-            if (room) {
-              room.claimedBy = claimedBy
-              room.unclaimed = false
-            }
+          this.stompClient.subscribe('/topic/chat.incoming.claimed', (frame) => {
+            const { roomId, claimedBy } = JSON.parse(frame.body)
+            const room = this.rooms.find((item) => item.roomId === roomId)
+            if (room) Object.assign(room, { claimedBy, unclaimed: false })
           })
+          this.stompClient.subscribe('/topic/chat.incoming.ended', (frame) => {
+            this.removeRoom(JSON.parse(frame.body).roomId)
+          })
+          await this.initInbox()
+        },
+        onWebSocketClose: () => {
+          this.isConnected = false
+          this.isAvailable = false
+        },
+        onStompError: () => {
+          this.errorMessage = 'Kết nối Live Chat bị gián đoạn.'
         },
       })
       this.stompClient.activate()
     },
 
-    upsertRoomSummary(msg) {
-      const room = this.rooms.find((r) => r.roomId === msg.roomId)
-      const isViewingThisRoom = this.isOpen && this.activeRoomId === msg.roomId
-      const isFromCustomer = msg.senderRole === 'CUSTOMER'
-
+    upsertRoomSummary(summary) {
+      const room = this.rooms.find((item) => item.roomId === summary.roomId)
+      const isViewing = this.isOpen && this.activeRoomId === summary.roomId
       if (room) {
-        room.lastMessage = msg.content
-        room.lastTimestamp = msg.timestamp
-        if (isFromCustomer && !isViewingThisRoom) {
-          room.hasNewMessage = true
-        }
+        Object.assign(room, summary)
+        if (!isViewing && summary.lastMessage) room.hasNewMessage = true
       } else {
-        this.rooms.unshift({
-          roomId: msg.roomId,
-          lastMessage: msg.content,
-          lastTimestamp: msg.timestamp,
-          claimedBy: null,
-          unclaimed: true,
-          hasNewMessage: isFromCustomer && !isViewingThisRoom,
-        })
-      }
-
-      if (this.activeRoomId === msg.roomId) {
-        if (!this.messages.some((m) => m.id === msg.id && m.id != null)) {
-          this.messages.push(msg)
-        }
+        this.rooms.unshift({ ...summary, hasNewMessage: !isViewing })
       }
     },
 
@@ -100,61 +118,84 @@ export const useAdminChatStore = defineStore('adminChat', {
       this.activeRoomId = roomId
       this.messages = []
       this.isOpen = true
-
-      const room = this.rooms.find((r) => r.roomId === roomId)
-      if (room) room.hasNewMessage = false
-
-      if (this.currentRoomSubscription) {
-        this.currentRoomSubscription.unsubscribe()
-      }
+      if (this.activeRoom) this.activeRoom.hasNewMessage = false
+      this.currentRoomSubscription?.unsubscribe()
+      this.endedSubscription?.unsubscribe()
 
       this.currentRoomSubscription = this.stompClient?.subscribe(
         `/topic/chat.room.${roomId}`,
-        (msg) => {
-          const receivedMsg = JSON.parse(msg.body)
-          if (!this.messages.some((m) => m.id === receivedMsg.id && m.id != null)) {
-            this.messages.push(receivedMsg)
-          }
+        (frame) => {
+          const message = JSON.parse(frame.body)
+          if (!this.messages.some((item) => item.id === message.id)) this.messages.push(message)
+        },
+      )
+      this.endedSubscription = this.stompClient?.subscribe(
+        `/topic/chat.room.${roomId}.ended`,
+        () => {
+          this.removeRoom(roomId)
         },
       )
 
       try {
-        const res = await getChatHistory(roomId)
-        this.messages = res.data.data ?? []
-      } catch (err) {
-        console.error('Lỗi tải lịch sử:', err)
+        const response = await getChatHistory(roomId)
+        this.messages = response.data?.data ?? []
+      } catch (error) {
+        this.errorMessage = error.response?.data?.message || 'Không tải được nội dung trò chuyện.'
       }
     },
 
     async claimRoom(roomId) {
       try {
-        await claimRoomChat(roomId)
-        const room = this.rooms.find((r) => r.roomId === roomId)
-        if (room) {
-          room.claimedBy = this.currentAdmin
-          room.unclaimed = false
-        }
+        const response = await claimRoomChat(roomId)
+        const session = response.data?.data
+        const room = this.rooms.find((item) => item.roomId === roomId)
+        if (room) Object.assign(room, { claimedBy: session?.claimedBy, unclaimed: false })
       } catch (error) {
-        console.error('Lỗi khi claim phòng:', error)
+        this.errorMessage =
+          error.response?.data?.message || 'Phiên đã được nhân viên khác tiếp nhận.'
+        await this.initInbox()
       }
     },
 
     sendMessage(content) {
-      if (!this.activeRoomId || !content.trim()) return
-
-      this.stompClient?.publish({
-        destination: '/app/chat.send',
-        body: JSON.stringify({
-          roomId: this.activeRoomId,
-          sender: this.currentAdmin,
-          senderRole: 'ADMIN',
-          content: content.trim(),
-        }),
+      const normalized = content?.trim()
+      if (!this.canReply || !this.isConnected || !normalized || normalized.length > 1000)
+        return false
+      this.stompClient.publish({
+        destination: '/app/chat.admin.send',
+        body: JSON.stringify({ roomId: this.activeRoomId, content: normalized }),
       })
+      return true
+    },
+
+    async endActiveRoom() {
+      if (!this.canReply) return
+      const roomId = this.activeRoomId
+      try {
+        await endRoomChat(roomId)
+        this.removeRoom(roomId)
+      } catch (error) {
+        this.errorMessage = error.response?.data?.message || 'Không thể kết thúc phiên hỗ trợ.'
+      }
+    },
+
+    removeRoom(roomId) {
+      this.rooms = this.rooms.filter((room) => room.roomId !== roomId)
+      if (this.activeRoomId === roomId) {
+        this.currentRoomSubscription?.unsubscribe()
+        this.endedSubscription?.unsubscribe()
+        this.activeRoomId = null
+        this.messages = []
+      }
     },
 
     disconnectSocket() {
+      this.currentRoomSubscription?.unsubscribe()
+      this.endedSubscription?.unsubscribe()
       this.stompClient?.deactivate()
+      this.stompClient = null
+      this.isConnected = false
+      this.isAvailable = false
     },
   },
 })
