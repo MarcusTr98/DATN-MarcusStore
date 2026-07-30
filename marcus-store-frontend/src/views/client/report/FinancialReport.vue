@@ -34,43 +34,12 @@
 
       <!-- Stats -->
       <div class="stats-grid">
+        <!-- Marcus sửa: ưu tiên nhóm KPI lượt giao dịch trước, sau đó mới tới tiền. -->
         <div class="stat-card">
           <div class="stat-icon stat-icon-blue"><i class="bi bi-receipt"></i></div>
           <div class="stat-body">
             <span>Tổng giao dịch</span>
             <strong>{{ stats.total }}</strong>
-          </div>
-        </div>
-        <div class="stat-card stat-card-money-in">
-          <div class="stat-icon stat-icon-green"><i class="bi bi-arrow-down-left-circle"></i></div>
-          <div class="stat-body">
-            <span>Tiền vào thành công</span>
-            <strong class="amount-inflow">{{ formatCurrencyVnd(stats.successfulInflow) }}</strong>
-          </div>
-        </div>
-        <div class="stat-card stat-card-money-in">
-          <div class="stat-icon stat-icon-green"><i class="bi bi-bag-check"></i></div>
-          <div class="stat-body">
-            <span>Doanh thu đơn hoàn tất</span>
-            <strong class="amount-inflow">{{ formatCurrencyVnd(stats.recognizedRevenue) }}</strong>
-            <small>Đã thu tiền và đơn đã hoàn thành</small>
-          </div>
-        </div>
-        <div class="stat-card stat-card-money-out">
-          <div class="stat-icon stat-icon-red"><i class="bi bi-arrow-up-right-circle"></i></div>
-          <div class="stat-body">
-            <span>Đã hoàn thành công</span>
-            <strong class="amount-outflow">-{{ formatCurrencyVnd(stats.successfulRefund) }}</strong>
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-amber"><i class="bi bi-exclamation-circle"></i></div>
-          <div class="stat-body">
-            <span>Tiền đơn hủy chưa hoàn xong</span>
-            <strong class="amount-outflow">
-              {{ formatCurrencyVnd(stats.unsettledCancellationAmount) }}
-            </strong>
-            <small>Đang chờ refund thành công</small>
           </div>
         </div>
         <div class="stat-card">
@@ -85,6 +54,38 @@
           <div class="stat-body">
             <span>Đang chờ xử lý</span>
             <strong>{{ stats.pending }}</strong>
+          </div>
+        </div>
+        <div class="stat-card stat-card-money-in">
+          <div class="stat-icon stat-icon-green"><i class="bi bi-arrow-down-left-circle"></i></div>
+          <div class="stat-body">
+            <span>Tiền vào thành công</span>
+            <strong class="amount-inflow">{{ formatCurrencyVnd(stats.successfulInflow) }}</strong>
+          </div>
+        </div>
+        <div class="stat-card stat-card-money-out">
+          <div class="stat-icon stat-icon-red"><i class="bi bi-arrow-up-right-circle"></i></div>
+          <div class="stat-body">
+            <span>Đã hoàn thành công</span>
+            <strong class="amount-outflow">-{{ formatCurrencyVnd(stats.successfulRefund) }}</strong>
+          </div>
+        </div>
+        <div class="stat-card stat-card-money-in">
+          <div class="stat-icon stat-icon-green"><i class="bi bi-bag-check"></i></div>
+          <div class="stat-body">
+            <span>Doanh thu đơn hoàn tất</span>
+            <strong class="amount-inflow">{{ formatCurrencyVnd(stats.recognizedRevenue) }}</strong>
+            <small>Đã thu tiền và đơn đã hoàn thành</small>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-amber"><i class="bi bi-exclamation-circle"></i></div>
+          <div class="stat-body">
+            <span>Tiền đơn hủy chưa hoàn xong</span>
+            <strong class="amount-outflow">
+              {{ formatCurrencyVnd(stats.unsettledCancellationAmount) }}
+            </strong>
+            <small>Đang chờ refund thành công</small>
           </div>
         </div>
         <div class="stat-card">
@@ -137,6 +138,7 @@
             <select v-model="filters.type" class="form-select" @change="onFilterChange">
               <option value="">Tất cả</option>
               <option value="COD_COLLECTION">Thu hộ (COD)</option>
+              <option value="STORE_PAYMENT">Thanh toán tại cửa hàng</option>
               <option value="VNPAY_PAYMENT">Thanh toán (VNPAY)</option>
               <option value="REFUND">Hoàn tiền</option>
             </select>

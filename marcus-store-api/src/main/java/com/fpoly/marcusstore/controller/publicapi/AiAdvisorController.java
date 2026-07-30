@@ -60,7 +60,9 @@ public class AiAdvisorController {
     public SseEmitter streamChat(
             @Valid @RequestBody AiAdvisorRequest request, HttpServletRequest servletRequest) {
         enforceRateLimit(clientKey(servletRequest));
-        SseEmitter emitter = new SseEmitter(35_000L);
+        // Marcus sửa: emitter phải sống lâu hơn timeout gọi Gemini để không đóng
+        // kết nối khi nhà cung cấp vẫn đang tạo câu trả lời.
+        SseEmitter emitter = new SseEmitter(75_000L);
         long startedAt = System.nanoTime();
 
         CompletableFuture.runAsync(() -> {

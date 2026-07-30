@@ -608,6 +608,15 @@
   background: #c00010;
 }
 
+.btn-confirm-received:not(:disabled) {
+  background: linear-gradient(135deg, #0c8a50, #087343);
+  box-shadow: 0 8px 18px rgba(8, 115, 67, 0.2);
+}
+
+.btn-confirm-received:not(:disabled):hover {
+  background: linear-gradient(135deg, #087343, #075c37);
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;

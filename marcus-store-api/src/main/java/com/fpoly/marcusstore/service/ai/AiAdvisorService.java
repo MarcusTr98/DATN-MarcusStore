@@ -104,8 +104,10 @@ public class AiAdvisorService {
 
         try {
             SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-            requestFactory.setConnectTimeout(Duration.ofSeconds(5));
-            requestFactory.setReadTimeout(Duration.ofSeconds(25));
+            requestFactory.setConnectTimeout(Duration.ofSeconds(8));
+            // Marcus sửa: Gemini 3.x có bước suy luận nên 25 giây dễ timeout dù
+            // nhà cung cấp vẫn đang xử lý yêu cầu.
+            requestFactory.setReadTimeout(Duration.ofSeconds(60));
 
             JsonNode response = RestClient.builder()
                     .baseUrl(baseUrl)
@@ -122,8 +124,9 @@ public class AiAdvisorService {
                                     "role", "user",
                                     "parts", List.of(Map.of("text", input)))),
                             "generationConfig", Map.of(
-                                    "maxOutputTokens", 900,
-                                    "responseMimeType", "application/json")))
+                                    "maxOutputTokens", 1_500,
+                                    "responseMimeType", "application/json",
+                                    "responseJsonSchema", advisorResponseSchema())))
                     .retrieve()
                     .body(JsonNode.class);
 
@@ -314,7 +317,7 @@ public class AiAdvisorService {
     }
 
     private AiAdvisorResponse buildAdvisorResponse(JsonNode response, List<AiProductProjection> products) {
-        String output = extractOutputText(response);
+        String output = normalizeJsonOutput(extractOutputText(response));
         try {
             JsonNode result = OBJECT_MAPPER.readTree(output);
             String answer = result.path("answer").asText("").trim();
@@ -343,6 +346,30 @@ public class AiAdvisorService {
                     .products(List.of())
                     .build();
         }
+    }
+
+    // Marcus thêm: schema buộc Gemini trả đúng contract mà widget đang đọc.
+    private Map<String, Object> advisorResponseSchema() {
+        return Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "answer", Map.of("type", "string"),
+                        "recommendedProductIds", Map.of(
+                                "type", "array",
+                                "maxItems", 3,
+                                "items", Map.of("type", "integer"))),
+                "required", List.of("answer", "recommendedProductIds"));
+    }
+
+    private String normalizeJsonOutput(String rawOutput) {
+        String output = rawOutput == null ? "" : rawOutput.trim();
+        output = output.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "").trim();
+        int firstBrace = output.indexOf('{');
+        int lastBrace = output.lastIndexOf('}');
+        return firstBrace >= 0 && lastBrace > firstBrace
+                ? output.substring(firstBrace, lastBrace + 1)
+                : output;
     }
 
     private String extractOutputText(JsonNode response) {

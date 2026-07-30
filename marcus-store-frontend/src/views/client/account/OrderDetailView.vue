@@ -352,6 +352,25 @@
 
                     <div class="detail-actions">
                       <button
+                        v-if="canConfirmReceipt"
+                        type="button"
+                        class="btn-dark btn-confirm-received"
+                        :disabled="confirmingReceipt"
+                        @click="openReceiptConfirmation"
+                      >
+                        <i
+                          class="fa-solid"
+                          :class="confirmingReceipt ? 'fa-spinner fa-spin' : 'fa-circle-check'"
+                        ></i>
+                        {{
+                          confirmingReceipt
+                            ? 'Đang xác nhận...'
+                            : selectedOrder.fulfillmentMethod === 'STORE_PICKUP'
+                              ? 'Tôi đã nhận hàng tại cửa hàng'
+                              : 'Tôi đã nhận được hàng'
+                        }}
+                      </button>
+                      <button
                         type="button"
                         class="btn-dark btn-cancel-order"
                         :disabled="cancelling || !canCancelOrder"
@@ -460,6 +479,14 @@
           </div>
         </div>
       </div>
+      <BaseModal
+        :visible="receiptModal.visible"
+        :type="receiptModal.type"
+        :title="receiptModal.title"
+        :message="receiptModal.message"
+        @close="closeReceiptModal"
+        @confirm="confirmReceivedOrder"
+      />
     </section>
     <!-- ===== Modal đánh giá: tạo mới / xem / sửa ===== -->
     <review-modal
@@ -480,6 +507,7 @@ import UserOrderApi from '@/api/userOrder.js'
 import '@/assets/css/OrderDetailView.css'
 import ReviewModal from './ReviewModal.vue'
 import reviewService from '@/stores/reviewService'
+import BaseModal from '@/components/BaseModal.vue'
 const selectedOrder = ref(null)
 
 const showReviewModal = ref(false)
@@ -688,6 +716,70 @@ const canCancelOrder = computed(() => {
   const status = (order.orderStatus || '').toUpperCase()
   return USER_CANCELLABLE_STATUSES.includes(status)
 })
+
+// Marcus thêm: nút nhận hàng bám đúng mốc nghiệp vụ của từng phương thức giao.
+const canConfirmReceipt = computed(() => {
+  const order = selectedOrder.value
+  if (!order) return false
+  const status = (order.orderStatus || '').toUpperCase()
+  return order.fulfillmentMethod === 'STORE_PICKUP'
+    ? status === 'READY_FOR_PICKUP'
+    : status === 'DELIVERED'
+})
+
+const confirmingReceipt = ref(false)
+const receiptModal = ref({
+  visible: false,
+  type: 'confirm',
+  title: '',
+  message: '',
+})
+
+function openReceiptConfirmation() {
+  if (!canConfirmReceipt.value || confirmingReceipt.value) return
+  const storePickup = selectedOrder.value?.fulfillmentMethod === 'STORE_PICKUP'
+  receiptModal.value = {
+    visible: true,
+    type: 'confirm',
+    title: storePickup ? 'Xác nhận đã nhận tại cửa hàng?' : 'Xác nhận đã nhận được hàng?',
+    message: storePickup
+      ? 'Sau khi xác nhận, đơn hàng sẽ hoàn thành và ghi nhận thanh toán tại cửa hàng.'
+      : 'Sau khi xác nhận, đơn hàng sẽ chuyển sang hoàn thành.',
+  }
+}
+
+function closeReceiptModal() {
+  if (confirmingReceipt.value) return
+  receiptModal.value.visible = false
+}
+
+async function confirmReceivedOrder() {
+  if (!canConfirmReceipt.value || confirmingReceipt.value) return
+  confirmingReceipt.value = true
+  receiptModal.value.visible = false
+  try {
+    const response = await UserOrderApi.confirmReceived(selectedOrder.value.orderCode)
+    selectedOrder.value = response?.data || selectedOrder.value
+    receiptModal.value = {
+      visible: true,
+      type: 'success',
+      title: 'Xác nhận thành công',
+      message: 'Cảm ơn bạn. Đơn hàng đã được chuyển sang hoàn thành.',
+    }
+  } catch (e) {
+    receiptModal.value = {
+      visible: true,
+      type: 'error',
+      title: 'Chưa thể xác nhận',
+      message:
+        e?.response?.data?.message ||
+        e?.message ||
+        'Không thể xác nhận đã nhận hàng. Vui lòng thử lại.',
+    }
+  } finally {
+    confirmingReceipt.value = false
+  }
+}
 
 const cancelling = ref(false)
 const OTHER_CANCEL_REASON = 'Lý do khác'

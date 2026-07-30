@@ -45,6 +45,12 @@ export function useFinancialReport() {
       transactions.value = data
         .map((t) => ({
           ...t,
+          // Marcus thêm lớp phòng vệ UI cho dữ liệu cũ: nhận tại quầy không
+          // được gắn nhãn thu hộ GHN.
+          type:
+            t.type === 'COD_COLLECTION' && t.fulfillmentMethod === 'STORE_PICKUP'
+              ? 'STORE_PAYMENT'
+              : t.type,
           // Ưu tiên lấy orderCode trực tiếp, nếu không có mới tìm trong order
           orderCode: t.orderCode || t.order?.orderCode || '---',
         }))
@@ -494,6 +500,7 @@ export function useFinancialReport() {
     dateString ? new Date(dateString).toLocaleString('vi-VN') : ''
   const formatType = (type) => {
     if (type === 'COD_COLLECTION') return 'Thu hộ (COD)'
+    if (type === 'STORE_PAYMENT') return 'Thanh toán tại cửa hàng'
     if (type === 'VNPAY_PAYMENT') return 'Thanh toán (VNPAY)'
     if (type === 'REFUND') return 'Hoàn tiền'
     return type
@@ -507,7 +514,13 @@ export function useFinancialReport() {
   }
 
   const getTypeClass = (type) =>
-    type === 'VNPAY_PAYMENT' ? 'bg-primary' : type === 'REFUND' ? 'bg-warning' : 'bg-info'
+    type === 'VNPAY_PAYMENT'
+      ? 'bg-primary'
+      : type === 'REFUND'
+        ? 'bg-warning'
+        : type === 'STORE_PAYMENT'
+          ? 'bg-success'
+          : 'bg-info'
 
   const getStatusClass = (status) =>
     status === 'SUCCESS' ? 'bg-success' : status === 'PENDING' ? 'bg-warning' : 'bg-danger'

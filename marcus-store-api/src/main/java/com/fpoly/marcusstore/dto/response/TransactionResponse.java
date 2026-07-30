@@ -18,6 +18,9 @@ public class TransactionResponse {
     // doanh thu đã đủ điều kiện ghi nhận.
     private String orderStatus;
     private String paymentStatus;
+    // Marcus thêm: frontend đối soát có thể kiểm chứng COD giao hàng và COD tại
+    // quầy.
+    private String fulfillmentMethod;
     private String note;
     private LocalDateTime createdAt;
 

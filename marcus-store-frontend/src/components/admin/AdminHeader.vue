@@ -193,7 +193,7 @@ const handleNotifClick = async (item) => {
   showNotifDropdown.value = false
 
   if (
-    ['ORDER', 'ORDER_CANCELLED', 'ORDER_FAILED', 'REFUND'].includes(item.type) &&
+    ['ORDER', 'ORDER_COMPLETED', 'ORDER_CANCELLED', 'ORDER_FAILED', 'REFUND'].includes(item.type) &&
     item.referenceId
   ) {
     router.push(`/admin/order/${item.referenceId}`)
@@ -204,6 +204,7 @@ const handleNotifClick = async (item) => {
 
 const getNotificationIcon = (type) => {
   if (type === 'ORDER') return 'fa-solid fa-box'
+  if (type === 'ORDER_COMPLETED') return 'fa-solid fa-circle-check'
   if (type === 'ORDER_CANCELLED') return 'fa-solid fa-ban'
   if (type === 'ORDER_FAILED') return 'fa-solid fa-triangle-exclamation'
   if (type === 'CONTACT') return 'fa-solid fa-envelope-open-text'
@@ -582,6 +583,9 @@ onUnmounted(() => {
 /* Tông màu icon hiện đại */
 .notif-icon.ORDER {
   background: #10b981;
+}
+.notif-icon.ORDER_COMPLETED {
+  background: #087b47;
 }
 .notif-icon.ORDER_CANCELLED {
   background: #ef4444;

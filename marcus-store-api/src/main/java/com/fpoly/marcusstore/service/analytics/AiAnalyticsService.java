@@ -187,8 +187,10 @@ public class AiAnalyticsService {
 
     private JsonNode callGemini(String context) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(5));
-        requestFactory.setReadTimeout(Duration.ofSeconds(25));
+        requestFactory.setConnectTimeout(Duration.ofSeconds(8));
+        // Marcus sửa: báo cáo dài cần đủ thời gian hoàn thiện JSON, tránh cắt
+        // phản hồi rồi báo sai định dạng.
+        requestFactory.setReadTimeout(Duration.ofSeconds(60));
 
         try {
             return RestClient.builder()
@@ -208,9 +210,9 @@ public class AiAnalyticsService {
                                             "text",
                                             "DỮ LIỆU TỔNG HỢP ĐÃ KIỂM DUYỆT:\n" + context)))),
                             "generationConfig", Map.of(
-                                    "temperature", 0.2,
-                                    "maxOutputTokens", 1_000,
-                                    "responseMimeType", "application/json")))
+                                    "maxOutputTokens", 2_400,
+                                    "responseMimeType", "application/json",
+                                    "responseJsonSchema", analyticsResponseSchema())))
                     .retrieve()
                     .body(JsonNode.class);
         } catch (HttpStatusCodeException exception) {
@@ -256,6 +258,59 @@ public class AiAnalyticsService {
 
     private String cacheModelName() {
         return METRIC_SCHEMA_VERSION + "|" + model;
+    }
+
+    // Marcus thêm: structured output khóa hình dạng báo cáo ngay từ Gemini,
+    // thay vì chỉ hy vọng model làm đúng phần mô tả trong prompt.
+    private Map<String, Object> analyticsResponseSchema() {
+        Map<String, Object> signal = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "title", Map.of("type", "string"),
+                        "evidence", Map.of("type", "string"),
+                        "interpretation", Map.of("type", "string"),
+                        "severity", Map.of("type", "string", "enum", List.copyOf(SEVERITIES))),
+                "required", List.of("title", "evidence", "interpretation", "severity"));
+        Map<String, Object> action = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "title", Map.of("type", "string"),
+                        "reason", Map.of("type", "string"),
+                        "priority", Map.of("type", "string", "enum", List.copyOf(PRIORITIES))),
+                "required", List.of("title", "reason", "priority"));
+        Map<String, Object> productOutlook = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "productId", Map.of("type", "integer"),
+                        "direction", Map.of("type", "string", "enum", List.copyOf(DIRECTIONS)),
+                        "reason", Map.of("type", "string")),
+                "required", List.of("productId", "direction", "reason"));
+
+        return Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "headline", Map.of("type", "string"),
+                        "executiveSummary", Map.of("type", "string"),
+                        "outlook", Map.of("type", "string", "enum", List.copyOf(OUTLOOKS)),
+                        "confidence", Map.of("type", "string", "enum", List.copyOf(PRIORITIES)),
+                        "signals", Map.of("type", "array", "maxItems", 4, "items", signal),
+                        "actions", Map.of("type", "array", "maxItems", 3, "items", action),
+                        "productOutlooks", Map.of(
+                                "type", "array",
+                                "maxItems", 5,
+                                "items", productOutlook)),
+                "required", List.of(
+                        "headline",
+                        "executiveSummary",
+                        "outlook",
+                        "confidence",
+                        "signals",
+                        "actions",
+                        "productOutlooks"));
     }
 
     private AiAnalyticsReportResponse parseReport(
@@ -330,7 +385,16 @@ public class AiAnalyticsService {
         if (text.isBlank()) {
             throw new IllegalStateException("Gemini không trả về nội dung phân tích.");
         }
-        return text.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "").trim();
+        String normalized = text
+                .replaceFirst("^```(?:json)?\\s*", "")
+                .replaceFirst("\\s*```$", "")
+                .trim();
+        // Marcus sửa: chấp nhận trường hợp provider bọc JSON bằng một câu dẫn.
+        int firstBrace = normalized.indexOf('{');
+        int lastBrace = normalized.lastIndexOf('}');
+        return firstBrace >= 0 && lastBrace > firstBrace
+                ? normalized.substring(firstBrace, lastBrace + 1)
+                : normalized;
     }
 
     private String requiredText(JsonNode node, String field, int maxLength) {

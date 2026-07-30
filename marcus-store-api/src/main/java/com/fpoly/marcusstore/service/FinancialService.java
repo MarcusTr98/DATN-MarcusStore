@@ -75,10 +75,15 @@ public class FinancialService {
                                                                                         : t.getOrder().getTransactionId())
                                                         .orderCode(t.getOrder().getOrderCode())
                                                         .amount(t.getAmount())
-                                                        .type(t.getType())
+                                                        // Marcus sửa riêng lớp báo cáo: COD của đơn tự
+                                                        // nhận là thanh toán tại cửa hàng, không phải
+                                                        // tiền GHN thu hộ. Không đổi transaction gốc để
+                                                        // tránh ảnh hưởng luồng thanh toán hiện hữu.
+                                                        .type(resolveReportTransactionType(t))
                                                         .status(t.getStatus())
                                                         .orderStatus(t.getOrder().getOrderStatus())
                                                         .paymentStatus(t.getOrder().getPaymentStatus())
+                                                        .fulfillmentMethod(t.getOrder().getFulfillmentMethod())
                                                         .note(note)
                                                         .createdAt(t.getCreatedAt())
                                                         .recipientName(t.getOrder().getRecipientName())
@@ -197,6 +202,16 @@ public class FinancialService {
 
         private static boolean isRefund(OrderTransaction transaction) {
                 return REFUND.equalsIgnoreCase(transaction.getType());
+        }
+
+        private static String resolveReportTransactionType(OrderTransaction transaction) {
+                if ("COD_COLLECTION".equalsIgnoreCase(transaction.getType())
+                                && transaction.getOrder() != null
+                                && "STORE_PICKUP".equalsIgnoreCase(
+                                                transaction.getOrder().getFulfillmentMethod())) {
+                        return "STORE_PAYMENT";
+                }
+                return transaction.getType();
         }
 
         public void updateReconciliationStatus(Integer transactionId, boolean status) {
