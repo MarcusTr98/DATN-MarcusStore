@@ -16,7 +16,7 @@ import java.util.List;
 @Repository
 public interface StatisticsRepository extends JpaRepository<Order, Integer> {
 
-    // Doanh thu theo ngày — tính theo Order_Transactions SUCCESS, chỉ COMPLETED orders
+    // Doanh thu theo ngày — chỉ transaction SUCCESS + order COMPLETED
     @Query(value = """
         WITH DateSeries AS (
             SELECT CAST(:startDate AS DATE) AS reportDate
@@ -44,7 +44,6 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate")   LocalDate endDate);
 
-    // KPI cũ (giữ lại phòng cần)
     @Query(value = """
         SELECT
             ISNULL(SUM(ot.amount), 0)               AS totalRevenue,
@@ -61,12 +60,12 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate")   LocalDate endDate);
 
-    // KPI mới có completedOrders — tính doanh thu theo tất cả transaction SUCCESS
+    // KPI mới — chỉ tính transaction SUCCESS + order COMPLETED
     @Query(value = """
         SELECT
-            ISNULL(SUM(ot.amount), 0)                                                             AS totalRevenue,
-            COUNT(DISTINCT o.order_id)                                                            AS totalOrders,
-            COUNT(DISTINCT CASE WHEN o.order_status = 'COMPLETED' THEN o.order_id END)           AS completedOrders,
+            ISNULL(SUM(CASE WHEN o.order_status = 'COMPLETED' THEN ot.amount ELSE 0 END), 0)     AS totalRevenue,
+            COUNT(DISTINCT o.order_id)                                                             AS totalOrders,
+            COUNT(DISTINCT CASE WHEN o.order_status = 'COMPLETED' THEN o.order_id END)            AS completedOrders,
             ISNULL((
                 SELECT SUM(oi.quantity)
                 FROM Order_Items oi
@@ -76,11 +75,11 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
                   AND o2.order_status = 'COMPLETED'
                   AND CAST(ot2.created_at AS DATE) >= :startDate
                   AND CAST(ot2.created_at AS DATE) <= :endDate
-            ), 0)                                                                                  AS totalProductsSold
+            ), 0)                                                                                   AS totalProductsSold
         FROM Order_Transactions ot
         INNER JOIN Orders o ON ot.order_id = o.order_id
         WHERE ot.status = 'SUCCESS'
-            AND o.order_status != 'CANCELLED'
+            AND o.order_status = 'COMPLETED'
             AND CAST(ot.created_at AS DATE) >= :startDate
             AND CAST(ot.created_at AS DATE) <= :endDate
         """, nativeQuery = true)
@@ -90,8 +89,8 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
 
     @Query(value = """
         SELECT
-            YEAR(o.created_at)           AS reportYear,
-            MONTH(o.created_at)          AS reportMonth,
+            YEAR(ot.created_at)          AS reportYear,
+            MONTH(ot.created_at)         AS reportMonth,
             COUNT(DISTINCT o.order_id)   AS totalOrders,
             0                             AS totalProductsSold,
             SUM(ot.amount)               AS totalRevenue
@@ -100,24 +99,25 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             AND o.order_status = 'COMPLETED'
         WHERE ot.status = 'SUCCESS'
             AND (:year IS NULL OR YEAR(ot.created_at) = :year)
-        GROUP BY YEAR(o.created_at), MONTH(o.created_at)
+        GROUP BY YEAR(ot.created_at), MONTH(ot.created_at)
         ORDER BY reportYear DESC, reportMonth DESC
         """, nativeQuery = true)
     List<RevenueByMonthProjection> getRevenueByMonth(@Param("year") Integer year);
 
-    // Top sản phẩm — tính theo Order_Transactions SUCCESS, loại bỏ CANCELLED
+    // Top sản phẩm — chỉ order COMPLETED + transaction SUCCESS
     @Query(value = """
         SELECT TOP (:topN)
             p.product_name                            AS productName,
             SUM(oi.quantity)                          AS totalSold,
             SUM(oi.quantity * oi.price_at_purchase)   AS revenue
         FROM Order_Items oi
-        INNER JOIN Product_Skus ps ON oi.sku_id    = ps.sku_id
-        INNER JOIN Products     p  ON ps.product_id = p.product_id
-        INNER JOIN Orders       o  ON oi.order_id  = o.order_id
-        INNER JOIN Order_Transactions ot ON o.order_id = ot.order_id AND ot.status = 'SUCCESS'
-        WHERE o.order_status != 'CANCELLED'
-            AND (:startDate IS NULL OR CAST(ot.created_at AS DATE) >= :startDate)
+        INNER JOIN Product_Skus ps ON oi.sku_id     = ps.sku_id
+        INNER JOIN Products     p  ON ps.product_id  = p.product_id
+        INNER JOIN Orders       o  ON oi.order_id   = o.order_id
+            AND o.order_status = 'COMPLETED'
+        INNER JOIN Order_Transactions ot ON o.order_id = ot.order_id
+            AND ot.status = 'SUCCESS'
+        WHERE (:startDate IS NULL OR CAST(ot.created_at AS DATE) >= :startDate)
             AND (:endDate   IS NULL OR CAST(ot.created_at AS DATE) <= :endDate)
             AND (:keyword   IS NULL OR p.product_name LIKE '%' + :keyword + '%')
         GROUP BY p.product_name
@@ -129,15 +129,15 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("endDate")   LocalDate endDate,
             @Param("keyword")   String keyword);
 
-    // Đơn theo thứ — tính theo Order_Transactions SUCCESS, loại bỏ CANCELLED
+    // Đơn theo thứ — chỉ order COMPLETED + transaction SUCCESS
     @Query(value = """
         SELECT
             DATEPART(WEEKDAY, ot.created_at) AS dayOfWeek,
             COUNT(DISTINCT o.order_id)       AS totalOrders
         FROM Order_Transactions ot
         INNER JOIN Orders o ON ot.order_id = o.order_id
+            AND o.order_status = 'COMPLETED'
         WHERE ot.status = 'SUCCESS'
-            AND o.order_status != 'CANCELLED'
             AND (:startDate IS NULL OR CAST(ot.created_at AS DATE) >= :startDate)
             AND (:endDate   IS NULL OR CAST(ot.created_at AS DATE) <= :endDate)
         GROUP BY DATEPART(WEEKDAY, ot.created_at)
@@ -147,17 +147,19 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate")   LocalDate endDate);
 
-    // Doanh thu theo brand — tính theo Order_Transactions SUCCESS
+    // Doanh thu theo brand — chỉ order COMPLETED + transaction SUCCESS
     @Query(value = """
         SELECT
             p.brand                                   AS brand,
             SUM(oi.quantity)                          AS totalSold,
             SUM(oi.quantity * oi.price_at_purchase)   AS revenue
         FROM Order_Items oi
-        INNER JOIN Product_Skus ps ON oi.sku_id    = ps.sku_id
-        INNER JOIN Products     p  ON ps.product_id = p.product_id
-        INNER JOIN Orders       o  ON oi.order_id  = o.order_id
-        INNER JOIN Order_Transactions ot ON o.order_id = ot.order_id AND ot.status = 'SUCCESS'
+        INNER JOIN Product_Skus ps ON oi.sku_id     = ps.sku_id
+        INNER JOIN Products     p  ON ps.product_id  = p.product_id
+        INNER JOIN Orders       o  ON oi.order_id   = o.order_id
+            AND o.order_status = 'COMPLETED'
+        INNER JOIN Order_Transactions ot ON o.order_id = ot.order_id
+            AND ot.status = 'SUCCESS'
         WHERE (:startDate IS NULL OR CAST(ot.created_at AS DATE) >= :startDate)
             AND (:endDate   IS NULL OR CAST(ot.created_at AS DATE) <= :endDate)
         GROUP BY p.brand
@@ -191,7 +193,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("brand")     String brand,
             @Param("status")    String status);
 
-    // Top khách hàng — tính theo Order_Transactions SUCCESS
+    // Top khách hàng — chỉ order COMPLETED + transaction SUCCESS
     @Query(value = """
         SELECT TOP (:topN)
             u.full_name                AS customerName,
@@ -200,6 +202,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             SUM(ot.amount)             AS totalSpent
         FROM Order_Transactions ot
         INNER JOIN Orders o ON ot.order_id = o.order_id
+            AND o.order_status = 'COMPLETED'
         INNER JOIN Users u ON o.user_id = u.user_id
         WHERE ot.status = 'SUCCESS'
             AND (:startDate IS NULL OR CAST(ot.created_at AS DATE) >= :startDate)
@@ -215,10 +218,12 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("endDate")   LocalDate endDate,
             @Param("keyword")   String keyword);
 
-    // Tổng doanh thu (dùng cho % đóng góp khách hàng)
+    // Tổng doanh thu — chỉ order COMPLETED + transaction SUCCESS
     @Query(value = """
         SELECT ISNULL(SUM(ot.amount), 0) AS totalRevenue
         FROM Order_Transactions ot
+        INNER JOIN Orders o ON ot.order_id = o.order_id
+            AND o.order_status = 'COMPLETED'
         WHERE ot.status = 'SUCCESS'
             AND CAST(ot.created_at AS DATE) >= :startDate
             AND CAST(ot.created_at AS DATE) <= :endDate
@@ -292,7 +297,8 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             COUNT(DISTINCT o.order_id)     AS totalOrders,
             ISNULL(SUM(ot.amount), 0)      AS totalRevenue
         FROM Orders o
-        LEFT JOIN Order_Transactions ot ON o.order_id = ot.order_id AND ot.status = 'SUCCESS'
+        LEFT JOIN Order_Transactions ot ON o.order_id = ot.order_id
+            AND ot.status = 'SUCCESS'
         WHERE (:startDate IS NULL OR CAST(o.created_at AS DATE) >= :startDate)
           AND (:endDate   IS NULL OR CAST(o.created_at AS DATE) <= :endDate)
         GROUP BY o.payment_method, o.order_status
@@ -302,7 +308,7 @@ public interface StatisticsRepository extends JpaRepository<Order, Integer> {
             @Param("startDate") LocalDate startDate,
             @Param("endDate")   LocalDate endDate);
 
-    // Revenue compare — tính theo Order_Transactions SUCCESS, chỉ COMPLETED orders
+    // Revenue compare — chỉ transaction SUCCESS + order COMPLETED
     @Query(value = """
         WITH DateSeries AS (
             SELECT CAST(:startDate AS DATE) AS dt

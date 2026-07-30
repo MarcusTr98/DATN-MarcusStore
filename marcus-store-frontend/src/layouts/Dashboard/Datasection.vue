@@ -8,7 +8,6 @@
       <button type="button" class="reset-btn" @click="resetFilters">Đặt lại bộ lọc</button>
     </div>
 
-    <!-- Filter bar -->
     <div class="filter-grid">
       <div class="search-box">
         <i class="bi bi-search"></i>
@@ -32,16 +31,10 @@
       </select>
       <div v-else></div>
 
-      <select v-if="showDateFilter" v-model="filters.date" @change="applyFilters">
-        <option value="week">Tuần này</option>
-        <option value="month">Tháng này</option>
-        <option value="quarter">Quý này</option>
-        <option value="year">Năm nay</option>
-      </select>
-      <div v-else></div>
+      <!-- FIX 2: ẩn date filter vì dashboard header đã có filter period rồi -->
+      <div></div>
     </div>
 
-    <!-- Tabs -->
     <div class="tab-list">
       <button
         v-for="tab in tabs"
@@ -57,7 +50,6 @@
       </button>
     </div>
 
-    <!-- Table -->
     <div class="table-wrap">
       <div v-if="isLoading" class="loading-cell">
         <span class="spinner"></span>
@@ -91,7 +83,7 @@
                 <span v-if="col.type === 'money'"   class="money">{{ formatCurrency(row[col.key]) }}</span>
                 <span v-else-if="col.type === 'percent'" class="cell-main">{{ row[col.key] }}%</span>
                 <span v-else-if="col.type === 'status'" class="status-badge" :class="statusClass(row[col.key])">
-  {{ statusLabel(row[col.key]) }}
+                  {{ statusLabel(row[col.key]) }}
                 </span>
                 <span v-else class="cell-main">{{ row[col.key] }}</span>
               </td>
@@ -99,7 +91,6 @@
           </tbody>
         </table>
 
-        <!-- Phân trang -->
         <div class="pagination-bar" v-if="totalPages > 1">
           <span class="pagination-info">
             Hiển thị {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, tableRows.length) }}
@@ -133,19 +124,18 @@ import { ref, reactive, computed, watch } from 'vue'
 import statisticsApi from '@/api/statisticsApi'
 
 const props = defineProps({
-  selectedTime:    { type: String, default: 'month' },
+  selectedTime:    { type: String, default: 'today' },
   customDate:      { type: String, default: '' },
   childCategories: { type: Array,  default: () => [] },
   brandList:       { type: Array,  default: () => [] },
 })
 
-// ── tabs ──────────────────────────────────────────────────────
 const tabs = [
-  { label: 'Đơn hàng gần nhất',         value: 'recentOrders'  },
-  { label: 'Đơn cần xử lý',             value: 'pendingOrders' },
-  { label: 'Sản phẩm đã bán ra',             value: 'topProducts'   },
-  { label: 'Sản phẩm sắp hết kho',      value: 'lowStock'      },
-  { label: 'Khách hàng mua nhiều nhất', value: 'topCustomers'  },
+  { label: 'Đơn hàng gần nhất',             value: 'recentOrders'  },
+  { label: 'Đơn cần xử lý',                 value: 'pendingOrders' },
+  { label: 'Sản phẩm đã bán ra',            value: 'topProducts'   },
+  { label: 'Sản phẩm sắp hết / hết kho',   value: 'lowStock'      },
+  { label: 'Khách hàng mua nhiều nhất',     value: 'topCustomers'  },
 ]
 
 const columnMap = {
@@ -187,7 +177,6 @@ const columnMap = {
   ],
 }
 
-// ── state ────────────────────────────────────────────────────
 const currentTab   = ref('recentOrders')
 const tableRows    = ref([])
 const isLoading    = ref(false)
@@ -199,11 +188,8 @@ const filters = reactive({
   search:   '',
   status:   '',
   brand:    '',
-  category: '',
-  date:     'month',
 })
 
-// ── phân trang ────────────────────────────────────────────────
 const totalPages = computed(() => Math.max(1, Math.ceil(tableRows.value.length / pageSize.value)))
 
 const pagedRows = computed(() => {
@@ -215,10 +201,7 @@ const visiblePages = computed(() => {
   const total = totalPages.value
   const cur   = currentPage.value
   const pages = []
-  const delta = 2
-  for (let i = Math.max(1, cur - delta); i <= Math.min(total, cur + delta); i++) {
-    pages.push(i)
-  }
+  for (let i = Math.max(1, cur - 2); i <= Math.min(total, cur + 2); i++) pages.push(i)
   return pages
 })
 
@@ -227,7 +210,6 @@ function goPage(p) {
   currentPage.value = p
 }
 
-// ── computed ─────────────────────────────────────────────────
 const activeColumns = computed(() => columnMap[currentTab.value] ?? [])
 
 const showStatusFilter = computed(() =>
@@ -236,10 +218,6 @@ const showStatusFilter = computed(() =>
 
 const showBrandFilter = computed(() =>
   ['recentOrders', 'lowStock'].includes(currentTab.value) && brandOptions.value.length > 0
-)
-
-const showDateFilter = computed(() =>
-  currentTab.value !== 'pendingOrders' && currentTab.value !== 'lowStock'
 )
 
 const searchPlaceholder = computed(() => {
@@ -272,13 +250,19 @@ const statusOptions = computed(() => {
   return []
 })
 
-// ── fetch ────────────────────────────────────────────────────
-async function fetchTableData() {
-  const period = filters.date || props.selectedTime || 'month'
-  const sd = props.customDate || ''
-  const ed = props.customDate || ''
+// FIX 2: period lấy từ props thay vì filters.date riêng
+function getActivePeriod() {
+  return props.customDate ? 'today' : (props.selectedTime || 'today')
+}
+function getActiveDates() {
+  return { sd: props.customDate || '', ed: props.customDate || '' }
+}
 
-  isLoading.value  = true
+async function fetchTableData() {
+  const period  = getActivePeriod()
+  const { sd, ed } = getActiveDates()
+
+  isLoading.value   = true
   currentPage.value = 1
   try {
     let res
@@ -318,45 +302,20 @@ function switchTab(val) {
   currentPage.value = 1
   filters.status    = ''
   filters.brand     = ''
-  filters.category  = ''
   fetchTableData()
 }
 
 function resetFilters() {
-  filters.search   = ''
-  filters.status   = ''
-  filters.brand    = ''
-  filters.category = ''
-  filters.date     = props.selectedTime || 'month'
+  filters.search = ''
+  filters.status = ''
+  filters.brand  = ''
   currentPage.value = 1
   fetchTableData()
 }
 
-watch(() => props.selectedTime, (val) => {
-  if (!val) return
-  filters.date = val
-  fetchTableData()
-})
-
-watch(() => props.customDate, (val) => {
-  filters.date = val || props.selectedTime
-  fetchTableData()
-})
-
-// ── helpers ──────────────────────────────────────────────────
-function formatCurrency(value) {
-  return new Intl.NumberFormat('vi-VN', {
-    style: 'currency', currency: 'VND', maximumFractionDigits: 0,
-  }).format(value || 0)
-}
-
-function alignClass(align) {
-  return {
-    'text-center': align === 'center',
-    'text-right':  align === 'right',
-    'text-left':   align !== 'center' && align !== 'right',
-  }
-}
+// FIX 2: watch props thay vì filters.date
+watch(() => props.selectedTime, () => fetchTableData())
+watch(() => props.customDate,   () => fetchTableData())
 
 const statusLabels = {
   PENDING: 'Chờ xử lý', CONFIRMED: 'Đã xác nhận', SHIPPING: 'Đang giao hàng',
@@ -364,9 +323,7 @@ const statusLabels = {
   PAID: 'Đã thanh toán', UNPAID: 'Chưa thanh toán',
   'Hết hàng': 'Hết hàng', 'Sắp hết hàng': 'Sắp hết hàng',
 }
-
 function statusLabel(s) { return statusLabels[s] || s }
-
 function statusClass(status) {
   return {
     success: ['COMPLETED', 'PAID'].includes(status),
@@ -375,14 +332,27 @@ function statusClass(status) {
     danger:  ['CANCELLED', 'Hết hàng', 'UNPAID'].includes(status),
   }
 }
+function alignClass(align) {
+  return {
+    'text-center': align === 'center',
+    'text-right':  align === 'right',
+    'text-left':   align !== 'center' && align !== 'right',
+  }
+}
+function formatCurrency(value) {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency', currency: 'VND', maximumFractionDigits: 0,
+  }).format(value || 0)
+}
 
 defineExpose({
   fetchTableData,
-  switchToLowStock()        { switchTab('lowStock') },
-  switchToPendingOrders()   { switchTab('pendingOrders') },
+  switchToLowStock()      { switchTab('lowStock')      },
+  switchToPendingOrders() { switchTab('pendingOrders') },
   pendingCount,
 })
 
+fetchTableData()
 fetchPendingCount()
 </script>
 
@@ -395,272 +365,74 @@ fetchPendingCount()
   padding: 22px;
   box-sizing: border-box;
 }
-
 .dashboard-card h2 { margin: 0; color: #111827; font-weight: 900; font-size: 20px; }
 .dashboard-card p  { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
-
 .data-card { display: grid; gap: 18px; }
-
-.data-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-
+.data-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .reset-btn {
-  padding: 12px 18px;
-  border-radius: 16px;
-  background: #fff2f7;
-  color: #e11d65;
-  border: 1px solid #ffcfe0;
-  cursor: pointer;
-  font-weight: 800;
-  transition: 0.2s ease;
+  padding: 12px 18px; border-radius: 16px; background: #fff2f7;
+  color: #e11d65; border: 1px solid #ffcfe0; cursor: pointer; font-weight: 800; transition: 0.2s ease;
 }
-
-.filter-grid {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 1.4fr 1fr;
-  gap: 14px;
+.filter-grid { display: grid; grid-template-columns: 1.2fr 1fr 1.4fr 1fr; gap: 14px; }
+.filter-grid input, .filter-grid select {
+  width: 100%; height: 52px; border-radius: 16px; border: 1px solid #ffe0ec;
+  background: #fff; color: #374151; font-weight: 700; font-size: 16px;
+  outline: none; padding: 0 16px; box-sizing: border-box;
 }
-
-.filter-grid input,
-.filter-grid select {
-  width: 100%;
-  height: 52px;
-  border-radius: 16px;
-  border: 1px solid #ffe0ec;
-  background: #fff;
-  color: #374151;
-  font-weight: 700;
-  font-size: 16px;
-  outline: none;
-  padding: 0 16px;
-  box-sizing: border-box;
+.filter-grid input:focus, .filter-grid select:focus {
+  border-color: #f9a8c9; box-shadow: 0 0 0 4px #fff2f7;
 }
-
-.filter-grid input:focus,
-.filter-grid select:focus {
-  border-color: #f9a8c9;
-  box-shadow: 0 0 0 4px #fff2f7;
-}
-
 .search-box { position: relative; }
-
-.search-box i {
-  position: absolute;
-  left: 16px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #f0528f;
-}
-
+.search-box i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #f0528f; }
 .search-box input { padding-left: 44px; }
-
-/* Tabs */
 .tab-list { display: flex; flex-wrap: wrap; gap: 10px; }
-
 .tab-list button {
-  position: relative;
-  padding: 12px 16px;
-  border-radius: 16px;
-  background: #fff;
-  color: #374151;
-  border: 1px solid #ffe0ec;
-  cursor: pointer;
-  font-weight: 800;
-  transition: 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  position: relative; padding: 12px 16px; border-radius: 16px;
+  background: #fff; color: #374151; border: 1px solid #ffe0ec;
+  cursor: pointer; font-weight: 800; transition: 0.2s ease;
+  display: inline-flex; align-items: center; gap: 6px;
 }
-
-.tab-list button.active {
-  background: #ff4d8d;
-  color: #fff;
-  box-shadow: 0 10px 22px rgba(255, 77, 141, 0.22);
-}
-
+.tab-list button.active { background: #ff4d8d; color: #fff; box-shadow: 0 10px 22px rgba(255,77,141,0.22); }
 .tab-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: #dc2626;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 900;
-  line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px;
+  background: #dc2626; color: #fff; font-size: 11px; font-weight: 900;
 }
-
 .tab-list button.active .tab-badge { background: rgba(255,255,255,0.3); }
-
-/* Table */
-.table-wrap {
-  overflow: hidden;
-  border: 1px solid #ffe0ec;
-  border-radius: 22px;
-  background: #fff;
-}
-
-:deep(table) {
-  width: 100%;
-  min-width: 980px;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
+.table-wrap { overflow: hidden; border: 1px solid #ffe0ec; border-radius: 22px; background: #fff; }
+:deep(table) { width: 100%; min-width: 980px; border-collapse: collapse; font-size: 14px; }
 :deep(thead) { background: #fff2f7; }
-
-:deep(th),
-:deep(td) {
-  padding: 15px 18px;
-  border-bottom: 1px solid #fff0f6;
-  white-space: nowrap;
-}
-
-:deep(th) {
-  color: #374151;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-:deep(tbody tr:hover) { background: rgba(255, 242, 247, 0.55); }
-
+:deep(th), :deep(td) { padding: 15px 18px; border-bottom: 1px solid #fff0f6; white-space: nowrap; }
+:deep(th) { color: #374151; font-size: 12px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase; }
+:deep(tbody tr:hover) { background: rgba(255,242,247,0.55); }
 .text-left   { text-align: left; }
 .text-center { text-align: center; }
 .text-right  { text-align: right; font-variant-numeric: tabular-nums; }
-
 .stt-cell { color: #9ca3af; font-weight: 700; font-size: 13px; }
-
 .cell-main { color: #374151; font-weight: 800; }
-
-.money {
-  color: #111827;
-  font-weight: 900;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
+.money { color: #111827; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .status-badge {
-  display: inline-flex;
-  min-width: 108px;
-  justify-content: center;
-  padding: 7px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 900;
-  white-space: nowrap;
+  display: inline-flex; min-width: 108px; justify-content: center;
+  padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 900; white-space: nowrap;
 }
-
 .status-badge.success { background: #ecfdf5; color: #047857; border: 1px solid #d1fae5; }
 .status-badge.warning { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
 .status-badge.info    { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
 .status-badge.danger  { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
-
 .empty-cell { padding: 44px 18px; text-align: center; }
 .empty-cell strong { display: block; color: #374151; font-size: 17px; font-weight: 900; }
 .empty-cell span   { display: block; margin-top: 6px; color: #9ca3af; font-weight: 700; }
-
-.loading-cell {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 44px 18px;
-  color: #9ca3af;
-  font-weight: 700;
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 3px solid #ffe0ec;
-  border-top-color: #ff4d8d;
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-  flex: none;
-}
-
+.loading-cell { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 44px 18px; color: #9ca3af; font-weight: 700; }
+.spinner { width: 20px; height: 20px; border: 3px solid #ffe0ec; border-top-color: #ff4d8d; border-radius: 50%; animation: spin 0.7s linear infinite; flex: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* Phân trang */
-.pagination-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border-top: 1px solid #fff0f6;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.pagination-info {
-  font-size: 13px;
-  color: #6b7280;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.pagination-btns {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.pg-btn {
-  min-width: 36px;
-  height: 36px;
-  padding: 0 10px;
-  border-radius: 10px;
-  border: 1px solid #ffe0ec;
-  background: #fff;
-  color: #374151;
-  font-weight: 800;
-  font-size: 13px;
-  cursor: pointer;
-  transition: 0.15s ease;
-}
-
-.pg-btn:hover:not(:disabled) {
-  background: #fff2f7;
-  border-color: #f9a8c9;
-  color: #e11d65;
-}
-
-.pg-btn.active {
-  background: #ff4d8d;
-  color: #fff;
-  border-color: #ff4d8d;
-  box-shadow: 0 4px 12px rgba(255, 77, 141, 0.25);
-}
-
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-top: 1px solid #fff0f6; gap: 12px; flex-wrap: wrap; }
+.pagination-info { font-size: 13px; color: #6b7280; font-weight: 700; white-space: nowrap; }
+.pagination-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.pg-btn { min-width: 36px; height: 36px; padding: 0 10px; border-radius: 10px; border: 1px solid #ffe0ec; background: #fff; color: #374151; font-weight: 800; font-size: 13px; cursor: pointer; transition: 0.15s ease; }
+.pg-btn:hover:not(:disabled) { background: #fff2f7; border-color: #f9a8c9; color: #e11d65; }
+.pg-btn.active { background: #ff4d8d; color: #fff; border-color: #ff4d8d; box-shadow: 0 4px 12px rgba(255,77,141,0.25); }
 .pg-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-
-.page-size-select {
-  height: 36px;
-  border-radius: 10px;
-  border: 1px solid #ffe0ec;
-  background: #fff;
-  color: #374151;
-  font-weight: 700;
-  font-size: 13px;
-  padding: 0 10px;
-  outline: none;
-  cursor: pointer;
-}
-
-.page-size-select:focus {
-  border-color: #f9a8c9;
-  box-shadow: 0 0 0 3px #fff2f7;
-}
-
+.page-size-select { height: 36px; border-radius: 10px; border: 1px solid #ffe0ec; background: #fff; color: #374151; font-weight: 700; font-size: 13px; padding: 0 10px; outline: none; cursor: pointer; }
 @media (max-width: 992px) {
   .data-header  { flex-direction: column; align-items: stretch; }
   .filter-grid  { grid-template-columns: 1fr; }

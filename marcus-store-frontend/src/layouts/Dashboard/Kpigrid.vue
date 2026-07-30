@@ -80,9 +80,8 @@ const periodTitle = computed(() => {
     case '7 ngày qua':  return '7 ngày qua'
     case '30 ngày qua': return '30 ngày qua'
     case 'tuần này':    return 'tuần này'
-    case 'tháng này':   return 'tháng này'
     case 'năm nay':     return 'năm nay'
-    default:            return props.periodLabel  // FIX: custom date hiển thị đúng label
+    default:            return 'tháng này'
   }
 })
 
@@ -157,7 +156,7 @@ const kpiItems = computed(() => [
   },
   {
     key: 'lowStock',
-    title: 'Sản phẩm sắp hết / hết hàng',
+    title: 'Sản phẩm sắp hết / hết kho',
     value: String(props.lowStockData.length),
     badge: props.lowStockData.length > 0 ? 'Cần nhập thêm' : '',
     badgeClass: 'badge-warning',
