@@ -46,6 +46,24 @@ public class OrderTransactionService {
         transactionRepository.save(transaction);
     }
 
+    // Marcus thêm: scheduler có thể vừa đánh FAILED thì IPN thành công hợp lệ mới
+    // đến. Khi đó phải ghi nhận tiền đã thu để tạo refund, không được bỏ callback.
+    @Transactional
+    public void markLateVnPayPaymentSuccess(
+            Order order, String providerTransactionId, String responseCode) {
+        OrderTransaction transaction = findOrCreateVnPayTransaction(
+                order, "VNPAY xác nhận thành công sau khi đơn đã tự hủy");
+        if (transaction == null) {
+            throw new IllegalStateException("Không thể ghi nhận giao dịch VNPAY thành công đến muộn");
+        }
+        transaction.setAmount(order.getFinalAmount());
+        transaction.setStatus("SUCCESS");
+        transaction.setProviderTransactionId(providerTransactionId);
+        transaction.setProviderResponseCode(responseCode);
+        transaction.setNote("VNPAY xác nhận thành công sau khi đơn đã tự hủy; chuyển sang chờ hoàn tiền");
+        transactionRepository.save(transaction);
+    }
+
     @Transactional(readOnly = true)
     public VnPayTransactionState getVnPayTransactionState(Order order) {
         return transactionRepository

@@ -50,13 +50,12 @@ public class OrderCancellationService {
             return false;
         }
 
-        // Marcus sửa: đơn VNPAY đã thanh toán tạo refund và không hoàn lại voucher.
+        // Marcus sửa: refund tiền và hoàn quyền dùng voucher là hai nghiệp vụ độc
+        // lập. Mọi đơn hủy hợp lệ đều hoàn voucher đúng một lần.
         boolean paidByVnPay = isPaidVnPay(order);
         Map<Integer, FlashSaleItem> restorableFlashSaleContexts = restoreFlashSaleQuantity(order);
         restoreStock(order, restorableFlashSaleContexts);
-        if (!paidByVnPay) {
-            restoreVoucher(order);
-        }
+        restoreVoucher(order);
         markPendingVnPayTransactionFailed(order, reason);
 
         order.setOrderStatus("CANCELLED");
@@ -65,6 +64,18 @@ public class OrderCancellationService {
             refundService.requestSystemRefundIfEligible(order, reason);
         }
         return true;
+    }
+
+    // Marcus thêm: IPN thành công đến sau scheduler không được hoàn kho/voucher lần
+    // hai; chỉ ghi nhận đúng số tiền đã thu và tạo một refund idempotent.
+    @Transactional
+    public void requestRefundForCancelledPaidOrder(Order order, String reason) {
+        if (order == null
+                || !"CANCELLED".equalsIgnoreCase(order.getOrderStatus())
+                || !isPaidVnPay(order)) {
+            throw new IllegalArgumentException("Đơn hủy chưa đủ điều kiện tạo refund VNPAY");
+        }
+        refundService.requestSystemRefundIfEligible(order, reason);
     }
 
     // Marcus them refund
@@ -244,7 +255,7 @@ public class OrderCancellationService {
         voucherRepository.save(voucher);
 
         userVoucherRepository
-                .findByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), order.getUser().getUserId())
+                .findByVoucherIdAndUserIdForUpdate(voucher.getVoucherId(), order.getUser().getUserId())
                 .filter(userVoucher -> Boolean.TRUE.equals(userVoucher.getIsUsed()))
                 .ifPresent(this::markVoucherUnused);
     }
