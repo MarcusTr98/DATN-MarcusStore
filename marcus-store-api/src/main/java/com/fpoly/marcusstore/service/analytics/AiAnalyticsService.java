@@ -38,6 +38,7 @@ import java.util.stream.Collectors;
 public class AiAnalyticsService {
 
     private static final Duration DOUBLE_SUBMIT_GUARD = Duration.ofSeconds(20);
+    private static final String METRIC_SCHEMA_VERSION = "recognized-revenue-v2";
     private static final int PRODUCT_LIMIT = 10;
     private static final Set<String> OUTLOOKS = Set.of("GROWTH", "STEADY", "DECLINE", "UNCERTAIN");
     private static final Set<String> SEVERITIES = Set.of("POSITIVE", "INFO", "WARNING", "CRITICAL");
@@ -67,9 +68,10 @@ public class AiAnalyticsService {
     public AiAnalyticsReportResponse findLatestReport(LocalDate fromDate, LocalDate toDate) {
         AnalyticsPeriod period = analyticsService.resolvePeriod(fromDate, toDate);
         return reportRepository
-                .findFirstByFromDateAndToDateOrderByGeneratedAtDesc(
+                .findFirstByFromDateAndToDateAndModelNameOrderByGeneratedAtDesc(
                         period.fromDate(),
-                        period.toDate())
+                        period.toDate(),
+                        cacheModelName())
                 .map(this::readStoredReport)
                 .orElse(null);
     }
@@ -111,7 +113,8 @@ public class AiAnalyticsService {
 
     private AiAnalyticsReportResponse findStoredReport(CacheKey key) {
         return reportRepository
-                .findFirstByFromDateAndToDateOrderByGeneratedAtDesc(key.fromDate(), key.toDate())
+                .findFirstByFromDateAndToDateAndModelNameOrderByGeneratedAtDesc(
+                        key.fromDate(), key.toDate(), cacheModelName())
                 .map(this::readStoredReport)
                 .orElse(null);
     }
@@ -122,7 +125,7 @@ public class AiAnalyticsService {
             entity.setFromDate(key.fromDate());
             entity.setToDate(key.toDate());
             entity.setReportJson(objectMapper.writeValueAsString(report));
-            entity.setModelName(model);
+            entity.setModelName(cacheModelName());
             entity.setGeneratedAt(report.generatedAt());
             reportRepository.save(entity);
         } catch (Exception exception) {
@@ -145,6 +148,15 @@ public class AiAnalyticsService {
             AnalyticsOverviewResponse overview,
             List<ProductTrendResponse> products) {
         Map<String, Object> context = new LinkedHashMap<>();
+        // Marcus thêm: gửi định nghĩa chỉ số để AI không diễn giải final_amount
+        // của đơn chưa thu được tiền thành doanh thu.
+        context.put("metricPolicy", Map.of(
+                "completedSales",
+                "SUCCESS COD/VNPAY transactions of COMPLETED orders, grouped by transaction date",
+                "successfulRefundAmount",
+                "SUCCESS REFUND transactions, grouped by transaction date",
+                "profitAvailable",
+                false));
         context.put("period", overview.period());
         context.put("completedSales", overview.completedSales());
         context.put("completedOrders", overview.completedOrders());
@@ -213,6 +225,8 @@ public class AiAnalyticsService {
                 Bạn là Marcus AI Business Analyst dành cho chủ cửa hàng thương mại điện tử.
                 Chỉ phân tích JSON tổng hợp được cung cấp. Không yêu cầu hoặc suy đoán dữ liệu khách hàng.
                 Không gọi doanh thu là lợi nhuận vì hệ thống không có giá nhập.
+                completedSales chỉ là tiền đã thu SUCCESS của đơn COMPLETED, không phải tổng final_amount.
+                successfulRefundAmount là tiền REFUND đã SUCCESS; PENDING/FAILED không được coi là đã hoàn.
                 Không bịa tin thị trường, tồn kho, nguyên nhân hoặc con số tương lai.
                 aiAdvisorUsage chỉ là số liệu tổng hợp ẩn danh; dùng để đánh giá mức khách tương tác với tư vấn AI.
                 Mọi kết luận phải gắn với evidence có số liệu trong JSON.
@@ -238,6 +252,10 @@ public class AiAnalyticsService {
                   ]
                 }
                 """;
+    }
+
+    private String cacheModelName() {
+        return METRIC_SCHEMA_VERSION + "|" + model;
     }
 
     private AiAnalyticsReportResponse parseReport(

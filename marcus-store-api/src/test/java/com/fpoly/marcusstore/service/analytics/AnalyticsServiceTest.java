@@ -155,6 +155,9 @@ class AnalyticsServiceTest {
                         long customers) {
                 SalesSummaryProjection projection = mock(SalesSummaryProjection.class);
                 when(projection.getTotalOrders()).thenReturn(totalOrders);
+                // Marcus thêm: tỷ lệ hoàn tất dùng cùng tập đơn theo ngày tạo, không trộn với
+                // ngày giao dịch.
+                when(projection.getCohortCompletedOrders()).thenReturn(completedOrders);
                 when(projection.getCompletedOrders()).thenReturn(completedOrders);
                 when(projection.getCancelledOrders()).thenReturn(cancelledOrders);
                 when(projection.getCompletedSales()).thenReturn(new BigDecimal(completedSales));

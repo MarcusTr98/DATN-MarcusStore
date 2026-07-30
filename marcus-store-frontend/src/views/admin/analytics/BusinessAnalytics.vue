@@ -4,7 +4,7 @@
       eyebrow="Báo cáo quản trị"
       eyebrow-icon="bi bi-bar-chart-line"
       title="Phân tích kinh doanh"
-      description="Theo dõi tăng trưởng bán hàng và xu hướng sản phẩm từ dữ liệu đơn đã hoàn tất."
+      description="Theo dõi tăng trưởng từ giao dịch đã thu tiền của đơn hoàn tất và xu hướng sản phẩm."
       icon="bi bi-graph-up-arrow"
     >
       <template #actions>
@@ -65,8 +65,10 @@
         <i class="bi bi-info-circle"></i>
         <p>
           <strong>Phạm vi số liệu:</strong>
-          doanh thu chỉ tính đơn <code>COMPLETED</code>; doanh số sản phẩm lấy giá tại lúc mua. Báo
-          cáo không gọi là lợi nhuận vì hệ thống chưa lưu giá nhập.
+          doanh thu chỉ tính giao dịch thu tiền <code>SUCCESS</code>, không phải
+          <code>REFUND</code>, của đơn <code>COMPLETED</code> và lọc theo ngày giao dịch. Doanh số
+          sản phẩm lấy giá tại lúc mua; báo cáo không gọi là lợi nhuận vì hệ thống chưa lưu giá
+          nhập.
         </p>
       </aside>
     </template>

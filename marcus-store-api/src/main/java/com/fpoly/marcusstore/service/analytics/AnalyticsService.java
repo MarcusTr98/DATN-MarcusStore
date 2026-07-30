@@ -127,6 +127,7 @@ public class AnalyticsService {
         return new SalesSummary(
                 value(projection.getTotalOrders()),
                 value(projection.getCompletedOrders()),
+                value(projection.getCohortCompletedOrders()),
                 value(projection.getCancelledOrders()),
                 zero(projection.getCompletedSales()),
                 value(projection.getUnitsSold()),
@@ -180,6 +181,7 @@ public class AnalyticsService {
     private record SalesSummary(
             long totalOrders,
             long completedOrders,
+            long cohortCompletedOrders,
             long cancelledOrders,
             BigDecimal completedSales,
             long unitsSold,
@@ -195,7 +197,7 @@ public class AnalyticsService {
         }
 
         double completionRate() {
-            return percentage(completedOrders, totalOrders);
+            return percentage(cohortCompletedOrders, totalOrders);
         }
 
         double cancellationRate() {

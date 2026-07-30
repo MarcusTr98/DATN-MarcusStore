@@ -13,63 +13,6 @@
   gap: 22px;
 }
 
-/* Hero */
-.fin-hero {
-  position: relative;
-  border-radius: 18px;
-  overflow: hidden;
-  background: linear-gradient(120deg, #0b3d91 0%, #1c64d6 55%, #2f80ed 100%);
-  box-shadow: 0 14px 32px -12px rgba(15, 64, 152, 0.45);
-}
-.fin-hero-bg {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 88% -10%, rgba(255, 255, 255, 0.22) 0%, transparent 45%),
-    radial-gradient(circle at 8% 120%, rgba(255, 255, 255, 0.12) 0%, transparent 50%);
-  pointer-events: none;
-}
-.fin-hero-content {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 18px;
-  padding: 28px 32px;
-}
-.hero-title {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-}
-.hero-icon {
-  flex-shrink: 0;
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: #ffffff;
-  font-size: 1.5rem;
-  backdrop-filter: blur(4px);
-}
-.hero-title h1 {
-  margin: 0 0 4px;
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: #ffffff;
-  letter-spacing: -0.01em;
-}
-.hero-title p {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.92rem;
-}
-
 /* Dynamic Total & Excel Btn */
 .hero-actions {
   display: flex;
@@ -79,31 +22,32 @@
   margin-left: auto;
 }
 .dynamic-total {
-  background: rgba(0, 0, 0, 0.15);
-  color: #fff;
+  background: #eef6ff;
+  color: #36516f;
+  border: 1px solid #d3e5f8;
   padding: 10px 16px;
   border-radius: 8px;
   font-size: 0.9rem;
 }
 .dynamic-total .amount-inflow {
-  color: #bbf7d0;
+  color: #087b47;
 }
 .dynamic-total .amount-outflow {
-  color: #fecaca;
+  color: #dc2638;
 }
 .btn-export-excel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid #c5d9f1;
   border-radius: 10px;
   background: #ffffff;
   color: #0b3d91;
   font-weight: 700;
   padding: 12px 20px;
   font-size: 0.92rem;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 12px rgba(21, 89, 165, 0.08);
   transition:
     background-color 0.18s ease,
     transform 0.12s ease,
@@ -124,7 +68,8 @@
 /* Stats */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Marcus sửa: 8 KPI hiển thị cân đối thành 4 cột x 2 dòng. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 18px;
 }
 .stat-card {
@@ -134,7 +79,8 @@
   background: #ffffff;
   border: 1px solid #dce8f9;
   border-radius: 14px;
-  padding: 18px 20px;
+  min-height: 124px;
+  padding: 16px 18px;
   box-shadow: 0 4px 14px -8px rgba(28, 100, 214, 0.18);
   transition:
     transform 0.16s ease,
@@ -177,15 +123,24 @@
   min-width: 0;
 }
 .stat-body span {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: #6b7c93;
-  font-weight: 600;
+  font-weight: 700;
+  line-height: 1.35;
 }
 .stat-body strong {
-  font-size: 1.4rem;
+  /* Marcus sửa: số tiền giữ trên một dòng và không lấn át tiêu đề KPI. */
+  font-size: clamp(1.02rem, 1.25vw, 1.22rem);
   font-weight: 800;
+  line-height: 1.25;
   color: #0f2c5c;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  letter-spacing: -0.02em;
+}
+.stat-body small {
+  color: #64748b;
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 .stat-body strong.amount-inflow {
   color: #08783e;
@@ -846,9 +801,6 @@
 @media (max-width: 576px) {
   .stats-grid {
     grid-template-columns: 1fr;
-  }
-  .fin-hero-content {
-    padding: 22px;
   }
   .hero-actions {
     width: 100%;

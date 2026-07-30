@@ -1,18 +1,17 @@
 <template>
   <div class="al-page">
 
-    <!-- Hero Banner -->
-    <div class="al-hero">
-      <div class="hero-bg"></div>
-      <div class="hero-content">
-        <div class="hero-title">
-          <div class="hero-icon"><i class="bi bi-clock-history"></i></div>
-          <div>
-            <h1>Nhật ký hoạt động</h1>
-            <p>Theo dõi toàn bộ thao tác tạo/sửa/xoá dữ liệu trong hệ thống.</p>
-          </div>
-        </div>
-        <div class="d-flex align-items-center gap-3">
+    <!-- Marcus sửa giao diện: giữ nguyên nghiệp vụ của Huy, chỉ dùng header quản trị thống nhất. -->
+    <AdminPageHeader
+      class="al-page-header"
+      eyebrow="Kiểm soát hệ thống"
+      eyebrow-icon="bi bi-shield-check"
+      title="Quản lý thao tác"
+      description="Theo dõi lịch sử tạo, cập nhật và xoá dữ liệu trong toàn bộ hệ thống."
+      icon="bi bi-clock-history"
+    >
+      <template #actions>
+        <div class="header-actions">
           <div class="dynamic-total" v-if="filteredLogs.length > 0">
             Tổng log lọc: <strong>{{ filteredLogs.length }}</strong>
           </div>
@@ -21,8 +20,8 @@
             {{ exporting ? 'Đang xuất...' : 'Xuất CSV' }}
           </button>
         </div>
-      </div>
-    </div>
+      </template>
+    </AdminPageHeader>
 
     <div v-if="loading" class="state-box">
       <i class="bi bi-arrow-repeat spin"></i> Đang tải dữ liệu...
@@ -328,6 +327,7 @@
 <script setup>
 import { reactive, ref, computed, watch, onMounted } from 'vue';
 import { auditLogApi } from '@/api/AuditLogApi';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue';
 
 const logs = ref([]);
 const loading = ref(true);
@@ -558,48 +558,21 @@ async function handleExport() {
   font-family: 'Be Vietnam Pro', sans-serif;
 }
 
-/* Hero */
-.al-hero {
-  position: relative;
-  border-radius: 18px;
-  overflow: hidden;
-  background: linear-gradient(120deg, #0b3d91 0%, #1c64d6 55%, #2f80ed 100%);
-  box-shadow: 0 14px 32px -12px rgba(15, 64, 152, 0.45);
-  margin-bottom: 22px;
+.al-page-header { margin-bottom: 22px; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.dynamic-total {
+  padding: 10px 16px;
+  border: 1px solid #d3e5f8;
+  border-radius: 9px;
+  color: #36516f;
+  background: #eef6ff;
+  font-size: 0.9rem;
 }
-.hero-bg {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(circle at 88% -10%, rgba(255,255,255,0.22) 0%, transparent 45%),
-    radial-gradient(circle at 8% 120%, rgba(255,255,255,0.12) 0%, transparent 50%);
-  pointer-events: none;
-}
-.hero-content {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 18px;
-  padding: 28px 32px;
-}
-.hero-title { display: flex; align-items: center; gap: 18px; }
-.hero-icon {
-  flex-shrink: 0; width: 56px; height: 56px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28);
-  color: #fff; font-size: 1.5rem; backdrop-filter: blur(4px);
-}
-.hero-title h1 { margin: 0 0 4px; font-size: 1.5rem; font-weight: 800; color: #fff; letter-spacing: -0.01em; }
-.hero-title p { margin: 0; color: rgba(255,255,255,0.85); font-size: 0.92rem; }
-.dynamic-total { background: rgba(0,0,0,0.15); color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; }
 .btn-export-excel {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-  border: 1px solid rgba(255,255,255,0.35); border-radius: 10px;
+  border: 1px solid #c5d9f1; border-radius: 10px;
   background: #fff; color: #0b3d91; font-weight: 700; padding: 12px 20px; font-size: 0.92rem;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.18); transition: all 0.18s ease; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(21,89,165,0.08); transition: all 0.18s ease; cursor: pointer;
 }
 .btn-export-excel:hover:not(:disabled) { background: #f0f6ff; transform: translateY(-1px); }
 .btn-export-excel:disabled { opacity: 0.7; cursor: not-allowed; }
@@ -784,6 +757,8 @@ async function handleExport() {
   .field-dates { grid-column: 1/-1; }
 }
 @media (max-width: 576px) {
+  .header-actions { width: 100%; flex-direction: column; }
+  .dynamic-total, .btn-export-excel { width: 100%; text-align: center; }
   .toolbar-row { grid-template-columns: 1fr; }
   .detail-section-row, .person-grid { grid-template-columns: 1fr; }
   .person-item-full { grid-column: 1; }

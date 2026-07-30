@@ -3,10 +3,10 @@
     <div class="analytics-panel__header">
       <div>
         <span class="analytics-panel__eyebrow">Xu hướng theo {{ monthly ? 'tháng' : 'ngày' }}</span>
-        <h2>Doanh thu và lượng đơn hoàn tất</h2>
+        <h2>Doanh thu đã thu và lượng đơn hoàn tất</h2>
       </div>
       <div class="analytics-chart-legend">
-        <span><i class="analytics-chart-legend__sales"></i>Doanh thu</span>
+        <span><i class="analytics-chart-legend__sales"></i>Doanh thu đã thu</span>
         <span><i class="analytics-chart-legend__orders"></i>Đơn hàng</span>
       </div>
     </div>
@@ -37,7 +37,7 @@ const moneyFormatter = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0
 
 const series = computed(() => [
   {
-    name: 'Doanh thu',
+    name: 'Doanh thu đã thu',
     type: 'area',
     data: props.trend.map((point) => Number(point.completedSales || 0)),
   },

@@ -451,12 +451,33 @@ export function useFinancialReport() {
     const successfulRefund = dataset
       .filter((t) => t.status === 'SUCCESS' && t.type === 'REFUND')
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+
+    // Marcus thêm: cùng quy tắc nguồn tiền với Analytics/AI.
+    const recognizedRevenue = dataset
+      .filter((t) => t.status === 'SUCCESS' && t.type !== 'REFUND' && t.orderStatus === 'COMPLETED')
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+
+    // Marcus thêm: tách tiền đã thu của đơn hủy nhưng refund chưa SUCCESS.
+    const cancelledBalances = new Map()
+    dataset
+      .filter((t) => t.status === 'SUCCESS' && t.orderStatus === 'CANCELLED')
+      .forEach((t) => {
+        const current = cancelledBalances.get(t.orderCode) || 0
+        const effect = t.type === 'REFUND' ? -(Number(t.amount) || 0) : Number(t.amount) || 0
+        cancelledBalances.set(t.orderCode, current + effect)
+      })
+    const unsettledCancellationAmount = [...cancelledBalances.values()]
+      .filter((amount) => amount > 0)
+      .reduce((sum, amount) => sum + amount, 0)
+
     return {
       total: dataset.length,
       success: dataset.filter((t) => t.status === 'SUCCESS').length,
       pending: dataset.filter((t) => t.status === 'PENDING').length,
       successfulInflow,
       successfulRefund,
+      recognizedRevenue,
+      unsettledCancellationAmount,
       totalAmount: successfulInflow - successfulRefund,
     }
   })

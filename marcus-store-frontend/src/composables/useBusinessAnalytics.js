@@ -155,7 +155,7 @@ export function useBusinessAnalytics() {
         tone: changeTone(salesChange),
         icon: salesChange >= 0 ? 'bi bi-arrow-up-right' : 'bi bi-arrow-down-right',
         title: 'Đà doanh thu',
-        text: metricNarrative('Doanh thu hoàn tất', salesChange),
+        text: metricNarrative('Doanh thu đã thu của đơn hoàn tất', salesChange),
       },
       {
         tone: cancellationChange > 1 ? 'warning' : 'positive',
