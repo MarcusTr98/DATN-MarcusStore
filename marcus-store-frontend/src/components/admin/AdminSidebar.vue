@@ -101,6 +101,11 @@
     </div>
     <div v-if="showBaoCao" class="menu-section">
       <p class="menu-title">BÁO CÁO</p>
+      <router-link v-if="canAccessRoute('/admin/analytics')" to="/admin/analytics" class="menu-item"
+        active-class="active">
+        <i class="bi bi-graph-up-arrow menu-icon"></i>
+        <span>Phân tích kinh doanh</span>
+      </router-link>
       <router-link v-if="canAccessRoute('/admin/finance-reports')" to="/admin/finance-reports" class="menu-item"
         active-class="active">
         <i class="bi bi-wallet2 menu-icon"></i>
@@ -275,6 +280,7 @@ const showNoiDung = computed(() => {
 
 const showBaoCao = computed(() => {
   return (
+    canAccessRoute("/admin/analytics") ||
     canAccessRoute("/admin/finance-reports") ||
     canAccessRoute("/admin/activity-log")
   );

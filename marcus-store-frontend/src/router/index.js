@@ -152,6 +152,13 @@ const routes = [
         component: () => import('@/views/admin/Dashboard.vue'),
       },
       {
+        path: 'analytics',
+        name: 'BusinessAnalytics',
+        component: () => import('@/views/admin/analytics/BusinessAnalytics.vue'),
+        // Marcus thêm: tab Phân tích độc lập, dùng cùng quyền xem số liệu quản trị.
+        meta: { permission: 'DASHBOARD_VIEW' },
+      },
+      {
         path: 'profile',
         name: 'AdminProfile',
         component: () => import('@/views/admin/auth/Profile.vue'),
@@ -269,16 +276,16 @@ const routes = [
         name: 'ActivityLog',
         component: () => import('@/views/admin/auth/ActivityLog.vue'),
       },
-                        {
-  path: "/oauth-success",
-  name: 'OAuthSuccess',
+      {
+        path: '/oauth-success',
+        name: 'OAuthSuccess',
         component: () => import('@/views/admin/auth/OAuthSuccess.vue'),
       },
-       {
-  path: "/admin/reviews",
-  name: 'ReviewManagement',
+      {
+        path: '/admin/reviews',
+        name: 'ReviewManagement',
         component: () => import('@/views/admin/cms/ReviewManagement.vue'),
-      }
+      },
     ],
   },
 
@@ -295,7 +302,7 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-    if (to.path === "/oauth-success") {
+  if (to.path === '/oauth-success') {
     return true
   }
   const token = localStorage.getItem('ACCESS_TOKEN')
