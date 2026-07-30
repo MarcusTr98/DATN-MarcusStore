@@ -13,10 +13,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import jakarta.validation.constraints.Positive;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/admin/skus")
 @PreAuthorize("hasAuthority('SKU_CREATE')")
+@Validated
 public class ProductSkuController {
 
     @Autowired
@@ -24,7 +27,7 @@ public class ProductSkuController {
 
     // Lấy danh sách SKU của 1 Sản phẩm
     @GetMapping("/product/{productId}")
-    public ApiResponse<List<ProductSku>> getSkusByProduct(@PathVariable Integer productId) {
+    public ApiResponse<List<ProductSku>> getSkusByProduct(@PathVariable @Positive Integer productId) {
         return ApiResponse.success(configService.getSkusByProductId(productId));
     }
 
@@ -37,7 +40,7 @@ public class ProductSkuController {
 
     // Cập nhật giá, tồn kho đồng loạt
     @PutMapping("/bulk-update")
-    public ApiResponse<String> bulkUpdateSkus(@RequestBody SkuBulkUpdateRequest request) {
+    public ApiResponse<String> bulkUpdateSkus(@Valid @RequestBody SkuBulkUpdateRequest request) {
         configService.bulkUpdateSkus(request);
         return ApiResponse.success("Cập nhật đồng loạt thành công!");
     }
@@ -45,7 +48,7 @@ public class ProductSkuController {
     // Cập nhật 1 SKU lẻ
     @PutMapping("/{skuId}")
     public ApiResponse<ProductSku> updateSingleSku(
-            @PathVariable Integer skuId,
+            @PathVariable @Positive Integer skuId,
             @Valid @RequestBody SkuSingleUpdateRequest request) {
         return ApiResponse
                 .success(configService.updateSingleSku(skuId, request.getPrice(), request.getStockQuantity()));
@@ -53,7 +56,7 @@ public class ProductSkuController {
 
     // Xóa mềm SKU
     @DeleteMapping("/{skuId}")
-    public ApiResponse<String> deleteSku(@PathVariable Integer skuId) {
+    public ApiResponse<String> deleteSku(@PathVariable @Positive Integer skuId) {
         configService.deleteSku(skuId);
         return ApiResponse.success("Đã vô hiệu hóa SKU thành công!");
     }

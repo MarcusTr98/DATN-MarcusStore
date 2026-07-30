@@ -1,6 +1,8 @@
 package com.fpoly.marcusstore.controller.admin;
 
 import com.fpoly.marcusstore.service.SystemSettingService;
+import com.fpoly.marcusstore.dto.request.BulkUpdateSettingsRequest;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,8 +26,9 @@ public class SystemSettingController {
     }
 
     @PutMapping("/admin/settings/bulk-update")
-    public Map<String, Object> updateSettings(@RequestBody Map<String, String> payload) {
-        service.updateSettings(payload);
+    public Map<String, Object> updateSettings(@Valid @RequestBody BulkUpdateSettingsRequest request) {
+        // Marcus sửa: request có DTO riêng; không nhận Map tùy ý trực tiếp từ client.
+        service.updateSettings(request.getSettings());
         return Map.of(
                 "status", 200,
                 "message", "Cập nhật cấu hình hệ thống thành công!");

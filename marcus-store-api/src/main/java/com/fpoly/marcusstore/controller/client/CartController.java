@@ -11,7 +11,10 @@ import com.fpoly.marcusstore.service.CartService;
 import com.fpoly.marcusstore.service.UserVoucherService;
 import com.fpoly.marcusstore.service.VoucherService;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,6 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cart")
 @RequiredArgsConstructor
+@Validated
 public class CartController {
     private final UserVoucherService userVoucherService;
     private final CartService cartService;
@@ -29,17 +33,20 @@ public class CartController {
     }
 
     @PostMapping("/items")
-    public CartResponse addItemToCart(@RequestBody AddCartItemRequest request) {
+    // Marcus thêm @Valid tại điểm giao Cart -> Checkout; phần nghiệp vụ Cart vẫn
+    // thuộc thành viên phụ trách.
+    public CartResponse addItemToCart(@Valid @RequestBody AddCartItemRequest request) {
         return cartService.addItemToCart(request);
     }
 
     @DeleteMapping("/items/{skuId}")
-    public CartResponse removeItemFromCart(@PathVariable("skuId") Integer skuId) {
+    public CartResponse removeItemFromCart(@PathVariable("skuId") @Positive Integer skuId) {
         return cartService.removeItemFromCart(skuId);
     }
 
     @DeleteMapping("/items/selected")
-    public CartResponse removeItemsFromCart(@RequestBody DeleteSelectedCartItemRequest request) {
+    // Marcus thêm @Valid để request rỗng/sai định dạng không đi xuống service.
+    public CartResponse removeItemsFromCart(@Valid @RequestBody DeleteSelectedCartItemRequest request) {
         return cartService.removeItemsFromCart(request.getSkuIds());
     }
 
@@ -49,7 +56,10 @@ public class CartController {
     }
 
     @PutMapping("/items/{skuId}")
-    public CartResponse updateCartItemsQuantity(@PathVariable("skuId") Integer skuId, @RequestBody UpdateCartItemRequest request){
+    // Marcus thêm validation SKU/số lượng nhằm bảo vệ dữ liệu Checkout đầu vào.
+    public CartResponse updateCartItemsQuantity(
+            @PathVariable("skuId") @Positive Integer skuId,
+            @Valid @RequestBody UpdateCartItemRequest request) {
         return cartService.updateItemQuantity(skuId, request);
     }
 
@@ -60,8 +70,10 @@ public class CartController {
 
     /**
      * Gợi ý sản phẩm cho trang Cart.
-     * - Chỉ user đã đăng nhập + giỏ có SP + có parent_category → trả về list cùng parent category.
-     * - Guest hoặc giỏ trống → trả về [] (giữ nguyên logic hiện tại, KHÔNG fallback trending).
+     * - Chỉ user đã đăng nhập + giỏ có SP + có parent_category → trả về list cùng
+     * parent category.
+     * - Guest hoặc giỏ trống → trả về [] (giữ nguyên logic hiện tại, KHÔNG fallback
+     * trending).
      *
      * @param limit số lượng tối đa (mặc định 12)
      */
@@ -77,4 +89,3 @@ public class CartController {
         return ResponseEntity.ok(suggestions);
     }
 }
-

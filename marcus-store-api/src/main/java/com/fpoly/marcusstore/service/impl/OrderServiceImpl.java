@@ -18,6 +18,8 @@ import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderPaymentService;
 import com.fpoly.marcusstore.service.OrderService;
 import com.fpoly.marcusstore.service.OrderShippingService;
+import com.fpoly.marcusstore.service.AdminNotificationService;
+import com.fpoly.marcusstore.service.UserNotificationService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -44,8 +46,13 @@ public class OrderServiceImpl implements OrderService {
     private final OrderCancellationService orderCancellationService;
     private final EmailService emailService;
     private final CommentEvaluationRepository commentEvaluationRepository;
-    private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of("PENDING", "PROCESSING", "PACKED",
-            "READY_FOR_PICKUP");
+    // Marcus thêm chuông hai chiều cho luồng hủy đơn.
+    private final AdminNotificationService adminNotificationService;
+    private final UserNotificationService userNotificationService;
+    // Marcus sửa: khách được hủy trước khi tạo vận đơn. PACKED đã có tracking GHN
+    // nên không thể chỉ hủy nội bộ rồi để vận đơn tiếp tục giao.
+    private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of(
+            "PENDING", "CONFIRMED", "PROCESSING", "READY_FOR_PICKUP");
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -180,6 +187,14 @@ public class OrderServiceImpl implements OrderService {
         }
 
         if ("CANCELLED".equals(newStatus)) {
+            // Marcus thêm: không được hủy cục bộ khi vận đơn GHN đã tồn tại, nếu
+            // không shipper vẫn giao dù kho/voucher đã được hoàn.
+            if (!"STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod())
+                    && order.getTrackingCode() != null
+                    && !order.getTrackingCode().isBlank()) {
+                throw new RuntimeException(
+                        "Đơn đã có vận đơn GHN; cần hủy vận đơn GHN trước khi hủy đơn trên hệ thống");
+            }
             // Hoàn kho, voucher, giỏ hàng và số lượng Flash Sale tại một nơi
             orderCancellationService.cancelAndRestore(order, note);
         } else {
@@ -212,6 +227,15 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
+
+        // Marcus thêm: mọi bước Admin cập nhật trong vòng đời đơn đều phát chuông
+        // cho đúng khách hàng. Service tự chuẩn hóa title/type theo trạng thái.
+        userNotificationService.createOrderStatusNotification(
+                order,
+                newStatus,
+                "CANCELLED".equals(newStatus)
+                        ? "Đơn " + order.getOrderCode() + " đã hủy. Lý do: " + note
+                        : null);
 
         return getOrderDetailResponse(orderCode);
     }
@@ -314,9 +338,8 @@ public class OrderServiceImpl implements OrderService {
                 .voucherMaxDiscount(order.getVoucher() != null ? order.getVoucher().getMaxDiscountAmount() : null)
                 .items(
                         order.getOrderItems().stream().map(orderItem -> {
-                                                        boolean reviewed =
-        commentEvaluationRepository.existsByOrderItemOrderItemId(
-                orderItem.getOrderItemId());
+                            boolean reviewed = commentEvaluationRepository.existsByOrderItemOrderItemId(
+                                    orderItem.getOrderItemId());
                             ProductSku sku = orderItem.getSku();
                             Product product = sku.getProduct();
                             // Lấy SKU có fetch variants từ map (tránh N+1 và LazyInit)
@@ -356,7 +379,7 @@ public class OrderServiceImpl implements OrderService {
                                     .imeis(orderItem.getProductItems().stream()
                                             .map(item -> ImeiResponse.builder().imeiCode(item.getImeiCode()).build())
                                             .toList())
-                                            .reviewed(reviewed) 
+                                    .reviewed(reviewed)
                                     .build();
                         }).toList())
                 .history(historyResponses)
@@ -404,6 +427,14 @@ public class OrderServiceImpl implements OrderService {
                 .status("CANCELLED")
                 .note((reason == null || reason.isBlank()) ? "Khách hàng tự hủy" : reason)
                 .build();
-        return updateStatusOrder(orderCode, request);
+        OrderDetailResponse response = updateStatusOrder(orderCode, request);
+        // Marcus thêm: khi khách tự hủy, chủ cửa hàng nhận chuông realtime để nắm
+        // lý do và dừng xử lý đơn.
+        adminNotificationService.createAndSendNotification(
+                "ORDER_CANCELLED",
+                "Khách đã hủy đơn " + order.getOrderCode(),
+                "Khách hàng " + getUserDisplayName(order.getUser()) + " hủy đơn. Lý do: " + request.getNote(),
+                order.getOrderCode());
+        return response;
     }
 }

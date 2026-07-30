@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -40,6 +41,9 @@ public class RefundService {
 
     private static final String VNPAY_PAYMENT = "VNPAY_PAYMENT";
     private static final String REFUND = "REFUND";
+    private static final Set<String> REFUND_STATUSES = Set.of(
+            PENDING_APPROVAL, SUBMITTING, PROCESSING, RETRY_PENDING,
+            SUCCESS, FAILED, MANUAL_REVIEW);
     private static final DateTimeFormatter VNPAY_DATE = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     private final RefundRequestRepository refundRepository;
@@ -49,6 +53,8 @@ public class RefundService {
     private final EmailService emailService;
     private final VnPayConfig vnPayConfig;
     private final AdminNotificationService notificationService;
+    // Marcus thêm chuông khách cho vòng đời refund VNPAY.
+    private final UserNotificationService userNotificationService;
 
     @Transactional
     public RefundResponse requestManualRefund(String orderCode, String reason) {
@@ -71,6 +77,9 @@ public class RefundService {
         String normalized = status == null || status.isBlank() || "ALL".equalsIgnoreCase(status)
                 ? null
                 : status.trim().toUpperCase();
+        if (normalized != null && !REFUND_STATUSES.contains(normalized)) {
+            throw new IllegalArgumentException("Trạng thái refund không hợp lệ");
+        }
         return refundRepository.findPage(normalized, pageable).map(this::toResponse);
     }
 
@@ -117,17 +126,13 @@ public class RefundService {
     @Transactional
     public VnPayRefundClient.RefundCommand prepareAdminRetry(Long refundId) {
         RefundRequest refund = lock(refundId);
-        // Marcus sửa: admin được chủ động retry cả lỗi đang chờ scheduler sau khi
-        // đã khắc phục TLS, vẫn giữ nguyên RequestId chống hoàn trùng.
-        if (!(FAILED.equals(refund.getStatus()) || RETRY_PENDING.equals(refund.getStatus()))) {
-            throw new RuntimeException("Yêu cầu refund chưa ở trạng thái được phép thử lại");
+        // Marcus sửa: FAILED là kết quả cuối từ VNPAY, không được gửi refund lại
+        // mù. Admin chỉ có thể đẩy sớm lỗi kỹ thuật đã được phân loại RETRY_PENDING.
+        if (!RETRY_PENDING.equals(refund.getStatus())) {
+            throw new RuntimeException("Chỉ được thử lại refund lỗi kỹ thuật đang chờ retry");
         }
         User approver = currentUser();
-        if (refund.getProviderMessage() != null && refund.getProviderMessage().contains("PKIX")) {
-            // Marcus sửa dữ liệu retry cũ: lỗi PKIX xảy ra trước khi request tới VNPAY,
-            // nên an toàn cập nhật số tiền sang hoàn toàn bộ theo chính sách mới.
-            applyFullRefundPolicy(refund);
-        }
+        applyFullRefundPolicy(refund);
         refund.setApprovedBy(approver);
         refund.setApprovedAt(LocalDateTime.now());
         refund.setRetryCount(0);
@@ -214,8 +219,14 @@ public class RefundService {
         refund.setReconciliationAttempts(attempts);
         refund.setLastReconciledAt(now);
         refund.setLastReconciliationMessage(normalizeProviderMessage(result.message()));
-        refund.setProviderResponseCode(result.responseCode());
-        refund.setProviderTransactionStatus(result.transactionStatus());
+        // Marcus sửa: QueryDR lỗi mạng thường không có code; không ghi đè bằng null
+        // làm mất dấu vết phản hồi VNPAY trước đó.
+        if (result.responseCode() != null) {
+            refund.setProviderResponseCode(result.responseCode());
+        }
+        if (result.transactionStatus() != null) {
+            refund.setProviderTransactionStatus(result.transactionStatus());
+        }
         if (result.transactionId() != null) {
             refund.setProviderRefundTransactionId(result.transactionId());
         }
@@ -335,6 +346,13 @@ public class RefundService {
                 "Đơn " + order.getOrderCode() + " đang chờ duyệt hoàn "
                         + refundAmount.stripTrailingZeros().toPlainString() + " VND",
                 order.getOrderCode());
+        userNotificationService.create(
+                order.getUser(),
+                "REFUND_PENDING",
+                "Đang xử lý hoàn tiền",
+                "Yêu cầu hoàn tiền cho đơn " + order.getOrderCode()
+                        + " đã được tạo và đang chờ Marcus Store xử lý.",
+                order.getOrderCode());
         // Marcus sửa: không gửi mail đồng bộ lúc hủy đơn để giảm độ trễ màn hình admin.
         return saved;
     }
@@ -358,8 +376,14 @@ public class RefundService {
         // Marcus thêm trạng thái SUBMITTING để tách lúc đang gọi network khỏi lúc
         // VNPAY đã tiếp nhận và đang xử lý.
         refund.setStatus(SUBMITTING);
+        refund.setProcessedAt(null);
         refund.setLastAttemptAt(LocalDateTime.now());
         refund.setNextRetryAt(null);
+        refund.setNextReconciliationAt(null);
+        refund.getOrder().setPaymentStatus("REFUND_PENDING");
+        refund.getRefundTransaction().setStatus("PENDING");
+        refund.getRefundTransaction().setIsReconciled(false);
+        refund.getRefundTransaction().setNote("Đang gửi yêu cầu hoàn tiền tới VNPAY");
         refundRepository.save(refund);
 
         OrderTransaction payment = refund.getPaymentTransaction();
@@ -397,6 +421,13 @@ public class RefundService {
         refund.getRefundTransaction().setProviderResponseCode(refund.getProviderResponseCode());
         refund.getRefundTransaction().setIsReconciled(true);
         refund.getRefundTransaction().setNote("Hoàn tiền VNPAY thành công");
+        // Marcus thêm: chỉ gửi khi gateway/reconciliation kết luận SUCCESS.
+        userNotificationService.create(
+                refund.getOrder().getUser(),
+                "REFUND_SUCCESS",
+                "Hoàn tiền thành công",
+                "Đơn " + refund.getOrder().getOrderCode() + " đã được VNPAY xác nhận hoàn tiền.",
+                refund.getOrder().getOrderCode());
     }
 
     private void markProcessing(RefundRequest refund) {
@@ -431,6 +462,13 @@ public class RefundService {
         refund.getOrder().setPaymentStatus("REFUND_FAILED");
         refund.getRefundTransaction().setStatus("FAILED");
         refund.getRefundTransaction().setNote("Hoàn tiền VNPAY thất bại: " + refund.getProviderMessage());
+        userNotificationService.create(
+                refund.getOrder().getUser(),
+                "REFUND_FAILED",
+                "Hoàn tiền cần kiểm tra",
+                "Yêu cầu hoàn tiền đơn " + refund.getOrder().getOrderCode()
+                        + " chưa hoàn tất. Marcus Store sẽ tiếp tục kiểm tra.",
+                refund.getOrder().getOrderCode());
     }
 
     private void copyProviderResult(RefundRequest refund, VnPayRefundClient.RefundGatewayResult result) {

@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-
 @Service
 @RequiredArgsConstructor
 public class VoucherServiceImpl implements VoucherService {
@@ -71,7 +70,8 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
     @Override
-    public Page<VoucherResponse> getVouchersPage(String keyword, String discountType, Boolean isActive, Pageable pageable) {
+    public Page<VoucherResponse> getVouchersPage(String keyword, String discountType, Boolean isActive,
+            Pageable pageable) {
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedDiscountType = normalizeDiscountType(discountType);
 
@@ -93,8 +93,7 @@ public class VoucherServiceImpl implements VoucherService {
                 voucherRepository.countVouchers(normalizedKeyword, normalizedDiscountType, isActive),
                 voucherRepository.countActiveVouchers(normalizedKeyword, normalizedDiscountType, isActive),
                 voucherRepository.countPercentVouchers(normalizedKeyword, normalizedDiscountType, isActive),
-                voucherRepository.countAmountVouchers(normalizedKeyword, normalizedDiscountType, isActive)
-        );
+                voucherRepository.countAmountVouchers(normalizedKeyword, normalizedDiscountType, isActive));
     }
 
     private String normalizeKeyword(String keyword) {
@@ -107,8 +106,8 @@ public class VoucherServiceImpl implements VoucherService {
         return discountType == null ||
                 discountType.isBlank() ||
                 "ALL".equalsIgnoreCase(discountType)
-                ? null
-                : discountType.trim().toUpperCase();
+                        ? null
+                        : discountType.trim().toUpperCase();
     }
 
     // Lấy chi tiết voucher theo ID
@@ -119,7 +118,6 @@ public class VoucherServiceImpl implements VoucherService {
 
         return toResponse(voucher);
     }
-
 
     // thêm mới voucher
     @Override
@@ -139,8 +137,7 @@ public class VoucherServiceImpl implements VoucherService {
         if (voucherRepository.existsByVoucherCode(voucherCode)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Mã voucher đã tồn tại"
-            );
+                    "Mã voucher đã tồn tại");
         }
 
         validateDateRange(request.getStartDate(), request.getEndDate());
@@ -150,35 +147,34 @@ public class VoucherServiceImpl implements VoucherService {
         if (!"ALL".equals(targetType) && !"SPECIFIC".equals(targetType)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Đối tượng sử dụng không hợp lệ. Các loại hợp lệ: ALL, SPECIFIC"
-            );
+                    "Đối tượng sử dụng không hợp lệ. Các loại hợp lệ: ALL, SPECIFIC");
         }
 
         // Nếu là SPECIFIC thì phải có danh sách user
         if ("SPECIFIC".equals(targetType) &&
-            (request.getTargetUserIds() == null || request.getTargetUserIds().isEmpty())) {
+                (request.getTargetUserIds() == null || request.getTargetUserIds().isEmpty())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Vui lòng chọn ít nhất một khách hàng để gán voucher"
-            );
+                    "Vui lòng chọn ít nhất một khách hàng để gán voucher");
         }
 
         // Validate quantity:
         // - ALL: bắt buộc phải có và > 0 (admin nhập tay, là tổng lượt dùng)
-        // - SPECIFIC: không cần nhập, tự sinh = số user được chọn (validate sau ở buildVoucher)
+        // - SPECIFIC: không cần nhập, tự sinh = số user được chọn (validate sau ở
+        // buildVoucher)
         if ("ALL".equals(targetType)) {
             if (request.getQuantity() == null || request.getQuantity() <= 0) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "Voucher áp dụng cho tất cả phải có số lượng lớn hơn 0"
-                );
+                        "Voucher áp dụng cho tất cả phải có số lượng lớn hơn 0");
             }
         }
 
         Voucher voucher = buildVoucher(request, voucherCode, discountType);
         Voucher savedVoucher = voucherRepository.saveAndFlush(voucher);
 
-        if ("SPECIFIC".equals(targetType) && request.getTargetUserIds() != null && !request.getTargetUserIds().isEmpty()) {
+        if ("SPECIFIC".equals(targetType) && request.getTargetUserIds() != null
+                && !request.getTargetUserIds().isEmpty()) {
             userVoucherService.assignVoucherToUsers(savedVoucher.getVoucherId(), request.getTargetUserIds());
         }
 
@@ -193,7 +189,6 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setMinOrderValue(request.getMinOrderValue());
         voucher.setStartDate(request.getStartDate());
         voucher.setEndDate(request.getEndDate());
-
 
         // Set targetType - mặc định là ALL
         voucher.setTargetType(request.getTargetType() != null ? request.getTargetType() : "ALL");
@@ -235,8 +230,7 @@ public class VoucherServiceImpl implements VoucherService {
             default:
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "Loại giảm giá không hợp lệ"
-                );
+                        "Loại giảm giá không hợp lệ");
         }
 
         return voucher;
@@ -247,8 +241,7 @@ public class VoucherServiceImpl implements VoucherService {
         if (discountType == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Loại giảm giá không được để trống"
-            );
+                    "Loại giảm giá không được để trống");
         }
 
         if (!"PERCENT".equals(discountType) &&
@@ -256,8 +249,7 @@ public class VoucherServiceImpl implements VoucherService {
                 !"FREESHIP".equals(discountType)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Loại giảm giá không hợp lệ. Các loại hợp lệ: PERCENT, AMOUNT, FREESHIP"
-            );
+                    "Loại giảm giá không hợp lệ. Các loại hợp lệ: PERCENT, AMOUNT, FREESHIP");
         }
     }
 
@@ -268,8 +260,7 @@ public class VoucherServiceImpl implements VoucherService {
                     request.getMaxDiscountAmount().compareTo(BigDecimal.ZERO) <= 0) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "Số tiền giảm tối đa phải lớn hơn 0"
-                );
+                        "Số tiền giảm tối đa phải lớn hơn 0");
             }
         }
 
@@ -277,16 +268,14 @@ public class VoucherServiceImpl implements VoucherService {
                 request.getDiscountValue().compareTo(BigDecimal.ZERO) <= 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Giá trị giảm phải lớn hơn 0"
-            );
+                    "Giá trị giảm phải lớn hơn 0");
         }
 
         if ("PERCENT".equals(discountType) &&
                 request.getDiscountValue().compareTo(new BigDecimal("100")) > 0) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Giảm theo phần trăm không được vượt quá 100%"
-            );
+                    "Giảm theo phần trăm không được vượt quá 100%");
         }
     }
 
@@ -295,15 +284,13 @@ public class VoucherServiceImpl implements VoucherService {
         if (startDate == null || endDate == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Ngày bắt đầu và ngày kết thúc không được để trống"
-            );
+                    "Ngày bắt đầu và ngày kết thúc không được để trống");
         }
 
         if (!endDate.isAfter(startDate)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Ngày kết thúc phải lớn hơn ngày bắt đầu"
-            );
+                    "Ngày kết thúc phải lớn hơn ngày bắt đầu");
         }
     }
 
@@ -314,8 +301,7 @@ public class VoucherServiceImpl implements VoucherService {
         Voucher voucher = voucherRepository.findById(voucherId).orElseThrow(
                 () -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
-                        "Không tìm thấy voucher"
-                ));
+                        "Không tìm thấy voucher"));
 
         String voucherCode = request.getVoucherCode().trim().toUpperCase();
         String discountType = request.getDiscountType().trim().toUpperCase();
@@ -333,8 +319,7 @@ public class VoucherServiceImpl implements VoucherService {
                 !voucher.getVoucherCode().equalsIgnoreCase(voucherCode)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Mã voucher đã tồn tại"
-            );
+                    "Mã voucher đã tồn tại");
         }
 
         validateDateRange(request.getStartDate(), request.getEndDate());
@@ -344,8 +329,7 @@ public class VoucherServiceImpl implements VoucherService {
         if (!"ALL".equals(targetType) && !"SPECIFIC".equals(targetType)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Đối tượng sử dụng không hợp lệ. Các loại hợp lệ: ALL, SPECIFIC"
-            );
+                    "Đối tượng sử dụng không hợp lệ. Các loại hợp lệ: ALL, SPECIFIC");
         }
 
         // Cập nhật các trường voucher
@@ -420,8 +404,7 @@ public class VoucherServiceImpl implements VoucherService {
         Voucher voucher = voucherRepository.findById(voucherId).orElseThrow(
                 () -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
-                        "Không tìm thấy voucher"
-                ));
+                        "Không tìm thấy voucher"));
 
         voucher.setIsActive(false);
         voucherRepository.save(voucher);
@@ -512,7 +495,8 @@ public class VoucherServiceImpl implements VoucherService {
         boolean isAllUsers = !"SPECIFIC".equals(voucher.getTargetType());
 
         if (!isAllUsers) {
-            boolean isAssigned = userVoucherRepository.existsByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(), userId);
+            boolean isAssigned = userVoucherRepository.existsByVoucherVoucherIdAndUserUserId(voucher.getVoucherId(),
+                    userId);
             if (!isAssigned) {
                 return VoucherApplyResult.builder()
                         .applied(false)
@@ -539,7 +523,8 @@ public class VoucherServiceImpl implements VoucherService {
         }
         // Voucher ALL: chưa có record -> sẽ tạo trong confirmVoucherUsage()
 
-        // 5. Kiểm tra quota (chỉ đọc - trừ quantity sẽ xảy ra trong confirmVoucherUsage)
+        // 5. Kiểm tra quota (chỉ đọc - trừ quantity sẽ xảy ra trong
+        // confirmVoucherUsage)
         if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
             if ("SPECIFIC".equals(voucher.getTargetType())) {
                 // SPECIFIC: reset UserVoucher.isUsed về false nếu user đã được gán
@@ -564,7 +549,7 @@ public class VoucherServiceImpl implements VoucherService {
         BigDecimal discountAmount = BigDecimal.ZERO;
         BigDecimal freeshipAmount = BigDecimal.ZERO;
 
-      // hiện tại chỉ hiển thị ở UI còn cơ chế trừ sẽ làm sau
+        // hiện tại chỉ hiển thị ở UI còn cơ chế trừ sẽ làm sau
         if ("FREESHIP".equalsIgnoreCase(voucher.getDiscountType())) {
             // Không tính freeshipAmount ở đây - frontend tự xử lý hiển thị
             // freeshipAmount = voucher.getDiscountValue();
@@ -603,14 +588,15 @@ public class VoucherServiceImpl implements VoucherService {
     public void confirmVoucherUsage(Integer voucherId, Integer userId) {
         LocalDateTime now = LocalDateTime.now();
 
-        // 1. Tìm voucher
-        Voucher voucher = voucherRepository.findById(voucherId)
+        // Marcus sửa: khóa voucher trước khi kiểm tra và trừ quota. Nếu hai Checkout
+        // cùng lấy lượt cuối, chỉ một giao dịch được phép thành công.
+        Voucher voucher = voucherRepository.findByIdForUpdate(voucherId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
                         "Không tìm thấy voucher.|VOUCHER_NOT_FOUND"));
 
         // 2. Nếu voucher đã bị deactivate trước đó → throw lỗi thân thiện
-        //    (admin có thể đã khóa voucher giữa lúc user apply và lúc thanh toán)
+        // (admin có thể đã khóa voucher giữa lúc user apply và lúc thanh toán)
         if (Boolean.FALSE.equals(voucher.getIsActive())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -624,6 +610,18 @@ public class VoucherServiceImpl implements VoucherService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Voucher đã hết hạn. Vui lòng chọn voucher khác.|VOUCHER_EXPIRED");
+        }
+
+        // Marcus sửa tại điểm giao Voucher -> Checkout/Hủy đơn: khóa và kiểm tra
+        // lượt của chính người dùng trước khi trừ quota. Đây là lớp chống retry
+        // Checkout trừ voucher hai lần, không thay đổi nghiệp vụ Voucher của thành
+        // viên.
+        Optional<UserVoucher> userVoucherOpt = userVoucherRepository
+                .findByVoucherIdAndUserIdForUpdate(voucherId, userId);
+        if (userVoucherOpt.isPresent() && Boolean.TRUE.equals(userVoucherOpt.get().getIsUsed())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Voucher đã được sử dụng cho tài khoản này.|VOUCHER_ALREADY_USED");
         }
 
         // 4. Nếu hết quantity → auto deactivate + throw lỗi (race condition guard)
@@ -645,9 +643,6 @@ public class VoucherServiceImpl implements VoucherService {
         voucherRepository.save(voucher);
 
         // 7. Update hoặc create UserVoucher record
-        Optional<UserVoucher> userVoucherOpt = userVoucherRepository
-                .findByVoucherVoucherIdAndUserUserId(voucherId, userId);
-
         if (userVoucherOpt.isPresent()) {
             UserVoucher userVoucher = userVoucherOpt.get();
             if (!Boolean.TRUE.equals(userVoucher.getIsUsed())) {

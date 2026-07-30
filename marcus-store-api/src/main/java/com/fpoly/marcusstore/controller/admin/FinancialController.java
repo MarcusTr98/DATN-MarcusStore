@@ -21,11 +21,16 @@ import com.fpoly.marcusstore.dto.response.FinancialReportResponse;
 import com.fpoly.marcusstore.service.FinancialService;
 
 import lombok.RequiredArgsConstructor;
+import com.fpoly.marcusstore.dto.request.FinancialReconcileRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/admin/finance-reports")
 @PreAuthorize("hasAuthority('DONGTIEN_VIEW')")
 @RequiredArgsConstructor
+@Validated
 public class FinancialController {
     private final FinancialService financialService;
 
@@ -48,8 +53,10 @@ public class FinancialController {
 
     @PostMapping("/{id}/reconcile")
     @PreAuthorize("hasAuthority('DONGTIEN_EXPORT')")
-    public ResponseEntity<?> reconcile(@PathVariable Integer id, @RequestBody boolean status) {
-        financialService.updateReconciliationStatus(id, status);
+    public ResponseEntity<?> reconcile(
+            @PathVariable @Positive Integer id,
+            @Valid @RequestBody FinancialReconcileRequest request) {
+        financialService.updateReconciliationStatus(id, request.getStatus());
         return ResponseEntity.ok().build();
     }
 }

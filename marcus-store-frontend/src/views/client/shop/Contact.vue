@@ -104,7 +104,13 @@
             <form @submit.prevent="submitContact" class="cps-form">
               <div class="form-group">
                 <label>Họ và tên <span class="required">*</span></label>
-                <input v-model="form.name" type="text" placeholder="Nhập họ tên của bạn" required />
+                <input
+                  v-model="form.name"
+                  type="text"
+                  maxlength="100"
+                  placeholder="Nhập họ tên của bạn"
+                  required
+                />
               </div>
 
               <div class="form-row">
@@ -122,6 +128,7 @@
                   <input
                     v-model="form.email"
                     type="email"
+                    maxlength="100"
                     placeholder="Nhập email (Không bắt buộc)"
                   />
                 </div>
@@ -132,6 +139,7 @@
                 <textarea
                   v-model="form.message"
                   rows="4"
+                  maxlength="2000"
                   placeholder="Vui lòng mô tả chi tiết vấn đề của bạn..."
                   required
                 ></textarea>
@@ -150,6 +158,25 @@
 
     <div class="cps-toast" :class="{ show: toastMessage }">
       <i class="fa-solid fa-circle-check"></i> {{ toastMessage }}
+    </div>
+
+    <!-- Marcus sửa: lỗi form liên hệ có thể dài/nhiều trường nên dùng modal thay
+         alert của trình duyệt. -->
+    <div v-if="responseModal.open" class="contact-modal-backdrop" @click.self="closeResponseModal">
+      <div class="contact-modal" role="dialog" aria-modal="true">
+        <div class="contact-modal-icon" :class="responseModal.type">
+          <i
+            class="fa-solid"
+            :class="responseModal.type === 'error' ? 'fa-circle-exclamation' : 'fa-circle-check'"
+          ></i>
+        </div>
+        <h3>{{ responseModal.title }}</h3>
+        <p>{{ responseModal.message }}</p>
+        <ul v-if="responseModal.fieldErrors.length" class="contact-error-list">
+          <li v-for="item in responseModal.fieldErrors" :key="item">{{ item }}</li>
+        </ul>
+        <button type="button" class="btn-submit" @click="closeResponseModal">Đã hiểu</button>
+      </div>
     </div>
   </main>
 </template>
@@ -185,6 +212,13 @@ const storeInfo = ref({
 // --- State cho Form ---
 const isSubmitting = ref(false)
 const toastMessage = ref('')
+const responseModal = reactive({
+  open: false,
+  type: 'error',
+  title: '',
+  message: '',
+  fieldErrors: [],
+})
 const form = reactive({
   name: '',
   phone: '',
@@ -244,6 +278,22 @@ const showToast = (msg) => {
   }, 3000)
 }
 
+const closeResponseModal = () => {
+  responseModal.open = false
+}
+
+const showContactError = (error) => {
+  const payload = error.response?.data
+  responseModal.open = true
+  responseModal.type = 'error'
+  responseModal.title = 'Chưa thể gửi yêu cầu'
+  responseModal.message = payload?.message || 'Có lỗi xảy ra, vui lòng kiểm tra và thử lại.'
+  responseModal.fieldErrors =
+    payload?.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+      ? Object.values(payload.data).filter(Boolean)
+      : []
+}
+
 const submitContact = async () => {
   isSubmitting.value = true
   try {
@@ -256,8 +306,7 @@ const submitContact = async () => {
     form.message = ''
   } catch (error) {
     console.error(error)
-    const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra, vui lòng thử lại sau.'
-    alert(errorMsg)
+    showContactError(error)
   } finally {
     isSubmitting.value = false
   }
@@ -269,6 +318,58 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.contact-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(3px);
+}
+
+.contact-modal {
+  width: min(440px, 100%);
+  padding: 28px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  text-align: center;
+}
+
+.contact-modal-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fee2e2;
+  color: #dc2626;
+  font-size: 25px;
+}
+
+.contact-modal h3 {
+  margin-bottom: 8px;
+  color: #172033;
+  font-size: 21px;
+  font-weight: 800;
+}
+
+.contact-modal p {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.contact-error-list {
+  margin: 14px 0 18px;
+  padding: 12px 14px 12px 32px;
+  border-radius: 10px;
+  background: #fff7f7;
+  color: #b91c1c;
+  text-align: left;
+}
 .bg-gray {
   background-color: #f3f4f6;
   min-height: 100vh;

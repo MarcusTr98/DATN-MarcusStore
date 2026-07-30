@@ -17,9 +17,8 @@ const financialApi = {
     })
   },
   reconcile(id, status) {
-    return api.post(`/admin/finance-reports/${id}/reconcile`, status, {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    // Marcus sửa: dùng object DTO thay vì gửi boolean thô để backend validate rõ ràng.
+    return api.post(`/admin/finance-reports/${id}/reconcile`, { status })
   },
 }
 

@@ -207,6 +207,159 @@
   flex-shrink: 0;
 }
 
+/* Marcus thêm cụm chuông khách, giữ cùng ngôn ngữ giao diện header hiện tại. */
+.client-notification {
+  position: relative;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.notification-button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.client-notification-panel {
+  position: absolute;
+  z-index: 1200;
+  top: calc(100% + 4px);
+  right: 0;
+  width: min(390px, 92vw);
+  max-height: 480px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.2);
+}
+
+/* Giữ vùng hover liền mạch từ nút xuống dropdown, tránh panel chớp tắt. */
+.client-notification-panel::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -10px;
+  height: 10px;
+}
+
+.client-notification-head {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #eef2f7;
+  background: #fff;
+}
+
+.client-notification-head div,
+.client-notification-item > span:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.client-notification-head small,
+.client-notification-item small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.client-notification-head button {
+  border: 0;
+  background: transparent;
+  color: #d70018;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.client-notification-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  padding: 13px 16px;
+  border: 0;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.client-notification-item.unread {
+  background: #fff5f5;
+}
+
+.client-notification-item:hover {
+  background: #f8fafc;
+  transform: translateX(2px);
+}
+
+.notification-item-icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #fee2e2;
+  color: #d70018;
+}
+
+.notification-item-icon.ORDER_CANCELLED,
+.notification-item-icon.ORDER_FAILED,
+.notification-item-icon.REFUND_FAILED {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.notification-item-icon.REFUND_PENDING {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.notification-item-icon.REFUND_SUCCESS {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.notification-item-icon.ORDER_CONFIRMED,
+.notification-item-icon.ORDER_COMPLETED,
+.notification-item-icon.ORDER_DELIVERED,
+.notification-item-icon.PAYMENT_SUCCESS {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.notification-item-icon.ORDER_PROCESSING,
+.notification-item-icon.ORDER_PACKED,
+.notification-item-icon.ORDER_SHIPPING {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.notification-item-icon.ORDER_PENDING,
+.notification-item-icon.ORDER_READY_FOR_PICKUP {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.notification-empty {
+  padding: 28px 16px;
+  color: #64748b;
+  text-align: center;
+}
+
+.notification-empty.error {
+  color: #b91c1c;
+}
+
 .h-action-btn {
   display: flex;
   align-items: center;

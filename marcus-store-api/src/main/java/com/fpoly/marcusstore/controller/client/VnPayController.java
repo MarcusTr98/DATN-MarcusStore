@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderTransactionService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
+import com.fpoly.marcusstore.service.UserNotificationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class VnPayController {
     private final OrderCancellationService orderCancellationService;
     private final OrderTransactionService orderTransactionService;
     private final AdminNotificationService notificationService;
+    private final UserNotificationService userNotificationService;
 
     @Transactional
     @GetMapping("/ipn")
@@ -117,6 +119,10 @@ public class VnPayController {
         OrderTransactionService.VnPayTransactionState transactionState = orderTransactionService
                 .getVnPayTransactionState(order);
         if (isTerminal(transactionState)) {
+            if (isLateSuccessAfterAutomaticCancellation(order, transactionState, responseCode)) {
+                handleLateSuccessAfterAutomaticCancellation(order, transactionId, responseCode);
+                return ok("00", "Confirm Success");
+            }
             if (matchesProcessedCallback(transactionState, transactionId, responseCode)) {
                 log.info("[VNPAY IPN] Callback lặp hợp lệ. Order={}, TransactionNo={}, Status={}",
                         orderCode, transactionId, transactionState.status());
@@ -151,6 +157,12 @@ public class VnPayController {
                     "Đơn VNPAY đã thanh toán: " + orderCode,
                     "Thanh toán đã được VNPAY xác nhận. Đơn hàng sẵn sàng để admin xử lý.",
                     orderCode);
+            userNotificationService.create(
+                    order.getUser(),
+                    "PAYMENT_SUCCESS",
+                    "Thanh toán VNPAY thành công",
+                    "Thanh toán cho đơn " + orderCode + " đã được xác nhận. Đơn đang chờ Admin xử lý.",
+                    orderCode);
 
             log.info("[VNPAY IPN] Thanh toán thành công. Đơn hàng {} chuyển sang PENDING để Admin xác nhận.",
                     orderCode);
@@ -163,6 +175,9 @@ public class VnPayController {
             orderTransactionService.markVnPayPaymentFailed(
                     order, transactionId, responseCode, failureNote);
             orderCancellationService.cancelAndRestore(order, failureNote);
+            userNotificationService.createOrderStatusNotification(
+                    order, "CANCELLED",
+                    "Đơn " + orderCode + " đã tự hủy vì thanh toán VNPAY không thành công.");
             log.info("[VNPAY IPN] Thanh toán thất bại/hủy. Order={}", orderCode);
         }
 
@@ -181,6 +196,42 @@ public class VnPayController {
         orderStatusHistoryRepository.save(history);
 
         return ok("00", "Confirm Success");
+    }
+
+    private boolean isLateSuccessAfterAutomaticCancellation(
+            Order order,
+            OrderTransactionService.VnPayTransactionState transactionState,
+            String responseCode) {
+        return "00".equals(responseCode)
+                && transactionState != null
+                && "FAILED".equalsIgnoreCase(transactionState.status())
+                && "CANCELLED".equalsIgnoreCase(order.getOrderStatus())
+                && "VNPAY".equalsIgnoreCase(order.getPaymentMethod());
+    }
+
+    private void handleLateSuccessAfterAutomaticCancellation(
+            Order order, String transactionId, String responseCode) {
+        String reason = "VNPAY xác nhận thanh toán thành công sau khi đơn đã tự hủy. TransactionNo: "
+                + transactionId;
+
+        orderTransactionService.markLateVnPayPaymentSuccess(order, transactionId, responseCode);
+        order.setPaymentStatus("PAID");
+        order.setTransactionId(transactionId);
+        order.setPaymentDate(LocalDateTime.now());
+        orderRepository.save(order);
+
+        // Tài nguyên đã được scheduler hoàn trước đó. Chỉ tạo refund, tuyệt đối
+        // không chạy cancelAndRestore lần hai.
+        orderCancellationService.requestRefundForCancelledPaidOrder(order, reason);
+
+        OrderStatusHistory history = new OrderStatusHistory();
+        history.setOrder(order);
+        history.setStatus("CANCELLED");
+        history.setTitle("Thanh toán VNPAY đến muộn");
+        history.setNote(reason + ". Hệ thống đã tạo yêu cầu hoàn tiền.");
+        orderStatusHistoryRepository.save(history);
+        log.warn("[VNPAY IPN] Đơn {} đã tự hủy nhưng VNPAY báo thu tiền thành công; đã tạo refund.",
+                order.getOrderCode());
     }
 
     // tạo response đúng format VNPAY yêu cầu

@@ -30,7 +30,8 @@ public class VnPayConfig {
     private String refundIpAddr;
 
     // Marcus thêm feature flag để tuyệt đối không xác nhận thủ công ở production.
-    @Value("${vnpay.sandbox:true}")
+    // Marcus sửa: nếu môi trường quên cấu hình thì mặc định phải khóa xác nhận giả.
+    @Value("${vnpay.sandbox:false}")
     private boolean sandbox;
 
     @Value("${vnpay.allowManualRefundConfirmation:false}")
