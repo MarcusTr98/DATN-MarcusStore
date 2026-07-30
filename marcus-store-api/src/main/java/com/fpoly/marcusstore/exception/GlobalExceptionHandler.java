@@ -7,6 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import jakarta.validation.ConstraintViolationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
@@ -71,6 +75,38 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Object>> handleRuntimeExceptions(RuntimeException ex) {
         ApiResponse<Object> response = new ApiResponse<>(400, ex.getMessage(), null);
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+    }
+
+    // Marcus thêm: mọi request sai JSON, sai kiểu hoặc vi phạm constraint ở
+    // path/query đều trả cùng cấu trúc ApiResponse để frontend đọc ổn định.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiResponse<Object>> handleUnreadableRequest(HttpMessageNotReadableException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(400, "Dữ liệu gửi lên sai định dạng.", "INVALID_REQUEST_BODY"));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleConstraintViolation(ConstraintViolationException ex) {
+        String message = ex.getConstraintViolations().stream()
+                .findFirst()
+                .map(violation -> violation.getMessage())
+                .orElse("Tham số không hợp lệ.");
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(400, message, "INVALID_PARAMETER"));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ApiResponse<Object>> handleMissingParameter(MissingServletRequestParameterException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(400, "Thiếu tham số bắt buộc: " + ex.getParameterName(),
+                        "MISSING_PARAMETER"));
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiResponse<Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(400, "Tham số " + ex.getName() + " sai định dạng.",
+                        "INVALID_PARAMETER_TYPE"));
     }
 
     // 4. Bắt lỗi hệ thống không xác định, chỉ ghi chi tiết ở server.

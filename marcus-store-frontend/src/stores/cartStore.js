@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import cartApi from '@/api/cartApi'
 
-
 // Convert dữ liệu backend trả về sang dữ liệu mà Cart.vue đang dùng
 function mapCartItem(item) {
   // Xác định có phải sản phẩm Flash Sale không
-  const isFlashSale = item.isFlashSale === true || item.isFlashSale === 'true' || !!item.flashSaleSlotId;
+  const isFlashSale =
+    item.isFlashSale === true || item.isFlashSale === 'true' || !!item.flashSaleSlotId
 
   return {
     id: item.skuId,
@@ -17,7 +17,6 @@ function mapCartItem(item) {
     variant: item.variantText || [item.color, item.storage].filter(Boolean).join(' / '),
 
     thumbnailUrl: item.thumbnailUrl,
-
 
     // Nếu là Flash Sale: price = giá FS, originalPrice = giá gốc
     // Nếu không: price = giá bán, originalPrice = giá gốc
@@ -117,16 +116,17 @@ export const useCartStore = defineStore('cart', {
     },
 
     // Action mới: Thêm sản phẩm Flash Sale vào giỏ hàng
-    async addToCartWithFlashSale(skuId, quantity, flashSaleSlotId, flashSalePrice) {
+    async addToCartWithFlashSale(skuId, quantity, flashSaleSlotId) {
       try {
         this.loading = true
         this.error = null
 
+        // Marcus sửa tại biên Cart -> Checkout: frontend chỉ gửi định danh, giá
+        // Flash Sale phải do backend đọc lại từ database.
         const data = {
           skuId,
           quantity,
           flashSaleSlotId,
-          flashSalePrice,
         }
 
         const res = await cartApi.addToCart(data)

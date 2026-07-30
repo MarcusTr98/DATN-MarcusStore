@@ -17,6 +17,8 @@ import com.fpoly.marcusstore.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.repository.core.ProductRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
@@ -52,21 +54,24 @@ public class CartService {
     private final ProductRepository productRepository;
     private final HomeProductRepository homeProductRepository;
     private final CategoryRepository categoryRepository;
+
     // lấy giá trị thuộc tính của SKU theo tên giá trị
-    private String getSkuAttributeValue(ProductSku sku, String attributeName){
-        if(sku == null || sku.getAttributeValues() == null){
+    private String getSkuAttributeValue(ProductSku sku, String attributeName) {
+        if (sku == null || sku.getAttributeValues() == null) {
             return null;
         }
         return sku.getAttributeValues().stream()
-                .filter(value -> value!=null) // bỏ qua phần tử null
+                .filter(value -> value != null) // bỏ qua phần tử null
                 .filter(value -> value.getAttribute() != null)
-                .filter(value -> value.getAttribute().getAttributeName() !=null)// check sự tồn tại của thuộc tính
-                .filter(value -> value.getAttribute().getAttributeName().equalsIgnoreCase(attributeName))// so sánh attributeName
+                .filter(value -> value.getAttribute().getAttributeName() != null)// check sự tồn tại của thuộc tính
+                .filter(value -> value.getAttribute().getAttributeName().equalsIgnoreCase(attributeName))// so sánh
+                                                                                                         // attributeName
                 .map(AttributeValue::getValueString)
                 .filter(value -> value != null && !value.isBlank())
                 .findFirst()
                 .orElse(null);
     }
+
     @Transactional
     public CartResponse getCartDetail() {
         Integer userId = SecurityUtils.getCurrentUserId();
@@ -77,7 +82,7 @@ public class CartService {
             String color = getSkuAttributeValue(item.getSku(), "Màu sắc");
             String storage = getSkuAttributeValue(item.getSku(), "Dung lượng bộ nhớ");
             String variantText = "";
-            if(color != null && storage != null){
+            if (color != null && storage != null) {
                 variantText = color + " / " + storage;
             }
             // XỬ LÝ HIỂN THỊ GIÁ FLASH SALE (CẬP NHẬT)
@@ -114,8 +119,8 @@ public class CartService {
             String thumbnailUrl = item.getSku().getProduct() != null
                     ? item.getSku().getProduct().getThumbnailUrl()
                     : null;
-            if (thumbnailUrl != null && thumbnailUrl.isBlank()) thumbnailUrl = null;
-
+            if (thumbnailUrl != null && thumbnailUrl.isBlank())
+                thumbnailUrl = null;
 
             return CartItemResponse.builder()
                     .cartItemId(item.getCartItemId())
@@ -152,23 +157,24 @@ public class CartService {
                 .build();
 
     }
+
     private Cart getOrCreateCart(Integer userId) {
-    return cartRepository.findByUserUserId(userId)
-            .orElseGet(() -> {
-                Cart newCart = new Cart();
-                newCart.setUser(userRepository.getReferenceById(userId));
-                newCart.setCreatedAt(LocalDateTime.now());
-                return cartRepository.save(newCart);
-            });
-}
+        return cartRepository.findByUserUserId(userId)
+                .orElseGet(() -> {
+                    Cart newCart = new Cart();
+                    newCart.setUser(userRepository.getReferenceById(userId));
+                    newCart.setCreatedAt(LocalDateTime.now());
+                    return cartRepository.save(newCart);
+                });
+    }
 
     @Transactional
     public CartResponse addItemToCart(AddCartItemRequest request) {
         Integer userId = SecurityUtils.getCurrentUserId();
-        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(() ->
-                new RuntimeException("không tìm được giỏ hàng của người dùng: " + userId));
-        ProductSku sku = productSkuRepository.findBySkuId(request.getSkuId()).orElseThrow(() ->
-                new RuntimeException("không tìm thy SKU phù hợp: " + request.getSkuId()));
+        Cart cart = cartRepository.findByUserUserId(userId)
+                .orElseThrow(() -> new RuntimeException("không tìm được giỏ hàng của người dùng: " + userId));
+        ProductSku sku = productSkuRepository.findBySkuId(request.getSkuId())
+                .orElseThrow(() -> new RuntimeException("không tìm thy SKU phù hợp: " + request.getSkuId()));
         // XỬ LÝ FLASH SALE (THÊM MỚI)
         FlashSaleItem flashSaleItem = null;
         Integer stockQuantity;
@@ -183,7 +189,7 @@ public class CartService {
                     .findFirst()
                     .orElseThrow(() -> new RuntimeException("Không tìm thấy sản phẩm Flash Sale này"));
 
-            FlashSaleSlot        slot = flashSaleItem.getSlot();
+            FlashSaleSlot slot = flashSaleItem.getSlot();
 
             // Validate slot đang active (status = 2)
             if (slot.getStatus() == null || slot.getStatus() != 2) {
@@ -209,7 +215,7 @@ public class CartService {
             }
         }
 
-        Integer quantity = request.getQuantity() == null || request.getQuantity() <= 0 ? 1 : request.getQuantity();
+        Integer quantity = request.getQuantity();
 
         // Tìm cartItem - không phân biệt Flash Sale status
         CartItem cartItem = cartItemRepository
@@ -229,11 +235,31 @@ public class CartService {
             // Set Flash Sale info nếu có
             if (flashSaleItem != null) {
                 cartItem.setFlashSaleSlot(flashSaleItem.getSlot());
-                cartItem.setFlashSalePrice(request.getFlashSalePrice());
+                // Marcus sửa: giá Flash Sale là dữ liệu tin cậy từ database, tuyệt đối
+                // không nhận giá do frontend gửi lên.
+                cartItem.setFlashSalePrice(flashSaleItem.getFlashSalePrice());
             }
         } else {
             // Đã tồn tại → chỉ cộng dồn số lượng
-            Integer newQuantity = cartItem.getQuantity() + quantity;
+            // Marcus sửa tại ranh giới Checkout: không cho Cart gộp hai ngữ cảnh
+            // giá thường/Flash Sale vì Checkout sẽ không xác định được giá tin cậy.
+            // Không thay đổi cách thành viên quản trị chương trình Flash Sale.
+            boolean existingFlashSale = cartItem.getFlashSaleSlot() != null;
+            boolean requestedFlashSale = flashSaleItem != null;
+            Integer existingSlotId = existingFlashSale ? cartItem.getFlashSaleSlot().getSlotId() : null;
+            Integer requestedSlotId = requestedFlashSale ? flashSaleItem.getSlot().getSlotId() : null;
+            if (existingFlashSale != requestedFlashSale
+                    || (existingFlashSale && !existingSlotId.equals(requestedSlotId))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Sản phẩm thường và sản phẩm Flash Sale phải được thêm riêng.|CART_PRICE_CONTEXT_CONFLICT");
+            }
+
+            long calculatedQuantity = (long) cartItem.getQuantity() + quantity;
+            if (calculatedQuantity > Integer.MAX_VALUE) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Số lượng sản phẩm không hợp lệ.|INVALID_QUANTITY");
+            }
+            Integer newQuantity = (int) calculatedQuantity;
             if (newQuantity > stockQuantity) {
                 if (flashSaleItem != null) {
                     throw new RuntimeException("Đã hết số lượng Sale, vui lòng chọn sản phẩm khác");
@@ -244,9 +270,8 @@ public class CartService {
             cartItem.setQuantity(newQuantity);
 
             // Cập nhật Flash Sale info nếu sản phẩm đang được sale
-            if (flashSaleItem != null && cartItem.getFlashSaleSlot() == null) {
-                cartItem.setFlashSaleSlot(flashSaleItem.getSlot());
-                cartItem.setFlashSalePrice(request.getFlashSalePrice());
+            if (flashSaleItem != null) {
+                cartItem.setFlashSalePrice(flashSaleItem.getFlashSalePrice());
             }
         }
 
@@ -258,10 +283,10 @@ public class CartService {
     @Transactional
     public CartResponse removeItemFromCart(Integer skuId) {
         Integer userId = SecurityUtils.getCurrentUserId();
-        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()
-                -> new RuntimeException("không tìm thấy giỏ hàng của người dùng"));
-        CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), skuId).orElseThrow(()
-                -> new RuntimeException("không tìm thấy sảm phẩm cần xóa"));
+        Cart cart = cartRepository.findByUserUserId(userId)
+                .orElseThrow(() -> new RuntimeException("không tìm thấy giỏ hàng của người dùng"));
+        CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), skuId)
+                .orElseThrow(() -> new RuntimeException("không tìm thấy sảm phẩm cần xóa"));
         cartItemRepository.deleteByCart_CartIdAndSku_SkuId(cart.getCartId(), cartItem.getSku().getSkuId());
         return getCartDetail();
     }
@@ -272,8 +297,8 @@ public class CartService {
             throw new RuntimeException("vui lòng chọn ít nhất một sản phẩm để xóa");
         }
         Integer userId = SecurityUtils.getCurrentUserId();
-        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()
-                -> new RuntimeException("không tìm thấy giỏ hàng phù hợp"));
+        Cart cart = cartRepository.findByUserUserId(userId)
+                .orElseThrow(() -> new RuntimeException("không tìm thấy giỏ hàng phù hợp"));
         cartItemRepository.deleteByCart_CartIdAndSku_SkuIdIn(cart.getCartId(), skuIds);
         return getCartDetail();
     }
@@ -281,75 +306,79 @@ public class CartService {
     @Transactional
     public CartResponse removeCartItems() {
         Integer userId = SecurityUtils.getCurrentUserId();
-        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()
-                -> new RuntimeException("không tìm thấy giỏ hàng"));
+        Cart cart = cartRepository.findByUserUserId(userId)
+                .orElseThrow(() -> new RuntimeException("không tìm thấy giỏ hàng"));
         cartItemRepository.deleteByCart_CartId(cart.getCartId());
         return getCartDetail();
     }
-    // transactional để khi đang CRUD mà bị sai thì rollback lại tránh làm sai dữ liệu
+
+    // transactional để khi đang CRUD mà bị sai thì rollback lại tránh làm sai dữ
+    // liệu
     @Transactional
-    public CartResponse updateItemQuantity(Integer skuId, UpdateCartItemRequest request){
+    public CartResponse updateItemQuantity(Integer skuId, UpdateCartItemRequest request) {
         Integer userId = SecurityUtils.getCurrentUserId();
-        Cart cart = cartRepository.findByUserUserId(userId).orElseThrow(()-> new RuntimeException("không tìm thấy giỏ hàng"));
-         if(request.getQuantity() == null || request.getQuantity() <= 0){
-             throw new RuntimeException("số lượng sản phẩm phải lớn hơn 0");
-         }
-         CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), skuId).orElseThrow(()
-                 ->new RuntimeException("khong tìm thấy sản phẩm"));
-            ProductSku sku = cartItem.getSku();
-            Integer stockQuantity;
+        Cart cart = cartRepository.findByUserUserId(userId)
+                .orElseThrow(() -> new RuntimeException("không tìm thấy giỏ hàng"));
+        if (request.getQuantity() == null || request.getQuantity() <= 0) {
+            throw new RuntimeException("số lượng sản phẩm phải lớn hơn 0");
+        }
+        CartItem cartItem = cartItemRepository.findByCart_CartIdAndSku_SkuId(cart.getCartId(), skuId)
+                .orElseThrow(() -> new RuntimeException("khong tìm thấy sản phẩm"));
+        ProductSku sku = cartItem.getSku();
+        Integer stockQuantity;
 
-            // Xử lý riêng cho sản phẩm Flash Sale
-            if (cartItem.getFlashSaleSlot() != null) {
-                FlashSaleSlot slot = cartItem.getFlashSaleSlot();
-                LocalDateTime now = LocalDateTime.now();
+        // Xử lý riêng cho sản phẩm Flash Sale
+        if (cartItem.getFlashSaleSlot() != null) {
+            FlashSaleSlot slot = cartItem.getFlashSaleSlot();
+            LocalDateTime now = LocalDateTime.now();
 
-                // Kiểm tra slot còn active không
-                boolean slotActive = slot.getStatus() != null
-                        && slot.getStatus() == 2
-                        && !now.isBefore(slot.getStartDate())
-                        && !now.isAfter(slot.getEndDate());
+            // Kiểm tra slot còn active không
+            boolean slotActive = slot.getStatus() != null
+                    && slot.getStatus() == 2
+                    && !now.isBefore(slot.getStartDate())
+                    && !now.isAfter(slot.getEndDate());
 
-                if (!slotActive) {
-                    // Slot không còn active, lấy stock quantity thường
+            if (!slotActive) {
+                // Slot không còn active, lấy stock quantity thường
+                stockQuantity = sku.getStockQuantity();
+            } else {
+                // Slot đang active, lấy số lượng Flash Sale còn lại
+                List<FlashSaleItem> flashSaleItems = flashSaleItemRepository
+                        .findItemsBySlotIdWithSlot(slot.getSlotId().intValue());
+                FlashSaleItem flashSaleItem = flashSaleItems.stream()
+                        .filter(item -> item.getId().getSkuId().equals(sku.getSkuId()))
+                        .findFirst()
+                        .orElse(null);
+
+                if (flashSaleItem == null) {
                     stockQuantity = sku.getStockQuantity();
                 } else {
-                    // Slot đang active, lấy số lượng Flash Sale còn lại
-                    List<FlashSaleItem> flashSaleItems = flashSaleItemRepository
-                            .findItemsBySlotIdWithSlot(slot.getSlotId().intValue());
-                    FlashSaleItem flashSaleItem = flashSaleItems.stream()
-                            .filter(item -> item.getId().getSkuId().equals(sku.getSkuId()))
-                            .findFirst()
-                            .orElse(null);
-
-                    if (flashSaleItem == null) {
-                        stockQuantity = sku.getStockQuantity();
-                    } else {
-                        stockQuantity = flashSaleItem.getFlashSaleQuantity() - flashSaleItem.getSoldQuantity();
-                        if (stockQuantity == null || stockQuantity <= 0) {
-                            throw new RuntimeException("Đã hết số lượng Sale, vui lòng chọn sản phẩm khác");
-                        }
+                    stockQuantity = flashSaleItem.getFlashSaleQuantity() - flashSaleItem.getSoldQuantity();
+                    if (stockQuantity == null || stockQuantity <= 0) {
+                        throw new RuntimeException("Đã hết số lượng Sale, vui lòng chọn sản phẩm khác");
                     }
                 }
-            } else {
-                stockQuantity = sku.getStockQuantity();
             }
+        } else {
+            stockQuantity = sku.getStockQuantity();
+        }
 
-            if(stockQuantity == null || stockQuantity <= 0){
-                throw  new RuntimeException("sản phẩm đã hết hàng");
+        if (stockQuantity == null || stockQuantity <= 0) {
+            throw new RuntimeException("sản phẩm đã hết hàng");
+        }
+        if (request.getQuantity() > stockQuantity) {
+            // Kiểm tra xem có phải sản phẩm Flash Sale không
+            if (cartItem.getFlashSaleSlot() != null) {
+                throw new RuntimeException("Đã hết số lượng Sale, vui lòng chọn sản phẩm khác");
+            } else {
+                throw new RuntimeException("số lượng đã vượt quá số lượng trong kho");
             }
-            if(request.getQuantity() > stockQuantity){
-                // Kiểm tra xem có phải sản phẩm Flash Sale không
-                if (cartItem.getFlashSaleSlot() != null) {
-                    throw new RuntimeException("Đã hết số lượng Sale, vui lòng chọn sản phẩm khác");
-                } else {
-                    throw new RuntimeException("số lượng đã vượt quá số lượng trong kho");
-                }
-            }
-            cartItem.setQuantity(request.getQuantity());
-            cartItemRepository.save(cartItem);
-            return getCartDetail();
+        }
+        cartItem.setQuantity(request.getQuantity());
+        cartItemRepository.save(cartItem);
+        return getCartDetail();
     }
+
     // logic lấy phụ kiẹn gợi ý theo các sản phẩm trong giỏ hàng
     @Transactional(readOnly = true)
     public List<HomeProductResponse> getCartSuggestions(Integer userId, int limit) {
@@ -420,8 +449,8 @@ public class CartService {
         List<Integer> productIds = related.stream().map(Product::getProductId).toList();
 
         // SKU rẻ nhất cho mỗi SP
-        List<HomeProductRepository.HomeProductRawProjection> rawSkus =
-                homeProductRepository.findSkuOverviewByProductIds(productIds);
+        List<HomeProductRepository.HomeProductRawProjection> rawSkus = homeProductRepository
+                .findSkuOverviewByProductIds(productIds);
         Map<Integer, HomeProductRepository.HomeProductRawProjection> skuMap = rawSkus.stream()
                 .collect(Collectors.toMap(
                         HomeProductRepository.HomeProductRawProjection::getProductId,

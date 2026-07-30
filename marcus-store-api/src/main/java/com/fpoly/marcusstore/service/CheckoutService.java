@@ -163,8 +163,15 @@ public class CheckoutService {
                 order.setShippingAddress(isStorePickup ? storeAddress : req.getShippingAddress());
                 order.setToDistrictId(isStorePickup ? null : req.getToDistrictId());
                 order.setToWardCode(isStorePickup ? null : req.getToWardCode());
-                order.setPaymentMethod(req.getPaymentMethod());
-                order.setPaymentStatus("COD".equalsIgnoreCase(req.getPaymentMethod()) ? "UNPAID" : "PENDING");
+                // Marcus sửa: chuẩn hóa và chỉ chấp nhận phương thức do server hỗ trợ.
+                // Không dùng trực tiếp chuỗi trạng thái/phương thức từ frontend.
+                String paymentMethod = req.getPaymentMethod().trim().toUpperCase();
+                if (!Set.of("COD", "VNPAY").contains(paymentMethod)) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Phương thức thanh toán không hợp lệ.|INVALID_PAYMENT_METHOD");
+                }
+                order.setPaymentMethod(paymentMethod);
+                order.setPaymentStatus("COD".equals(paymentMethod) ? "UNPAID" : "PENDING");
                 order.setOrderStatus("PENDING");
                 order.setDeliveryNote(req.getNote());
 
@@ -173,12 +180,18 @@ public class CheckoutService {
 
                 for (CartItem cartItem : cartItems) {
                         ProductSku sku = skuMap.get(cartItem.getSku().getSkuId());
-                        if (sku == null || !sku.getIsActive()) {
+                        if (sku == null || !Boolean.TRUE.equals(sku.getIsActive())) {
                                 throw new RuntimeException(
                                                 "Sản phẩm " + cartItem.getSku().getSkuCode() + " không còn tồn tại.");
                         }
 
-                        int buyQuantity = cartItem.getQuantity();
+                        Integer persistedQuantity = cartItem.getQuantity();
+                        if (persistedQuantity == null || persistedQuantity <= 0 || persistedQuantity > 100) {
+                                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                                "Số lượng sản phẩm trong giỏ không hợp lệ.|INVALID_QUANTITY");
+                        }
+                        int buyQuantity = persistedQuantity;
+                        BigDecimal trustedFlashSalePrice = null;
 
                         // CHECK FLASH SALE: khoá dòng + kiểm tra còn hàng trước khi cộng soldQuantity
                         // Tránh lỗi CHECK constraint CK_FlashSaleItems_Qty khi khách khác đã mua hết
@@ -253,6 +266,15 @@ public class CheckoutService {
                                                                                 + sku.getSkuCode()
                                                                                 + " không còn khả dụng (có thể đã bị admin hủy)."));
 
+                                trustedFlashSalePrice = fsi.getFlashSalePrice();
+                                if (trustedFlashSalePrice == null
+                                                || trustedFlashSalePrice.compareTo(BigDecimal.ZERO) <= 0
+                                                || sku.getPrice() == null
+                                                || trustedFlashSalePrice.compareTo(sku.getPrice()) >= 0) {
+                                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                        "Giá Flash Sale không hợp lệ. Vui lòng tải lại giỏ hàng.|FLASH_SALE_INVALID_PRICE");
+                                }
+
                                 int remaining = fsi.getFlashSaleQuantity() - fsi.getSoldQuantity();
                                 if (remaining < buyQuantity) {
                                         throw new ResponseStatusException(
@@ -267,6 +289,11 @@ public class CheckoutService {
                                 flashSaleItemRepository.save(fsi);
                         }
 
+                        if (sku.getStockQuantity() == null || sku.getPrice() == null
+                                        || sku.getPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "Thông tin SKU không hợp lệ. Vui lòng chọn sản phẩm khác.|SKU_INVALID");
+                        }
                         int currentStock = sku.getStockQuantity();
 
                         if (currentStock < buyQuantity) {
@@ -282,9 +309,10 @@ public class CheckoutService {
                         BigDecimal originalPrice = null;
                         String flashSaleSlotName = null;
 
-                        if (cartItem.getFlashSaleSlot() != null && cartItem.getFlashSalePrice() != null) {
-                                // Sản phẩm Flash Sale - dùng giá Flash Sale
-                                priceAtPurchase = cartItem.getFlashSalePrice();
+                        if (trustedFlashSalePrice != null) {
+                                // Marcus sửa: Checkout dùng giá từ FlashSaleItem vừa khóa, không
+                                // dùng bản giá lưu trong CartItem hay giá frontend.
+                                priceAtPurchase = trustedFlashSalePrice;
                                 isFlashSale = true;
                                 originalPrice = sku.getPrice();
                                 flashSaleSlotName = cartItem.getFlashSaleSlot().getName();

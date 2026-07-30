@@ -612,6 +612,18 @@ public class VoucherServiceImpl implements VoucherService {
                     "Voucher đã hết hạn. Vui lòng chọn voucher khác.|VOUCHER_EXPIRED");
         }
 
+        // Marcus sửa tại điểm giao Voucher -> Checkout/Hủy đơn: khóa và kiểm tra
+        // lượt của chính người dùng trước khi trừ quota. Đây là lớp chống retry
+        // Checkout trừ voucher hai lần, không thay đổi nghiệp vụ Voucher của thành
+        // viên.
+        Optional<UserVoucher> userVoucherOpt = userVoucherRepository
+                .findByVoucherIdAndUserIdForUpdate(voucherId, userId);
+        if (userVoucherOpt.isPresent() && Boolean.TRUE.equals(userVoucherOpt.get().getIsUsed())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Voucher đã được sử dụng cho tài khoản này.|VOUCHER_ALREADY_USED");
+        }
+
         // 4. Nếu hết quantity → auto deactivate + throw lỗi (race condition guard)
         if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
             voucher.setIsActive(false);
@@ -631,9 +643,6 @@ public class VoucherServiceImpl implements VoucherService {
         voucherRepository.save(voucher);
 
         // 7. Update hoặc create UserVoucher record
-        Optional<UserVoucher> userVoucherOpt = userVoucherRepository
-                .findByVoucherIdAndUserIdForUpdate(voucherId, userId);
-
         if (userVoucherOpt.isPresent()) {
             UserVoucher userVoucher = userVoucherOpt.get();
             if (!Boolean.TRUE.equals(userVoucher.getIsUsed())) {
