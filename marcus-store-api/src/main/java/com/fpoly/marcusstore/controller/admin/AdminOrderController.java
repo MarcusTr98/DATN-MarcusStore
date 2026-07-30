@@ -10,6 +10,8 @@ import com.fpoly.marcusstore.service.OrderService;
 import com.fpoly.marcusstore.service.RefundProcessor;
 import com.fpoly.marcusstore.service.RefundService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -18,6 +20,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDate;
 import java.util.Map;
@@ -26,6 +29,7 @@ import java.util.Map;
 @RequestMapping("/api/admin")
 @PreAuthorize("hasAuthority('ORDER_VIEW')")
 @RequiredArgsConstructor
+@Validated
 public class AdminOrderController {
     private final OrderService orderService;
     private final RefundService refundService;
@@ -78,47 +82,48 @@ public class AdminOrderController {
             @RequestParam(required = false) String status) {
         return refundService.getRefunds(
                 status,
-                PageRequest.of(Math.max(page, 0), Math.max(size, 1)));
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100)));
     }
 
     @GetMapping("/orders/{orderCode}/refund")
-    public ResponseEntity<RefundResponse> getOrderRefund(@PathVariable String orderCode) {
+    public ResponseEntity<RefundResponse> getOrderRefund(
+            @PathVariable @Size(min = 1, max = 50) String orderCode) {
         RefundResponse refund = refundService.getLatestRefundForOrder(orderCode);
         return refund == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(refund);
     }
 
     @PostMapping("/orders/{orderCode}/refunds")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public RefundResponse createRefund(
-            @PathVariable String orderCode,
+            @PathVariable @Size(min = 1, max = 50) String orderCode,
             @Valid @RequestBody CreateRefundRequest request) {
         return refundService.requestManualRefund(orderCode, request.getReason());
     }
 
     @PostMapping("/refunds/{refundId}/approve")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
-    public RefundResponse approveRefund(@PathVariable Long refundId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public RefundResponse approveRefund(@PathVariable @Positive Long refundId) {
         return refundProcessor.approve(refundId);
     }
 
     @PostMapping("/refunds/{refundId}/retry")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
-    public RefundResponse retryRefund(@PathVariable Long refundId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public RefundResponse retryRefund(@PathVariable @Positive Long refundId) {
         return refundProcessor.retry(refundId);
     }
 
     // Marcus thêm nút đối soát QueryDR thủ công cho admin.
     @PostMapping("/refunds/{refundId}/reconcile")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
-    public RefundResponse reconcileRefund(@PathVariable Long refundId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public RefundResponse reconcileRefund(@PathVariable @Positive Long refundId) {
         return refundProcessor.reconcile(refundId);
     }
 
     // Marcus thêm xác nhận thủ công chỉ dành cho Sandbox, bắt buộc ghi chú audit.
     @PostMapping("/refunds/{refundId}/sandbox-confirm")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    @PreAuthorize("hasRole('ADMIN')")
     public RefundResponse confirmSandboxRefund(
-            @PathVariable Long refundId,
+            @PathVariable @Positive Long refundId,
             @Valid @RequestBody CreateRefundRequest request) {
         return refundProcessor.confirmSandbox(refundId, request.getReason());
     }

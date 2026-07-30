@@ -419,7 +419,7 @@
               </div>
 
               <button
-                v-if="!refund"
+                v-if="isAdmin && !refund"
                 class="primary-btn"
                 type="button"
                 :disabled="refundBusy || !refundReason.trim()"
@@ -428,7 +428,7 @@
                 {{ refundBusy ? 'Đang tạo...' : 'Tạo yêu cầu hoàn tiền' }}
               </button>
               <button
-                v-else-if="refund.status === 'PENDING_APPROVAL'"
+                v-else-if="isAdmin && refund.status === 'PENDING_APPROVAL'"
                 class="primary-btn"
                 type="button"
                 :disabled="refundBusy"
@@ -437,7 +437,7 @@
                 {{ refundBusy ? 'Đang gửi VNPAY...' : 'Duyệt & gửi hoàn tiền' }}
               </button>
               <button
-                v-else-if="['FAILED', 'RETRY_PENDING'].includes(refund.status)"
+                v-else-if="isAdmin && refund.status === 'RETRY_PENDING'"
                 class="primary-btn"
                 type="button"
                 :disabled="refundBusy"
@@ -446,7 +446,7 @@
                 {{ refundBusy ? 'Đang thử lại...' : 'Thử lại hoàn tiền' }}
               </button>
               <button
-                v-else-if="refund.status === 'PROCESSING'"
+                v-else-if="isAdmin && refund.status === 'PROCESSING'"
                 class="primary-btn"
                 type="button"
                 :disabled="refundBusy"
@@ -597,9 +597,19 @@ const nextStatuses = computed(() => {
   return allowedTransitions[orderDetail.value.orderStatus] || []
 })
 // Marcus lam them refund
+const isAdmin = computed(() => {
+  try {
+    const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
+    return Array.isArray(roles) && roles.includes('ROLE_ADMIN')
+  } catch {
+    return false
+  }
+})
+
 const canManageRefund = computed(() => {
   const order = orderDetail.value
   return (
+    isAdmin.value &&
     order &&
     String(order.paymentMethod).toUpperCase() === 'VNPAY' &&
     ['CANCELLED', 'FAILED'].includes(order.orderStatus) &&
