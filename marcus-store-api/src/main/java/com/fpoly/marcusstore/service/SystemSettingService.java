@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.Set;
+import java.net.URI;
+import java.util.regex.Pattern;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 public class SystemSettingService {
@@ -20,9 +23,21 @@ public class SystemSettingService {
             "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL",
             "STORE_LOCATION", "HOME_HERO_BADGE", "HOME_HERO_TITLE",
             "HOME_HERO_TITLE_ACCENT", "HOME_HERO_LEAD", "HOME_HERO_SLIDES");
+    private static final Set<String> ADMIN_EDITABLE_KEYS = Set.of(
+            "HOTLINE", "EMAIL", "ADDRESS", "WORKING_HOURS", "PROMO_TEXT",
+            "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL",
+            "STORE_LOCATION", "HOME_HERO_BADGE", "HOME_HERO_TITLE",
+            "HOME_HERO_TITLE_ACCENT", "HOME_HERO_LEAD", "HOME_HERO_SLIDES",
+            "AI_ADVISOR_POLICY");
+    private static final Set<String> URL_KEYS = Set.of(
+            "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL");
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
 
     @Autowired
     private SystemSettingRepository repository;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     public Map<String, String> getAllSettingsAsMap() {
@@ -56,13 +71,10 @@ public class SystemSettingService {
         List<SystemSetting> toSave = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : payload.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
+            String key = entry.getKey() == null ? "" : entry.getKey().trim().toUpperCase();
+            String value = validateSettingValue(key, entry.getValue());
 
             // Bỏ qua nếu giá trị null
-            if (value == null)
-                continue;
-
             if ("AI_ADVISOR_POLICY".equalsIgnoreCase(key)) {
                 value = validateAiPolicy(value);
             }
@@ -85,6 +97,55 @@ public class SystemSettingService {
         }
 
         repository.saveAll(toSave);
+    }
+
+    // Marcus thêm: System Settings chỉ nhận key do hệ thống định nghĩa và validate
+    // theo loại dữ liệu; Admin không thể tạo cấu hình tùy ý bằng DevTools.
+    private String validateSettingValue(String key, String rawValue) {
+        if (!ADMIN_EDITABLE_KEYS.contains(key)) {
+            throw new IllegalArgumentException("Khóa cấu hình không được phép cập nhật: " + key);
+        }
+        if (rawValue == null) {
+            throw new IllegalArgumentException("Giá trị cấu hình " + key + " không được để trống.");
+        }
+        String value = rawValue.trim();
+        if (Set.of("HOTLINE", "EMAIL", "ADDRESS").contains(key) && value.isBlank()) {
+            throw new IllegalArgumentException(key + " không được để trống.");
+        }
+        if ("EMAIL".equals(key) && !EMAIL_PATTERN.matcher(value).matches()) {
+            throw new IllegalArgumentException("Email cửa hàng không đúng định dạng.");
+        }
+        if ("HOTLINE".equals(key) && !value.matches("^[+0-9(). -]{8,20}$")) {
+            throw new IllegalArgumentException("Hotline không đúng định dạng.");
+        }
+        if (URL_KEYS.contains(key) && !value.isBlank()) {
+            try {
+                URI uri = URI.create(value);
+                if (!Set.of("http", "https").contains(uri.getScheme()) || uri.getHost() == null) {
+                    throw new IllegalArgumentException();
+                }
+            } catch (Exception ex) {
+                throw new IllegalArgumentException(key + " phải là URL http/https hợp lệ.");
+            }
+        }
+        int maxLength = switch (key) {
+            case "HOME_HERO_SLIDES" -> 20_000;
+            case "STORE_LOCATION" -> 2_000;
+            case "AI_ADVISOR_POLICY" -> 1_000;
+            case "HOME_HERO_LEAD", "PROMO_TEXT", "ADDRESS" -> 500;
+            default -> 255;
+        };
+        if (value.length() > maxLength) {
+            throw new IllegalArgumentException(key + " vượt quá " + maxLength + " ký tự.");
+        }
+        if ("STORE_LOCATION".equals(key) || "HOME_HERO_SLIDES".equals(key)) {
+            try {
+                objectMapper.readTree(value);
+            } catch (Exception ex) {
+                throw new IllegalArgumentException(key + " không phải JSON hợp lệ.");
+            }
+        }
+        return value;
     }
 
     private String validateAiPolicy(String value) {

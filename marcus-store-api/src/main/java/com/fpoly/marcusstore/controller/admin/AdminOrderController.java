@@ -68,8 +68,9 @@ public class AdminOrderController {
 
     @PutMapping("/order/{orderCode}")
     @PreAuthorize("hasAuthority('ORDER_UPDATE')")
-    public OrderDetailResponse updateStatusOrder(@PathVariable("orderCode") String orderCode,
-            @RequestBody UpdateOrderStatusRequest request) {
+    public OrderDetailResponse updateStatusOrder(
+            @PathVariable("orderCode") @Size(min = 1, max = 50) String orderCode,
+            @Valid @RequestBody UpdateOrderStatusRequest request) {
         return orderService.updateStatusOrder(orderCode, request);
     }
 

@@ -19,11 +19,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import com.fpoly.marcusstore.dto.request.AdminAvailabilityRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/admin/live-chat")
 @RequiredArgsConstructor
 @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_STAFF')")
+@Validated
 public class AdminChatController {
 
     private final ChatSessionService chatSessionService;
@@ -35,18 +40,22 @@ public class AdminChatController {
     }
 
     @GetMapping("/rooms/{roomId}/history")
-    public ApiResponse<List<ChatMessageDTO>> getHistory(@PathVariable String roomId) {
+    public ApiResponse<List<ChatMessageDTO>> getHistory(
+            @PathVariable @Pattern(regexp = "^[A-Za-z0-9_-]{1,100}$") String roomId) {
         return ApiResponse.success(chatSessionService.getAdminRoomHistory(roomId));
     }
 
     @PutMapping("/rooms/{roomId}/claim")
     public ApiResponse<ChatSessionDTO> claimRoom(
-            @PathVariable String roomId, Authentication authentication) {
+            @PathVariable @Pattern(regexp = "^[A-Za-z0-9_-]{1,100}$") String roomId,
+            Authentication authentication) {
         return ApiResponse.success(chatSessionService.claimRoom(roomId, authentication.getName()));
     }
 
     @DeleteMapping("/rooms/{roomId}")
-    public ApiResponse<String> endRoom(@PathVariable String roomId, Authentication authentication) {
+    public ApiResponse<String> endRoom(
+            @PathVariable @Pattern(regexp = "^[A-Za-z0-9_-]{1,100}$") String roomId,
+            Authentication authentication) {
         chatSessionService.endAdminSession(roomId, authentication.getName());
         return ApiResponse.success("Phiên chat đã kết thúc.");
     }
@@ -59,8 +68,8 @@ public class AdminChatController {
 
     @PutMapping("/availability")
     public ApiResponse<Map<String, Boolean>> updateAvailability(
-            @RequestBody Map<String, Boolean> request, Authentication authentication) {
-        boolean available = Boolean.TRUE.equals(request.get("available"));
+            @Valid @RequestBody AdminAvailabilityRequest request, Authentication authentication) {
+        boolean available = request.getAvailable();
         return ApiResponse.success(Map.of(
                 "available", adminPresenceService.setAvailability(authentication.getName(), available)));
     }

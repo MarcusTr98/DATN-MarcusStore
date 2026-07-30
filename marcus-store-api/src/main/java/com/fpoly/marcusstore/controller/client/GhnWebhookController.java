@@ -12,6 +12,8 @@ import org.springframework.web.bind.annotation.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Map;
+import com.fpoly.marcusstore.dto.request.GhnWebhookRequest;
+import jakarta.validation.Valid;
 
 @Slf4j
 @RestController
@@ -29,7 +31,7 @@ public class GhnWebhookController {
     public ResponseEntity<String> handleWebhook(
             @RequestHeader(value = "X-Verification-Token", required = false) String verifyToken,
             Authentication authentication,
-            @RequestBody Map<String, Object> payload) {
+            @Valid @RequestBody GhnWebhookRequest payload) {
 
         boolean configuredWebhookToken = ghnWebhookToken != null && !ghnWebhookToken.isBlank();
         boolean validWebhookToken = configuredWebhookToken && isValidToken(verifyToken);
@@ -45,13 +47,9 @@ public class GhnWebhookController {
             return ResponseEntity.status(401).body("Unauthorized");
         }
 
-        log.info("[GHN Webhook] Nhận payload đã xác thực: {}", payload);
-        String trackingCode = (String) payload.get("order_code");
-        String ghnStatus = (String) payload.get("status");
-
-        if (trackingCode == null || ghnStatus == null)
-            return ResponseEntity.badRequest().body("Missing data");
-        trackingCode = trackingCode.trim();
+        // Marcus sửa: không log toàn bộ payload provider và không cast Map tùy ý.
+        String trackingCode = payload.getOrderCode().trim();
+        String ghnStatus = payload.getStatus();
 
         GhnStatusService.SyncResult result = ghnStatusService.applyStatus(
                 trackingCode, ghnStatus, "WEBHOOK");

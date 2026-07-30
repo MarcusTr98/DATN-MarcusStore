@@ -254,7 +254,8 @@
               placeholder="VD: Ưu tiên sản phẩm còn hàng, giải thích dễ hiểu cho sinh viên..."
             ></textarea>
             <div class="form-text">
-              Chỉ dùng để chỉnh giọng điệu và ưu tiên tư vấn. Quy tắc bảo mật trong backend không thể bị ghi đè.
+              Chỉ dùng để chỉnh giọng điệu và ưu tiên tư vấn. Quy tắc bảo mật trong backend không
+              thể bị ghi đè.
             </div>
             <div v-if="aiClickStats.length" class="mt-3">
               <div class="fw-semibold mb-2">Sản phẩm được mở nhiều nhất từ Marcus AI</div>
@@ -431,7 +432,8 @@ const saveSettings = async () => {
     settings.value.HOME_HERO_SLIDES = JSON.stringify(slidesData.value)
 
     // ĐÃ FIX: Bỏ "const res =" đi
-    await api.put('/admin/settings/bulk-update', settings.value)
+    // Marcus sửa đồng bộ DTO backend: payload cấu hình nằm trong field settings.
+    await api.put('/admin/settings/bulk-update', { settings: settings.value })
 
     // ĐÃ FIX: Dùng Modal thay cho alert()
     showAlert('success', 'Thành công', 'Đã cập nhật cấu hình hệ thống thành công!')
