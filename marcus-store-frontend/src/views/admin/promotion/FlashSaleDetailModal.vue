@@ -18,9 +18,6 @@
             </p>
           </div>
         </div>
-        <button class="close-btn fs-close-btn" aria-label="Đóng" @click="onClose">
-          <i class="bi bi-x-lg"></i>
-        </button>
       </header>
 
       <!-- ====== BODY (scrollable) ====== -->

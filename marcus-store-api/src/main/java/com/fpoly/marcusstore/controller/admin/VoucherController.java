@@ -35,8 +35,7 @@ public class VoucherController {
     ) {
         Pageable pageable = PageRequest.of(
                 Math.max(page, 0),
-                Math.max(size, 1),
-                Sort.by(Sort.Direction.DESC, "voucherId")
+                Math.max(size, 1)
         );
 
         return voucherService.getVouchersPage(keyword, discountType, isActive, pageable);

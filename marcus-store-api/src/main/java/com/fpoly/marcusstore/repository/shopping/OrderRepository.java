@@ -58,7 +58,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
         AND (:toDate   IS NULL OR CAST(o.createdAt AS LocalDate) <= :toDate)
       ORDER BY
         CASE WHEN o.orderStatus = 'PENDING' THEN 0 ELSE 1 END,
-        o.createdAt DESC,
+        o.createdAt ASC,
         o.orderId DESC
       """)
   Page<Order> searchOrders(
