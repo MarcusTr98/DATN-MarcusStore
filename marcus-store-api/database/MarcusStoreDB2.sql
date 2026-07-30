@@ -214,9 +214,6 @@ ALTER TABLE Cart_Items ADD flash_sale_price DECIMAL(18, 2) NULL;
 -- Thêm cột tham chiếu đến FlashSaleSlot (biết sản phẩm thuộc slot nào)
 ALTER TABLE Cart_Items ADD flash_sale_slot_id INT NULL;
 
--- Thêm khóa ngoại
-ALTER TABLE Cart_Items ADD CONSTRAINT FK_CartItems_FlashSaleSlot FOREIGN KEY (flash_sale_slot_id) REFERENCES Flash_Sale_Slots(slot_id);
-
 
 CREATE TABLE Wishlists (
     wishlist_id INT IDENTITY(1,1),
@@ -251,9 +248,6 @@ ALTER TABLE Vouchers ADD CONSTRAINT CK_Vouchers_Discount_Type
 CHECK (discount_type IN ('PERCENT', 'AMOUNT', 'FREESHIP', 'GIFT'));
 
 
-select*from Flash_Sale_Slots
-select*from Flash_Sale_Items
-
 CREATE TABLE Flash_Sale_Slots (
     slot_id    INT IDENTITY(1,1),
     name       NVARCHAR(100) NOT NULL,
@@ -285,6 +279,11 @@ CREATE TABLE Flash_Sale_Items (
     CONSTRAINT CK_FlashSaleItems_Qty      CHECK (sold_quantity <= flash_sale_quantity)
 );
 
+-- Marcus sửa: chỉ tạo FK sau khi bảng Flash_Sale_Slots đã tồn tại.
+ALTER TABLE Cart_Items
+ADD CONSTRAINT FK_CartItems_FlashSaleSlot
+FOREIGN KEY (flash_sale_slot_id) REFERENCES Flash_Sale_Slots(slot_id);
+
 
 -- ============================================================
 -- ORDERS
@@ -305,11 +304,15 @@ CREATE TABLE Orders (
     payment_status   NVARCHAR(50)   DEFAULT N'UNPAID',
     transaction_id   VARCHAR(100)   NULL,
     order_status     NVARCHAR(50)   DEFAULT N'PENDING',
+    fulfillment_method VARCHAR(30)  NOT NULL
+        CONSTRAINT DF_Orders_FulfillmentMethod DEFAULT 'DELIVERY',
     created_at       DATETIME2      DEFAULT GETDATE(),
     updated_at       DATETIME2      DEFAULT GETDATE(),
     CONSTRAINT PK_Orders          PRIMARY KEY (order_id),
     CONSTRAINT FK_Orders_Users    FOREIGN KEY (user_id)    REFERENCES Users(user_id),
-    CONSTRAINT FK_Orders_Vouchers FOREIGN KEY (voucher_id) REFERENCES Vouchers(voucher_id) ON DELETE SET NULL
+    CONSTRAINT FK_Orders_Vouchers FOREIGN KEY (voucher_id) REFERENCES Vouchers(voucher_id) ON DELETE SET NULL,
+    CONSTRAINT CK_Orders_FulfillmentMethod
+        CHECK (fulfillment_method IN ('DELIVERY', 'STORE_PICKUP'))
 );
 ALTER TABLE Orders ADD shipping_fee DECIMAL(18,2) DEFAULT 0 CHECK (shipping_fee >= 0);
 ALTER TABLE Orders ADD tracking_code VARCHAR(100) NULL;
@@ -362,7 +365,6 @@ CREATE TABLE Product_Items (
 -- ============================================================
 -- CMS & UI
 -- ============================================================
-SELECt * FROM System_Settings
 CREATE TABLE System_Settings (
     setting_key   VARCHAR(50)    NOT NULL,
     setting_value NVARCHAR(MAX)  NOT NULL,
@@ -428,13 +430,39 @@ CREATE TABLE Comments_Evaluations (
     review_id    INT IDENTITY(1,1),
     user_id      INT           NOT NULL,
     product_id   INT           NOT NULL,
+    order_item_id INT          NOT NULL,
     rating       INT           CHECK (rating BETWEEN 1 AND 5),
     comment_text NVARCHAR(MAX),
     is_approved  BIT           DEFAULT 0,
     created_at   DATETIME2     DEFAULT GETDATE(),
     CONSTRAINT PK_Comments_Evaluations PRIMARY KEY (review_id),
     CONSTRAINT FK_Reviews_Users        FOREIGN KEY (user_id)    REFERENCES Users(user_id)       ON DELETE CASCADE,
-    CONSTRAINT FK_Reviews_Products     FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE
+    CONSTRAINT FK_Reviews_Products     FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE CASCADE,
+    CONSTRAINT FK_Reviews_OrderItems   FOREIGN KEY (order_item_id) REFERENCES Order_Items(order_item_id)
+);
+
+CREATE TABLE Review_Images (
+    image_id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    review_id INT NOT NULL,
+    image_url VARCHAR(500) NOT NULL,
+    display_order INT NULL,
+    created_at DATETIME2 NOT NULL CONSTRAINT DF_ReviewImages_CreatedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_ReviewImages_Review
+        FOREIGN KEY (review_id) REFERENCES Comments_Evaluations(review_id) ON DELETE CASCADE
+);
+
+CREATE TABLE Review_Replies (
+    reply_id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    review_id INT NULL,
+    staff_id INT NULL,
+    reply_text NVARCHAR(MAX) NULL,
+    created_at DATETIME2 NULL,
+    updated_at DATETIME2 NULL,
+    CONSTRAINT UQ_ReviewReplies_Review UNIQUE (review_id),
+    CONSTRAINT FK_ReviewReplies_Review
+        FOREIGN KEY (review_id) REFERENCES Comments_Evaluations(review_id) ON DELETE CASCADE,
+    CONSTRAINT FK_ReviewReplies_Staff
+        FOREIGN KEY (staff_id) REFERENCES Users(user_id) ON DELETE SET NULL
 );
 
 CREATE TABLE Audit_Logs (
@@ -458,6 +486,7 @@ CREATE TABLE EmailOtps (
     otp_code VARCHAR(6) NOT NULL,
     expired_at DATETIME2 NOT NULL,
     created_at DATETIME2 DEFAULT GETDATE(),
+    attempt_count INT NOT NULL CONSTRAINT DF_EmailOtps_AttemptCount DEFAULT 0,
 
     CONSTRAINT PK_EmailOtps
         PRIMARY KEY (otp_id)
@@ -515,16 +544,6 @@ CREATE TABLE Order_Status_History (
         ON DELETE SET NULL
 );
 
-CREATE TABLE Order_Status_History (
-    history_id INT IDENTITY(1,1) PRIMARY KEY,
-    order_id INT NOT NULL,
-    status VARCHAR(50) NOT NULL, -- Chỉ chứa mã tiếng Anh (PENDING, v.v.)
-    title NVARCHAR(255) NULL,    -- Ép kiểu N để lưu tiếng Việt
-    note NVARCHAR(500) NULL,     -- Ép kiểu N để lưu tiếng Việt
-    created_by INT NULL,
-    created_at DATETIME2 DEFAULT GETDATE(),
-    CONSTRAINT FK_OrderStatusHistory_Orders FOREIGN KEY (order_id) REFERENCES Orders(order_id) ON DELETE CASCADE
-);
 CREATE INDEX IX_OrderStatusHistory_Order_CreatedAt
 ON Order_Status_History(order_id, created_at);
 
@@ -563,6 +582,22 @@ CREATE TABLE Admin_Notifications (
     is_read BIT DEFAULT 0,
     created_at DATETIME2 DEFAULT GETDATE()
 );
+
+-- Marcus thêm: chuông của khách hàng được lưu riêng, hỗ trợ đọc/chưa đọc và realtime.
+CREATE TABLE User_Notifications (
+    id INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+    user_id INT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    title NVARCHAR(255) NOT NULL,
+    message NVARCHAR(1000) NOT NULL,
+    reference_id VARCHAR(50) NULL,
+    is_read BIT NOT NULL CONSTRAINT DF_UserNotifications_IsRead DEFAULT 0,
+    created_at DATETIME2 NOT NULL CONSTRAINT DF_UserNotifications_CreatedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT FK_UserNotifications_User
+        FOREIGN KEY (user_id) REFERENCES Users(user_id)
+);
+CREATE INDEX IX_UserNotifications_User_Created
+    ON User_Notifications(user_id, created_at DESC);
 
 -- Marcus thêm để tính phí ship riêng
 USE MarcusStoreDB;
@@ -724,6 +759,46 @@ CREATE TABLE Product_Spec_Values (
     CREATE INDEX IX_AI_Product_Clicks_Session
         ON dbo.AI_Product_Clicks(session_id, product_id, clicked_at DESC);
 
+-- Marcus thêm: lưu bản phân tích AI để lần sau mở lại không tốn quota Gemini.
+CREATE TABLE AI_Analytics_Reports (
+    report_id BIGINT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_AI_Analytics_Reports PRIMARY KEY,
+    from_date DATE NOT NULL,
+    to_date DATE NOT NULL,
+    report_json NVARCHAR(MAX) NOT NULL,
+    model_name VARCHAR(100) NOT NULL,
+    generated_at DATETIME2 NOT NULL
+        CONSTRAINT DF_AIAnalyticsReports_GeneratedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT CK_AIAnalyticsReports_Period CHECK (from_date <= to_date),
+    CONSTRAINT CK_AIAnalyticsReports_Json CHECK (ISJSON(report_json) = 1)
+);
+CREATE INDEX IX_AIAnalyticsReports_PeriodGenerated
+    ON AI_Analytics_Reports(from_date, to_date, generated_at DESC);
+
+-- Marcus thêm: telemetry AI ẩn danh; không lưu nội dung chat, IP, email hay user_id.
+CREATE TABLE AI_Usage_Events (
+    event_id BIGINT IDENTITY(1,1) NOT NULL
+        CONSTRAINT PK_AI_Usage_Events PRIMARY KEY,
+    session_id VARCHAR(36) NOT NULL,
+    event_type VARCHAR(30) NOT NULL,
+    product_id INT NULL,
+    response_time_ms INT NULL,
+    created_at DATETIME2 NOT NULL
+        CONSTRAINT DF_AIUsageEvents_CreatedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT CK_AIUsageEvents_Type CHECK (
+        event_type IN ('CHAT_SUCCESS', 'CHAT_FAILED', 'PRODUCT_CLICK')
+    ),
+    CONSTRAINT CK_AIUsageEvents_ResponseTime CHECK (
+        response_time_ms IS NULL OR response_time_ms BETWEEN 0 AND 120000
+    ),
+    CONSTRAINT FK_AIUsageEvents_Product
+        FOREIGN KEY (product_id) REFERENCES Products(product_id)
+);
+CREATE INDEX IX_AIUsageEvents_CreatedType
+    ON AI_Usage_Events(created_at DESC, event_type);
+CREATE INDEX IX_AIUsageEvents_Session
+    ON AI_Usage_Events(session_id, created_at DESC);
+
 
 CREATE INDEX IX_OrderTrans_OrderId ON Order_Transactions(order_id);	
 CREATE INDEX IX_UserVouchers_UserId ON User_Vouchers(user_id);
@@ -743,6 +818,22 @@ CREATE UNIQUE INDEX UX_User_DefaultAddress   ON User_Addresses(user_id) WHERE is
 
 CREATE NONCLUSTERED INDEX IX_CartItems_FlashSaleSlotId ON Cart_Items (flash_sale_slot_id) WHERE flash_sale_slot_id IS NOT NULL;
 
+GO
+
+-- Marcus thêm: kiểm tra cuối file để máy mới không khởi động với schema bị thiếu.
+IF OBJECT_ID('dbo.Orders', 'U') IS NULL
+    OR OBJECT_ID('dbo.Order_Transactions', 'U') IS NULL
+    OR OBJECT_ID('dbo.Refund_Requests', 'U') IS NULL
+    OR OBJECT_ID('dbo.User_Notifications', 'U') IS NULL
+    OR OBJECT_ID('dbo.AI_Product_Clicks', 'U') IS NULL
+    OR OBJECT_ID('dbo.AI_Analytics_Reports', 'U') IS NULL
+    OR OBJECT_ID('dbo.AI_Usage_Events', 'U') IS NULL
+BEGIN
+    THROW 51000, N'MarcusStoreDB chưa được tạo đủ bảng mới. Kiểm tra lỗi SQL phía trên.', 1;
+END;
+GO
+
+PRINT N'Marcus: tạo MarcusStoreDB phiên bản 30/07/2026 thành công.';
 GO
 
 

@@ -1,0 +1,72 @@
+package com.fpoly.marcusstore.service.ai;
+
+import com.fpoly.marcusstore.dto.ai.AiUsageSummaryResponse;
+import com.fpoly.marcusstore.repository.analytics.AiUsageEventRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class AiUsageEventService {
+
+    private static final int MAX_RESPONSE_TIME_MS = 120_000;
+    private final AiUsageEventRepository repository;
+
+    // Marcus thêm: chỉ lưu telemetry tối thiểu; tuyệt đối không nhận câu hỏi,
+    // câu trả lời, IP, userId hoặc dữ liệu nhận dạng khách hàng.
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordChatResult(String sessionId, boolean successful, long responseTimeMs) {
+        save(sessionId, successful ? "CHAT_SUCCESS" : "CHAT_FAILED", null, responseTimeMs);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordProductClick(String sessionId, Integer productId) {
+        save(sessionId, "PRODUCT_CLICK", productId, null);
+    }
+
+    private void save(String sessionId, String eventType, Integer productId, Long responseTimeMs) {
+        if (sessionId == null || !sessionId.matches(
+                "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")) {
+            return;
+        }
+        Integer safeResponseTime = null;
+        if (responseTimeMs != null) {
+            safeResponseTime = (int) Math.min(Math.max(responseTimeMs, 0), MAX_RESPONSE_TIME_MS);
+        }
+        repository.insert(sessionId, eventType, productId, safeResponseTime);
+    }
+
+    @Transactional(readOnly = true)
+    public AiUsageSummaryResponse summarize(LocalDate fromDate, LocalDate toDate) {
+        LocalDate safeTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate safeFrom = fromDate == null ? safeTo.minusDays(29) : fromDate;
+        if (safeFrom.isAfter(safeTo) || safeFrom.isBefore(safeTo.minusYears(2))) {
+            throw new IllegalArgumentException("Khoảng ngày thống kê AI không hợp lệ.");
+        }
+
+        var row = repository.summarize(safeFrom.atStartOfDay(), safeTo.plusDays(1).atStartOfDay());
+        long success = row.successfulChats();
+        long failed = row.failedChats();
+        long clicks = row.productClicks();
+        long chats = success + failed;
+        double successRate = chats == 0 ? 0 : round(success * 100.0 / chats);
+        double clickRate = success == 0 ? 0 : round(clicks * 100.0 / success);
+        return new AiUsageSummaryResponse(
+                success,
+                failed,
+                clicks,
+                row.uniqueSessions(),
+                successRate,
+                clickRate,
+                row.averageResponseTimeMs());
+    }
+
+    private double round(double value) {
+        return Math.round(value * 10.0) / 10.0;
+    }
+}

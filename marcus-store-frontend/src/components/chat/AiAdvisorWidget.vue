@@ -194,7 +194,7 @@ const sendMessage = async () => {
       products: [],
     }
     messages.value.push(assistantMessage)
-    await streamAiAdvisor(content, history, {
+    await streamAiAdvisor(content, history, getTrackingSessionId(), {
       onToken: (token) => {
         isStreamingText.value = true
         assistantMessage.content += token

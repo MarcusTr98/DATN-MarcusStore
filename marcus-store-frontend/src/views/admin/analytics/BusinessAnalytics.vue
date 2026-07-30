@@ -47,6 +47,7 @@
         :error="aiError"
         :loading="aiLoading"
         :report="aiReport"
+        :usage="aiUsage"
         @generate="generateAiReport"
       />
 
@@ -97,6 +98,7 @@ const {
   aiError,
   aiLoading,
   aiReport,
+  aiUsage,
   errorMessage,
   fromDate,
   forecast,

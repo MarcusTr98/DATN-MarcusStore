@@ -33,6 +33,11 @@ const analyticsApi = {
     return get('/admin/analytics/ai-report', params)
   },
 
+  // Marcus thêm: đọc telemetry AI đã ẩn danh, không chứa nội dung hội thoại.
+  getAiUsageSummary(params) {
+    return get('/admin/ai-advisor/usage-summary', params)
+  },
+
   generateAiReport(params) {
     const query = queryString(params)
     // Marcus thêm: POST là thao tác duy nhất gọi AI; GET phía trên chỉ đọc DB.

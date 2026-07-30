@@ -150,6 +150,8 @@ const routes = [
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/Dashboard.vue'),
+        // Marcus sửa: Dashboard có quyền riêng để đồng nhất route và API thống kê.
+        meta: { permission: 'DASHBOARD_VIEW' },
       },
       {
         path: 'analytics',
@@ -185,6 +187,7 @@ const routes = [
         path: 'skugenerator',
         name: 'Skugeneratorview',
         component: () => import('@/views/admin/product/Skugeneratorview.vue'),
+        // Marcus sửa: đồng bộ route với quyền SKU_CREATE do thành viên định nghĩa.
         meta: { permission: 'SKU_CREATE' },
       },
       {
@@ -275,6 +278,8 @@ const routes = [
         path: 'activity-log',
         name: 'ActivityLog',
         component: () => import('@/views/admin/auth/ActivityLog.vue'),
+        // Marcus sửa: API nhật ký chỉ dành cho ADMIN nên route phải đồng nhất.
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: '/oauth-success',

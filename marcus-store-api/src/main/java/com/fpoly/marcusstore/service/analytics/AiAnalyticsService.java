@@ -11,6 +11,7 @@ import com.fpoly.marcusstore.dto.analytics.AnalyticsPeriod;
 import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
 import com.fpoly.marcusstore.entity.analytics.AiAnalyticsReport;
 import com.fpoly.marcusstore.repository.analytics.AiAnalyticsReportRepository;
+import com.fpoly.marcusstore.service.ai.AiUsageEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -46,6 +47,7 @@ public class AiAnalyticsService {
     private final AnalyticsService analyticsService;
     private final ObjectMapper objectMapper;
     private final AiAnalyticsReportRepository reportRepository;
+    private final AiUsageEventService aiUsageEventService;
     private final Map<CacheKey, LocalDateTime> recentGenerations = new ConcurrentHashMap<>();
 
     @Value("${gemini.api-key:}")
@@ -154,6 +156,17 @@ public class AiAnalyticsService {
         context.put("orderingCustomers", overview.orderingCustomers());
         context.put("productTrends", products);
         try {
+            // Marcus thêm: AI chỉ nhận thống kê hành vi đã tổng hợp, không nhận
+            // sessionId hay nội dung câu hỏi của từng khách.
+            context.put(
+                    "aiAdvisorUsage",
+                    aiUsageEventService.summarize(
+                            overview.period().fromDate(),
+                            overview.period().toDate()));
+        } catch (RuntimeException ignored) {
+            // Chưa chạy migration telemetry vẫn cho phép phân tích số liệu bán hàng.
+        }
+        try {
             return objectMapper.writeValueAsString(context);
         } catch (Exception exception) {
             throw new IllegalStateException("Không thể chuẩn bị dữ liệu tổng hợp cho AI.");
@@ -201,6 +214,7 @@ public class AiAnalyticsService {
                 Chỉ phân tích JSON tổng hợp được cung cấp. Không yêu cầu hoặc suy đoán dữ liệu khách hàng.
                 Không gọi doanh thu là lợi nhuận vì hệ thống không có giá nhập.
                 Không bịa tin thị trường, tồn kho, nguyên nhân hoặc con số tương lai.
+                aiAdvisorUsage chỉ là số liệu tổng hợp ẩn danh; dùng để đánh giá mức khách tương tác với tư vấn AI.
                 Mọi kết luận phải gắn với evidence có số liệu trong JSON.
                 Có thể dự đoán HƯỚNG tăng/đi ngang/giảm của sản phẩm, nhưng phải dùng UNCERTAIN khi dữ liệu yếu.
                 Nếu changePercent là null, hiểu là kỳ trước bằng 0; không tự biến thành phần trăm tăng.
