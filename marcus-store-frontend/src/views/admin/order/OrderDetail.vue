@@ -282,8 +282,23 @@
               </div>
 
               <div v-if="nextStatuses.length > 0 && isStatusNoteRequired" class="status-note-box">
-                <label class="status-note-label">Ghi chú trạng thái</label>
+                <!-- Marcus thêm danh sách lý do hủy chuẩn cho Admin; dữ liệu này
+                     được lưu vào lịch sử để thống kê nguyên nhân hủy. -->
+                <template v-if="selectedStatus === 'CANCELLED'">
+                  <label class="status-note-label">Lý do hủy đơn</label>
+                  <select v-model="selectedAdminCancelReason" class="status-note-input">
+                    <option value="" disabled>Chọn lý do hủy</option>
+                    <option v-for="reason in ADMIN_CANCEL_REASONS" :key="reason" :value="reason">
+                      {{ reason }}
+                    </option>
+                  </select>
+                </template>
+                <label v-else class="status-note-label">Ghi chú trạng thái</label>
                 <input
+                  v-if="
+                    selectedStatus !== 'CANCELLED' ||
+                    selectedAdminCancelReason === OTHER_CANCEL_REASON
+                  "
                   v-model="statusNote"
                   type="text"
                   class="status-note-input"
@@ -487,6 +502,16 @@ const refundBusy = ref(false)
 
 const selectedStatus = ref('')
 const statusNote = ref('')
+const OTHER_CANCEL_REASON = 'Lý do khác'
+const ADMIN_CANCEL_REASONS = [
+  'Khách hàng yêu cầu hủy',
+  'Không liên hệ được với khách hàng',
+  'Sản phẩm hết hàng hoặc lỗi tồn kho',
+  'Thông tin nhận hàng không hợp lệ',
+  'Phát hiện đơn hàng bất thường',
+  OTHER_CANCEL_REASON,
+]
+const selectedAdminCancelReason = ref('')
 const updatingStatus = ref(false)
 
 async function fetchGetDetailOrder(orderCode) {
@@ -656,6 +681,11 @@ watch(
   { immediate: true },
 )
 
+watch(selectedStatus, (status) => {
+  if (status !== 'CANCELLED') selectedAdminCancelReason.value = ''
+  statusNote.value = ''
+})
+
 const formatCurrency = (value) =>
   new Intl.NumberFormat('vi-VN', {
     style: 'currency',
@@ -787,7 +817,13 @@ const saveStatusUpdate = async () => {
       return
     }
 
-    if (isStatusNoteRequired.value && !statusNote.value.trim()) {
+    const resolvedNote =
+      selectedStatus.value === 'CANCELLED' &&
+      selectedAdminCancelReason.value !== OTHER_CANCEL_REASON
+        ? selectedAdminCancelReason.value
+        : statusNote.value.trim()
+
+    if (isStatusNoteRequired.value && !resolvedNote) {
       showToast('Vui lòng nhập lý do cho trạng thái này.')
       return
     }
@@ -795,12 +831,13 @@ const saveStatusUpdate = async () => {
     const orderCode = orderDetail.value.orderCode
     const response = await OrderDetailApi.updateStatusOrder(orderCode, {
       status: selectedStatus.value,
-      note: statusNote.value.trim() || null,
+      note: resolvedNote || null,
     })
 
     orderDetail.value = response.data
     await fetchGetDetailOrder(orderCode)
     statusNote.value = ''
+    selectedAdminCancelReason.value = ''
     showToast(
       `Đã cập nhật trạng thái đơn sang ${getOrderStatusLabel(orderDetail.value.orderStatus)}.`,
     )

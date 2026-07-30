@@ -53,6 +53,8 @@ public class RefundService {
     private final EmailService emailService;
     private final VnPayConfig vnPayConfig;
     private final AdminNotificationService notificationService;
+    // Marcus thêm chuông khách cho vòng đời refund VNPAY.
+    private final UserNotificationService userNotificationService;
 
     @Transactional
     public RefundResponse requestManualRefund(String orderCode, String reason) {
@@ -344,6 +346,13 @@ public class RefundService {
                 "Đơn " + order.getOrderCode() + " đang chờ duyệt hoàn "
                         + refundAmount.stripTrailingZeros().toPlainString() + " VND",
                 order.getOrderCode());
+        userNotificationService.create(
+                order.getUser(),
+                "REFUND_PENDING",
+                "Đang xử lý hoàn tiền",
+                "Yêu cầu hoàn tiền cho đơn " + order.getOrderCode()
+                        + " đã được tạo và đang chờ Marcus Store xử lý.",
+                order.getOrderCode());
         // Marcus sửa: không gửi mail đồng bộ lúc hủy đơn để giảm độ trễ màn hình admin.
         return saved;
     }
@@ -412,6 +421,13 @@ public class RefundService {
         refund.getRefundTransaction().setProviderResponseCode(refund.getProviderResponseCode());
         refund.getRefundTransaction().setIsReconciled(true);
         refund.getRefundTransaction().setNote("Hoàn tiền VNPAY thành công");
+        // Marcus thêm: chỉ gửi khi gateway/reconciliation kết luận SUCCESS.
+        userNotificationService.create(
+                refund.getOrder().getUser(),
+                "REFUND_SUCCESS",
+                "Hoàn tiền thành công",
+                "Đơn " + refund.getOrder().getOrderCode() + " đã được VNPAY xác nhận hoàn tiền.",
+                refund.getOrder().getOrderCode());
     }
 
     private void markProcessing(RefundRequest refund) {
@@ -446,6 +462,13 @@ public class RefundService {
         refund.getOrder().setPaymentStatus("REFUND_FAILED");
         refund.getRefundTransaction().setStatus("FAILED");
         refund.getRefundTransaction().setNote("Hoàn tiền VNPAY thất bại: " + refund.getProviderMessage());
+        userNotificationService.create(
+                refund.getOrder().getUser(),
+                "REFUND_FAILED",
+                "Hoàn tiền cần kiểm tra",
+                "Yêu cầu hoàn tiền đơn " + refund.getOrder().getOrderCode()
+                        + " chưa hoàn tất. Marcus Store sẽ tiếp tục kiểm tra.",
+                refund.getOrder().getOrderCode());
     }
 
     private void copyProviderResult(RefundRequest refund, VnPayRefundClient.RefundGatewayResult result) {

@@ -18,6 +18,8 @@ import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderPaymentService;
 import com.fpoly.marcusstore.service.OrderService;
 import com.fpoly.marcusstore.service.OrderShippingService;
+import com.fpoly.marcusstore.service.AdminNotificationService;
+import com.fpoly.marcusstore.service.UserNotificationService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -44,6 +46,9 @@ public class OrderServiceImpl implements OrderService {
     private final OrderCancellationService orderCancellationService;
     private final EmailService emailService;
     private final CommentEvaluationRepository commentEvaluationRepository;
+    // Marcus thêm chuông hai chiều cho luồng hủy đơn.
+    private final AdminNotificationService adminNotificationService;
+    private final UserNotificationService userNotificationService;
     // Marcus sửa: khách được hủy trước khi tạo vận đơn. PACKED đã có tracking GHN
     // nên không thể chỉ hủy nội bộ rồi để vận đơn tiếp tục giao.
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of(
@@ -222,6 +227,17 @@ public class OrderServiceImpl implements OrderService {
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
+
+        if ("CANCELLED".equals(newStatus)) {
+            // Marcus thêm: khách luôn nhận được kết quả hủy, dù người thao tác là
+            // khách hay Admin. Notification gắn user từ Order, không tin userId client.
+            userNotificationService.create(
+                    order.getUser(),
+                    "ORDER_CANCELLED",
+                    "Đơn hàng " + order.getOrderCode() + " đã hủy",
+                    "Lý do: " + note,
+                    order.getOrderCode());
+        }
 
         return getOrderDetailResponse(orderCode);
     }
@@ -413,6 +429,14 @@ public class OrderServiceImpl implements OrderService {
                 .status("CANCELLED")
                 .note((reason == null || reason.isBlank()) ? "Khách hàng tự hủy" : reason)
                 .build();
-        return updateStatusOrder(orderCode, request);
+        OrderDetailResponse response = updateStatusOrder(orderCode, request);
+        // Marcus thêm: khi khách tự hủy, chủ cửa hàng nhận chuông realtime để nắm
+        // lý do và dừng xử lý đơn.
+        adminNotificationService.createAndSendNotification(
+                "ORDER_CANCELLED",
+                "Khách đã hủy đơn " + order.getOrderCode(),
+                "Khách hàng " + getUserDisplayName(order.getUser()) + " hủy đơn. Lý do: " + request.getNote(),
+                order.getOrderCode());
+        return response;
     }
 }

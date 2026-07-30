@@ -1,0 +1,90 @@
+package com.fpoly.marcusstore.service;
+
+import com.fpoly.marcusstore.dto.response.UserNotificationResponse;
+import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.entity.contact.UserNotification;
+import com.fpoly.marcusstore.repository.contact.UserNotificationRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.*;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.*;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.*;
+
+import static org.springframework.http.HttpStatus.NOT_FOUND;
+
+@Service
+@RequiredArgsConstructor
+// Marcus thêm luồng lưu + phát realtime notification cho đúng tài khoản khách.
+public class UserNotificationService {
+    private static final int MAX_PAGE_SIZE = 30;
+    private final UserNotificationRepository repository;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getNotifications(Integer userId, int page, int size) {
+        Page<UserNotification> result = repository.findByUserUserIdOrderByCreatedAtDesc(
+                userId, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), MAX_PAGE_SIZE)));
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("list", result.getContent().stream().map(this::toResponse).toList());
+        response.put("unreadCount", repository.countByUserUserIdAndIsReadFalse(userId));
+        response.put("hasMore", result.hasNext());
+        return response;
+    }
+
+    @Transactional
+    public void create(User user, String type, String title, String message, String referenceId) {
+        if (user == null || user.getUserId() == null)
+            return;
+        UserNotification notification = new UserNotification();
+        notification.setUser(user);
+        notification.setType(type);
+        notification.setTitle(title);
+        notification.setMessage(message);
+        notification.setReferenceId(referenceId);
+        UserNotificationResponse data = toResponse(repository.saveAndFlush(notification));
+        sendAfterCommit(user.getUsername(), Map.of("event", "NEW", "data", data));
+    }
+
+    @Transactional
+    public void markRead(Integer userId, Integer id) {
+        UserNotification notification = repository.findById(id)
+                .filter(item -> item.getUser().getUserId().equals(userId))
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Không tìm thấy thông báo."));
+        if (!Boolean.TRUE.equals(notification.getIsRead())) {
+            notification.setIsRead(true);
+            repository.save(notification);
+        }
+    }
+
+    @Transactional
+    public void markAllRead(Integer userId) {
+        repository.markAllAsRead(userId);
+    }
+
+    private UserNotificationResponse toResponse(UserNotification item) {
+        return UserNotificationResponse.builder()
+                .id(item.getId()).type(item.getType()).title(item.getTitle())
+                .message(item.getMessage()).referenceId(item.getReferenceId())
+                .isRead(Boolean.TRUE.equals(item.getIsRead())).createdAt(item.getCreatedAt()).build();
+    }
+
+    private void sendAfterCommit(String username, Object payload) {
+        // Marcus sửa bảo mật: dùng user destination của STOMP, khách không thể đổi
+        // userId trên topic để nghe chuông của tài khoản khác.
+        Runnable send = () -> messagingTemplate.convertAndSendToUser(username, "/queue/notifications", payload);
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            send.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                send.run();
+            }
+        });
+    }
+}

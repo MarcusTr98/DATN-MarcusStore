@@ -38,7 +38,9 @@ class OrderServicePaymentGuardTest {
                                 mock(OrderPaymentService.class),
                                 mock(OrderCancellationService.class),
                                 mock(EmailService.class),
-                                mock(CommentEvaluationRepository.class));
+                                mock(CommentEvaluationRepository.class),
+                                mock(AdminNotificationService.class),
+                                mock(UserNotificationService.class));
 
                 UpdateOrderStatusRequest request = new UpdateOrderStatusRequest();
                 request.setStatus("CONFIRMED");
@@ -72,7 +74,9 @@ class OrderServicePaymentGuardTest {
                                 mock(OrderPaymentService.class),
                                 cancellationService,
                                 mock(EmailService.class),
-                                mock(CommentEvaluationRepository.class));
+                                mock(CommentEvaluationRepository.class),
+                                mock(AdminNotificationService.class),
+                                mock(UserNotificationService.class));
 
                 UpdateOrderStatusRequest request = new UpdateOrderStatusRequest();
                 request.setStatus("CANCELLED");

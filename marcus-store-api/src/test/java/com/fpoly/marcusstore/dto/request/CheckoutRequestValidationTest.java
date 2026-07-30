@@ -63,6 +63,21 @@ class CheckoutRequestValidationTest {
         assertThat(validator.validate(validCheckout())).isEmpty();
     }
 
+    @Test
+    void contactRejectsMalformedEmailEvenWhenBrowserValidationIsBypassed() {
+        CreateContactRequest request = new CreateContactRequest();
+        request.setName("Marcus");
+        request.setPhone("0912345678");
+        request.setEmail("marcus-sai-dinh-dang");
+        request.setMessage("Tôi cần được hỗ trợ");
+
+        var fields = validator.validate(request).stream()
+                .map(violation -> violation.getPropertyPath().toString())
+                .toList();
+
+        assertThat(fields).contains("email");
+    }
+
     private static CheckoutRequestDTO validCheckout() {
         CheckoutRequestDTO request = new CheckoutRequestDTO();
         request.setCartItemIds(List.of(1));

@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
 import BaseModal from '../BaseModal.vue'
 import wishlist from '@/composables/useWishlistShared'
+import { useUserNotifications } from '@/composables/useUserNotifications'
 
 const router = useRouter()
 const cartStore = useCartStore()
@@ -14,6 +15,18 @@ const totalQuantity = computed(() => cartStore.totalQuantity)
 const isLoggedIn = ref(false)
 const userName = ref('')
 const searchQuery = ref('')
+const showNotifications = ref(false)
+let notificationCloseTimer = null
+const {
+  notifications,
+  displayUnreadCount,
+  isLoading: notificationsLoading,
+  errorMessage: notificationError,
+  fetchNotifications,
+  markRead,
+  markAllRead,
+  disconnectRealtime,
+} = useUserNotifications()
 
 const wishlistCount = computed(() => (wishlist.isLoaded() ? wishlist.totalCount() : 0))
 
@@ -36,6 +49,7 @@ const handleLogout = () => {
 }
 
 const confirmLogout = () => {
+  disconnectRealtime()
   localStorage.removeItem('ACCESS_TOKEN')
   localStorage.removeItem('USER_ROLE')
   localStorage.removeItem('USERNAME')
@@ -72,12 +86,42 @@ const closeGuestModal = () => {
   showGuestModal.value = false
 }
 
+const openNotificationsOnHover = async () => {
+  window.clearTimeout(notificationCloseTimer)
+  if (!showNotifications.value) {
+    showNotifications.value = true
+    await fetchNotifications()
+  }
+}
+
+const scheduleCloseNotifications = () => {
+  window.clearTimeout(notificationCloseTimer)
+  notificationCloseTimer = window.setTimeout(() => {
+    showNotifications.value = false
+  }, 180)
+}
+
+const openNotification = async (item) => {
+  const target = await markRead(item)
+  showNotifications.value = false
+  if (target) router.push(target)
+}
+
+const getUserNotificationIcon = (type) =>
+  ({
+    ORDER_CANCELLED: 'fas fa-ban',
+    REFUND_PENDING: 'fas fa-hourglass-half',
+    REFUND_SUCCESS: 'fas fa-circle-check',
+    REFUND_FAILED: 'fas fa-triangle-exclamation',
+  })[type] || 'far fa-bell'
+
 onMounted(() => {
   checkAuth()
 
   if (localStorage.getItem('ACCESS_TOKEN')) {
     cartStore.fetchCart()
     wishlist.fetchIds()
+    fetchNotifications()
   } else {
     wishlist.reset()
   }
@@ -86,6 +130,7 @@ onMounted(() => {
   window.addEventListener('auth-changed', checkAuth)
 })
 onUnmounted(() => {
+  window.clearTimeout(notificationCloseTimer)
   window.removeEventListener('auth-changed', checkAuth)
 })
 </script>
@@ -172,6 +217,68 @@ onUnmounted(() => {
 
           <!-- Header Actions -->
           <div class="header-actions">
+            <!-- Marcus thêm chuông khách: tách dữ liệu theo user đăng nhập và cập
+                 nhật realtime khi hủy đơn/refund đổi trạng thái. -->
+            <div
+              v-if="isLoggedIn"
+              class="h-action client-notification"
+              @mouseenter="openNotificationsOnHover"
+              @mouseleave="scheduleCloseNotifications"
+            >
+              <button
+                type="button"
+                class="h-action-btn notification-button"
+                @click="openNotificationsOnHover"
+              >
+                <div class="h-action-icon position-relative">
+                  <i class="far fa-bell"></i>
+                  <span
+                    v-if="Number(displayUnreadCount) > 0 || displayUnreadCount === '99+'"
+                    class="cart-count"
+                  >
+                    {{ displayUnreadCount }}
+                  </span>
+                </div>
+                <div class="h-action-text d-none d-xl-block">
+                  <span class="h-action-main">Thông báo</span>
+                </div>
+              </button>
+              <div v-if="showNotifications" class="client-notification-panel">
+                <div class="client-notification-head">
+                  <div><strong>Thông báo của bạn</strong><small>Đơn hàng và hoàn tiền</small></div>
+                  <button v-if="notifications.length" type="button" @click="markAllRead">
+                    Đọc tất cả
+                  </button>
+                </div>
+                <div v-if="notificationsLoading" class="notification-empty">
+                  Đang tải thông báo...
+                </div>
+                <div v-else-if="notificationError" class="notification-empty error">
+                  {{ notificationError }}
+                </div>
+                <div v-else-if="!notifications.length" class="notification-empty">
+                  Bạn chưa có thông báo.
+                </div>
+                <template v-else>
+                  <button
+                    v-for="item in notifications"
+                    :key="item.id"
+                    type="button"
+                    class="client-notification-item"
+                    :class="{ unread: !item.isRead }"
+                    @click="openNotification(item)"
+                  >
+                    <span class="notification-item-icon" :class="item.type">
+                      <i :class="getUserNotificationIcon(item.type)"></i>
+                    </span>
+                    <span
+                      ><strong>{{ item.title }}</strong
+                      ><small>{{ item.message }}</small></span
+                    >
+                  </button>
+                </template>
+              </div>
+            </div>
             <!-- Account -->
             <div class="h-action">
               <template v-if="!isLoggedIn">
@@ -179,10 +286,7 @@ onUnmounted(() => {
                   href="#"
                   class="h-action-btn"
                   @click.prevent="
-                    goOrPrompt(
-                      '/profile',
-                      'Vui lòng đăng nhập để quản lý tài khoản của bạn.',
-                    )
+                    goOrPrompt('/profile', 'Vui lòng đăng nhập để quản lý tài khoản của bạn.')
                   "
                 >
                   <div class="h-action-icon"><i class="far fa-user"></i></div>
@@ -254,10 +358,7 @@ onUnmounted(() => {
               href="#"
               class="h-action-btn cart-action"
               @click.prevent="
-                goOrPrompt(
-                  '/cart',
-                  'Vui lòng đăng nhập để xem và thanh toán giỏ hàng của bạn.',
-                )
+                goOrPrompt('/cart', 'Vui lòng đăng nhập để xem và thanh toán giỏ hàng của bạn.')
               "
             >
               <div class="h-action-icon position-relative">

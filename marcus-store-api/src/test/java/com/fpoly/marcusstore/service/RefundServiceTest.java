@@ -48,7 +48,8 @@ class RefundServiceTest {
                                 mock(UserRepository.class),
                                 emailService,
                                 vnPayConfig,
-                                notificationService);
+                                notificationService,
+                                mock(UserNotificationService.class));
                 when(refundRepository.save(any(RefundRequest.class)))
                                 .thenAnswer(invocation -> invocation.getArgument(0));
         }
