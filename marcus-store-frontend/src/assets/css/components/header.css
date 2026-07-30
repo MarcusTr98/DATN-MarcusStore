@@ -313,6 +313,7 @@
 }
 
 .notification-item-icon.ORDER_CANCELLED,
+.notification-item-icon.ORDER_FAILED,
 .notification-item-icon.REFUND_FAILED {
   background: #fee2e2;
   color: #dc2626;
@@ -326,6 +327,27 @@
 .notification-item-icon.REFUND_SUCCESS {
   background: #dcfce7;
   color: #16a34a;
+}
+
+.notification-item-icon.ORDER_CONFIRMED,
+.notification-item-icon.ORDER_COMPLETED,
+.notification-item-icon.ORDER_DELIVERED,
+.notification-item-icon.PAYMENT_SUCCESS {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.notification-item-icon.ORDER_PROCESSING,
+.notification-item-icon.ORDER_PACKED,
+.notification-item-icon.ORDER_SHIPPING {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.notification-item-icon.ORDER_PENDING,
+.notification-item-icon.ORDER_READY_FOR_PICKUP {
+  background: #fef3c7;
+  color: #d97706;
 }
 
 .notification-empty {

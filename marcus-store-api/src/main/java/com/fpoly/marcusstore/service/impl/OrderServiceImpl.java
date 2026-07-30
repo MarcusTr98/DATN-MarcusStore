@@ -228,16 +228,14 @@ public class OrderServiceImpl implements OrderService {
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
 
-        if ("CANCELLED".equals(newStatus)) {
-            // Marcus thêm: khách luôn nhận được kết quả hủy, dù người thao tác là
-            // khách hay Admin. Notification gắn user từ Order, không tin userId client.
-            userNotificationService.create(
-                    order.getUser(),
-                    "ORDER_CANCELLED",
-                    "Đơn hàng " + order.getOrderCode() + " đã hủy",
-                    "Lý do: " + note,
-                    order.getOrderCode());
-        }
+        // Marcus thêm: mọi bước Admin cập nhật trong vòng đời đơn đều phát chuông
+        // cho đúng khách hàng. Service tự chuẩn hóa title/type theo trạng thái.
+        userNotificationService.createOrderStatusNotification(
+                order,
+                newStatus,
+                "CANCELLED".equals(newStatus)
+                        ? "Đơn " + order.getOrderCode() + " đã hủy. Lý do: " + note
+                        : null);
 
         return getOrderDetailResponse(orderCode);
     }

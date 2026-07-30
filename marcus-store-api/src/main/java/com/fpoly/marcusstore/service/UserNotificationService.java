@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.response.UserNotificationResponse;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.contact.UserNotification;
+import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.repository.contact.UserNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -20,6 +21,17 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 @RequiredArgsConstructor
 // Marcus thêm luồng lưu + phát realtime notification cho đúng tài khoản khách.
 public class UserNotificationService {
+    private static final Map<String, String> ORDER_STATUS_TITLES = Map.ofEntries(
+            Map.entry("PENDING", "Đặt hàng thành công"),
+            Map.entry("CONFIRMED", "Admin đã xác nhận đơn"),
+            Map.entry("PROCESSING", "Đang chuẩn bị hàng"),
+            Map.entry("READY_FOR_PICKUP", "Sẵn sàng nhận tại cửa hàng"),
+            Map.entry("PACKED", "Đơn hàng đã đóng gói"),
+            Map.entry("SHIPPING", "Đơn hàng đang được giao"),
+            Map.entry("DELIVERED", "Giao hàng thành công"),
+            Map.entry("COMPLETED", "Đơn hàng hoàn thành"),
+            Map.entry("CANCELLED", "Đơn hàng đã hủy"),
+            Map.entry("FAILED", "Giao hàng chưa thành công"));
     private static final int MAX_PAGE_SIZE = 30;
     private final UserNotificationRepository repository;
     private final SimpMessagingTemplate messagingTemplate;
@@ -47,6 +59,20 @@ public class UserNotificationService {
         notification.setReferenceId(referenceId);
         UserNotificationResponse data = toResponse(repository.saveAndFlush(notification));
         sendAfterCommit(user.getUsername(), Map.of("event", "NEW", "data", data));
+    }
+
+    // Marcus thêm một cổng phát chuông thống nhất cho toàn bộ vòng đời đơn hàng,
+    // tránh mỗi service tự viết title/type khác nhau.
+    @Transactional
+    public void createOrderStatusNotification(Order order, String status, String detail) {
+        if (order == null || status == null) return;
+        String normalized = status.trim().toUpperCase(Locale.ROOT);
+        String title = ORDER_STATUS_TITLES.get(normalized);
+        if (title == null) return;
+        String message = detail == null || detail.isBlank()
+                ? "Đơn " + order.getOrderCode() + " vừa được cập nhật: " + title + "."
+                : detail;
+        create(order.getUser(), "ORDER_" + normalized, title, message, order.getOrderCode());
     }
 
     @Transactional

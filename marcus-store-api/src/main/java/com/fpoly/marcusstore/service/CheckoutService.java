@@ -66,6 +66,8 @@ public class CheckoutService {
         @Autowired
         private AdminNotificationService notificationService;
         @Autowired
+        private UserNotificationService userNotificationService;
+        @Autowired
         private ShippingService shippingService; // NÂNG CẤP: Thêm ShippingService để tính trợ giá
         @Autowired
         private OrderTransactionService orderTransactionService;
@@ -403,6 +405,13 @@ public class CheckoutService {
                 order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
                 Order savedOrder = orderRepository.save(order);
+                // Marcus thêm: khách nhận xác nhận ngay khi backend tạo đơn thành
+                // công; VNPAY vẫn có notification thanh toán riêng sau IPN.
+                userNotificationService.createOrderStatusNotification(
+                                savedOrder,
+                                "PENDING",
+                                "Đơn " + savedOrder.getOrderCode()
+                                                + " đã được tạo thành công và đang chờ Marcus Store xác nhận.");
 
                 // (Đã cập nhật soldQuantity cho Flash Sale ngay trong vòng lặp kiểm tra cart
                 // phía trên

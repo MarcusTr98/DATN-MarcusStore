@@ -19,6 +19,7 @@ public class VnPayPaymentExpiryService {
     private final OrderTransactionRepository transactionRepository;
     private final OrderStatusHistoryRepository historyRepository;
     private final OrderCancellationService cancellationService;
+    private final UserNotificationService userNotificationService;
 
     @Transactional
     public void cancelOneExpiredPayment(Integer orderId) {
@@ -40,6 +41,11 @@ public class VnPayPaymentExpiryService {
         history.setTitle("Tự hủy do quá hạn thanh toán VNPAY");
         history.setNote(EXPIRED_REASON);
         historyRepository.save(history);
+        // Marcus thêm: khách biết đơn treo VNPAY đã được hệ thống xử lý, không cần
+        // tự vào chi tiết đơn để kiểm tra.
+        userNotificationService.createOrderStatusNotification(
+                order, "CANCELLED",
+                "Đơn " + order.getOrderCode() + " đã tự hủy do quá hạn thanh toán VNPAY.");
     }
 
     private boolean isStillAwaitingVnPay(Order order) {

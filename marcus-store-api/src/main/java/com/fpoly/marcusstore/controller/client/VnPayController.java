@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderTransactionService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
+import com.fpoly.marcusstore.service.UserNotificationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +36,7 @@ public class VnPayController {
     private final OrderCancellationService orderCancellationService;
     private final OrderTransactionService orderTransactionService;
     private final AdminNotificationService notificationService;
+    private final UserNotificationService userNotificationService;
 
     @Transactional
     @GetMapping("/ipn")
@@ -155,6 +157,12 @@ public class VnPayController {
                     "Đơn VNPAY đã thanh toán: " + orderCode,
                     "Thanh toán đã được VNPAY xác nhận. Đơn hàng sẵn sàng để admin xử lý.",
                     orderCode);
+            userNotificationService.create(
+                    order.getUser(),
+                    "PAYMENT_SUCCESS",
+                    "Thanh toán VNPAY thành công",
+                    "Thanh toán cho đơn " + orderCode + " đã được xác nhận. Đơn đang chờ Admin xử lý.",
+                    orderCode);
 
             log.info("[VNPAY IPN] Thanh toán thành công. Đơn hàng {} chuyển sang PENDING để Admin xác nhận.",
                     orderCode);
@@ -167,6 +175,9 @@ public class VnPayController {
             orderTransactionService.markVnPayPaymentFailed(
                     order, transactionId, responseCode, failureNote);
             orderCancellationService.cancelAndRestore(order, failureNote);
+            userNotificationService.createOrderStatusNotification(
+                    order, "CANCELLED",
+                    "Đơn " + orderCode + " đã tự hủy vì thanh toán VNPAY không thành công.");
             log.info("[VNPAY IPN] Thanh toán thất bại/hủy. Order={}", orderCode);
         }
 

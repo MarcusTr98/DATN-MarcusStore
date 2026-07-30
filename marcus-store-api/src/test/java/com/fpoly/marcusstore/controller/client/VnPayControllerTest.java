@@ -7,6 +7,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderTransactionService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
+import com.fpoly.marcusstore.service.UserNotificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 
@@ -35,7 +36,8 @@ class VnPayControllerTest {
                         historyRepository,
                         cancellationService,
                         transactionService,
-                        mock(AdminNotificationService.class));
+                        mock(AdminNotificationService.class),
+                        mock(UserNotificationService.class));
 
         @Test
         void parsesVnPayAmountWithoutLongOverflowOrTruncation() {

@@ -109,7 +109,17 @@ const openNotification = async (item) => {
 
 const getUserNotificationIcon = (type) =>
   ({
+    ORDER_PENDING: 'fas fa-receipt',
+    ORDER_CONFIRMED: 'fas fa-circle-check',
+    ORDER_PROCESSING: 'fas fa-box-open',
+    ORDER_READY_FOR_PICKUP: 'fas fa-store',
+    ORDER_PACKED: 'fas fa-box',
+    ORDER_SHIPPING: 'fas fa-truck-fast',
+    ORDER_DELIVERED: 'fas fa-house-circle-check',
+    ORDER_COMPLETED: 'fas fa-medal',
     ORDER_CANCELLED: 'fas fa-ban',
+    ORDER_FAILED: 'fas fa-triangle-exclamation',
+    PAYMENT_SUCCESS: 'fas fa-credit-card',
     REFUND_PENDING: 'fas fa-hourglass-half',
     REFUND_SUCCESS: 'fas fa-circle-check',
     REFUND_FAILED: 'fas fa-triangle-exclamation',

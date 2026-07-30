@@ -31,7 +31,8 @@ class VnPayPaymentExpiryServiceTest {
         historyRepository = mock(OrderStatusHistoryRepository.class);
         cancellationService = mock(OrderCancellationService.class);
         service = new VnPayPaymentExpiryService(
-                orderRepository, transactionRepository, historyRepository, cancellationService);
+                orderRepository, transactionRepository, historyRepository, cancellationService,
+                mock(UserNotificationService.class));
     }
 
     @Test

@@ -60,6 +60,8 @@ public class GhnStatusService {
     private final OrderPaymentService orderPaymentService;
     private final OrderCancellationService orderCancellationService;
     private final RefundService refundService;
+    private final UserNotificationService userNotificationService;
+    private final AdminNotificationService adminNotificationService;
 
     @Transactional
     public SyncResult applyStatus(String trackingCode, String ghnStatus, String source) {
@@ -97,6 +99,16 @@ public class GhnStatusService {
         requestExceptionalRefundIfNeeded(order, normalizedGhnStatus, trackingCode, source);
         createHistory(order, newStatus, normalizedGhnStatus, source);
         orderRepository.save(order);
+        // Marcus thêm: trạng thái do GHN cập nhật cũng đi qua cùng chuông khách,
+        // không phụ thuộc khách đang mở trang chi tiết đơn.
+        userNotificationService.createOrderStatusNotification(order, newStatus, null);
+        if ("FAILED".equals(newStatus) || "CANCELLED".equals(newStatus)) {
+            adminNotificationService.createAndSendNotification(
+                    "ORDER_" + newStatus,
+                    "GHN cập nhật đơn " + order.getOrderCode(),
+                    "Đơn cần kiểm tra. Trạng thái GHN: " + normalizedGhnStatus + ".",
+                    order.getOrderCode());
+        }
         return SyncResult.UPDATED;
     }
 
