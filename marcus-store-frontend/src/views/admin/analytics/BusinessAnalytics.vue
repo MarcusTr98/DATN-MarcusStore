@@ -51,13 +51,24 @@
         @generate="generateAiReport"
       />
 
-      <AnalyticsKpiGrid :overview="overview" />
-
       <AnalyticsInsightPanel v-if="analysis" :analysis="analysis" :forecast="forecast" />
 
-      <AnalyticsSalesChart :monthly="numberOfDays > 120" :trend="trend" />
-
       <AnalyticsForecastChart v-if="forecast" :forecast="forecast" />
+
+      <div class="analytics-history-divider">
+        <div>
+          <span>Dữ liệu hệ thống</span>
+          <h2>Số liệu dùng để kiểm chứng phân tích</h2>
+          <p>KPI và lịch sử bán hàng được đặt sau phần kết luận để tránh biến trang thành Dashboard.</p>
+        </div>
+        <i class="bi bi-database-check"></i>
+      </div>
+
+      <AnalyticsKpiGrid :overview="overview" />
+
+      <AnalyticsCancellationReasons :reasons="cancellationReasons" />
+
+      <AnalyticsSalesChart :monthly="numberOfDays > 120" :trend="trend" />
 
       <AnalyticsProductTable :products="products" />
 
@@ -91,6 +102,7 @@ import AnalyticsForecastChart from '@/components/analytics/AnalyticsForecastChar
 import AnalyticsInsightPanel from '@/components/analytics/AnalyticsInsightPanel.vue'
 import AnalyticsKpiGrid from '@/components/analytics/AnalyticsKpiGrid.vue'
 import AnalyticsProductTable from '@/components/analytics/AnalyticsProductTable.vue'
+import AnalyticsCancellationReasons from '@/components/analytics/AnalyticsCancellationReasons.vue'
 import AnalyticsSalesChart from '@/components/analytics/AnalyticsSalesChart.vue'
 import { useBusinessAnalytics } from '@/composables/useBusinessAnalytics'
 
@@ -101,6 +113,7 @@ const {
   aiLoading,
   aiReport,
   aiUsage,
+  cancellationReasons,
   errorMessage,
   fromDate,
   forecast,

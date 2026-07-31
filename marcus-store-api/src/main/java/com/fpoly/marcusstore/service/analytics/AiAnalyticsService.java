@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.dto.analytics.AiAnalyticsReportResponse.ProductOutl
 import com.fpoly.marcusstore.dto.analytics.AiAnalyticsReportResponse.Signal;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsOverviewResponse;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsPeriod;
+import com.fpoly.marcusstore.dto.analytics.AnalyticsTrendPoint;
 import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
 import com.fpoly.marcusstore.entity.analytics.AiAnalyticsReport;
 import com.fpoly.marcusstore.repository.analytics.AiAnalyticsReportRepository;
@@ -98,7 +99,15 @@ public class AiAnalyticsService {
                 overview.period().fromDate(),
                 overview.period().toDate(),
                 PRODUCT_LIMIT);
-        String context = buildSafeContext(overview, products);
+        List<Map<String, Object>> salesTrendBuckets = summarizeSalesTrend(
+                analyticsService.getSalesTrend(
+                        overview.period().fromDate(), overview.period().toDate()));
+        String context = buildSafeContext(
+                overview,
+                products,
+                analyticsService.getCancellationReasons(
+                        overview.period().fromDate(), overview.period().toDate()),
+                salesTrendBuckets);
         JsonNode providerResponse = callGemini(context);
         AiAnalyticsReportResponse report = parseReport(
                 providerResponse,
@@ -146,7 +155,9 @@ public class AiAnalyticsService {
 
     private String buildSafeContext(
             AnalyticsOverviewResponse overview,
-            List<ProductTrendResponse> products) {
+            List<ProductTrendResponse> products,
+            List<com.fpoly.marcusstore.dto.analytics.CancellationReasonResponse> cancellationReasons,
+            List<Map<String, Object>> salesTrendBuckets) {
         Map<String, Object> context = new LinkedHashMap<>();
         // Marcus thêm: gửi định nghĩa chỉ số để AI không diễn giải final_amount
         // của đơn chưa thu được tiền thành doanh thu.
@@ -167,6 +178,12 @@ public class AiAnalyticsService {
         context.put("successfulRefundAmount", overview.successfulRefundAmount());
         context.put("orderingCustomers", overview.orderingCustomers());
         context.put("productTrends", products);
+        // Marcus nâng cấp: nén chuỗi thời gian thành tối đa 12 giai đoạn để AI
+        // nhận ra đà tăng/giảm mà vẫn tiết kiệm quota Gemini miễn phí.
+        context.put("salesTrendBuckets", salesTrendBuckets);
+        // Marcus thêm: AI chỉ nhận nhóm lý do và số đếm đã chuẩn hóa, không nhận
+        // ghi chú hủy tự do hay thông tin nhận diện khách hàng.
+        context.put("cancellationReasons", cancellationReasons);
         try {
             // Marcus thêm: AI chỉ nhận thống kê hành vi đã tổng hợp, không nhận
             // sessionId hay nội dung câu hỏi của từng khách.
@@ -183,6 +200,32 @@ public class AiAnalyticsService {
         } catch (Exception exception) {
             throw new IllegalStateException("Không thể chuẩn bị dữ liệu tổng hợp cho AI.");
         }
+    }
+
+    private List<Map<String, Object>> summarizeSalesTrend(List<AnalyticsTrendPoint> trend) {
+        if (trend == null || trend.isEmpty()) {
+            return List.of();
+        }
+        int bucketSize = Math.max(1, (int) Math.ceil(trend.size() / 12D));
+        List<Map<String, Object>> buckets = new ArrayList<>();
+        for (int start = 0; start < trend.size(); start += bucketSize) {
+            int end = Math.min(start + bucketSize, trend.size());
+            List<AnalyticsTrendPoint> points = trend.subList(start, end);
+            Map<String, Object> bucket = new LinkedHashMap<>();
+            bucket.put("fromDate", points.getFirst().date());
+            bucket.put("toDate", points.getLast().date());
+            bucket.put("completedSales", points.stream()
+                    .map(AnalyticsTrendPoint::completedSales)
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
+            bucket.put("completedOrders", points.stream()
+                    .mapToLong(AnalyticsTrendPoint::completedOrders)
+                    .sum());
+            bucket.put("unitsSold", points.stream()
+                    .mapToLong(AnalyticsTrendPoint::unitsSold)
+                    .sum());
+            buckets.add(bucket);
+        }
+        return buckets;
     }
 
     private JsonNode callGemini(String context) {
@@ -231,8 +274,17 @@ public class AiAnalyticsService {
                 successfulRefundAmount là tiền REFUND đã SUCCESS; PENDING/FAILED không được coi là đã hoàn.
                 Không bịa tin thị trường, tồn kho, nguyên nhân hoặc con số tương lai.
                 aiAdvisorUsage chỉ là số liệu tổng hợp ẩn danh; dùng để đánh giá mức khách tương tác với tư vấn AI.
+                cancellationReasons là thống kê lý do đã chuẩn hóa; dùng nó để giải thích tỷ lệ hủy, không tự bịa nguyên nhân.
+                salesTrendBuckets là chuỗi thời gian đã nén theo thứ tự cũ đến mới;
+                dùng để nhận diện đà tăng/giảm, điểm bứt phá và mức biến động thay vì chỉ đọc tổng KPI.
+                Không đưa ra con số dự báo doanh thu tuyệt đối nếu chuỗi biến động mạnh hoặc dữ liệu quá ít.
                 Mọi kết luận phải gắn với evidence có số liệu trong JSON.
                 Có thể dự đoán HƯỚNG tăng/đi ngang/giảm của sản phẩm, nhưng phải dùng UNCERTAIN khi dữ liệu yếu.
+                headline và executiveSummary phải ưu tiên triển vọng sắp tới, rủi ro chính và quyết định quản lý;
+                không chỉ liệt kê lại KPI giống dashboard.
+                Sắp xếp productOutlooks theo mức cần hành động: xu hướng tăng rõ, xu hướng giảm rõ, rồi mới chưa chắc chắn.
+                Signals ưu tiên tín hiệu có giá trị dự báo, biến động lý do hủy và hành vi khách; tránh lặp cùng một KPI.
+                Actions phải cụ thể, có thể thực hiện trong kỳ kế tiếp và nói rõ căn cứ dữ liệu.
                 Nếu changePercent là null, hiểu là kỳ trước bằng 0; không tự biến thành phần trăm tăng.
                 Viết tiếng Việt rõ, ngắn, phù hợp người quản lý cửa hàng.
                 Chỉ nhắc productId có trong productTrends.

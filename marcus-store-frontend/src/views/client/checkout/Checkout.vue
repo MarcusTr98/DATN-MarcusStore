@@ -331,7 +331,31 @@
                   >{{ isStorePickup ? 'Ghi chú cho cửa hàng' : 'Ghi chú cho shipper' }}
                   <span class="optional">(Tùy chọn)</span></label
                 >
-                <textarea v-model="orderForm.note" class="form-textarea" rows="2"></textarea>
+                <div class="checkout-note-suggestions" aria-label="Gợi ý ghi chú nhanh">
+                  <button
+                    v-for="suggestion in noteSuggestions"
+                    :key="suggestion"
+                    type="button"
+                    class="checkout-note-suggestion"
+                    :class="{ 'is-selected': orderForm.note === suggestion }"
+                    @click="applyNoteSuggestion(suggestion)"
+                  >
+                    <i class="fas fa-plus"></i>
+                    {{ suggestion }}
+                  </button>
+                </div>
+                <textarea
+                  v-model.trim="orderForm.note"
+                  class="form-textarea"
+                  rows="2"
+                  maxlength="500"
+                  :placeholder="
+                    isStorePickup
+                      ? 'Ví dụ: Nhờ cửa hàng gọi khi đơn sẵn sàng'
+                      : 'Ví dụ: Gọi cho tôi trước khi giao'
+                  "
+                ></textarea>
+                <small class="checkout-note-counter">{{ orderForm.note?.length || 0 }}/500</small>
               </div>
             </div>
           </form>
@@ -620,6 +644,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import BaseModal from '@/components/BaseModal.vue'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import CheckoutPaymentMethods from '@/components/client/checkout/CheckoutPaymentMethods.vue'
@@ -691,4 +716,24 @@ const {
   isProcessing,
   handleCheckout,
 } = useCheckoutPage()
+
+// Marcus thêm: ghi chú mẫu giúp khách chọn nhanh nhưng vẫn cho phép nhập nội dung riêng.
+const deliveryNoteSuggestions = [
+  'Gọi cho tôi trước khi giao',
+  'Không gọi được vui lòng nhắn tin',
+  'Giao trong giờ hành chính',
+  'Gửi tại lễ tân hoặc bảo vệ',
+]
+const pickupNoteSuggestions = [
+  'Nhờ cửa hàng gọi khi đơn sẵn sàng',
+  'Tôi sẽ đến nhận trong giờ hành chính',
+]
+const noteSuggestions = computed(() =>
+  isStorePickup.value ? pickupNoteSuggestions : deliveryNoteSuggestions,
+)
+
+function applyNoteSuggestion(suggestion) {
+  // Marcus sửa: bấm lại lựa chọn đang dùng sẽ bỏ ghi chú, không ghép lặp nội dung.
+  orderForm.value.note = orderForm.value.note === suggestion ? '' : suggestion
+}
 </script>

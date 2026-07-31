@@ -1363,6 +1363,123 @@
   }
 }
 
+.cancellation-reasons__total {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid #f2c8cc;
+  border-radius: 999px;
+  background: #fff6f7;
+  color: #bd1f2d;
+  font-weight: 700;
+}
+
+.analytics-history-divider {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 22px;
+  border: 1px solid #dbe5ef;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #f8fafc, #eef4fa);
+}
+
+.analytics-history-divider span {
+  color: #607187;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.analytics-history-divider h2 {
+  margin: 3px 0;
+  color: #132b4f;
+  font-size: 20px;
+}
+
+.analytics-history-divider p {
+  margin: 0;
+  color: #66778e;
+}
+
+.analytics-history-divider > i {
+  color: #3974bb;
+  font-size: 30px;
+}
+
+.cancellation-reasons__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+}
+
+.cancellation-reason {
+  padding: 14px;
+  border: 1px solid #e1e8f0;
+  border-radius: 14px;
+  background: #fbfcfe;
+}
+
+.cancellation-reason__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.cancellation-reason__top strong {
+  color: #172b4d;
+}
+
+.cancellation-reason__top span {
+  flex: 0 0 auto;
+  color: #607187;
+  font-weight: 700;
+}
+
+.cancellation-reason__track {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8edf3;
+}
+
+.cancellation-reason__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #e43142, #ff7b62);
+}
+
+.cancellation-reason small {
+  display: block;
+  margin-top: 8px;
+  font-weight: 600;
+}
+
+.cancellation-reason small.is-positive {
+  color: #14804a;
+}
+
+.cancellation-reason small.is-negative {
+  color: #c52835;
+}
+
+.cancellation-reason small.is-neutral {
+  color: #728197;
+}
+
+.cancellation-reasons__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 100px;
+  color: #14804a;
+  font-weight: 650;
+}
+
 @media (max-width: 760px) {
   .business-analytics {
     padding: 14px;
@@ -1467,6 +1584,16 @@
   .analytics-product-signals > div:first-child {
     border-right: 0;
     border-bottom: 1px solid #e5ebf2;
+  }
+
+  .cancellation-reasons__list {
+    grid-template-columns: 1fr;
+  }
+
+  .cancellation-reason__top {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .analytics-chart-legend {

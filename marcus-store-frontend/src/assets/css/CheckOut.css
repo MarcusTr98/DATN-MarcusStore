@@ -732,6 +732,51 @@
   background: #fff;
 }
 
+.checkout-note-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.checkout-note-suggestion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border: 1px solid #d8e1ec;
+  border-radius: 999px;
+  background: #fff;
+  color: #536273;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
+}
+
+.checkout-note-suggestion:hover,
+.checkout-note-suggestion.is-selected {
+  border-color: #df1f2d;
+  background: #fff3f4;
+  color: #c91523;
+}
+
+.checkout-note-suggestion i {
+  font-size: 10px;
+}
+
+.checkout-note-counter {
+  display: block;
+  margin-top: 5px;
+  color: #8491a2;
+  font-size: 12px;
+  text-align: right;
+}
+
 /*
    PAYMENT & SHIPPING OPTIONS
   */

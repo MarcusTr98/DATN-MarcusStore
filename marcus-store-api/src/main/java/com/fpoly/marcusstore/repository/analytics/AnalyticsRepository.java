@@ -188,6 +188,58 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
             @Param("previousFrom") LocalDateTime previousFrom,
             @Param("previousToExclusive") LocalDateTime previousToExclusive);
 
+    /**
+     * Marcus thêm: mỗi đơn chỉ lấy một sự kiện CANCELLED mới nhất và gom ghi chú
+     * về nhóm nghiệp vụ an toàn trước khi đưa sang Analytics/AI.
+     */
+    @Query(value = """
+            WITH CancelEvents AS (
+                SELECT
+                    history.order_id,
+                    history.note,
+                    history.created_at,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY history.order_id
+                        ORDER BY history.created_at DESC, history.history_id DESC
+                    ) AS eventRank
+                FROM Order_Status_History history
+                WHERE history.status = 'CANCELLED'
+            ),
+            NormalizedReasons AS (
+                SELECT
+                    CASE
+                        WHEN note LIKE N'%Đặt nhầm sản phẩm hoặc số lượng%'
+                            THEN N'Đặt nhầm sản phẩm hoặc số lượng'
+                        WHEN note LIKE N'%thay đổi địa chỉ nhận hàng%'
+                            THEN N'Muốn thay đổi địa chỉ nhận hàng'
+                        WHEN note LIKE N'%sản phẩm hoặc giá phù hợp hơn%'
+                            THEN N'Tìm được sản phẩm hoặc giá phù hợp hơn'
+                        WHEN note LIKE N'%Thời gian giao hàng không phù hợp%'
+                            THEN N'Thời gian giao hàng không phù hợp'
+                        WHEN note LIKE N'%Không còn nhu cầu mua%'
+                            THEN N'Không còn nhu cầu mua'
+                        WHEN UPPER(COALESCE(note, '')) LIKE '%VNPAY%'
+                          OR LOWER(COALESCE(note, '')) LIKE N'%thanh toán%'
+                          OR LOWER(COALESCE(note, '')) LIKE N'%hết hạn%'
+                            THEN N'Thanh toán gián đoạn hoặc hết hạn'
+                        WHEN note IS NULL OR LTRIM(RTRIM(note)) = ''
+                            THEN N'Không ghi nhận lý do'
+                        ELSE N'Lý do khác'
+                    END AS reason
+                FROM CancelEvents
+                WHERE eventRank = 1
+                  AND created_at >= :fromDateTime
+                  AND created_at < :toDateTimeExclusive
+            )
+            SELECT reason, COUNT_BIG(*) AS reasonCount
+            FROM NormalizedReasons
+            GROUP BY reason
+            ORDER BY reasonCount DESC, reason
+            """, nativeQuery = true)
+    List<CancellationReasonProjection> findCancellationReasons(
+            @Param("fromDateTime") LocalDateTime fromDateTime,
+            @Param("toDateTimeExclusive") LocalDateTime toDateTimeExclusive);
+
     interface SalesSummaryProjection {
         Long getTotalOrders();
 
@@ -228,5 +280,11 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
         BigDecimal getCurrentMerchandiseSales();
 
         BigDecimal getPreviousMerchandiseSales();
+    }
+
+    interface CancellationReasonProjection {
+        String getReason();
+
+        Long getReasonCount();
     }
 }

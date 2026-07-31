@@ -28,6 +28,7 @@ export function useBusinessAnalytics() {
   const overview = ref(null)
   const dailyTrend = ref([])
   const products = ref([])
+  const cancellationReasons = ref([])
   const loading = ref(false)
   const errorMessage = ref('')
   const aiReport = ref(null)
@@ -264,11 +265,12 @@ export function useBusinessAnalytics() {
     const params = { fromDate: fromDate.value, toDate: toDate.value }
 
     try {
-      const [overviewResponse, trendResponse, productsResponse, aiUsageResponse] =
+      const [overviewResponse, trendResponse, productsResponse, cancellationResponse, aiUsageResponse] =
         await Promise.all([
           analyticsApi.getOverview(params),
           analyticsApi.getSalesTrend(params),
           analyticsApi.getProductTrends({ ...params, limit: 12 }),
+          analyticsApi.getCancellationReasons(params),
           // Marcus sửa: telemetry là phần bổ sung; chưa chạy migration không được
           // làm hỏng toàn bộ trang phân tích kinh doanh.
           analyticsApi.getAiUsageSummary(params).catch(() => null),
@@ -278,6 +280,7 @@ export function useBusinessAnalytics() {
       overview.value = unwrap(overviewResponse)
       dailyTrend.value = unwrap(trendResponse) || []
       products.value = unwrap(productsResponse) || []
+      cancellationReasons.value = unwrap(cancellationResponse) || []
       aiUsage.value = unwrap(aiUsageResponse) || null
       await loadSavedAiReport(currentRequest)
     } catch (error) {
@@ -319,6 +322,7 @@ export function useBusinessAnalytics() {
     aiLoading,
     aiReport,
     aiUsage,
+    cancellationReasons,
     errorMessage,
     fromDate,
     forecast,

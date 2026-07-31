@@ -12,7 +12,7 @@
   <!-- ===== MAIN CONTENT ===== -->
   <main class="home-page-upgraded">
     <!-- ============ HERO SLIDER ============ -->
-    <section class="hero" @mouseenter="pauseHeroSlider" @mouseleave="resumeHeroSlider">
+    <section class="hero">
       <div class="hero-grid" aria-hidden="true"></div>
       <div class="hero-glow"></div>
       <div class="hero-orb hero-orb-one" aria-hidden="true"></div>
@@ -199,8 +199,6 @@ const {
   currentTime,
   currentDate,
   brandBanners,
-  pauseHeroSlider,
-  resumeHeroSlider,
 } = useHomePage()
 </script>
 

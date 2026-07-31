@@ -42,37 +42,6 @@
       <span>{{ error }}</span>
     </div>
 
-    <div v-if="usage" class="ai-briefing__usage">
-      <article>
-        <span><i class="bi bi-chat-dots"></i></span>
-        <div>
-          <strong>{{ formatNumber(usage.successfulChats) }}</strong
-          ><small>Lượt tư vấn thành công</small>
-        </div>
-      </article>
-      <article>
-        <span><i class="bi bi-people"></i></span>
-        <div>
-          <strong>{{ formatNumber(usage.uniqueSessions) }}</strong
-          ><small>Phiên AI ẩn danh</small>
-        </div>
-      </article>
-      <article>
-        <span><i class="bi bi-cursor"></i></span>
-        <div>
-          <strong>{{ formatNumber(usage.productClicks) }}</strong
-          ><small>Click sang sản phẩm</small>
-        </div>
-      </article>
-      <article>
-        <span><i class="bi bi-bullseye"></i></span>
-        <div>
-          <strong>{{ formatPercent(usage.clickThroughRate) }}</strong
-          ><small>Tỷ lệ click từ AI</small>
-        </div>
-      </article>
-    </div>
-
     <template v-if="report">
       <div class="ai-briefing__meta">
         <span :class="`outlook-${report.outlook.toLowerCase()}`">
@@ -87,6 +56,26 @@
           <i class="bi bi-database-check"></i>
           Chỉ dùng dữ liệu tổng hợp
         </span>
+      </div>
+
+      <div v-if="report.productOutlooks.length" class="ai-product-outlooks">
+        <div class="ai-product-outlooks__title">
+          <i class="bi bi-stars"></i>
+          <div>
+            <strong>Dự báo xu hướng sản phẩm từ AI</strong>
+            <small>AI đối chiếu biến động bán hàng giữa kỳ hiện tại và kỳ liền trước</small>
+          </div>
+        </div>
+        <article v-for="product in report.productOutlooks" :key="product.productId">
+          <span :class="`direction-${product.direction.toLowerCase()}`">
+            <i :class="directionIcon(product.direction)"></i>
+          </span>
+          <div>
+            <strong>{{ product.productName }}</strong>
+            <p>{{ product.reason }}</p>
+          </div>
+          <em>{{ directionLabel(product.direction) }}</em>
+        </article>
       </div>
 
       <div class="ai-briefing__content">
@@ -126,31 +115,42 @@
         </div>
       </div>
 
-      <div v-if="report.productOutlooks.length" class="ai-product-outlooks">
-        <div class="ai-product-outlooks__title">
-          <i class="bi bi-boxes"></i>
-          <div>
-            <strong>AI dự đoán hướng sản phẩm</strong>
-            <small>Dựa trên biến động bán hàng giữa hai kỳ</small>
-          </div>
-        </div>
-        <article v-for="product in report.productOutlooks" :key="product.productId">
-          <span :class="`direction-${product.direction.toLowerCase()}`">
-            <i :class="directionIcon(product.direction)"></i>
-          </span>
-          <div>
-            <strong>{{ product.productName }}</strong>
-            <p>{{ product.reason }}</p>
-          </div>
-          <em>{{ directionLabel(product.direction) }}</em>
-        </article>
-      </div>
-
       <footer class="ai-briefing__footer">
         <i class="bi bi-shield-lock"></i>
         {{ report.disclaimer }}
       </footer>
     </template>
+
+    <div v-if="usage" class="ai-briefing__usage">
+      <article>
+        <span><i class="bi bi-chat-dots"></i></span>
+        <div>
+          <strong>{{ formatNumber(usage.successfulChats) }}</strong
+          ><small>Phản hồi AI thành công</small>
+        </div>
+      </article>
+      <article>
+        <span><i class="bi bi-people"></i></span>
+        <div>
+          <strong>{{ formatNumber(usage.uniqueSessions) }}</strong
+          ><small>Phiên AI ẩn danh</small>
+        </div>
+      </article>
+      <article>
+        <span><i class="bi bi-cursor"></i></span>
+        <div>
+          <strong>{{ formatNumber(usage.productClicks) }}</strong
+          ><small>Click sang sản phẩm</small>
+        </div>
+      </article>
+      <article>
+        <span><i class="bi bi-bullseye"></i></span>
+        <div>
+          <strong>{{ formatPercent(usage.clickThroughRate) }}</strong
+          ><small>Tỷ lệ click từ AI</small>
+        </div>
+      </article>
+    </div>
   </section>
 </template>
 
