@@ -133,8 +133,9 @@ export function useCheckoutPage() {
     // Khách chọn "Tiếp tục với giá gốc" → KHÔNG xóa SP, chỉ ẩn modal.
     // Giá đã được sync về giá gốc từ server, khách có thể tiếp tục checkout bình thường.
 
-    // Dọn snapshot cục bộ để tránh đọc lại dữ liệu cũ ở lần vào Checkout kế tiếp.
-    localStorage.removeItem('selectedCartItems')
+    // Marcus sửa: không xóa phạm vi sản phẩm đã chọn. findCancelledFlashSaleItem
+    // đã đồng bộ giá server; giữ snapshot mới giúp F5 không kéo cả giỏ vào Checkout.
+    persistCheckoutSelection()
     localStorage.removeItem('selectedVoucher')
   }
 
@@ -156,6 +157,7 @@ export function useCheckoutPage() {
 
     // 2) Dọn snapshot cục bộ để tránh đọc lại dữ liệu cũ ở lần vào Checkout kế tiếp.
     localStorage.removeItem('selectedCartItems')
+    localStorage.removeItem('selectedCartItemIds')
     localStorage.removeItem('selectedVoucher')
 
     // 3) Điều hướng về trang chủ thay vì reload toàn trang.
@@ -191,9 +193,7 @@ export function useCheckoutPage() {
     const revertedItems = [] // Lưu các cartItemId vừa bị revert giá (để hiện cảnh báo)
     if (Array.isArray(cartData.value.items)) {
       for (const fresh of serverItems) {
-        const idx = cartData.value.items.findIndex(
-          (i) => i.cartItemId === fresh.cartItemId,
-        )
+        const idx = cartData.value.items.findIndex((i) => i.cartItemId === fresh.cartItemId)
         if (idx !== -1) {
           const oldItem = cartData.value.items[idx]
           // Phát hiện SP Flash Sale bị admin hủy → giá vừa revert từ giá FS về giá gốc
@@ -219,6 +219,15 @@ export function useCheckoutPage() {
           // Cập nhật giá + trạng thái Flash Sale theo server
           cartData.value.items[idx] = {
             ...oldItem,
+            // Marcus sửa: snapshot cũ từ Cart có thể thiếu skuId. Luôn bù lại
+            // toàn bộ định danh và nội dung authoritative từ cart server.
+            cartItemId: fresh.cartItemId ?? oldItem.cartItemId,
+            skuId: fresh.skuId ?? oldItem.skuId,
+            skuCode: fresh.skuCode ?? oldItem.skuCode,
+            productName: fresh.productName ?? oldItem.productName,
+            variantName: fresh.variantName ?? fresh.variantText ?? oldItem.variantName,
+            thumbnailUrl: fresh.thumbnailUrl ?? oldItem.thumbnailUrl,
+            quantity: Number(fresh.quantity ?? oldItem.quantity ?? 1),
             price: fresh.price ?? oldItem.price,
             totalPrice: fresh.totalPrice ?? oldItem.totalPrice,
             originalPrice: fresh.originalPrice ?? oldItem.originalPrice,
@@ -244,12 +253,15 @@ export function useCheckoutPage() {
         (sum, i) => sum + (i.totalPrice || 0),
         0,
       )
-      localStorage.setItem('selectedCartItems', JSON.stringify(cartData.value.items))
+      persistCheckoutSelection()
     }
 
     // Emit sự kiện revert để UI hiện modal thông báo
     if (revertedItems.length > 0) {
       priceRevertedItems.value = revertedItems
+      // Marcus sửa: giá đổi phải kéo theo shipping/voucher mới; không giữ kết
+      // quả được tính khi cartTotal còn bằng 0 hoặc đang ở giá Flash Sale cũ.
+      await refreshPricingAfterCartChange()
       // Hiện modal cancelled để thông báo cho user biết giá đã revert
       if (!showCancelledModal.value) {
         openCancelledModal()
@@ -338,6 +350,70 @@ export function useCheckoutPage() {
   }
 
   const cartData = ref(getInitialCartData())
+
+  function readSelectedCartItemIds() {
+    try {
+      const storedIds = JSON.parse(localStorage.getItem('selectedCartItemIds') || '[]')
+      if (Array.isArray(storedIds) && storedIds.length) {
+        return storedIds.map(Number).filter(Number.isInteger)
+      }
+    } catch {
+      localStorage.removeItem('selectedCartItemIds')
+    }
+
+    // Marcus tương thích snapshot cũ trước khi Cart bổ sung selectedCartItemIds.
+    return (cartData.value.items || [])
+      .map((item) => Number(item.cartItemId))
+      .filter(Number.isInteger)
+  }
+
+  function persistCheckoutSelection() {
+    const items = Array.isArray(cartData.value.items) ? cartData.value.items : []
+    const ids = items.map((item) => Number(item.cartItemId)).filter(Number.isInteger)
+    localStorage.setItem('selectedCartItems', JSON.stringify(items))
+    localStorage.setItem('selectedCartItemIds', JSON.stringify(ids))
+  }
+
+  function normalizeServerCartItem(item) {
+    const quantity = Number(item.quantity || 1)
+    const price = Number(item.price || 0)
+    return {
+      ...item,
+      cartItemId: Number(item.cartItemId),
+      skuId: item.skuId == null ? null : Number(item.skuId),
+      productName: item.productName || item.name || '',
+      variantName:
+        item.variantName ||
+        item.variantText ||
+        [item.color, item.storage].filter(Boolean).join(' / '),
+      quantity,
+      price,
+      totalPrice: Number(item.totalPrice || price * quantity),
+      isFlashSale: item.isFlashSale === true,
+    }
+  }
+
+  function reconcileSelectedItems(fetchedCart) {
+    const serverItems = Array.isArray(fetchedCart?.items) ? fetchedCart.items : []
+    const selectedIds = new Set(readSelectedCartItemIds())
+
+    // Marcus sửa: thiếu snapshot không được tự hiểu là khách chọn toàn bộ giỏ.
+    if (selectedIds.size === 0) {
+      cartData.value = { items: [], totalQuantity: 0, totalAmount: 0 }
+      return
+    }
+
+    const selectedItems = serverItems
+      .filter((item) => selectedIds.has(Number(item.cartItemId)))
+      .map(normalizeServerCartItem)
+
+    cartData.value = {
+      items: selectedItems,
+      totalQuantity: selectedItems.reduce((sum, item) => sum + item.quantity, 0),
+      totalAmount: selectedItems.reduce((sum, item) => sum + item.totalPrice, 0),
+    }
+    persistCheckoutSelection()
+  }
 
   // Marcus sửa: dữ liệu localStorage hỏng không được làm trang Checkout bị trắng.
   const getSavedVoucher = () => {
@@ -665,6 +741,17 @@ export function useCheckoutPage() {
     }
   }
 
+  async function refreshPricingAfterCartChange() {
+    const tasks = []
+    if (!isStorePickup.value && isAddressReady.value) {
+      tasks.push(calculateShippingFee())
+    }
+    if (appliedVoucherCode.value) {
+      tasks.push(previewVoucher())
+    }
+    await Promise.allSettled(tasks)
+  }
+
   // ─── 2. Sổ địa chỉ
   const fetchMyAddresses = async () => {
     try {
@@ -756,8 +843,15 @@ export function useCheckoutPage() {
       const data = res.data
       const fetchedCart = data?.data ?? data
 
-      if (!cartData.value.items?.length && fetchedCart.items?.length) {
-        cartData.value = fetchedCart
+      // Marcus sửa: luôn lấy giá/SKU mới nhất từ server nhưng chỉ giữ đúng tập
+      // cartItemId khách đã chọn, kể cả sau F5 hoặc Flash Sale vừa revert giá.
+      reconcileSelectedItems(fetchedCart)
+      if (!cartData.value.items.length) {
+        showModal(
+          'Chưa chọn sản phẩm',
+          'Không tìm thấy sản phẩm đã chọn để thanh toán. Vui lòng quay lại giỏ hàng.',
+          'redirect_cart',
+        )
       }
     } catch (error) {
       if (error.response?.status === 401) {
@@ -801,6 +895,20 @@ export function useCheckoutPage() {
     // server xác nhận vẫn còn lỗi (đã refetch + đồng bộ lại giá bên trong hàm này).
     if (await findCancelledFlashSaleItem()) {
       openCancelledModal()
+      return
+    }
+
+    // Marcus thêm: chặn sớm snapshot thiếu định danh thay vì tạo đơn xong mới
+    // phát hiện không thể dọn đúng SKU khỏi giỏ.
+    const hasInvalidIdentity = cartData.value.items.some(
+      (item) => !Number.isInteger(Number(item.cartItemId)) || !Number.isInteger(Number(item.skuId)),
+    )
+    if (hasInvalidIdentity) {
+      showModal(
+        'Dữ liệu giỏ hàng chưa đồng bộ',
+        'Không xác định được SKU của một sản phẩm. Vui lòng quay lại giỏ hàng và chọn lại sản phẩm.',
+        'redirect_cart',
+      )
       return
     }
 
@@ -874,10 +982,13 @@ export function useCheckoutPage() {
     try {
       const { data } = await api.post('/checkout', payload)
 
-      const paidSkuIds = cartData.value.items.map((i) => i.skuId)
+      const paidSkuIds = cartData.value.items
+        .map((item) => Number(item.skuId))
+        .filter(Number.isInteger)
       await cartStore.removeManyItemFromCart(paidSkuIds)
 
       localStorage.removeItem('selectedCartItems')
+      localStorage.removeItem('selectedCartItemIds')
       localStorage.removeItem('selectedSubtotal')
       localStorage.removeItem('selectedVoucher')
 
@@ -946,13 +1057,11 @@ export function useCheckoutPage() {
       })
       .catch(() => {})
     await prefillUserEmail()
-    await Promise.allSettled([
-      fetchGhnProvinces(),
-      fetchCart(),
-      fetchMyAddresses(),
-      // Tải slot FS để phát hiện slot CANCELLED trước khi user bấm Đặt hàng.
-      flashSaleStore.fetchClientSlots(20),
-    ])
+    // Marcus sửa thứ tự khởi tạo: phải có giỏ authoritative trước khi địa chỉ
+    // gọi tính phí GHN; tránh cartTotal=0 rồi giữ cảnh báo tối thiểu bị stale.
+    await Promise.allSettled([fetchGhnProvinces(), flashSaleStore.fetchClientSlots(20)])
+    await fetchCart()
+    await fetchMyAddresses()
     // Preview voucher nếu có voucher được chọn từ cart
     if (appliedVoucherCode.value) {
       await previewVoucher()
