@@ -78,6 +78,7 @@
       <div v-for="t in toasts" :key="t.id" class="toast" :class="t.type">{{ t.message }}</div>
     </div>
 
+    <!-- Modal xác nhận ẩn bài -->
     <Teleport to="body">
       <div v-if="confirmHidePost" class="modal-overlay" @click.self="cancelHideConfirm">
         <div class="modal-box">
@@ -98,6 +99,29 @@
       </div>
     </Teleport>
 
+    <!-- FIX: Modal cảnh báo khi toggle bài đang hẹn lịch -->
+    <Teleport to="body">
+      <div v-if="confirmScheduledPost" class="modal-overlay" @click.self="cancelScheduledConfirm">
+        <div class="modal-box">
+          <div class="modal-header">
+            <i class="bi bi-clock-history warn-icon"></i>
+            <span class="modal-title">Bài viết đang được hẹn lịch</span>
+          </div>
+          <p class="modal-body">
+            Bài viết "<strong>{{ confirmScheduledPost.title }}</strong>" đang hẹn đăng lúc
+            <strong>{{ formatDate(confirmScheduledPost.publishedAt) }}</strong>.<br/>
+            Nếu ẩn bài này, lịch hẹn sẽ bị huỷ và cần đặt lại khi xuất bản lại.
+          </p>
+          <div class="modal-actions">
+            <button class="btn-cancel-modal" @click="cancelScheduledConfirm">Giữ lịch hẹn</button>
+            <button class="btn-confirm-hide" @click="confirmScheduledHide">
+              <i class="bi bi-eye-slash"></i> Vẫn ẩn bài
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
@@ -108,26 +132,33 @@ import PostTable from './PostTable.vue';
 import PostForm from './PostForm.vue';
 import { postApi } from '@/api/PostApi';
 
-const view = ref('list'); 
-const editingPost = ref(null); 
+const view = ref('list');
+const editingPost = ref(null);
 const confirmHidePost = ref(null);
+const confirmScheduledPost = ref(null);
 
 const posts = ref([]);
 const rawCategories = ref([]);
 const loading = ref(true);
 const loadError = ref('');
 const toasts = ref([]);
+
 function pushToast(type, message) {
   const id = Date.now() + Math.random();
   toasts.value.push({ id, type, message });
   setTimeout(() => { toasts.value = toasts.value.filter((t) => t.id !== id); }, 3200);
 }
 
+function formatDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('vi-VN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
 const categoryOptions = computed(() =>
-  rawCategories.value.map((c) => ({
-    value: c.id,
-    label: c.name,
-  }))
+  rawCategories.value.map((c) => ({ value: c.id, label: c.name }))
 );
 
 const filters = reactive({ search: '', categoryId: '', status: '' });
@@ -223,33 +254,50 @@ async function onFormSaved() {
   await loadAll();
 }
 
-// Bật công khai -> làm ngay. Ẩn bài viết -> hỏi xác nhận trước rồi mới ẩn ngay lập tức.
 function handleToggle(post) {
   const wantPublish = !post.isPublished;
+
   if (!wantPublish) {
+    if (computeStatus(post) === 'scheduled') {
+      confirmScheduledPost.value = post;
+      return;
+    }
     confirmHidePost.value = post;
     return;
   }
   executeToggle(post, true);
 }
 
-function cancelHideConfirm() {
-  confirmHidePost.value = null;
-}
-
+function cancelHideConfirm() { confirmHidePost.value = null; }
 function confirmHide() {
   const post = confirmHidePost.value;
   confirmHidePost.value = null;
   executeToggle(post, false);
 }
 
+function cancelScheduledConfirm() { confirmScheduledPost.value = null; }
+function confirmScheduledHide() {
+  const post = confirmScheduledPost.value;
+  confirmScheduledPost.value = null;
+  executeToggle(post, false);
+}
+
 async function executeToggle(post, newVal) {
   const idx = posts.value.findIndex((p) => p.id === post.id);
   if (idx === -1) return;
+
   posts.value[idx] = { ...posts.value[idx], isPublished: newVal };
+
   try {
     await postApi.togglePublish(post, newVal);
     pushToast('success', newVal ? 'Đã công khai bài viết.' : 'Đã ẩn bài viết.');
+   
+    try {
+      const updated = await postApi.getById(post.id);
+      posts.value[idx] = mapFromApi(updated);
+    } catch {
+    
+    }
   } catch (err) {
     posts.value[idx] = { ...posts.value[idx], isPublished: !newVal };
     pushToast('error', err?.response?.data?.message || 'Cập nhật trạng thái thất bại.');
@@ -283,7 +331,7 @@ async function executeToggle(post, newVal) {
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
 @media (max-width: 992px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
 .stat-card {
-  border: 1px solid #f3d6e3; background: #ffffff; box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+  border: 1px solid #f3d6e3; background: #ffffff; box-shadow: 0 4px 18px rgba(15,23,42,0.06);
   padding: 20px 18px; border-radius: 8px; display: flex; flex-direction: column;
   justify-content: space-between; min-height: 100px;
 }
@@ -307,7 +355,7 @@ async function executeToggle(post, newVal) {
 .toast.error { background: #fef2f2; color: #b91c1c; border: 1px solid #f5c2c7; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.46); display: flex; align-items: center; justify-content: center; z-index: 10001; padding: 20px; }
-.modal-box { background: #fff; border-radius: 14px; padding: 22px 24px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(15,23,42,0.18); }
+.modal-box { background: #fff; border-radius: 14px; padding: 22px 24px; max-width: 420px; width: 100%; box-shadow: 0 20px 60px rgba(15,23,42,0.18); }
 .modal-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .warn-icon { color: #f59e0b; font-size: 18px; }
 .modal-title { font-size: 16px; font-weight: 700; color: #111827; }

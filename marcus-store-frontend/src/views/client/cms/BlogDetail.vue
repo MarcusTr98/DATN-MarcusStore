@@ -32,8 +32,8 @@
 
           <!-- Nút Mua ngay — chỉ render khi bài có product links -->
           <div v-if="productLinks.length" class="product-links-section">
-            <div v-if="showHotBadge" class="hot-badge">
-              <i class="bi bi-fire"></i> Bán chạy
+            <div v-if="hotBadgeText" class="hot-badge">
+              <i class="bi bi-fire"></i> {{ hotBadgeText }}
             </div>
             <div class="product-links-wrap">
               <a
@@ -69,23 +69,27 @@ function formatDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
+
 const productLinks = ref([])
-const showHotBadge = ref(false)
+const hotBadgeText = ref('')
+const sanitizedContent = ref('')
 
-const sanitizedContent = computed(() => {
-  if (!post.value?.content) return ''
-
+function parsePostContent(html) {
+  if (!html) {
+    sanitizedContent.value = ''
+    productLinks.value = []
+    hotBadgeText.value = ''
+    return
+  }
   const parser = new DOMParser()
-  const doc = parser.parseFromString(post.value.content, 'text/html')
+  const doc = parser.parseFromString(html, 'text/html')
 
-  // Đọc trạng thái badge
-  const badgeEl = doc.querySelector('span[data-hot-badge="true"]')
-  showHotBadge.value = !!badgeEl
+  const badgeEl = doc.querySelector('span[data-hot-badge]')
+  hotBadgeText.value = badgeEl ? (badgeEl.getAttribute('data-hot-badge') || '') : ''
   badgeEl?.remove()
 
   const anchors = doc.querySelectorAll('a[data-product-link="true"]')
   const links = []
-
   anchors.forEach(a => {
     links.push({
       href: a.getAttribute('href') || '#',
@@ -93,16 +97,21 @@ const sanitizedContent = computed(() => {
     })
     a.remove()
   })
-
   productLinks.value = links
-  return doc.body.innerHTML
-})
+  sanitizedContent.value = doc.body.innerHTML
+}
+
+watch(() => post.value?.content, (newContent) => {
+  parsePostContent(newContent || '')
+}, { immediate: true })
 
 async function loadPost(slug) {
   loading.value = true
   loadError.value = ''
   post.value = null
   productLinks.value = []
+  hotBadgeText.value = ''
+  sanitizedContent.value = ''
   try {
     post.value = await postPublicApi.getBySlug(slug)
   } catch (err) {

@@ -40,7 +40,7 @@ public class AdminPostController {
         return ApiResponse.success(postService.getOne(id));
     }
 
-   
+    // GET /api/admin/posts/check-slug
     @GetMapping("/check-slug")
     public ApiResponse<Map<String, Boolean>> checkSlug(
             @RequestParam String slug,
@@ -49,7 +49,7 @@ public class AdminPostController {
         return ApiResponse.success(Map.of("exists", exists));
     }
 
-        // POST /api/admin/posts/upload-image
+    // POST /api/admin/posts/upload-image
     @PostMapping(value = "/upload-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('POST_CREATE')")
     public ApiResponse<Map<String, String>> uploadImage(@RequestParam("file") MultipartFile file) {
@@ -61,8 +61,7 @@ public class AdminPostController {
         }
     }
 
-
-     // POST /api/admin/posts
+    // POST /api/admin/posts
     @PostMapping
     @PreAuthorize("hasAuthority('POST_CREATE')")
     public ApiResponse<PostResponseDTO> add(@Valid @RequestBody PostRequestDTO req) {
@@ -81,8 +80,8 @@ public class AdminPostController {
     // DELETE /api/admin/posts/{id}
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('POST_DELETE')")
-    public ApiResponse<Void> remove(@PathVariable Integer id) {
-        postService.remove(id);
-        return ApiResponse.success("Xóa post thành công");
+    public ApiResponse<String> remove(@PathVariable Integer id) {
+        postService.unpublish(id);
+        return ApiResponse.success("Ẩn bài viết thành công");
     }
 }

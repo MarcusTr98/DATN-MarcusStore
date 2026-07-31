@@ -94,42 +94,84 @@
         <!-- ── Liên kết sản phẩm ── -->
         <div class="page-card pad">
           <p class="section-title">Liên kết sản phẩm</p>
-          <p class="section-sub">Không bắt buộc — nếu điền, sẽ hiện nút "🛒 Mua ngay" ở cuối bài viết.</p>
+          <p class="section-sub">Không bắt buộc — nếu chọn, sẽ hiện nút "🛒 Mua ngay" ở cuối bài viết.</p>
 
           <div v-for="(link, i) in productLinks" :key="i" class="product-link-row">
-            <input
-              class="form-input"
-              type="text"
-              v-model="link.label"
-              placeholder="Tên sản phẩm (vd: iPhone 18 Pro Max)"
-              style="margin-bottom: 6px;"
-            />
-            <div style="display:flex; gap:8px; align-items:center;">
-              <input
-                class="form-input"
-                type="url"
-                v-model="link.href"
-                placeholder="URL sản phẩm (vd: /products/iphone-18-pro-max)"
-                style="flex:1;"
-              />
+            <!-- Autocomplete search -->
+            <div class="product-search-wrap" v-click-outside="() => closeDropdown(i)">
+              <div class="product-search-input-wrap">
+                <i class="bi bi-search product-search-icon"></i>
+                <input
+                  class="form-input product-search-input"
+                  type="text"
+                  :value="link._query"
+                  placeholder="Gõ tên sản phẩm để tìm kiếm..."
+                  @input="onProductSearch($event.target.value, i)"
+                  @focus="onSearchFocus(i)"
+                />
+                <button v-if="link.productId" type="button" class="product-search-clear" @click="clearProduct(i)" title="Xoá lựa chọn">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </div>
+
+              <!-- Dropdown gợi ý -->
+              <div v-if="link._open && (link._results.length || link._searching)" class="product-dropdown">
+                <div v-if="link._searching" class="product-dropdown-loading">
+                  <i class="bi bi-arrow-repeat spin-icon"></i> Đang tìm...
+                </div>
+                <div v-else-if="!link._results.length" class="product-dropdown-empty">
+                  Không tìm thấy sản phẩm nào
+                </div>
+                <div
+                  v-else
+                  v-for="p in link._results"
+                  :key="p.productId"
+                  class="product-dropdown-item"
+                  @mousedown.prevent="selectProduct(p, i)"
+                >
+                  <img v-if="p.thumbnailUrl" :src="p.thumbnailUrl" class="product-dropdown-thumb" alt="" />
+                  <div v-else class="product-dropdown-thumb-placeholder"><i class="bi bi-image"></i></div>
+                  <div class="product-dropdown-info">
+                    <div class="product-dropdown-name">{{ p.productName }}</div>
+                    <div class="product-dropdown-meta">{{ p.brand }} · /products/{{ p.slug }}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Sản phẩm đã chọn -->
+            <div v-if="link.productId" class="product-selected-preview">
+              <img v-if="link.thumbnailUrl" :src="link.thumbnailUrl" class="product-selected-thumb" alt="" />
+              <div v-else class="product-selected-thumb-placeholder"><i class="bi bi-image"></i></div>
+              <div class="product-selected-info">
+                <span class="product-selected-name">{{ link.label }}</span>
+                <span class="product-selected-url">/products/{{ link.slug }}</span>
+              </div>
               <button type="button" class="btn-remove-link" @click="removeProductLink(i)" title="Xoá">
                 <i class="bi bi-trash3"></i>
               </button>
             </div>
           </div>
 
-          <div class="toggle-row" style="margin-bottom: 12px;">
-            <span class="toggle-label">
-              <i class="bi bi-fire"></i> Hiện badge "Bán chạy"
-            </span>
-            <label class="toggle">
-              <input type="checkbox" v-model="showHotBadge" />
-              <span class="toggle-slider"></span>
-            </label>
+          <!-- Badge text tự điền -->
+          <div class="badge-text-row">
+            <label class="badge-text-label"><i class="bi bi-tag"></i> Nhãn badge (tuỳ chọn)</label>
+            <div class="badge-text-input-wrap">
+              <input
+                class="form-input"
+                type="text"
+                v-model="hotBadgeText"
+                maxlength="30"
+                placeholder="VD: Bán chạy, Hot, Mới về, Sale 50%... (bỏ trống = ẩn badge)"
+              />
+              <span v-if="hotBadgeText.trim()" class="badge-text-preview">
+                <i class="bi bi-fire"></i> {{ hotBadgeText }}
+              </span>
+            </div>
           </div>
 
           <button type="button" class="btn-add-link" @click="addProductLink">
-            <i class="bi bi-plus-circle me-1"></i>Thêm sản phẩm
+            <i class="bi bi-plus-circle"></i> Thêm sản phẩm
           </button>
         </div>
       </div>
@@ -229,6 +271,7 @@
 <script setup>
 import { reactive, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import { postApi } from '@/api/PostApi';
+import api from '@/utils/api';
 import PostEditor from './Posteditor.vue';
 
 const props = defineProps({
@@ -262,37 +305,129 @@ const uploading = ref(false);
 const uploadPercent = ref(0);
 const uploadError = ref('');
 
-const productLinks = ref([]) // [{ label: '', href: '' }]
-const showHotBadge = ref(false)
+const productLinks = ref([])
+const hotBadgeText = ref('')   // tuỳ chọn — bỏ trống = ẩn badge
+
+function emptyLink() {
+  return { productId: null, label: '', slug: '', href: '', thumbnailUrl: '', _query: '', _open: false, _results: [], _searching: false, _timer: null }
+}
+
+const MAX_PRODUCT_LINKS = 5
 
 function addProductLink() {
-  productLinks.value.push({ label: '', href: '' })
+  if (productLinks.value.length >= MAX_PRODUCT_LINKS) {
+    pushToast('error', `Tối đa ${MAX_PRODUCT_LINKS} sản phẩm mỗi bài viết.`)
+    return
+  }
+  productLinks.value.push(emptyLink())
 }
 
 function removeProductLink(i) {
   productLinks.value.splice(i, 1)
 }
 
+function closeDropdown(i) {
+  if (productLinks.value[i]) productLinks.value[i]._open = false
+}
+
+function onSearchFocus(i) {
+  const link = productLinks.value[i]
+  if (link._query && link._results.length) link._open = true
+}
+
+function onProductSearch(val, i) {
+  const link = productLinks.value[i]
+  link._query = val
+  if (!val.trim()) {
+    // Xoá hết text → reset toàn bộ selection
+    Object.assign(link, emptyLink())
+    return
+  }
+  link.productId = null  // clear selection khi gõ mới
+  link._open = true
+  link._searching = true
+  clearTimeout(link._timer)
+  link._timer = setTimeout(() => searchProducts(val, i), 320)
+}
+
+async function searchProducts(keyword, i) {
+  const link = productLinks.value[i]
+  if (!link) return  // guard: link có thể bị xoá khi đang debounce
+  try {
+    const res = await api.get('/admin/product', { params: { keyword, filter: 'all', page: 0, size: 8 } })
+    // Guard lại sau await vì component có thể đã unmount
+    if (!productLinks.value[i]) return
+    const payload = res.data?.data ?? res.data
+    const items = Array.isArray(payload) ? payload : (payload.content ?? [])
+    productLinks.value[i]._results = items
+  } catch {
+    if (productLinks.value[i]) productLinks.value[i]._results = []
+  } finally {
+    if (productLinks.value[i]) productLinks.value[i]._searching = false
+  }
+}
+
+function selectProduct(p, i) {
+  // Validate: không cho chọn trùng sản phẩm đã có ở dòng khác
+  const duplicate = productLinks.value.some((l, idx) => idx !== i && l.productId === p.productId)
+  if (duplicate) {
+    pushToast('error', `"${p.productName}" đã được thêm rồi.`)
+    return
+  }
+  const link = productLinks.value[i]
+  link.productId = p.productId
+  link.label = p.productName
+  link.slug = p.slug
+  link.href = `/products/${p.slug}`
+  link.thumbnailUrl = p.thumbnailUrl || ''
+  link._query = p.productName
+  link._open = false
+  link._results = []
+}
+
+function clearProduct(i) {
+  const link = productLinks.value[i]
+  Object.assign(link, emptyLink())
+}
+
+const vClickOutside = {
+  mounted(el, binding) {
+    el._clickOutsideHandler = (e) => { if (!el.contains(e.target)) binding.value(e) }
+    document.addEventListener('mousedown', el._clickOutsideHandler)
+  },
+  unmounted(el) {
+    document.removeEventListener('mousedown', el._clickOutsideHandler)
+  }
+}
+
+function sanitizeBadgeText(text) {
+  return text.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
 function parseProductLinksFromContent(html) {
-  if (!html) return { links: [], cleanContent: html, hotBadge: false }
+  if (!html) return { links: [], cleanContent: html, badgeText: '' }
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, 'text/html')
-  const badgeEl = doc.querySelector('span[data-hot-badge="true"]')
-  const hotBadge = !!badgeEl
+  const badgeEl = doc.querySelector('span[data-hot-badge]')
+  const badgeText = badgeEl ? (badgeEl.getAttribute('data-hot-badge') || '') : ''
   badgeEl?.remove()
   const anchors = doc.querySelectorAll('a[data-product-link="true"]')
   const links = []
   anchors.forEach(a => {
-    links.push({ label: a.textContent.trim(), href: a.getAttribute('href') || '' })
+    const href = a.getAttribute('href') || ''
+    const slug = href.replace('/products/', '')
+    links.push({ ...emptyLink(), label: a.textContent.trim(), href, slug, _query: a.textContent.trim() })
     a.remove()
   })
-  return { links, cleanContent: doc.body.innerHTML, hotBadge }
+  return { links, cleanContent: doc.body.innerHTML, badgeText }
 }
 
-function injectProductLinksIntoContent(html, links, hotBadge) {
+function injectProductLinksIntoContent(html, links, badgeText) {
   const validLinks = links.filter(l => l.label.trim() && l.href.trim())
-  if (!validLinks.length) return html
-  const badgeTag = hotBadge ? '<span data-hot-badge="true"></span>' : ''
+  const badge = badgeText.trim()
+  // Chỉ inject nếu có ít nhất 1 trong 2: link hợp lệ hoặc badge text
+  if (!validLinks.length && !badge) return html
+  const badgeTag = badge ? `<span data-hot-badge="${sanitizeBadgeText(badge)}"></span>` : ''
   const linkTags = validLinks
     .map(l => `<a href="${l.href.trim()}" data-product-link="true">${l.label.trim()}</a>`)
     .join('')
@@ -333,7 +468,14 @@ const slugPreview = computed(() => slugify(form.title));
 const usingAutoExcerpt = computed(() => !form.excerpt.trim() && stripHtml(form.content).trim().length > 0);
 const effectiveExcerpt = computed(() => (form.excerpt.trim() ? form.excerpt.trim() : autoExcerpt(form.content)));
 const categoryName = computed(() => props.categories.find((c) => String(c.value) === String(form.postCategoryId))?.label);
-const isDirty = computed(() => JSON.stringify(form) !== initialSnapshot.value);
+const productLinksSnapshot = ref('')
+const hotBadgeSnapshot = ref('')
+const isDirty = computed(() => {
+  const formChanged = JSON.stringify(form) !== initialSnapshot.value
+  const linksChanged = JSON.stringify(productLinks.value.map(l => ({ productId: l.productId, href: l.href }))) !== productLinksSnapshot.value
+  const badgeChanged = hotBadgeText.value !== hotBadgeSnapshot.value
+  return formChanged || linksChanged || badgeChanged
+});
 
 function nowLocalDatetime() {
   const d = new Date();
@@ -412,10 +554,9 @@ function onDrop(e) {
 
 function initFromProps() {
   if (props.post) {
-    // Tách product links + badge ra khỏi content trước khi đưa vào editor
-    const { links, cleanContent, hotBadge } = parseProductLinksFromContent(props.post.content || '')
+    const { links, cleanContent, badgeText } = parseProductLinksFromContent(props.post.content || '')
     productLinks.value = links
-    showHotBadge.value = hotBadge
+    hotBadgeText.value = badgeText
     Object.assign(form, {
       title: props.post.title || '',
       postCategoryId: props.post.postCategoryId ?? '',
@@ -427,9 +568,11 @@ function initFromProps() {
     });
   } else {
     productLinks.value = []
-    showHotBadge.value = false
+    hotBadgeText.value = ''
     Object.assign(form, emptyForm());
   }
+  productLinksSnapshot.value = JSON.stringify(productLinks.value.map(l => ({ productId: l.productId, href: l.href })))
+  hotBadgeSnapshot.value = hotBadgeText.value
   initialSnapshot.value = JSON.stringify(form);
 }
 
@@ -442,7 +585,10 @@ function handleBeforeUnload(e) {
   }
 }
 onMounted(() => window.addEventListener('beforeunload', handleBeforeUnload));
-onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnload));
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  productLinks.value.forEach(link => clearTimeout(link._timer))
+});
 
 async function onSave() {
   form.title = form.title.trim();
@@ -466,8 +612,7 @@ async function onSave() {
     const payload = {
       title: form.title,
       postCategoryId: form.postCategoryId,
-      // Inject product links vào cuối content trước khi gửi lên BE
-      content: injectProductLinksIntoContent(form.content, productLinks.value, showHotBadge.value),
+      content: injectProductLinksIntoContent(form.content, productLinks.value, hotBadgeText.value),
       excerpt: form.excerpt || autoExcerpt(form.content),
       thumbnailUrl: form.thumbnailUrl || null,
       isPublished: form.isPublished,
@@ -480,7 +625,9 @@ async function onSave() {
       await postApi.create(payload);
     }
 
-    initialSnapshot.value = JSON.stringify(form);
+    productLinksSnapshot.value = JSON.stringify(productLinks.value.map(l => ({ productId: l.productId, href: l.href })))
+  hotBadgeSnapshot.value = hotBadgeText.value
+  initialSnapshot.value = JSON.stringify(form);
     pushToast('success', 'Đã lưu bài viết.');
     setTimeout(() => emit('saved'), 500);
   } catch (err) {
@@ -640,10 +787,6 @@ function cancelLeaveNav() {
 
 /* ── Product links ── */
 .product-link-row {
-  background: #fffafd;
-  border: 1px solid #f3d6e3;
-  border-radius: 8px;
-  padding: 12px;
   margin-bottom: 10px;
 }
 .btn-add-link {
@@ -659,16 +802,93 @@ function cancelLeaveNav() {
   cursor: pointer;
   transition: background 0.15s;
   font-weight: 500;
+  margin-top: 10px;
 }
 .btn-add-link:hover { background: #ffe4ef; border-color: #efbdd2; }
 .btn-remove-link {
-  width: 36px; height: 38px; flex-shrink: 0;
+  width: 36px; height: 36px; flex-shrink: 0;
   background: #fff5f6; border: 1px solid #f5c2c7;
   border-radius: 8px; color: #dc3545;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: background 0.15s;
 }
 .btn-remove-link:hover { background: #f8d7da; }
+
+/* Autocomplete */
+.product-search-wrap { position: relative; margin-bottom: 8px; }
+.product-search-input-wrap { position: relative; }
+.product-search-icon {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: #b4557d; font-size: 13px; pointer-events: none;
+}
+.product-search-input { padding-left: 32px !important; padding-right: 32px !important; }
+.product-search-clear {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: #b4557d; cursor: pointer; font-size: 12px; padding: 2px;
+}
+.product-search-clear:hover { color: #dc3545; }
+.product-dropdown {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 100;
+  background: #fff; border: 1px solid #f3d6e3; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.12); max-height: 240px; overflow-y: auto;
+}
+.product-dropdown-loading, .product-dropdown-empty {
+  padding: 12px 14px; font-size: 13px; color: #94a3b8; text-align: center;
+}
+.product-dropdown-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; cursor: pointer; transition: background 0.12s;
+}
+.product-dropdown-item:hover { background: #fff0f7; }
+.product-dropdown-thumb {
+  width: 38px; height: 38px; object-fit: cover; border-radius: 6px;
+  border: 1px solid #f3d6e3; flex-shrink: 0;
+}
+.product-dropdown-thumb-placeholder {
+  width: 38px; height: 38px; border-radius: 6px; background: #f1f5f9;
+  display: flex; align-items: center; justify-content: center;
+  color: #94a3b8; font-size: 16px; flex-shrink: 0;
+}
+.product-dropdown-info { flex: 1; min-width: 0; }
+.product-dropdown-name { font-size: 13.5px; font-weight: 600; color: #202636; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.product-dropdown-meta { font-size: 11.5px; color: #94a3b8; margin-top: 2px; }
+
+/* Sản phẩm đã chọn */
+.product-selected-preview {
+  display: flex; align-items: center; gap: 10px;
+  background: #f0fdf4; border: 1px solid #bbf0cc;
+  border-radius: 8px; padding: 9px 12px;
+}
+.product-selected-thumb {
+  width: 40px; height: 40px; object-fit: cover; border-radius: 6px; flex-shrink: 0;
+}
+.product-selected-thumb-placeholder {
+  width: 40px; height: 40px; border-radius: 6px; background: #e2e8f0;
+  display: flex; align-items: center; justify-content: center; color: #94a3b8; flex-shrink: 0;
+}
+.product-selected-info { flex: 1; min-width: 0; }
+.product-selected-name { display: block; font-size: 13px; font-weight: 600; color: #15803d; }
+.product-selected-url { display: block; font-size: 11.5px; color: #6b7280; }
+
+/* Badge text */
+.badge-text-row { margin-bottom: 12px; }
+.badge-text-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: #344054; margin-bottom: 6px;
+}
+.badge-text-label i { color: #f55d9b; }
+.badge-text-input-wrap { display: flex; align-items: center; gap: 10px; }
+.badge-text-input-wrap .form-input { flex: 1; }
+.badge-text-preview {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #fef2f2; color: #991b1b;
+  border: 1px solid #fca5a5; border-radius: 20px;
+  font-size: 12px; font-weight: 600; padding: 4px 12px;
+  white-space: nowrap; flex-shrink: 0;
+}
+
+@keyframes spin-anim { to { transform: rotate(360deg); } }
+.spin-icon { display: inline-block; animation: spin-anim 0.7s linear infinite; }
 
 .bn-modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.46); display: flex; align-items: center; justify-content: center; z-index: 9999; padding: 20px; }
 .banner-modal-box { background: #fff; border-radius: 14px; width: 520px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(15, 23, 42, 0.18); }
