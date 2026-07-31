@@ -1909,3 +1909,128 @@
     justify-self: start;
   }
 }
+
+/*
+   FLASH SALE PRICE REVERTED - Badge cảnh báo trên cart item khi giá vừa bị revert
+   về giá gốc do admin hủy Flash Sale.
+*/
+.order-item__reverted-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #fef3f2, #fee2e2);
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-top: 6px;
+  border: 1px solid #fecaca;
+  line-height: 1.4;
+}
+
+.order-item__reverted-badge small {
+  font-weight: 400;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+
+.order-item__reverted-badge i {
+  font-size: 12px;
+  color: #E11D1D;
+}
+
+/*
+   Toast notification khi giá Flash Sale tự động đổi về giá gốc
+*/
+.fs-reverted-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9998;
+  background: #fff;
+  border-left: 4px solid #E11D1D;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 360px;
+  min-width: 280px;
+}
+
+.fs-reverted-toast__icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fef3f2;
+  color: #E11D1D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.fs-reverted-toast__body {
+  flex: 1;
+  font-size: 13px;
+  color: #1e293b;
+  line-height: 1.5;
+}
+
+.fs-reverted-toast__body strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.fs-reverted-toast__body p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+}
+
+.fs-reverted-toast__body s {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.fs-reverted-toast__close {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 2px;
+  font-size: 14px;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.fs-reverted-toast__close:hover {
+  color: #475569;
+}
+
+/* Toast animation */
+.toast-slide-enter-active,
+.toast-slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-slide-enter-from,
+.toast-slide-leave-to {
+  transform: translateX(120%);
+  opacity: 0;
+}
+
+@media (max-width: 540px) {
+  .fs-reverted-toast {
+    top: auto;
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    max-width: none;
+    min-width: 0;
+  }
+}

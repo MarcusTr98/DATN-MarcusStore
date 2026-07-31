@@ -691,6 +691,9 @@ onMounted(async () => {
   // Lắng nghe event auth-required (khi guest nhận 401 từ API)
   window.addEventListener('auth-required', handleAuthRequired)
 
+  // Lắng nghe WebSocket event CANCELLED/EXPIRED từ FlashSaleStore
+  window.addEventListener('fs-event', handleFsEvent)
+
   // Tải song song cả cart và danh sách slot FS để check slot CANCELLED sớm nhất có thể.
   await Promise.all([cartStore.fetchCart(), flashSaleStore.fetchClientSlots(20)])
   await fetchAvailableVouchers()
@@ -726,8 +729,9 @@ watch(
 // quay lại /cart mà vẫn còn SP CANCELLED thì modal có thể hiện lại.
 onBeforeUnmount(() => {
   hasHandledCancelled.value = false
-  // Cleanup event listener
+  // Cleanup event listeners
   window.removeEventListener('auth-required', handleAuthRequired)
+  window.removeEventListener('fs-event', handleFsEvent)
 })
 
 // ==== Event listener cho auth-required (từ api interceptor khi guest nhận 401) ====
@@ -735,6 +739,22 @@ function handleAuthRequired(event) {
   loginRequiredTitle.value = event.detail?.title || 'Đăng nhập để tiếp tục'
   loginRequiredMessage.value = event.detail?.message || 'Vui lòng đăng nhập để truy cập giỏ hàng và thanh toán.'
   showLoginRequiredModal.value = true
+}
+
+// ==== WebSocket event handler cho Flash Sale CANCELLED/EXPIRED ====
+function handleFsEvent(event) {
+  const fsEvent = event.detail
+  // Chỉ xử lý event CANCELLED hoặc EXPIRED
+  if (fsEvent?.type !== 'CANCELLED' && fsEvent?.type !== 'EXPIRED') return
+  // Bỏ qua nếu đã xử lý trong phiên này
+  if (hasHandledCancelled.value) return
+  // Kiểm tra xem có SP nào trong giỏ thuộc slot bị ảnh hưởng
+  const affectedItem = cartItems.value.find(
+    (item) => item.isFlashSale && item.flashSaleSlotId === fsEvent.slotId,
+  )
+  if (affectedItem) {
+    showCancelledModal.value = true
+  }
 }
 
 // Khôi phục trạng thái checkbox từ localStorage
@@ -1157,7 +1177,7 @@ function scrollAccessories(direction) {
   })
 }
 
-function handleCheckout() {
+async function handleCheckout() {
   if (selectedCount.value === 0) {
     showAlert('Vui lòng chọn ít nhất một sản phẩm để thanh toán')
     return
@@ -1165,6 +1185,8 @@ function handleCheckout() {
 
   // Chặn checkout nếu giỏ có SP thuộc Flash Sale đã bị admin hủy.
   // (User phải bấm "Đồng ý" ở modal để hệ thống xóa các SP đó khỏi giỏ + reload)
+  // Refresh clientSlots trước khi check để đảm bảo lấy trạng thái mới nhất từ server
+  await flashSaleStore.fetchClientSlots(20)
   if (findCancelledFlashSaleItem()) {
     showCancelledModal.value = true
     return

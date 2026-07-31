@@ -482,6 +482,14 @@
     </div>
 
     <div class="order-detail-toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
+
+    <BaseModal
+      :visible="statusSuccessModal"
+      type="success"
+      title="Cập nhật thành công"
+      :message="statusSuccessMessage"
+      @close="statusSuccessModal = false"
+    />
   </section>
 </template>
 
@@ -490,9 +498,12 @@ import { computed, ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import '@/assets/css/OrderDetails.css'
 import OrderDetailApi from '@/api/orderDetailApi.js'
+import BaseModal from '@/components/BaseModal.vue'
 
 const route = useRoute()
 const toastMessage = ref('')
+const statusSuccessModal = ref(false)
+const statusSuccessMessage = ref('')
 const orderDetail = ref(null)
 const loading = ref(false)
 const error = ref(null)
@@ -596,7 +607,7 @@ const allowedTransitions = {
     { value: 'FAILED', label: 'Giao thất bại' },
   ],
 
-  DELIVERED: [{ value: 'COMPLETED', label: 'Đối soát hoàn tất' }],
+  DELIVERED: [{ value: 'COMPLETED', label: 'Đơn hoàn thành' }],
   COMPLETED: [],
   CANCELLED: [],
   FAILED: [
@@ -838,9 +849,8 @@ const saveStatusUpdate = async () => {
     await fetchGetDetailOrder(orderCode)
     statusNote.value = ''
     selectedAdminCancelReason.value = ''
-    showToast(
-      `Đã cập nhật trạng thái đơn sang ${getOrderStatusLabel(orderDetail.value.orderStatus)}.`,
-    )
+    statusSuccessMessage.value = `Đơn ${orderDetail.value.orderCode} đã được chuyển sang trạng thái ${getOrderStatusLabel(orderDetail.value.orderStatus)}.`
+    statusSuccessModal.value = true
   } catch (e) {
     const message =
       e.response?.data?.message ||

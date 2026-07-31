@@ -246,7 +246,7 @@
       <div class="flashsale-modal">
         <div class="modal-head">
           <div>
-            <h2>{{ isEditing ? 'Chỉnh sửa Flash Sale' : 'Tạo Flash Sale mới' }}</h2>
+            <h2>{{ isEditing ? 'Chi tiết Flash Sale' : 'Tạo Flash Sale mới' }}</h2>
             <p>Thiết lập thông tin chiến dịch và các sản phẩm áp dụng.</p>
           </div>
           <button type="button" class="icon-button" title="Đóng" @click="closeModal">

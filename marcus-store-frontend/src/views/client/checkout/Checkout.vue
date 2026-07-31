@@ -10,8 +10,10 @@
     <!-- Modal thông báo Flash Sale đã bị admin hủy -->
     <CancelledFlashSaleModal
       :visible="showCancelledModal"
-      @close="showCancelledModal = false"
+      :reverted-items="priceRevertedItems"
+      @close="handleCancelledClose"
       @confirm="handleCancelledConfirm"
+      @remove="handleCancelledRemove"
     />
 
     <!-- Modal thông báo voucher không khả dụng -->
@@ -445,6 +447,15 @@
                 <span v-if="item.isFlashSale" class="order-item__flash-sale-badge">
                   ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
                 </span>
+
+                <!-- Badge cảnh báo giá vừa bị revert do admin hủy FS -->
+                <span v-if="item.priceReverted" class="order-item__reverted-badge">
+                  <i class="fas fa-exclamation-circle"></i>
+                  Giá đã về giá gốc do admin hủy Flash Sale
+                  <small v-if="item.priceRevertedInfo?.slotName">
+                    ({{ item.priceRevertedInfo.slotName }})
+                  </small>
+                </span>
               </div>
 
               <!-- Cột phải: Giá tiền -->
@@ -618,12 +629,20 @@ import { useCheckoutPage } from '@/composables/useCheckoutPage'
 import '@/assets/css/CheckOut.css'
 import '@/assets/css/cart.css'
 
+function formatPrice(value) {
+  if (value == null) return '0'
+  return Number(value).toLocaleString('vi-VN')
+}
+
 // Marcus refactor: Checkout.vue chỉ còn nhiệm vụ kết nối giao diện với luồng checkout.
 const {
   modal,
   handleModalConfirm,
   showCancelledModal,
   handleCancelledConfirm,
+  handleCancelledRemove,
+  // Danh sách cart item bị revert giá
+  priceRevertedItems,
   fulfillmentMethod,
   isStorePickup,
   storeInfo,

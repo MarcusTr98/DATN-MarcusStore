@@ -26,6 +26,15 @@ public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
                         WHERE (:keyword IS NULL OR LOWER(v.voucherCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
                           AND (:discountType IS NULL OR v.discountType = :discountType)
                           AND (:isActive IS NULL OR v.isActive = :isActive)
+                        ORDER BY
+                            CASE
+                                WHEN v.isActive = true
+                                 AND v.quantity > 0
+                                 AND v.startDate <= CURRENT_TIMESTAMP
+                                 AND v.endDate >= CURRENT_TIMESTAMP
+                                THEN 0 ELSE 1
+                            END,
+                            v.endDate ASC
                         """)
         Page<Voucher> searchVouchers(
                         @Param("keyword") String keyword,

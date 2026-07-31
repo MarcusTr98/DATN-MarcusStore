@@ -28,11 +28,11 @@ public class OrderResponse {
     // Marcus bổ sung
     private String transactionId;
 
-    // format ngày giờ về dạng dd/MM/yyyy HH:mm
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy HH:mm")
+    // format ngày giờ về dạng yyyy-MM-dd HH:mm (để frontend lọc đúng bằng slice(0,10))
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm")
     private LocalDateTime createdAt;
     // Marcus bổ sung
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd/MM/yyyy HH:mm")
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm")
     private LocalDateTime paymentDate;
 
 }

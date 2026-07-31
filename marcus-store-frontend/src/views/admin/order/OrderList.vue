@@ -308,6 +308,7 @@ const orderStatusMap = {
   CONFIRMED: { label: 'Đã xác nhận', className: 'confirmed' },
   PROCESSING: { label: 'Đang chuẩn bị', className: 'processing' },
   READY_FOR_PICKUP: { label: 'Sẵn sàng nhận tại cửa hàng', className: 'confirmed' },
+  PICKED_UP: { label: 'Đã nhận tại cửa hàng', className: 'completed' },
   PACKED: { label: 'Đã đóng gói', className: 'processing' },
   SHIPPING: { label: 'Đang giao', className: 'shipping' },
   DELIVERED: { label: 'Giao thành công', className: 'shipping' },

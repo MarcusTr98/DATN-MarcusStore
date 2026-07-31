@@ -1,14 +1,16 @@
 import { ref, computed, onUnmounted, watch } from 'vue'
 
 
- //    - Tự động chọn slot "đang diễn ra" (status=2) ưu tiên đầu tiên.
- //    - Nếu không có ACTIVE thì chọn slot "sắp diễn ra" (status=1) đầu tiên.
+ //    - Tự động chọn slot đang được user chọn trên timeline (qua getSelectedSlotId).
+ //    - Nếu không có getSelectedSlotId (hoặc nó null) thì fallback:
+ //      + Ưu tiên 1: slot "đang diễn ra" (status=2).
+ //      + Ưu tiên 2: slot "sắp diễn ra" (status=1).
  //    - Trả về:
  //        + label: 'KẾT THÚC SAU' | 'BẮT ĐẦU SAU' | ''
  //        + timer: { hours: 'HH', minutes: 'MM', seconds: 'SS' }  (đã padStart(2, '0'))
  //        + targetSlot: ref tới slot đang được đếm ngược
 
-export function useFlashSaleCountdown(getSlots, onExpire) {
+export function useFlashSaleCountdown(getSlots, onExpire, getSelectedSlotId = null) {
     const now = ref(Date.now())
     let intervalId = null
     const hasFiredExpire = ref(false)
@@ -17,10 +19,20 @@ export function useFlashSaleCountdown(getSlots, onExpire) {
     const targetSlot = computed(() => {
         const slots = getSlots()
         if (!Array.isArray(slots) || slots.length === 0) return null
-        // Ưu tiên 1: slot đang diễn ra (status=2)
+
+        // Ưu tiên 1: slot user đang chọn trên timeline (nếu composable được truyền getSelectedSlotId)
+        if (typeof getSelectedSlotId === 'function') {
+            const selectedId = getSelectedSlotId()
+            if (selectedId != null) {
+                const selected = slots.find((s) => s.slotId === selectedId)
+                if (selected) return selected
+            }
+        }
+
+        // Ưu tiên 2: slot đang diễn ra (status=2)
         const active = slots.find((s) => Number(s.status) === 2)
         if (active) return active
-        // Ưu tiên 2: slot sắp diễn ra (status=1)
+        // Ưu tiên 3: slot sắp diễn ra (status=1)
         const upcoming = slots.find((s) => Number(s.status) === 1)
         return upcoming || null
     })

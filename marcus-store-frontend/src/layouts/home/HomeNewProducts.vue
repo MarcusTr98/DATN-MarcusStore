@@ -17,18 +17,7 @@
     </Teleport>
 
     <div class="tech-panel">
-      <nav class="folder-tabs" aria-label="Danh mục sản phẩm">
-        <button
-          v-for="tab in tabs"
-          :key="tab.label"
-          type="button"
-          class="folder-tab"
-          :class="{ active: tab.active }"
-        >
-          <i :class="tab.icon"></i>
-          <span v-if="tab.label">{{ tab.label }}</span>
-        </button>
-      </nav>
+
 
       <header class="section-header section-header--center">
         <div class="fire-header-wrapper">
@@ -43,7 +32,7 @@
           <span class="ember ember-8"></span>
           <h2 class="section-title">
             <i class="fas fa-bolt title-bolt"></i>
-            <strong>🔥 SẢN PHẨM MỚI</strong>
+            <strong> SẢN PHẨM MỚI 🔥</strong>
           </h2>
         </div>
         <p class="section-subtitle">Những thiết bị công nghệ mới nhất vừa ra mắt</p>
