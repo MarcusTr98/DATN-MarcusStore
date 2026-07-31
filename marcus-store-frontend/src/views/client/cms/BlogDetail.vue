@@ -30,23 +30,24 @@
 
           <div class="blog-rich-content lh-base text-secondary" v-html="sanitizedContent"></div>
 
-          <!-- Nút Mua ngay — chỉ render khi bài có product links -->
+          <!-- Nút Mua ngay — Đã FIX thành nút Click Vue Router -->
           <div v-if="productLinks.length" class="product-links-section">
             <div v-if="hotBadgeText" class="hot-badge">
               <i class="bi bi-fire"></i> {{ hotBadgeText }}
             </div>
             <div class="product-links-wrap">
-              <a
+              <button
                 v-for="(link, i) in productLinks"
                 :key="i"
-                :href="link.href"
+                type="button"
+                @click="handleBuyNow(link)"
                 class="btn-buy-now"
               >
                 <i class="bi bi-cart2 btn-buy-icon"></i>
                 <span class="btn-buy-divline"></span>
                 <span class="btn-buy-text">Mua ngay</span>
                 <span class="btn-buy-name">{{ link.label }}</span>
-              </a>
+              </button>
             </div>
           </div>
         </template>
@@ -56,11 +57,13 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { postPublicApi } from '@/api/PostApi'
 
 const route = useRoute()
+const router = useRouter()
+
 const post = ref(null)
 const loading = ref(true)
 const loadError = ref('')
@@ -92,13 +95,40 @@ function parsePostContent(html) {
   const links = []
   anchors.forEach(a => {
     links.push({
-      href: a.getAttribute('href') || '#',
+      href: a.getAttribute('href') || '',
       label: a.textContent.trim() || 'Sản phẩm'
     })
     a.remove()
   })
   productLinks.value = links
   sanitizedContent.value = doc.body.innerHTML
+}
+
+function handleBuyNow(link) {
+  let rawHref = link.href.trim()
+
+  let slug = ''
+  if (rawHref.includes('/product/')) {
+    slug = rawHref.split('/product/')[1]
+  } else if (rawHref && rawHref !== '#') {
+    slug = rawHref.replace(/^\//, '') 
+  }
+  slug = slug.split('#')[0].split('?')[0]
+
+  if (slug) {
+    router.push({ name: 'ProductDetail', params: { slug } })
+  } else {
+    const fallbackSlug = link.label
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[^a-z0-9 -]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+
+    router.push({ name: 'ProductDetail', params: { slug: fallbackSlug } })
+  }
 }
 
 watch(() => post.value?.content, (newContent) => {
@@ -237,5 +267,4 @@ watch(() => route.params.slug, (newSlug) => {
 .btn-buy-name {
   font-weight: 700;
 }
-
 </style>
