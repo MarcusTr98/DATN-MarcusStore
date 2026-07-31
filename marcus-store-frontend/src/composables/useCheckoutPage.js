@@ -26,6 +26,15 @@ export function useCheckoutPage() {
   // (admin vừa hủy sau khi user checkout từ giỏ) → chặn + hiện modal.
   const showCancelledModal = ref(false)
 
+  // Danh sách cart item vừa bị revert giá do admin hủy Flash Sale.
+  // Dùng để hiện toast/inline notification cho khách hiểu lý do giá đổi.
+  const priceRevertedItems = ref([])
+  const showPriceRevertedToast = ref(false)
+
+  function dismissPriceRevertedToast() {
+    showPriceRevertedToast.value = false
+  }
+
   // Cờ chặn vòng lặp modal bật liên tục. Sau khi user bấm "Đồng ý" 1 lần,
   // không tự động mở lại modal trong cùng phiên. Reset khi component unmount
   // (user rời trang) để lần sau quay lại modal vẫn hoạt động nếu vẫn còn lỗi.
@@ -36,33 +45,219 @@ export function useCheckoutPage() {
     showCancelledModal.value = true
   }
 
+  // Ghi nhớ CHÍNH XÁC skuId của các SP gây lỗi Flash Sale, tại đúng thời điểm phát hiện lỗi
+  // (lúc mount, lúc watch clientSlots, hoặc lúc backend trả 409 khi bấm Đặt hàng).
+  //
+  // Lý do cần biến này: KHÔNG được dựa vào flashSaleStore.isSlotCancelled() tại thời điểm
+  // purge, vì flashSaleStore.clientSlots (lấy qua fetchClientSlots) rất có thể CHỈ chứa
+  // các slot đang active/sắp diễn ra — slot đã bị admin hủy có thể không còn nằm trong
+  // danh sách này nữa. Khi đó isSlotCancelled(slotId) trả về false cho 1 slot store
+  // "chưa từng biết", khiến hàm purge lọc ra danh sách rỗng và KHÔNG gọi API xóa nào cả
+  // (đây chính là nguyên nhân giỏ hàng không được xóa dù user đã bấm "Đồng ý").
+  const pendingRemovalSkuIds = ref([])
+
+  // Xóa hẳn các SP đã ghi nhận trong pendingRemovalSkuIds khỏi GIỎ HÀNG TRÊN SERVER.
+  // Bắt buộc phải gọi API xóa thật (không chỉ xóa localStorage), vì cart_item trong DB
+  // vẫn giữ tham chiếu flashSaleSlotId cũ -> backend /checkout sẽ luôn từ chối
+  // (409 FLASH_SALE_CANCELLED) dù giá hiển thị trên UI đã về giá gốc.
+  async function purgeCancelledFlashSaleItemsFromCart() {
+    let skuIds = pendingRemovalSkuIds.value.filter(Boolean)
+
+    // Fallback 1: dùng cartData.items (localStorage) - chỉ lọc items Flash Sale.
+    if (skuIds.length === 0) {
+      const items = Array.isArray(cartData.value.items) ? cartData.value.items : []
+      skuIds = items
+        .filter((item) => item.isFlashSale)
+        .map((item) => item.skuId)
+        .filter(Boolean)
+    }
+
+    // Fallback 2: refetch cart thật từ server để đảm bảo lấy đúng TẤT CẢ SP
+    // còn thuộc Flash Sale (theo quan điểm server). Dùng cartStore.fetchCart() để
+    // tự sync lại cartStore.items, rồi lọc isFlashSale=true.
+    if (skuIds.length === 0) {
+      try {
+        await cartStore.fetchCart()
+        const serverItems = Array.isArray(cartStore.items) ? cartStore.items : []
+        skuIds = serverItems
+          .filter((item) => item.isFlashSale)
+          .map((item) => item.skuId)
+          .filter(Boolean)
+      } catch (e) {
+        console.warn('Không thể refetch cart để lấy SP Flash Sale:', e)
+      }
+    }
+
+    if (skuIds.length === 0) return
+
+    try {
+      await cartStore.removeManyItemFromCart(skuIds)
+      pendingRemovalSkuIds.value = []
+    } catch (e) {
+      console.warn('Không thể xóa SP Flash Sale đã hủy khỏi giỏ hàng server:', e)
+    }
+  }
+
   async function handleCancelledConfirm() {
     if (hasHandledCancelled.value) return
     hasHandledCancelled.value = true
 
     showCancelledModal.value = false
-    // Điều hướng về trang chủ thay vì reload toàn trang.
-    // Lý do: reload sẽ trigger lại onMounted → watch(clientSlots) → lại mở modal nếu
-    // cartData trong localStorage vẫn chứa SP CANCELLED. router.replace('/') thì an toàn.
+
+    // Khách chọn "Tiếp tục với giá gốc" → KHÔNG xóa SP, chỉ ẩn modal.
+    // Giá đã được sync về giá gốc từ server, khách có thể tiếp tục checkout bình thường.
+
+    // Dọn snapshot cục bộ để tránh đọc lại dữ liệu cũ ở lần vào Checkout kế tiếp.
+    localStorage.removeItem('selectedCartItems')
+    localStorage.removeItem('selectedVoucher')
+  }
+
+  // Khách chọn "Xóa khỏi giỏ hàng" → xóa thật SP FS khỏi cart server.
+  async function handleCancelledRemove() {
+    if (hasHandledCancelled.value) return
+    hasHandledCancelled.value = true
+
+    showCancelledModal.value = false
+
+    // 1) Xóa thật SP khỏi giỏ hàng server trước — đây là bước quan trọng nhất,
+    //    nếu bỏ qua thì lần sau user mua lại vẫn dính lỗi 409 y hệt.
+    await purgeCancelledFlashSaleItemsFromCart()
+
+    // 2) Dọn snapshot cục bộ để tránh đọc lại dữ liệu cũ ở lần vào Checkout kế tiếp.
+    localStorage.removeItem('selectedCartItems')
+    localStorage.removeItem('selectedVoucher')
+
+    // 3) Điều hướng về trang chủ thay vì reload toàn trang.
     await router.replace({ path: '/' }).catch(() => {
       window.location.href = '/'
     })
   }
 
-  // Kiểm tra trong cartData có SP Flash Sale thuộc slot đã bị admin hủy không.
-  // cartData lấy từ localStorage 'selectedCartItems' (đã có isFlashSale + flashSaleSlotId).
-  function findCancelledFlashSaleItem() {
+  // Kiểm tra có SP Flash Sale thuộc slot đã bị admin hủy không.
+  //
+  // Flow mới (đã sửa lỗi "giá đã về gốc nhưng vẫn bị chặn mua"):
+  //   1. Refetch cart thật từ server TRƯỚC (không dựa vào localStorage).
+  //   2. Nếu server đã KHÔNG còn đánh dấu isFlashSale (giá đã revert về gốc) →
+  //      cho phép checkout tiếp tục, đồng thời sync lại cartData cục bộ.
+  //   3. CHỈ chặn khi server vẫn xác nhận isFlashSale=true với slot đã bị hủy.
+  //
+  // Lý do: localStorage là snapshot tĩnh lưu lúc user rời Cart. Nếu admin hủy FS,
+  // server revert giá về gốc nhưng localStorage vẫn còn isFlashSale=true. Logic cũ
+  // dựa vào localStorage để chặn ngay → user kẹt vĩnh viễn không mua được.
+  async function findCancelledFlashSaleItem() {
+    let serverItems = []
+    try {
+      const res = await cartApi.getCart()
+      const freshData = res.data?.data ?? res.data
+      serverItems = Array.isArray(freshData?.items) ? freshData.items : []
+    } catch (e) {
+      console.warn('Không thể refetch cart để kiểm tra Flash Sale:', e)
+      // Lỗi mạng → fallback dùng localStorage (giữ hành vi cũ an toàn)
+      return findCancelledFromLocal()
+    }
+
+    // Sync cartData cục bộ với server (đảm bảo UI đúng giá)
+    const revertedItems = [] // Lưu các cartItemId vừa bị revert giá (để hiện cảnh báo)
+    if (Array.isArray(cartData.value.items)) {
+      for (const fresh of serverItems) {
+        const idx = cartData.value.items.findIndex(
+          (i) => i.cartItemId === fresh.cartItemId,
+        )
+        if (idx !== -1) {
+          const oldItem = cartData.value.items[idx]
+          // Phát hiện SP Flash Sale bị admin hủy → giá vừa revert từ giá FS về giá gốc
+          const wasFlashSale = oldItem.isFlashSale === true
+          const isNowRegular = fresh.isFlashSale !== true
+          const priceChanged = (oldItem.price || 0) !== (fresh.price || 0)
+          if (wasFlashSale && isNowRegular && priceChanged) {
+            revertedItems.push({
+              cartItemId: fresh.cartItemId,
+              productName: fresh.productName || oldItem.productName,
+              variantName: fresh.variantName || oldItem.variantName,
+              oldPrice: oldItem.price,
+              newPrice: fresh.price,
+              slotName: oldItem.flashSaleSlotName || 'Flash Sale',
+            })
+          }
+
+          // Cập nhật giá + trạng thái Flash Sale theo server
+          cartData.value.items[idx] = {
+            ...oldItem,
+            price: fresh.price ?? oldItem.price,
+            totalPrice: fresh.totalPrice ?? oldItem.totalPrice,
+            originalPrice: fresh.originalPrice ?? oldItem.originalPrice,
+            isFlashSale: fresh.isFlashSale === true,
+            flashSaleSlotId: fresh.flashSaleSlotId ?? null,
+            flashSaleSlotName: fresh.flashSaleSlotName ?? null,
+            // Đánh dấu nếu vừa bị revert (dùng để hiện badge cảnh báo)
+            priceReverted: wasFlashSale && isNowRegular && priceChanged,
+            priceRevertedInfo:
+              wasFlashSale && isNowRegular && priceChanged
+                ? {
+                    oldPrice: oldItem.price,
+                    newPrice: fresh.price,
+                    slotName: oldItem.flashSaleSlotName || 'Flash Sale',
+                  }
+                : null,
+          }
+        }
+      }
+
+      // Cập nhật tổng tiền + ghi đè localStorage
+      cartData.value.totalAmount = cartData.value.items.reduce(
+        (sum, i) => sum + (i.totalPrice || 0),
+        0,
+      )
+      localStorage.setItem('selectedCartItems', JSON.stringify(cartData.value.items))
+    }
+
+    // Emit sự kiện revert để UI có thể hiện toast/inline notification
+    if (revertedItems.length > 0) {
+      priceRevertedItems.value = revertedItems
+      // Auto-show toast nếu chưa hiện modal cancelled (modal cancelled vẫn ưu tiên hơn)
+      if (!showCancelledModal.value) {
+        showPriceRevertedToast.value = true
+        // Auto-hide sau 8 giây
+        setTimeout(() => {
+          showPriceRevertedToast.value = false
+        }, 8000)
+      }
+    }
+
+    // Tìm SP còn là Flash Sale trên server mà slot đã bị hủy
+    const stillInvalid = serverItems.find(
+      (item) =>
+        item.isFlashSale === true &&
+        item.flashSaleSlotId &&
+        flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
+    )
+
+    if (stillInvalid?.skuId) {
+      pendingRemovalSkuIds.value = [stillInvalid.skuId]
+    }
+
+    return stillInvalid || null
+  }
+
+  // Fallback cũ: kiểm tra dựa trên localStorage khi không gọi được API
+  function findCancelledFromLocal() {
     const items = Array.isArray(cartData.value.items) ? cartData.value.items : []
     const slots = flashSaleStore.clientSlots
     if (!Array.isArray(slots)) return null
-    return (
-      items.find(
-        (item) =>
-          item.isFlashSale &&
-          item.flashSaleSlotId &&
-          flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
-      ) || null
+
+    const staleFsItems = items.filter(
+      (item) =>
+        item.isFlashSale &&
+        item.flashSaleSlotId &&
+        flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
     )
+
+    if (staleFsItems.length === 0) return null
+
+    if (staleFsItems[0]?.skuId) {
+      pendingRemovalSkuIds.value = [staleFsItems[0].skuId]
+    }
+    return staleFsItems[0]
   }
 
   const modal = ref({ show: false, title: 'Thông báo', message: '', action: null })
@@ -570,9 +765,9 @@ export function useCheckoutPage() {
     // Marcus thêm: khóa ngay từ đầu để tránh tạo hai đơn khi double click/submit liên tiếp.
     if (isProcessing.value || !cartData.value.items?.length) return
 
-    // Chặn submit nếu đơn hàng có SP Flash Sale thuộc slot đã bị admin hủy.
-    // Hiện modal — user bấm "Đồng ý" sẽ reload trang, khi đó Cart.vue sẽ tự dọn các SP này.
-    if (findCancelledFlashSaleItem()) {
+    // Chặn submit nếu đơn hàng có SP Flash Sale thuộc slot đã bị admin hủy VÀ
+    // server xác nhận vẫn còn lỗi (đã refetch + đồng bộ lại giá bên trong hàm này).
+    if (await findCancelledFlashSaleItem()) {
       openCancelledModal()
       return
     }
@@ -663,14 +858,31 @@ export function useCheckoutPage() {
       router.push({ path: '/order-success', query: { orderCode: savedOrderCode } })
     } catch (error) {
       const responseData = error.response?.data
-      const errorCode = responseData?.data // ResponseStatusException -> data = errorCode string
-      const errorMessage = responseData?.message ?? 'Hệ thống gián đoạn. Vui lòng thử lại.'
+
+      // Fix: backend không phải lúc nào cũng trả mã lỗi qua field `data`.
+      // Với lỗi FLASH_SALE_CANCELLED, `data` là null và mã lỗi thật nằm ở đầu
+      // chuỗi `message`, dạng "FLASH_SALE_CANCELLED|Mô tả chi tiết...".
+      // Ưu tiên đọc `data`, fallback sang tách từ `message` nếu `data` rỗng.
+      const rawMessage = typeof responseData?.message === 'string' ? responseData.message : ''
+      const errorCode = responseData?.data || rawMessage.split('|')[0]?.trim()
+      const errorMessage = rawMessage.includes('|')
+        ? rawMessage.split('|').slice(1).join('|').trim()
+        : rawMessage || 'Hệ thống gián đoạn. Vui lòng thử lại.'
 
       // Nếu backend báo lỗi liên quan đến Flash Sale (slot đã hủy/hết hạn/hết hàng) →
-      // mở modal thông báo để user hiểu vấn đề, đồng thời reload để Cart.vue tự dọn SP hỏng.
-      // Đây là tuyến phòng thủ cuối cùng phía client — backend đã chặn ngay từ đầu,
-      // nhưng FE cần phản hồi thân thiện thay vì hiện toast lỗi khô khan.
+      // hiện modal thông báo. Khi user bấm đóng/xác nhận modal này, hệ thống sẽ TỰ ĐỘNG
+      // xóa sản phẩm khỏi giỏ hàng server (xem handleCancelledConfirm) rồi mới redirect,
+      // đảm bảo lần mua lại sau đó không còn dính lỗi 409 tương tự.
       if (isFlashSaleCancelledCode(errorCode)) {
+        // Fix: ghi nhận NGAY danh sách skuId cần xóa tại đây. Backend không trả về
+        // skuId cụ thể trong response (chỉ có tên slot trong message), nên ta lấy
+        // tất cả SP đang đánh dấu isFlashSale trong giỏ hiện tại làm danh sách cần xóa —
+        // đây chính xác là các SP khiến /checkout bị từ chối.
+        pendingRemovalSkuIds.value = cartData.value.items
+          .filter((item) => item.isFlashSale)
+          .map((item) => item.skuId)
+          .filter(Boolean)
+
         showCancelledModal.value = true
         return
       }
@@ -716,7 +928,9 @@ export function useCheckoutPage() {
 
     // Nếu đơn hàng hiện tại có SP Flash Sale thuộc slot bị admin hủy → hiện modal ngay.
     // Guard: bỏ qua nếu user đã xử lý trong phiên này rồi (tránh vòng lặp modal).
-    if (findCancelledFlashSaleItem()) {
+    // findCancelledFlashSaleItem() giờ tự refetch + đồng bộ giá thật với server trước
+    // khi kết luận, nên sẽ không còn báo lỗi nhầm khi giá đã revert về gốc.
+    if (await findCancelledFlashSaleItem()) {
       openCancelledModal()
     }
   })
@@ -724,15 +938,19 @@ export function useCheckoutPage() {
   onBeforeUnmount(() => {
     // Reset cờ khi rời trang để lần sau vào lại modal vẫn hoạt động nếu lỗi còn.
     hasHandledCancelled.value = false
+    pendingRemovalSkuIds.value = []
+    priceRevertedItems.value = []
+    showPriceRevertedToast.value = false
   })
 
   // Theo dõi khi clientSlots thay đổi (vd: refresh, scheduler reload) để phát hiện
   // slot vừa bị admin hủy trong khi user đang ở trang checkout.
   watch(
     () => flashSaleStore.clientSlots,
-    () => {
-      // Chỉ mở modal khi: chưa xử lý + chưa mở + có item CANCELLED trong đơn
-      if (!hasHandledCancelled.value && !showCancelledModal.value && findCancelledFlashSaleItem()) {
+    async () => {
+      // Chỉ mở modal khi: chưa xử lý + chưa mở + server xác nhận vẫn còn item lỗi thật
+      if (hasHandledCancelled.value || showCancelledModal.value) return
+      if (await findCancelledFlashSaleItem()) {
         openCancelledModal()
       }
     },
@@ -762,6 +980,11 @@ export function useCheckoutPage() {
     handleModalConfirm,
     showCancelledModal,
     handleCancelledConfirm,
+    handleCancelledRemove,
+    // Toast cảnh báo giá Flash Sale vừa bị revert do admin hủy
+    priceRevertedItems,
+    showPriceRevertedToast,
+    dismissPriceRevertedToast,
     fulfillmentMethod,
     isStorePickup,
     storeInfo,

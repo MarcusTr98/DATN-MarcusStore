@@ -12,6 +12,7 @@ import com.fpoly.marcusstore.entity.promotion.FlashSaleSlot;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleSlotRepository;
+import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.service.FlashSaleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     private final FlashSaleSlotRepository flashSaleSlotRepository;
     private final FlashSaleItemRepository flashSaleItemRepository;
     private final ProductSkuRepository productSkuRepository;
+    private final CartItemRepository cartItemRepository;
 
 
     // Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
@@ -684,6 +686,37 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         }
         slot.setStatus(status);
         flashSaleSlotRepository.save(slot);
+
+        // 5. Nếu admin vừa hủy slot (status = 4 = CANCELLED):
+        //    a) clear tham chiếu Flash Sale trên cart items để user vẫn mua được
+        //       với giá gốc (không bị chặn ở Checkout).
+        //    b) Khôi phục giá SKU về giá gốc — tránh trường hợp product_sku.price
+        //       bị kẹt ở flashSalePrice vĩnh viễn vì scheduler chỉ restore khi
+        //       slot ACTIVE quá endDate, không xử lý slot CANCELLED.
+        if (status == 4) {
+            int cleared = cartItemRepository.clearFlashSaleReference(slotId);
+            log.info("[FlashSale] Admin hủy slot #{}: đã clear FK trên {} cart item(s)",
+                    slotId, cleared);
+
+            // Khôi phục giá SKU về giá gốc (giống logic scheduler khi expire)
+            List<FlashSaleItem> items = flashSaleItemRepository.findBySlotSlotId(slotId);
+            int restoredCount = 0;
+            for (FlashSaleItem item : items) {
+                ProductSku sku = productSkuRepository
+                        .findById(item.getId().getSkuId()).orElse(null);
+                if (sku != null && sku.getPrice().compareTo(item.getOriginalPrice()) != 0) {
+                    log.info("[FlashSale] Slot #{} huỷ: SKU #{} giá restored {} → {}",
+                            slotId, sku.getSkuId(),
+                            item.getFlashSalePrice(), item.getOriginalPrice());
+                    sku.setPrice(item.getOriginalPrice());
+                    productSkuRepository.save(sku);
+                    restoredCount++;
+                }
+            }
+            log.info("[FlashSale] Admin hủy slot #{}: đã restore giá {} SKU",
+                    slotId, restoredCount);
+        }
+
         log.info("[FlashSale] Admin đổi status slot #{}: {} → {}", slotId, currentStatus, status);
         return buildSlotDetailResponse(slot);
     }
@@ -721,6 +754,7 @@ public class FlashSaleServiceImpl implements FlashSaleService {
 
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime endDate = slot.getEndDate();
+        LocalDateTime startDate = slot.getStartDate();
         LocalDateTime restoreDeadline = endDate.minusHours(1);
 
         // 3. Điều kiện 1: Kiểm tra thời gian khôi phục
@@ -732,32 +766,56 @@ public class FlashSaleServiceImpl implements FlashSaleService {
                             + ", phải khôi phục trước " + restoreDeadline + " (ít nhất 1 tiếng trước khi kết thúc).");
         }
 
-        // 4. Điều kiện 2: Kiểm tra overlap với các slot khác
-        //    Tìm các slot ACTIVE (2) hoặc SCHEDULED (1) trùng với [now, endDate]
-        List<FlashSaleSlot> overlappingSlots = flashSaleSlotRepository
-                .findOverlappingSlotsForRestore(now, endDate, slotId);
+        // 4. Khôi phục: Chuyển status phù hợp với thời gian hiện tại
+        if (now.isBefore(startDate)) {
+            // Chưa đến giờ → giữ SCHEDULED (1)
+            // Check overlap với các slot SCHEDULED khác (không check với ACTIVE vì ACTIVE sẽ kết thúc trước)
+            List<FlashSaleSlot> overlappingScheduled = flashSaleSlotRepository
+                    .findOverlappingScheduledSlotsForRestore(startDate, endDate, slotId);
 
-        if (!overlappingSlots.isEmpty()) {
-            String detail = overlappingSlots.stream()
-                    .map(s -> String.format("#%d '%s' (%s → %s, status=%d)",
-                            s.getSlotId(),
-                            s.getName(),
-                            s.getStartDate(),
-                            s.getEndDate(),
-                            s.getStatus()))
-                    .collect(Collectors.joining("; "));
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "Không thể khôi phục do trùng khung giờ với các flash sale khác: " + detail);
+            if (!overlappingScheduled.isEmpty()) {
+                String detail = overlappingScheduled.stream()
+                        .map(s -> String.format("#%d '%s' (%s → %s)",
+                                s.getSlotId(),
+                                s.getName(),
+                                s.getStartDate(),
+                                s.getEndDate()))
+                        .collect(Collectors.joining("; "));
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Không thể khôi phục do trùng khung giờ với các flash sale đã lên lịch khác: " + detail);
+            }
+
+            slot.setStatus((short) 1);
+            FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
+            log.info("[FlashSale] Admin khôi phục slot #{}: {} → SCHEDULED (chưa đến giờ)",
+                    slotId, currentStatus);
+            return buildSlotDetailResponse(savedSlot);
+        } else {
+            // Đã đến giờ → ACTIVE (2), CẦN check overlap với các slot khác
+            List<FlashSaleSlot> overlappingSlots = flashSaleSlotRepository
+                    .findOverlappingSlotsForRestore(now, endDate, slotId);
+
+            if (!overlappingSlots.isEmpty()) {
+                String detail = overlappingSlots.stream()
+                        .map(s -> String.format("#%d '%s' (%s → %s, status=%d)",
+                                s.getSlotId(),
+                                s.getName(),
+                                s.getStartDate(),
+                                s.getEndDate(),
+                                s.getStatus()))
+                        .collect(Collectors.joining("; "));
+                throw new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Không thể khôi phục do trùng khung giờ với các flash sale khác: " + detail);
+            }
+
+            slot.setStatus((short) 2);
+            FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
+            log.info("[FlashSale] Admin khôi phục slot #{}: {} → ACTIVE, endDate={}, now={}",
+                    slotId, currentStatus, endDate, now);
+            return buildSlotDetailResponse(savedSlot);
         }
-
-        // 5. Khôi phục: Chuyển status về ACTIVE (2) để tiếp tục chạy
-        slot.setStatus((short) 2);
-        FlashSaleSlot savedSlot = flashSaleSlotRepository.save(slot);
-
-        log.info("[FlashSale] Admin khôi phục slot #{}: {} → ACTIVE, endDate={}, now={}",
-                slotId, currentStatus, endDate, now);
-        return buildSlotDetailResponse(savedSlot);
     }
 
     // Kiểm tra khoảng thời gian có đang đụng với slot khác không.
@@ -868,8 +926,21 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         LocalDateTime now = LocalDateTime.now();
 
         // 1. Chuyển slot 'Lên lịch' (1) mà đã đến giờ bắt đầu → 'Đang diễn ra' (2)
+        //    Đồng thời cập nhật giá sản phẩm về giá Flash Sale
         List<FlashSaleSlot> toActivate = flashSaleSlotRepository.findSlotsToActivate(now);
         if (!toActivate.isEmpty()) {
+            // Cập nhật giá sản phẩm thành giá Flash Sale
+            for (FlashSaleSlot slot : toActivate) {
+                for (FlashSaleItem item : slot.getFlashSaleItems()) {
+                    ProductSku sku = productSkuRepository.findById(item.getId().getSkuId()).orElse(null);
+                    if (sku != null) {
+                        sku.setPrice(item.getFlashSalePrice());
+                        productSkuRepository.save(sku);
+                        log.info("[FlashSale] Slot #{}: SKU #{} price updated to {}",
+                                slot.getSlotId(), sku.getSkuId(), item.getFlashSalePrice());
+                    }
+                }
+            }
             toActivate.forEach(s -> s.setStatus((short) 2));
             flashSaleSlotRepository.saveAll(toActivate);
             log.info("[FlashSale] Đã kích hoạt {} slot: {}",
@@ -878,9 +949,21 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         }
 
         // 2. Chuyển slot 'Đang diễn ra' (2) mà đã quá endDate → 'Đã kết thúc' (3)
-
+        //    Đồng thời khôi phục giá sản phẩm về giá gốc
         List<FlashSaleSlot> toExpire = flashSaleSlotRepository.findSlotsToExpire(now);
         if (!toExpire.isEmpty()) {
+            // Khôi phục giá sản phẩm về giá gốc
+            for (FlashSaleSlot slot : toExpire) {
+                for (FlashSaleItem item : slot.getFlashSaleItems()) {
+                    ProductSku sku = productSkuRepository.findById(item.getId().getSkuId()).orElse(null);
+                    if (sku != null && sku.getPrice().compareTo(item.getOriginalPrice()) < 0) {
+                        log.info("[FlashSale] Slot #{}: SKU #{} price restored to {}",
+                                slot.getSlotId(), sku.getSkuId(), item.getOriginalPrice());
+                        sku.setPrice(item.getOriginalPrice());
+                        productSkuRepository.save(sku);
+                    }
+                }
+            }
             toExpire.forEach(s -> s.setStatus((short) 3));
             flashSaleSlotRepository.saveAll(toExpire);
 
@@ -890,6 +973,18 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         }
         List<FlashSaleSlot> overdue = flashSaleSlotRepository.findOverdueScheduledSlots(now);
         if (!overdue.isEmpty()) {
+            // Khôi phục giá sản phẩm về giá gốc cho các slot bị quên
+            for (FlashSaleSlot slot : overdue) {
+                for (FlashSaleItem item : slot.getFlashSaleItems()) {
+                    ProductSku sku = productSkuRepository.findById(item.getId().getSkuId()).orElse(null);
+                    if (sku != null && sku.getPrice().compareTo(item.getOriginalPrice()) < 0) {
+                        log.info("[FlashSale] Slot #{} (overdue): SKU #{} price restored to {}",
+                                slot.getSlotId(), sku.getSkuId(), item.getOriginalPrice());
+                        sku.setPrice(item.getOriginalPrice());
+                        productSkuRepository.save(sku);
+                    }
+                }
+            }
             overdue.forEach(s -> s.setStatus((short) 3));
             flashSaleSlotRepository.saveAll(overdue);
             log.info("[FlashSale] Đã đánh dấu kết thúc {} slot bị quên: {}",

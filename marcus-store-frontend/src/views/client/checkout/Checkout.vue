@@ -10,9 +10,34 @@
     <!-- Modal thông báo Flash Sale đã bị admin hủy -->
     <CancelledFlashSaleModal
       :visible="showCancelledModal"
-      @close="showCancelledModal = false"
+      :reverted-items="priceRevertedItems"
+      @close="handleCancelledConfirm"
       @confirm="handleCancelledConfirm"
+      @remove="handleCancelledRemove"
     />
+
+    <!-- Toast cảnh báo giá Flash Sale vừa bị revert do admin hủy -->
+    <Transition name="toast-slide">
+      <div v-if="showPriceRevertedToast" class="fs-reverted-toast" role="alert">
+        <div class="fs-reverted-toast__icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div class="fs-reverted-toast__body">
+          <strong>Flash Sale đã bị admin hủy</strong>
+          <p v-if="priceRevertedItems.length === 1">
+            <strong>{{ priceRevertedItems[0].productName }}</strong> đã chuyển từ
+            <s>{{ formatPrice(priceRevertedItems[0].oldPrice) }}₫</s>
+            → <strong>{{ formatPrice(priceRevertedItems[0].newPrice) }}₫</strong>
+          </p>
+          <p v-else>
+            {{ priceRevertedItems.length }} sản phẩm đã chuyển về giá gốc.
+          </p>
+        </div>
+        <button class="fs-reverted-toast__close" @click="dismissPriceRevertedToast" type="button">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+    </Transition>
 
     <!-- Modal thông báo voucher không khả dụng -->
     <BaseModal
@@ -445,6 +470,15 @@
                 <span v-if="item.isFlashSale" class="order-item__flash-sale-badge">
                   ⚡ {{ item.flashSaleSlotName || 'Flash Sale' }}
                 </span>
+
+                <!-- Badge cảnh báo giá vừa bị revert do admin hủy FS -->
+                <span v-if="item.priceReverted" class="order-item__reverted-badge">
+                  <i class="fas fa-exclamation-circle"></i>
+                  Giá đã về giá gốc do admin hủy Flash Sale
+                  <small v-if="item.priceRevertedInfo?.slotName">
+                    ({{ item.priceRevertedInfo.slotName }})
+                  </small>
+                </span>
               </div>
 
               <!-- Cột phải: Giá tiền -->
@@ -618,12 +652,22 @@ import { useCheckoutPage } from '@/composables/useCheckoutPage'
 import '@/assets/css/CheckOut.css'
 import '@/assets/css/cart.css'
 
+function formatPrice(value) {
+  if (value == null) return '0'
+  return Number(value).toLocaleString('vi-VN')
+}
+
 // Marcus refactor: Checkout.vue chỉ còn nhiệm vụ kết nối giao diện với luồng checkout.
 const {
   modal,
   handleModalConfirm,
   showCancelledModal,
   handleCancelledConfirm,
+  handleCancelledRemove,
+  // Toast + danh sách cart item bị revert giá
+  priceRevertedItems,
+  showPriceRevertedToast,
+  dismissPriceRevertedToast,
   fulfillmentMethod,
   isStorePickup,
   storeInfo,

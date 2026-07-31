@@ -7,7 +7,15 @@
         v-for="(slot, index) in flashSlots"
         :key="slot.slotId || index"
         class="slot"
-        :class="{ live: slot.isLive }"
+        :class="{
+          live: slot.isLive,
+          active: slot.slotId === selectedSlotId,
+          upcoming: !slot.isLive,
+        }"
+        role="button"
+        tabindex="0"
+        @click="onSelectSlot(slot)"
+        @keydown.enter="onSelectSlot(slot)"
       >
         <span class="dot"></span>
         {{ slot.time }}
@@ -16,12 +24,12 @@
     </section>
 
     <!-- Hero Banner Section -->
-    <section class="flash-hero" :class="{ 'has-banner': showBanner }">
+    <section class="flash-hero" :class="{ 'has-banner': showBanner && selectedSlot?.bannerImageUrl }">
       <!-- Banner image làm background khi có.
-           Guard: chỉ hiện khi activeSlot còn valid (ACTIVE/SCHEDULED + còn thời gian).
+           Guard: chỉ hiện khi slot được chọn còn valid (ACTIVE/SCHEDULED + còn thời gian).
            Nếu admin vừa hủy slot → showBanner=false → banner được ẩn hoàn toàn. -->
-      <div v-if="showBanner" class="hero-banner-bg">
-        <img :src="activeSlot.bannerImageUrl" alt="Flash Sale Banner" />
+      <div v-if="showBanner && selectedSlot?.bannerImageUrl" class="hero-banner-bg">
+        <img :src="selectedSlot.bannerImageUrl" alt="Flash Sale Banner" />
         <div class="hero-banner-overlay"></div>
       </div>
 
@@ -91,7 +99,7 @@
         </div>
 
         <!-- Stats chỉ hiện khi không có banner -->
-        <div v-if="!activeSlot?.bannerImageUrl" class="hero-right">
+        <div v-if="!selectedSlot?.bannerImageUrl" class="hero-right">
           <div class="hero-stats">
             <div class="stat-item">
               <span class="stat-number">{{ stats.totalProducts || '200+' }}</span>
@@ -112,13 +120,47 @@
       </div>
     </section>
 
-    <!-- Product Section -->
-    <div class="section-head">
-      <h2>Đang <span>cháy</span> hàng</h2>
-      <router-link to="/" class="see-all">← Quay lại trang chủ</router-link>
-    </div>
+    <!-- Màn chờ cho slot SCHEDULED — chỉ hiện khi slot được chọn chưa LIVE -->
+    <section v-if="selectedSlot && !isSelectedSlotLive" class="flash-waiting">
+      <div class="waiting-card">
+        <div class="waiting-icon">
+          <svg viewBox="0 0 24 24" class="bell-icon">
+            <path d="M12 22a2 2 0 0 0 2-2h-4a2 2 0 0 0 2 2zm6-6V11a6 6 0 1 0-12 0v5l-2 2v1h16v-1l-2-2z"/>
+          </svg>
+        </div>
+        <h2 class="waiting-title">{{ selectedSlot.name || 'Flash Sale sắp diễn ra' }}</h2>
+        <p class="waiting-subtitle">Vui lòng quay lại lúc</p>
 
-    <section class="product-grid">
+        <!-- Countdown tới startDate -->
+        <div class="waiting-countdown">
+          <div class="waiting-unit">
+            <span class="waiting-digit">{{ waitingTimer.hours }}</span>
+            <span class="waiting-unit-label">Giờ</span>
+          </div>
+          <span class="waiting-colon">:</span>
+          <div class="waiting-unit">
+            <span class="waiting-digit">{{ waitingTimer.minutes }}</span>
+            <span class="waiting-unit-label">Phút</span>
+          </div>
+          <span class="waiting-colon">:</span>
+          <div class="waiting-unit">
+            <span class="waiting-digit">{{ waitingTimer.seconds }}</span>
+            <span class="waiting-unit-label">Giây</span>
+          </div>
+        </div>
+
+        <p class="waiting-note">Hệ thống sẽ tự động mở bán khi đến giờ</p>
+      </div>
+    </section>
+
+    <!-- Product Section -->
+    <template v-if="isSelectedSlotLive">
+      <div class="section-head">
+        <h2>Đang <span>cháy</span> hàng</h2>
+        <router-link to="/" class="see-all">← Quay lại trang chủ</router-link>
+      </div>
+
+      <section class="product-grid">
       <article
         v-for="(product, index) in flashSaleProducts"
         :key="product.id"
@@ -281,6 +323,7 @@
     <div class="fsp-pagination-info" v-if="totalProducts > 0">
       Hiển thị {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, totalProducts) }} của {{ totalProducts }} sản phẩm
     </div>
+    </template>
 
     <!-- Promo Banners -->
     <section class="promo-grid">
@@ -416,20 +459,49 @@ async function fetchFlashSales() {
   await flashSaleStore.fetchClientSlots(20)
 }
 
-// Tên slot Flash Sale đang hiển thị (ưu tiên ACTIVE=2, rồi SCHEDULED=1).
-const activeSlot = computed(() => {
-  if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return null
+// ID của slot user đang chọn xem trên timeline (mặc định = slot ACTIVE nếu có, fallback SCHEDULED đầu tiên).
+// Click vào 1 mốc giờ trên timeline → setSlotId → đổi "tab" đang xem.
+const selectedSlotId = ref(null)
 
-  const validStatuses = [1, 2]
-  const validSlots = clientSlots.value.filter((s) => validStatuses.includes(Number(s.status)))
+// Đồng bộ selectedSlotId với clientSlots:
+//  - Nếu slot đang chọn vẫn còn trong danh sách → giữ nguyên.
+//  - Nếu slot đang chọn đã biến mất (admin xoá, hoặc reload) → fallback ACTIVE trước, SCHEDULED sau.
+watch(clientSlots, (slots) => {
+  if (!Array.isArray(slots) || slots.length === 0) {
+    selectedSlotId.value = null
+    return
+  }
+  if (selectedSlotId.value && slots.some((s) => s.slotId === selectedSlotId.value)) return
+  const firstActive = slots.find((s) => Number(s.status) === 2)
+  const firstUpcoming = slots.find((s) => Number(s.status) === 1)
+  selectedSlotId.value = firstActive?.slotId ?? firstUpcoming?.slotId ?? null
+}, { immediate: true })
 
-  return (
-    validSlots.find((s) => Number(s.status) === 2) ||
-    validSlots.find((s) => Number(s.status) === 1) ||
-    null
-  )
+// Slot đang được chọn để hiển thị (object đầy đủ).
+const selectedSlot = computed(() => {
+  if (!selectedSlotId.value || !Array.isArray(clientSlots.value)) return null
+  return clientSlots.value.find((s) => s.slotId === selectedSlotId.value) || null
 })
-const slotName = computed(() => activeSlot.value?.name || '')
+
+// Tên slot được chọn (hiển thị trong hero title).
+const slotName = computed(() => selectedSlot.value?.name || '')
+
+// Slot đang chọn có LIVE (status=2 + đang nằm trong khoảng [startDate, endDate]) hay không.
+const isSelectedSlotLive = computed(() => {
+  const s = selectedSlot.value
+  if (!s) return false
+  if (Number(s.status) !== 2) return false
+  const now = Date.now()
+  const startMs = s.startDate ? new Date(s.startDate).getTime() : null
+  const endMs = s.endDate ? new Date(s.endDate).getTime() : null
+  if (startMs && now < startMs) return false
+  if (endMs && now >= endMs) return false
+  return true
+})
+
+// ==== Giữ activeSlot để không phá vỡ các nơi khác vẫn đang tham chiếu (HomeFlashSale, etc.) ====
+// Trên trang này activeSlot = selectedSlot để đảm bảo tương thích ngược với showBanner.
+const activeSlot = selectedSlot
 
 const showBanner = computed(() => {
   const slot = activeSlot.value
@@ -454,9 +526,13 @@ const showBanner = computed(() => {
 })
 
 // ==== Bộ đếm ngược động (chạy mỗi giây) ====
+// Truyền thêm getSelectedSlotId để countdown ưu tiên slot user đang chọn trên timeline.
+// Nếu đang chọn slot SCHEDULED → countdown đếm tới startDate (label "BẮT ĐẦU SAU").
+// Nếu đang chọn slot ACTIVE → countdown đếm tới endDate (label "KẾT THÚC SAU").
 const { label: countdownLabel, timer } = useFlashSaleCountdown(
   () => flashSaleStore.clientSlots,
   () => fetchFlashSales(),
+  () => selectedSlotId.value,
 )
 
 // Timeline
@@ -514,18 +590,18 @@ function derivePromoTags(item) {
   return tags
 }
 
-// Gộp item thô từ mọi slot ACTIVE/SCHEDULED trong clientSlots
+// Chỉ lấy items của slot đang được chọn (selectedSlotId) — tách riêng ACTIVE và SCHEDULED.
+// Trước đây: gộp tất cả items từ mọi slot ACTIVE/SCHEDULED → làm user thấy sản phẩm của slot
+// sắp diễn ra chung với slot đang chạy. Bây giờ: khi click vào 1 mốc giờ trên timeline →
+// chỉ hiển thị items của slot đó (hoặc màn chờ nếu slot chưa LIVE).
 const rawFlashSaleItems = computed(() => {
   if (!Array.isArray(clientSlots.value) || clientSlots.value.length === 0) return []
-  const allItems = []
-  for (const slot of clientSlots.value) {
-    if (Array.isArray(slot.items)) {
-      for (const it of slot.items) {
-        allItems.push({ ...it, _slotId: slot.slotId, _slotName: slot.name })
-      }
-    }
-  }
-  return allItems.map(buildRawItem)
+  if (!selectedSlotId.value) return []
+  const slot = clientSlots.value.find((s) => s.slotId === selectedSlotId.value)
+  if (!slot || !Array.isArray(slot.items)) return []
+  return slot.items
+    .filter((it) => !slot.isCancelled)
+    .map((it) => buildRawItem({ ...it, _slotId: slot.slotId, _slotName: slot.name }))
 })
 
 // ==== Phân trang sản phẩm ====
@@ -553,6 +629,16 @@ const paginatedRawItems = computed(() => {
 function goToPage(page) {
   if (page < 1 || page > totalPages.value) return
   currentPage.value = page
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// Xử lý khi user click 1 slot trên timeline.
+function onSelectSlot(slot) {
+  if (!slot || !slot.slotId) return
+  if (slot.slotId === selectedSlotId.value) return
+  selectedSlotId.value = slot.slotId
+  // Reset về trang 1 khi chuyển slot để tránh trang hiện tại vượt quá tổng trang của slot mới.
+  currentPage.value = 1
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -1028,6 +1114,54 @@ const createFallingDots = () => {
 let resizeHandler = null
 let refreshTimer = null
 
+// ==== Countdown đếm ngược cho màn chờ (slot SCHEDULED) ====
+// Chỉ chạy khi user đang chọn 1 slot chưa LIVE — đếm tới startDate của slot đó.
+// Khi startDate trôi qua → gọi fetchFlashSales() để store đồng bộ lại (slot sẽ chuyển sang ACTIVE).
+const waitingTimer = reactive({
+  hours: '00',
+  minutes: '00',
+  seconds: '00',
+})
+
+function pad2(n) {
+  return String(Math.max(0, Math.floor(n))).padStart(2, '0')
+}
+
+function tickWaiting() {
+  const slot = selectedSlot.value
+  if (!slot || !slot.startDate) return
+  const diff = new Date(slot.startDate).getTime() - Date.now()
+  if (diff <= 0) {
+    // Đã tới giờ → reload dữ liệu để slot chuyển sang ACTIVE.
+    fetchFlashSales()
+    return
+  }
+  const totalSec = Math.floor(diff / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  waitingTimer.hours = pad2(h)
+  waitingTimer.minutes = pad2(m)
+  waitingTimer.seconds = pad2(s)
+}
+
+let waitingTimerId = null
+watch(
+  selectedSlot,
+  (slot) => {
+    if (waitingTimerId) {
+      clearInterval(waitingTimerId)
+      waitingTimerId = null
+    }
+    // Chỉ chạy countdown khi slot được chọn chưa LIVE (đang ở màn chờ).
+    if (slot && !isSelectedSlotLive.value) {
+      tickWaiting()
+      waitingTimerId = setInterval(tickWaiting, 1000)
+    }
+  },
+  { immediate: true }
+)
+
 onMounted(async () => {
   // Lắng nghe event auth-required (khi guest nhận 401 từ API)
   window.addEventListener('auth-required', handleAuthRequiredPage)
@@ -1053,5 +1187,6 @@ onUnmounted(() => {
   clearInterval(fomoTimer)
   if (refreshTimer) clearInterval(refreshTimer)
   if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+  if (waitingTimerId) clearInterval(waitingTimerId)
 })
 </script>

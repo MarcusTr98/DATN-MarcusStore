@@ -99,11 +99,13 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
             """)
     List<FlashSaleSlot> findSlotsToExpire(@Param("now") LocalDateTime now);
 
-    // Scheduled: tìm slot 'Lên lịch' (1) mà endDate đã qua mà chưa kịp chạy
+    // Scheduled: tìm slot 'Lên lịch' (1) mà đã đến giờ bắt đầu nhưng bị bỏ lỡ (endDate cũng đã qua)
+    // Điều kiện startDate <= now để tránh trùng với findSlotsToActivate
 
     @Query("""
             SELECT s FROM FlashSaleSlot s
             WHERE s.status = 1
+              AND s.startDate <= :now
               AND s.endDate <= :now
             """)
     List<FlashSaleSlot> findOverdueScheduledSlots(@Param("now") LocalDateTime now);
@@ -171,6 +173,21 @@ public interface FlashSaleSlotRepository extends JpaRepository<FlashSaleSlot, In
             ORDER BY s.startDate ASC
             """)
     List<FlashSaleSlot> findOverlappingSlotsForRestore(
+            @Param("restoreStart") LocalDateTime restoreStart,
+            @Param("restoreEnd") LocalDateTime restoreEnd,
+            @Param("excludeSlotId") Integer excludeSlotId);
+
+    // Kiểm tra overlap với các slot SCHEDULED (1) khi restore thành SCHEDULED
+    // Không check với ACTIVE (2) vì ACTIVE sẽ kết thúc trước khi slot này bắt đầu
+    @Query("""
+            SELECT s FROM FlashSaleSlot s
+            WHERE s.slotId <> :excludeSlotId
+              AND s.status = 1
+              AND s.startDate < :restoreEnd
+              AND s.endDate > :restoreStart
+            ORDER BY s.startDate ASC
+            """)
+    List<FlashSaleSlot> findOverlappingScheduledSlotsForRestore(
             @Param("restoreStart") LocalDateTime restoreStart,
             @Param("restoreEnd") LocalDateTime restoreEnd,
             @Param("excludeSlotId") Integer excludeSlotId);
