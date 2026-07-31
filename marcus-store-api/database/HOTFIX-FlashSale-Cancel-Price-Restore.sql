@@ -1,7 +1,6 @@
 -- =============================================================================
 -- HOTFIX: Khôi phục giá SKU bị "kẹt" ở flashSalePrice do admin hủy Flash Sale
 --
--- Bối cảnh bug:
 --   Khi admin hủy Flash Sale, code chỉ clear FK trong cart_items mà KHÔNG
 --   khôi phục product_sku.price về giá gốc. Scheduler chỉ restore giá khi
 --   slot ACTIVE quá endDate, không xử lý slot CANCELLED → giá SKU bị kẹt
