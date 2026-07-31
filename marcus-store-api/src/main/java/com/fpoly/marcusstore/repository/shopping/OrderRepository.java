@@ -57,8 +57,9 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
         AND (:fromDate IS NULL OR CAST(o.createdAt AS LocalDate) >= :fromDate)
         AND (:toDate   IS NULL OR CAST(o.createdAt AS LocalDate) <= :toDate)
       ORDER BY
+        CASE WHEN o.orderStatus IN ('COMPLETED', 'CANCELLED', 'PICKED_UP') THEN 1 ELSE 0 END,
         CASE WHEN o.orderStatus = 'PENDING' THEN 0 ELSE 1 END,
-        o.createdAt ASC,
+        o.createdAt DESC,
         o.orderId DESC
       """)
   Page<Order> searchOrders(
@@ -177,15 +178,16 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Query(value = """
       SELECT status_code
       FROM (VALUES
-          ('PENDING',    1),
-          ('CONFIRMED',  2),
-          ('PROCESSING', 3),
-          ('PACKED',     4),
-          ('SHIPPING',   5),
-          ('DELIVERED',  6),
-          ('COMPLETED',  7),
-          ('FAILED',     8),
-          ('CANCELLED',  9)
+          ('PENDING',          1),
+          ('CONFIRMED',        2),
+          ('PROCESSING',       3),
+          ('READY_FOR_PICKUP', 4),
+          ('PACKED',           5),
+          ('SHIPPING',         6),
+          ('DELIVERED',        7),
+          ('COMPLETED',        8),
+          ('FAILED',           9),
+          ('CANCELLED',       10)
       ) AS statuses(status_code, sort_order)
       ORDER BY sort_order
       """, nativeQuery = true)

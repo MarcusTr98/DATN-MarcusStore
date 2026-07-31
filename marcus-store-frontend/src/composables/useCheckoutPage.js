@@ -27,13 +27,12 @@ export function useCheckoutPage() {
   const showCancelledModal = ref(false)
 
   // Danh sách cart item vừa bị revert giá do admin hủy Flash Sale.
-  // Dùng để hiện toast/inline notification cho khách hiểu lý do giá đổi.
+  // Dùng để hiện modal thông báo cho khách hiểu lý do giá đổi.
   const priceRevertedItems = ref([])
-  const showPriceRevertedToast = ref(false)
 
-  function dismissPriceRevertedToast() {
-    showPriceRevertedToast.value = false
-  }
+  // Track cartItemIds đã bị revert để dùng khi user bấm "Xóa khỏi giỏ hàng"
+  // (vì sau sync với server, isFlashSale đã bị clear nên không thể filter lại)
+  const revertedCartItemIds = ref([])
 
   // Cờ chặn vòng lặp modal bật liên tục. Sau khi user bấm "Đồng ý" 1 lần,
   // không tự động mở lại modal trong cùng phiên. Reset khi component unmount
@@ -72,7 +71,18 @@ export function useCheckoutPage() {
         .filter(Boolean)
     }
 
-    // Fallback 2: refetch cart thật từ server để đảm bảo lấy đúng TẤT CẢ SP
+    // Fallback 2: dùng revertedCartItemIds (đã được track từ findCancelledFlashSaleItem)
+    // Vì sau sync với server, isFlashSale đã bị clear nên cần dùng cartItemId để tìm lại
+    // KHÔNG filter isFlashSale vì các SP này đã bị revert rồi (isFlashSale = false)
+    if (skuIds.length === 0 && revertedCartItemIds.value.length > 0) {
+      const items = Array.isArray(cartData.value.items) ? cartData.value.items : []
+      skuIds = items
+        .filter((item) => revertedCartItemIds.value.includes(item.cartItemId))
+        .map((item) => item.skuId)
+        .filter(Boolean)
+    }
+
+    // Fallback 3: refetch cart thật từ server để đảm bảo lấy đúng TẤT CẢ SP
     // còn thuộc Flash Sale (theo quan điểm server). Dùng cartStore.fetchCart() để
     // tự sync lại cartStore.items, rồi lọc isFlashSale=true.
     if (skuIds.length === 0) {
@@ -88,11 +98,27 @@ export function useCheckoutPage() {
       }
     }
 
+    // Fallback 4: dùng revertedCartItemIds để refetch cart từ server
+    // (phòng trường hợp cartData đã bị thay đổi nhưng revertedCartItemIds vẫn còn)
+    if (skuIds.length === 0 && revertedCartItemIds.value.length > 0) {
+      try {
+        await cartStore.fetchCart()
+        const serverItems = Array.isArray(cartStore.items) ? cartStore.items : []
+        skuIds = serverItems
+          .filter((item) => revertedCartItemIds.value.includes(item.cartItemId))
+          .map((item) => item.skuId)
+          .filter(Boolean)
+      } catch (e) {
+        console.warn('Không thể refetch cart để lấy SP theo cartItemId:', e)
+      }
+    }
+
     if (skuIds.length === 0) return
 
     try {
       await cartStore.removeManyItemFromCart(skuIds)
       pendingRemovalSkuIds.value = []
+      revertedCartItemIds.value = []
     } catch (e) {
       console.warn('Không thể xóa SP Flash Sale đã hủy khỏi giỏ hàng server:', e)
     }
@@ -183,6 +209,11 @@ export function useCheckoutPage() {
               newPrice: fresh.price,
               slotName: oldItem.flashSaleSlotName || 'Flash Sale',
             })
+            // Lưu cartItemId để handleCancelledRemove có thể xóa được SP
+            // (vì sau khi sync, isFlashSale đã bị clear)
+            if (!revertedCartItemIds.value.includes(fresh.cartItemId)) {
+              revertedCartItemIds.value.push(fresh.cartItemId)
+            }
           }
 
           // Cập nhật giá + trạng thái Flash Sale theo server
@@ -216,16 +247,12 @@ export function useCheckoutPage() {
       localStorage.setItem('selectedCartItems', JSON.stringify(cartData.value.items))
     }
 
-    // Emit sự kiện revert để UI có thể hiện toast/inline notification
+    // Emit sự kiện revert để UI hiện modal thông báo
     if (revertedItems.length > 0) {
       priceRevertedItems.value = revertedItems
-      // Auto-show toast nếu chưa hiện modal cancelled (modal cancelled vẫn ưu tiên hơn)
+      // Hiện modal cancelled để thông báo cho user biết giá đã revert
       if (!showCancelledModal.value) {
-        showPriceRevertedToast.value = true
-        // Auto-hide sau 8 giây
-        setTimeout(() => {
-          showPriceRevertedToast.value = false
-        }, 8000)
+        openCancelledModal()
       }
     }
 
@@ -931,6 +958,9 @@ export function useCheckoutPage() {
       await previewVoucher()
     }
 
+    // Lắng nghe WebSocket event CANCELLED/EXPIRED từ FlashSaleStore
+    window.addEventListener('fs-event', handleFsEvent)
+
     // Nếu đơn hàng hiện tại có SP Flash Sale thuộc slot bị admin hủy → hiện modal ngay.
     // Guard: bỏ qua nếu user đã xử lý trong phiên này rồi (tránh vòng lặp modal).
     // findCancelledFlashSaleItem() giờ tự refetch + đồng bộ giá thật với server trước
@@ -944,9 +974,33 @@ export function useCheckoutPage() {
     // Reset cờ khi rời trang để lần sau vào lại modal vẫn hoạt động nếu lỗi còn.
     hasHandledCancelled.value = false
     pendingRemovalSkuIds.value = []
-    priceRevertedItems.value = []
-    showPriceRevertedToast.value = false
+    revertedCartItemIds.value = []
+    // Cleanup event listener
+    window.removeEventListener('fs-event', handleFsEvent)
   })
+
+  // ==== WebSocket event handler cho Flash Sale CANCELLED/EXPIRED ====
+  async function handleFsEvent(event) {
+    const fsEvent = event.detail
+    // Chỉ xử lý event CANCELLED hoặc EXPIRED
+    if (fsEvent?.type !== 'CANCELLED' && fsEvent?.type !== 'EXPIRED') return
+    // Bỏ qua nếu đã xử lý trong phiên này
+    if (hasHandledCancelled.value) return
+
+    // Refresh clientSlots để đảm bảo có trạng thái mới nhất từ server
+    await flashSaleStore.fetchClientSlots(20)
+
+    // Kiểm tra xem có SP nào trong cart thuộc slot bị ảnh hưởng
+    const affectedItem = cartData.value.items?.find(
+      (item) =>
+        item.isFlashSale &&
+        item.flashSaleSlotId &&
+        flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
+    )
+    if (affectedItem) {
+      openCancelledModal()
+    }
+  }
 
   // Theo dõi khi clientSlots thay đổi (vd: refresh, scheduler reload) để phát hiện
   // slot vừa bị admin hủy trong khi user đang ở trang checkout.
@@ -987,10 +1041,8 @@ export function useCheckoutPage() {
     handleCancelledClose,
     handleCancelledConfirm,
     handleCancelledRemove,
-    // Toast cảnh báo giá Flash Sale vừa bị revert do admin hủy
+    // Danh sách cart item bị revert giá
     priceRevertedItems,
-    showPriceRevertedToast,
-    dismissPriceRevertedToast,
     fulfillmentMethod,
     isStorePickup,
     storeInfo,

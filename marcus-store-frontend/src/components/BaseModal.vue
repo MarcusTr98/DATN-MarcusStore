@@ -98,7 +98,7 @@ const confirmAction = () => {
 }
 
 .modal-icon.success {
-  color: #10b981;
+  color: #0ea5e9;
 }
 .modal-icon.error {
   color: #ef4444;
@@ -163,10 +163,10 @@ const confirmAction = () => {
 }
 
 .btn-confirm.success {
-  background: #10b981;
+  background: #0ea5e9;
 }
 .btn-confirm.success:hover {
-  background: #059669;
+  background: #0284c7;
 }
 
 .btn-confirm.error {

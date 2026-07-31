@@ -11,10 +11,17 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 import './assets/css/main.css'
 import './assets/css/variables.css'
 
-const app = createApp(App) // 2. Tạo app trước
+const pinia = createPinia()
+const app = createApp(App)
 
-app.use(createPinia())
+app.use(pinia)
 app.use(router)
 app.use(VueApexCharts)
+
+// Init Flash Sale WebSocket real-time notifications (CANCELLED/EXPIRED events)
+// Phải gọi SAU khi pinia đã được app.use để store hoạt động
+import { useFlashSaleStore } from '@/stores/FlashSaleStore'
+const flashSaleStore = useFlashSaleStore()
+flashSaleStore.initWebSocket()
 
 app.mount('#app')

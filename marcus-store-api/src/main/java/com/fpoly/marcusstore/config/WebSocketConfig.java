@@ -68,9 +68,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             throw new AccessDeniedException("Token không hợp lệ hoặc đã hết hạn!");
                         }
                     } else {
-                        // Khách Guest => Chặn ngay lập tức
-                        throw new AccessDeniedException(
-                                "Truy cập bị từ chối! Chưa đăng nhập không được sử dụng Live Chat của hệ thống!");
+                        // Khách Guest được phép kết nối để nhận thông báo Flash Sale (chỉ subscribe, không gửi).
+                        // Hệ thống vẫn chặn ở bước SUBSCRIBE nếu destination là kênh yêu cầu auth.
                     }
                 }
 
@@ -91,6 +90,12 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                             || destination.equals("/app/chat.admin.send");
                     if (adminOnlyDestination && !isAdminOrStaff) {
                         throw new AccessDeniedException("Bạn không có quyền truy cập kênh quản trị.");
+                    }
+
+                    // Marcus thêm: cho phép Guest subscribe topic công khai Flash Sale (thông báo hủy/hết hạn).
+                    boolean publicDestination = destination.startsWith("/topic/flashsale");
+                    if (!publicDestination && authentication == null) {
+                        throw new AccessDeniedException("Bạn cần đăng nhập để truy cập kênh này.");
                     }
 
                     // Marcus thêm: Admin không được giả lập tin nhắn khách hàng.

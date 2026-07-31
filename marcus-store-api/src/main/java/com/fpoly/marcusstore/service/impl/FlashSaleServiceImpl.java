@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +37,21 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     private final FlashSaleItemRepository flashSaleItemRepository;
     private final ProductSkuRepository productSkuRepository;
     private final CartItemRepository cartItemRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    private static final String FLASH_SALE_TOPIC = "/topic/flashsale";
+
+    // Broadcast Flash Sale event đến tất cả client đang lắng nghe
+    private void broadcastFlashSaleEvent(String eventType, FlashSaleSlot slot) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("event", eventType); // "CANCELLED" hoặc "EXPIRED"
+        payload.put("slotId", slot.getSlotId());
+        payload.put("slotName", slot.getName());
+        payload.put("status", slot.getStatus());
+        messagingTemplate.convertAndSend(FLASH_SALE_TOPIC, payload);
+        log.info("[FlashSale] Broadcast {} event for slot #{}: {}",
+                eventType, slot.getSlotId(), slot.getName());
+    }
 
 
     // Map 1 slot sang FlashSaleResponse, lấy tổng số lượng từ map batch để tránh N+1.
@@ -687,6 +703,11 @@ public class FlashSaleServiceImpl implements FlashSaleService {
         slot.setStatus(status);
         flashSaleSlotRepository.save(slot);
 
+        // 4b. Broadcast WebSocket event khi admin hủy slot
+        if (status == 4) {
+            broadcastFlashSaleEvent("CANCELLED", slot);
+        }
+
         // 5. Nếu admin vừa hủy slot (status = 4 = CANCELLED):
         //    a) clear tham chiếu Flash Sale trên cart items để user vẫn mua được
         //       với giá gốc (không bị chặn ở Checkout).
@@ -967,6 +988,11 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             toExpire.forEach(s -> s.setStatus((short) 3));
             flashSaleSlotRepository.saveAll(toExpire);
 
+            // Broadcast EXPIRED event via WebSocket
+            for (FlashSaleSlot slot : toExpire) {
+                broadcastFlashSaleEvent("EXPIRED", slot);
+            }
+
             log.info("[FlashSale] Đã kết thúc {} slot: {}",
                     toExpire.size(),
                     toExpire.stream().map(FlashSaleSlot::getSlotId).toList());
@@ -987,6 +1013,12 @@ public class FlashSaleServiceImpl implements FlashSaleService {
             }
             overdue.forEach(s -> s.setStatus((short) 3));
             flashSaleSlotRepository.saveAll(overdue);
+
+            // Broadcast EXPIRED event via WebSocket cho overdue slots
+            for (FlashSaleSlot slot : overdue) {
+                broadcastFlashSaleEvent("EXPIRED", slot);
+            }
+
             log.info("[FlashSale] Đã đánh dấu kết thúc {} slot bị quên: {}",
                     overdue.size(),
                     overdue.stream().map(FlashSaleSlot::getSlotId).toList());

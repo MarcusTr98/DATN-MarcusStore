@@ -6,6 +6,13 @@
 import { defineStore } from 'pinia'
 import flashSaleApi from '@/api/FlashSaleApi.js'
 
+// Singleton polling state (shared across all store instances)
+let pollingIntervalId = null
+let pollingCallback = null
+// Singleton WebSocket state
+let wsStompClient = null
+let wsReconnectTimer = null
+
 
 // map data từ BE sang FE
 
@@ -199,6 +206,15 @@ export const useFlashSaleStore = defineStore('flashSale', {
     // === Client side (public storefront) ===
     clientSlots: [],           // danh sách slot ACTIVE + SCHEDULED cho /khuyen-mai và home
     clientLoading: false,
+
+    // Track các slotId đã bị hủy (để check khi slot không còn trong clientSlots nữa)
+    cancelledSlotIds: [],
+
+    // === WebSocket real-time ===
+    stompClient: null,
+    isWsConnected: false,
+    // Event buffer: lưu event nhận được để Cart/Checkout đọc khi mounted
+    pendingFsEvent: null,
   }),
 
   getters: {
@@ -259,8 +275,16 @@ export const useFlashSaleStore = defineStore('flashSale', {
     },
     // Kiểm tra 1 slotId cụ thể đã bị admin hủy chưa.
     // FE dùng để chặn click "Mua ngay" / "Thêm giỏ" khi slot CANCELLED.
+    // Check cả trong cancelledSlotIds vì slot có thể không còn trong clientSlots
+    // (do fetchClientSlots chỉ trả về ACTIVE + SCHEDULED).
     isSlotCancelled: (state) => (slotId) => {
-      if (!Array.isArray(state.clientSlots) || slotId == null) return false
+      if (slotId == null) return false
+      // Ưu tiên check cancelledSlotIds trước
+      if (Array.isArray(state.cancelledSlotIds) && state.cancelledSlotIds.includes(slotId)) {
+        return true
+      }
+      // Fallback: check trong clientSlots
+      if (!Array.isArray(state.clientSlots)) return false
       const slot = state.clientSlots.find((s) => s.slotId === slotId)
       return slot ? slot.isCancelled === true : false
     },
@@ -287,6 +311,22 @@ export const useFlashSaleStore = defineStore('flashSale', {
       if (startMs && now < startMs) return false
       if (endMs && now >= endMs) return false
       return true
+    },
+    // Kiểm tra 1 slotId cụ thể đã HẾT HẠN chưa (theo thời gian thực tế).
+    // Tiêu chí: status=2 (hoặc 1) VÀ thời gian hiện tại >= endDate.
+    // Dùng khi khách đang ở Cart/Checkout mà FS tự kết thúc.
+    isSlotExpired: (state) => (slotId) => {
+      if (!Array.isArray(state.clientSlots) || slotId == null) return false
+      const slot = state.clientSlots.find((s) => s.slotId === slotId)
+      if (!slot) {
+        // Nếu slot không còn trong clientSlots (đã hết hoặc bị xóa) → coi là hết hạn
+        return true
+      }
+      const now = Date.now()
+      const endMs = slot.endDate ? new Date(slot.endDate).getTime() : null
+      // Hết hạn khi: có endDate VÀ thời gian hiện tại >= endDate
+      if (endMs && now >= endMs) return true
+      return false
     },
   },
 
@@ -560,6 +600,132 @@ export const useFlashSaleStore = defineStore('flashSale', {
         return []
       } finally {
         this.clientLoading = false
+      }
+    },
+
+    // === Polling for real-time Flash Sale status updates ===
+    // Dùng khi user đang ở Cart/Checkout để phát hiện FS hết hạn/admin hủy real-time
+
+    startPolling(callback, intervalMs = 10000) {
+      // Stop existing polling if any
+      this.stopPolling()
+      pollingCallback = callback
+      pollingIntervalId = setInterval(async () => {
+        try {
+          const res = await flashSaleApi.getActiveAndUpcoming(20)
+          const raw = res.data?.data ?? res.data ?? []
+          const newSlots = Array.isArray(raw) ? raw.map(mapClientSlot).filter(Boolean) : []
+          const oldSlots = this.clientSlots
+          this.clientSlots = newSlots
+          // Gọi callback nếu có thay đổi về trạng thái cancelled
+          if (pollingCallback) {
+            pollingCallback(newSlots, oldSlots)
+          }
+        } catch (error) {
+          console.warn('[FlashSaleStore] polling error:', error)
+        }
+      }, intervalMs)
+    },
+
+    stopPolling() {
+      if (pollingIntervalId) {
+        clearInterval(pollingIntervalId)
+        pollingIntervalId = null
+      }
+      pollingCallback = null
+    },
+
+    // === WebSocket real-time for Flash Sale events ===
+    // Kết nối STOMP đến /topic/flashsale để nhận event CANCELLED/EXPIRED
+    // Gọi 1 lần khi app init (trong App.vue hoặc main.js)
+    initWebSocket() {
+      // Đã kết nối rồi hoặc đang kết nối → skip
+      if (wsStompClient?.active) return
+
+      // Lazy import để tránh block initial bundle
+      import('sockjs-client').then(({ default: SockJS }) => {
+        import('@stomp/stompjs').then(({ Client }) => {
+          const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:8080/ws-endpoint'
+
+          wsStompClient = new Client({
+            webSocketFactory: () => new SockJS(socketUrl),
+            reconnectDelay: 5000,
+            onConnect: () => {
+              this.isWsConnected = true
+              this.stompClient = wsStompClient
+              console.log('[FlashSaleStore] WebSocket connected')
+
+              // Subscribe topic flashsale để nhận event CANCELLED/EXPIRED
+              wsStompClient.subscribe('/topic/flashsale', (frame) => {
+                try {
+                  const event = JSON.parse(frame.body)
+                  console.log('[FlashSaleStore] Received FS event:', event)
+
+                  // Cập nhật clientSlots: đánh dấu slot tương ứng là CANCELLED/EXPIRED
+                  if (event.slotId) {
+                    if (event.event === 'CANCELLED' || event.event === 'EXPIRED') {
+                      this.markSlotAsCancelled(event.slotId)
+                    }
+                  }
+
+                  // Lưu event vào buffer để Cart/Checkout đọc khi cần
+                  this.pendingFsEvent = {
+                    type: event.event, // 'CANCELLED' hoặc 'EXPIRED'
+                    slotId: event.slotId,
+                    slotName: event.slotName,
+                    timestamp: Date.now(),
+                  }
+
+                  // Phát event global để các component lắng nghe
+                  window.dispatchEvent(new CustomEvent('fs-event', { detail: this.pendingFsEvent }))
+                } catch (err) {
+                  console.warn('[FlashSaleStore] Parse event error:', err)
+                }
+              })
+            },
+            onWebSocketClose: () => {
+              this.isWsConnected = false
+              this.stompClient = null
+              console.log('[FlashSaleStore] WebSocket disconnected')
+            },
+            onStompError: (frame) => {
+              console.error('[FlashSaleStore] STOMP error:', frame)
+            },
+          })
+          wsStompClient.activate()
+        })
+      })
+    },
+
+    // Đánh dấu slot là CANCELLED trong clientSlots
+    markSlotAsCancelled(slotId) {
+      const idx = this.clientSlots.findIndex((s) => s.slotId === slotId)
+      if (idx !== -1) {
+        this.clientSlots[idx] = { ...this.clientSlots[idx], isCancelled: true }
+      }
+      // Track trong danh sách riêng để check ngay cả khi slot bị remove khỏi clientSlots
+      if (!this.cancelledSlotIds.includes(slotId)) {
+        this.cancelledSlotIds.push(slotId)
+      }
+    },
+
+    // Lấy event đang chờ và xóa buffer (dùng bởi Cart/Checkout)
+    consumePendingEvent() {
+      const event = this.pendingFsEvent
+      this.pendingFsEvent = null
+      return event
+    },
+
+    disconnectWebSocket() {
+      if (wsStompClient) {
+        wsStompClient.deactivate()
+        wsStompClient = null
+        this.stompClient = null
+        this.isWsConnected = false
+      }
+      if (wsReconnectTimer) {
+        clearTimeout(wsReconnectTimer)
+        wsReconnectTimer = null
       }
     },
   },

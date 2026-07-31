@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="checkout-page pt-4">
     <BaseModal
       :visible="modal.show"
@@ -15,29 +15,6 @@
       @confirm="handleCancelledConfirm"
       @remove="handleCancelledRemove"
     />
-
-    <!-- Toast cảnh báo giá Flash Sale vừa bị revert do admin hủy -->
-    <Transition name="toast-slide">
-      <div v-if="showPriceRevertedToast" class="fs-reverted-toast" role="alert">
-        <div class="fs-reverted-toast__icon">
-          <i class="fas fa-exclamation-triangle"></i>
-        </div>
-        <div class="fs-reverted-toast__body">
-          <strong>Flash Sale đã bị admin hủy</strong>
-          <p v-if="priceRevertedItems.length === 1">
-            <strong>{{ priceRevertedItems[0].productName }}</strong> đã chuyển từ
-            <s>{{ formatPrice(priceRevertedItems[0].oldPrice) }}₫</s>
-            → <strong>{{ formatPrice(priceRevertedItems[0].newPrice) }}₫</strong>
-          </p>
-          <p v-else>
-            {{ priceRevertedItems.length }} sản phẩm đã chuyển về giá gốc.
-          </p>
-        </div>
-        <button class="fs-reverted-toast__close" @click="dismissPriceRevertedToast" type="button">
-          <i class="fas fa-times"></i>
-        </button>
-      </div>
-    </Transition>
 
     <!-- Modal thông báo voucher không khả dụng -->
     <BaseModal
@@ -664,10 +641,8 @@ const {
   showCancelledModal,
   handleCancelledConfirm,
   handleCancelledRemove,
-  // Toast + danh sách cart item bị revert giá
+  // Danh sách cart item bị revert giá
   priceRevertedItems,
-  showPriceRevertedToast,
-  dismissPriceRevertedToast,
   fulfillmentMethod,
   isStorePickup,
   storeInfo,
