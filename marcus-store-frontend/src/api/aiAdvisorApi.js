@@ -1,17 +1,17 @@
 import api from '@/utils/api'
 
 // Marcus thêm: AI dùng public API nhưng key nhà cung cấp chỉ tồn tại ở backend.
-export const askAiAdvisor = (message, history) =>
+export const askAiAdvisor = (message, history, sessionId) =>
   // Marcus sửa: chat có trạng thái đang trả lời riêng trong widget, không che toàn
   // bộ website bằng GlobalSpinner.
-  api.post('/public/ai-advisor/chat', { message, history }, { skipGlobalLoading: true })
+  api.post('/public/ai-advisor/chat', { message, history, sessionId }, { skipGlobalLoading: true })
 
 // Marcus thêm: dùng fetch để đọc POST SSE; EventSource mặc định không hỗ trợ body.
-export const streamAiAdvisor = async (message, history, handlers = {}) => {
+export const streamAiAdvisor = async (message, history, sessionId, handlers = {}) => {
   const response = await fetch(`${api.defaults.baseURL}/public/ai-advisor/chat-stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify({ message, history }),
+    body: JSON.stringify({ message, history, sessionId }),
   })
 
   if (!response.ok || !response.body) {

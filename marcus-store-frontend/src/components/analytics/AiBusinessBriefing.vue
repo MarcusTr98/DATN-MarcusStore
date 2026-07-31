@@ -28,7 +28,11 @@
         <small v-if="!report">Kết quả sẽ được lưu để xem lại miễn phí</small>
         <small v-else>
           <i :class="report.cached ? 'bi bi-database-check' : 'bi bi-clock'"></i>
-          {{ report.cached ? `Báo cáo đã lưu · ${formatTime(report.generatedAt)}` : `Vừa tạo lúc ${formatTime(report.generatedAt)}` }}
+          {{
+            report.cached
+              ? `Báo cáo đã lưu · ${formatTime(report.generatedAt)}`
+              : `Vừa tạo lúc ${formatTime(report.generatedAt)}`
+          }}
         </small>
       </div>
     </div>
@@ -52,6 +56,26 @@
           <i class="bi bi-database-check"></i>
           Chỉ dùng dữ liệu tổng hợp
         </span>
+      </div>
+
+      <div v-if="report.productOutlooks.length" class="ai-product-outlooks">
+        <div class="ai-product-outlooks__title">
+          <i class="bi bi-stars"></i>
+          <div>
+            <strong>Dự báo xu hướng sản phẩm từ AI</strong>
+            <small>AI đối chiếu biến động bán hàng giữa kỳ hiện tại và kỳ liền trước</small>
+          </div>
+        </div>
+        <article v-for="product in report.productOutlooks" :key="product.productId">
+          <span :class="`direction-${product.direction.toLowerCase()}`">
+            <i :class="directionIcon(product.direction)"></i>
+          </span>
+          <div>
+            <strong>{{ product.productName }}</strong>
+            <p>{{ product.reason }}</p>
+          </div>
+          <em>{{ directionLabel(product.direction) }}</em>
+        </article>
       </div>
 
       <div class="ai-briefing__content">
@@ -91,31 +115,42 @@
         </div>
       </div>
 
-      <div v-if="report.productOutlooks.length" class="ai-product-outlooks">
-        <div class="ai-product-outlooks__title">
-          <i class="bi bi-boxes"></i>
-          <div>
-            <strong>AI dự đoán hướng sản phẩm</strong>
-            <small>Dựa trên biến động bán hàng giữa hai kỳ</small>
-          </div>
-        </div>
-        <article v-for="product in report.productOutlooks" :key="product.productId">
-          <span :class="`direction-${product.direction.toLowerCase()}`">
-            <i :class="directionIcon(product.direction)"></i>
-          </span>
-          <div>
-            <strong>{{ product.productName }}</strong>
-            <p>{{ product.reason }}</p>
-          </div>
-          <em>{{ directionLabel(product.direction) }}</em>
-        </article>
-      </div>
-
       <footer class="ai-briefing__footer">
         <i class="bi bi-shield-lock"></i>
         {{ report.disclaimer }}
       </footer>
     </template>
+
+    <div v-if="usage" class="ai-briefing__usage">
+      <article>
+        <span><i class="bi bi-chat-dots"></i></span>
+        <div>
+          <strong>{{ formatNumber(usage.successfulChats) }}</strong
+          ><small>Phản hồi AI thành công</small>
+        </div>
+      </article>
+      <article>
+        <span><i class="bi bi-people"></i></span>
+        <div>
+          <strong>{{ formatNumber(usage.uniqueSessions) }}</strong
+          ><small>Phiên AI ẩn danh</small>
+        </div>
+      </article>
+      <article>
+        <span><i class="bi bi-cursor"></i></span>
+        <div>
+          <strong>{{ formatNumber(usage.productClicks) }}</strong
+          ><small>Click sang sản phẩm</small>
+        </div>
+      </article>
+      <article>
+        <span><i class="bi bi-bullseye"></i></span>
+        <div>
+          <strong>{{ formatPercent(usage.clickThroughRate) }}</strong
+          ><small>Tỷ lệ click từ AI</small>
+        </div>
+      </article>
+    </div>
   </section>
 </template>
 
@@ -124,6 +159,7 @@ defineProps({
   error: { type: String, default: '' },
   loading: { type: Boolean, default: false },
   report: { type: Object, default: null },
+  usage: { type: Object, default: null },
 })
 
 defineEmits(['generate'])
@@ -137,7 +173,12 @@ const labels = {
   },
   confidence: { HIGH: 'Cao', MEDIUM: 'Trung bình', LOW: 'Thấp' },
   priority: { HIGH: 'Ưu tiên cao', MEDIUM: 'Nên làm', LOW: 'Theo dõi' },
-  direction: { UP: 'Có thể tăng', STEADY: 'Đi ngang', DOWN: 'Có thể giảm', UNCERTAIN: 'Chưa đủ dữ liệu' },
+  direction: {
+    UP: 'Có thể tăng',
+    STEADY: 'Đi ngang',
+    DOWN: 'Có thể giảm',
+    UNCERTAIN: 'Chưa đủ dữ liệu',
+  },
 }
 
 function outlookLabel(value) {
@@ -184,4 +225,65 @@ function formatTime(value) {
     month: '2-digit',
   }).format(new Date(value))
 }
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString('vi-VN')
+}
+
+function formatPercent(value) {
+  return `${Number(value || 0).toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`
+}
 </script>
+
+<style scoped>
+.ai-briefing__usage {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 22px 18px;
+}
+
+.ai-briefing__usage article {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-radius: 14px;
+  padding: 11px 12px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.ai-briefing__usage article > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 11px;
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.ai-briefing__usage strong,
+.ai-briefing__usage small {
+  display: block;
+}
+
+.ai-briefing__usage strong {
+  color: #312e81;
+  font-size: 16px;
+}
+
+.ai-briefing__usage small {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+}
+
+@media (max-width: 900px) {
+  .ai-briefing__usage {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>

@@ -1,8 +1,9 @@
 .admin-profile-page {
-  --pink: #ff6fa3;
-  --pink-dark: #e84d8a;
-  --pink-light: #ffe0ee;
-  --pink-soft: #fff5f9;
+  /* Marcus sửa: bảng màu xanh navy tạo cảm giác quản trị vững và đồng nhất Admin Panel. */
+  --pink: #1769ca;
+  --pink-dark: #0f4f9c;
+  --pink-light: #d8e9fb;
+  --pink-soft: #f2f7fd;
 
   --green: #10b981;
   --green-soft: #ecfdf5;
@@ -25,58 +26,36 @@
 
   --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-  --shadow-pink: 0 4px 16px rgba(232, 77, 138, 0.18);
+  --shadow-pink: 0 8px 24px rgba(15, 79, 156, 0.14);
 }
 
-/* 
-   PAGE HEADER
-   */
-.page-header {
-  background: var(--bg-card);
-  border-radius: var(--radius-lg);
-  padding: 20px 28px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-shadow: var(--shadow-pink);
-  border: 1px solid var(--pink-light);
+.admin-profile-page {
+  min-height: 100%;
+  background:
+    radial-gradient(circle at 100% 0, rgba(23, 105, 202, 0.06), transparent 28%),
+    #eef3fb;
 }
-.page-header-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-.page-header-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--pink), var(--pink-dark));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-size: 22px;
-  box-shadow: var(--shadow-pink);
-  flex-shrink: 0;
-}
-.page-header-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--pink-dark);
-  margin: 0 0 2px;
-}
-.page-header-sub {
-  font-size: 13.5px;
-  color: var(--text-sub);
-  margin: 0;
-}
+.profile-page-header { margin-bottom: 24px; }
 .last-updated-badge {
-  font-size: 12.5px;
-  color: var(--text-muted);
-  background: var(--bg-page);
-  border: 1px solid var(--border);
-  padding: 6px 14px;
-  border-radius: 20px;
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 1px 8px;
+  align-items: center;
+  padding: 9px 14px;
+  border: 1px solid #c8dcf3;
+  border-radius: 12px;
+  color: #60738c;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+}
+.last-updated-badge i {
+  grid-row: 1 / 3;
+  color: #1769ca;
+  font-size: 18px;
+}
+.last-updated-badge strong {
+  color: #19385f;
+  font-size: 12px;
 }
 
 /* 
@@ -129,7 +108,7 @@
   background: var(--bg-card);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 12px 32px rgba(15, 35, 64, 0.08);
   padding: 28px 20px 24px;
   height: 100%;
 }
@@ -144,12 +123,12 @@
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--pink), var(--pink-dark));
+  background: linear-gradient(145deg, #1769ca, #102f5c);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 12px;
-  box-shadow: 0 6px 20px rgba(232, 77, 138, 0.3);
+  box-shadow: 0 10px 26px rgba(15, 79, 156, 0.3);
 }
 .avatar-initials {
   font-size: 30px;
@@ -162,7 +141,7 @@
   position: absolute;
   inset: -4px;
   border-radius: 50%;
-  border: 3px dashed var(--pink-light);
+  border: 2px solid #bcd7f4;
 }
 .avatar-name {
   font-size: 15.5px;
@@ -179,9 +158,10 @@
   letter-spacing: 0.5px;
 }
 .role-admin {
-  background: var(--pink);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(255, 111, 163, 0.4);
+  border: 1px solid #e5c16a;
+  background: linear-gradient(135deg, #fff4c7, #f1d47a);
+  color: #674b08;
+  box-shadow: 0 4px 12px rgba(181, 137, 28, 0.18);
 }
 .role-staff {
   background: #e0e7ff;

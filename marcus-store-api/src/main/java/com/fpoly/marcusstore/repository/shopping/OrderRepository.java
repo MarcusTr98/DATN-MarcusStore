@@ -207,6 +207,25 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
   Optional<Order> findByOrderCodeAndUserUserId(String OrderCode, Integer userId);
 
+  // Marcus thêm: lấy theo mốc DELIVERED trong lịch sử, không dùng updated_at vì
+  // các tác vụ đối soát khác có thể cập nhật đơn và làm sai thời gian chờ.
+  @Query(value = """
+      SELECT TOP (100) o.order_id
+      FROM Orders o
+      WHERE o.order_status = 'DELIVERED'
+        AND UPPER(COALESCE(o.fulfillment_method, 'DELIVERY')) <> 'STORE_PICKUP'
+        AND EXISTS (
+          SELECT 1
+          FROM Order_Status_History h
+          WHERE h.order_id = o.order_id
+            AND h.status = 'DELIVERED'
+            AND h.created_at <= :cutoff
+        )
+      ORDER BY o.order_id
+      """, nativeQuery = true)
+  List<Integer> findDeliveredOrderIdsEligibleForAutoCompletion(
+      @Param("cutoff") java.time.LocalDateTime cutoff);
+
   @Query("SELECT COALESCE(SUM(o.finalAmount), 0) FROM Order o " +
       "WHERE o.user.userId = :userId AND o.orderStatus = 'COMPLETED'")
   BigDecimal sumTotalSpentByUserId(@Param("userId") Integer userId);

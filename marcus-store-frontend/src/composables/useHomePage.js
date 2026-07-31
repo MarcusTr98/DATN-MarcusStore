@@ -89,11 +89,8 @@ export function useHomePage() {
   const resumeHeroSlider = () => {
     stopHeroSlider()
 
-    // Marcus thêm: tôn trọng thiết lập giảm chuyển động của người dùng.
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
-
     heroSliderTimer = setInterval(() => {
-      if (heroSlides.value.length > 0) {
+      if (!document.hidden && heroSlides.value.length > 1) {
         activeHeroSlide.value = (activeHeroSlide.value + 1) % heroSlides.value.length
       }
     }, 4000)
@@ -129,6 +126,8 @@ export function useHomePage() {
     () => heroSlides.value.length,
     (length) => {
       if (length > 0 && activeHeroSlide.value >= length) activeHeroSlide.value = 0
+      // Marcus sửa: dữ liệu CMS tải bất đồng bộ vẫn phải khởi động lại slider.
+      if (length > 1 && !document.hidden) resumeHeroSlider()
     },
   )
 
@@ -177,7 +176,5 @@ export function useHomePage() {
     currentTime,
     currentDate,
     brandBanners,
-    pauseHeroSlider,
-    resumeHeroSlider,
   }
 }

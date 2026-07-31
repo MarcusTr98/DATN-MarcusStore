@@ -45,6 +45,12 @@ export function useFinancialReport() {
       transactions.value = data
         .map((t) => ({
           ...t,
+          // Marcus thêm lớp phòng vệ UI cho dữ liệu cũ: nhận tại quầy không
+          // được gắn nhãn thu hộ GHN.
+          type:
+            t.type === 'COD_COLLECTION' && t.fulfillmentMethod === 'STORE_PICKUP'
+              ? 'STORE_PAYMENT'
+              : t.type,
           // Ưu tiên lấy orderCode trực tiếp, nếu không có mới tìm trong order
           orderCode: t.orderCode || t.order?.orderCode || '---',
         }))
@@ -451,12 +457,33 @@ export function useFinancialReport() {
     const successfulRefund = dataset
       .filter((t) => t.status === 'SUCCESS' && t.type === 'REFUND')
       .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+
+    // Marcus thêm: cùng quy tắc nguồn tiền với Analytics/AI.
+    const recognizedRevenue = dataset
+      .filter((t) => t.status === 'SUCCESS' && t.type !== 'REFUND' && t.orderStatus === 'COMPLETED')
+      .reduce((sum, t) => sum + (Number(t.amount) || 0), 0)
+
+    // Marcus thêm: tách tiền đã thu của đơn hủy nhưng refund chưa SUCCESS.
+    const cancelledBalances = new Map()
+    dataset
+      .filter((t) => t.status === 'SUCCESS' && t.orderStatus === 'CANCELLED')
+      .forEach((t) => {
+        const current = cancelledBalances.get(t.orderCode) || 0
+        const effect = t.type === 'REFUND' ? -(Number(t.amount) || 0) : Number(t.amount) || 0
+        cancelledBalances.set(t.orderCode, current + effect)
+      })
+    const unsettledCancellationAmount = [...cancelledBalances.values()]
+      .filter((amount) => amount > 0)
+      .reduce((sum, amount) => sum + amount, 0)
+
     return {
       total: dataset.length,
       success: dataset.filter((t) => t.status === 'SUCCESS').length,
       pending: dataset.filter((t) => t.status === 'PENDING').length,
       successfulInflow,
       successfulRefund,
+      recognizedRevenue,
+      unsettledCancellationAmount,
       totalAmount: successfulInflow - successfulRefund,
     }
   })
@@ -473,6 +500,7 @@ export function useFinancialReport() {
     dateString ? new Date(dateString).toLocaleString('vi-VN') : ''
   const formatType = (type) => {
     if (type === 'COD_COLLECTION') return 'Thu hộ (COD)'
+    if (type === 'STORE_PAYMENT') return 'Thanh toán tại cửa hàng'
     if (type === 'VNPAY_PAYMENT') return 'Thanh toán (VNPAY)'
     if (type === 'REFUND') return 'Hoàn tiền'
     return type
@@ -486,7 +514,13 @@ export function useFinancialReport() {
   }
 
   const getTypeClass = (type) =>
-    type === 'VNPAY_PAYMENT' ? 'bg-primary' : type === 'REFUND' ? 'bg-warning' : 'bg-info'
+    type === 'VNPAY_PAYMENT'
+      ? 'bg-primary'
+      : type === 'REFUND'
+        ? 'bg-warning'
+        : type === 'STORE_PAYMENT'
+          ? 'bg-success'
+          : 'bg-info'
 
   const getStatusClass = (status) =>
     status === 'SUCCESS' ? 'bg-success' : status === 'PENDING' ? 'bg-warning' : 'bg-danger'

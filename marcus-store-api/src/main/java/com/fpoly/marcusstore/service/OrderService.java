@@ -11,16 +11,27 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface OrderService {
-    // Lấy dữ liệu theo keyword, phương thức thanh toán, trạng thái đơn hàng và khoảng thời gian tạo đơn
-    Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus, LocalDate fromDate, LocalDate toDate, Pageable pageable);
+    // Lấy dữ liệu theo keyword, phương thức thanh toán, trạng thái đơn hàng và
+    // khoảng thời gian tạo đơn
+    Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus, LocalDate fromDate,
+            LocalDate toDate, Pageable pageable);
+
     OrderStatsResponse getOrderStats(String keyword, String paymentMethod, String orderStatus);
+
     List<String> getPaymentMethods();
 
     List<String> getOrderStatuses();
+
     OrderDetailResponse getOrderDetailResponse(String orderCode);
+
     OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request);
-     List<OrderResponse> getUserOrder();
-     OrderDetailResponse getUserOrderDetail(String orderCode);
+
+    List<OrderResponse> getUserOrder();
+
+    OrderDetailResponse getUserOrderDetail(String orderCode);
+
     OrderDetailResponse cancelUserOrder(String orderCode, String reason);
+
+    OrderDetailResponse confirmUserReceivedOrder(String orderCode);
 
 }

@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.controller.admin;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsOverviewResponse;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsTrendPoint;
 import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
+import com.fpoly.marcusstore.dto.analytics.CancellationReasonResponse;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.service.analytics.AnalyticsService;
 import lombok.RequiredArgsConstructor;
@@ -44,5 +45,12 @@ public class AnalyticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
             @RequestParam(defaultValue = "10") int limit) {
         return ApiResponse.success(analyticsService.getProductTrends(fromDate, toDate, limit));
+    }
+
+    @GetMapping("/cancellation-reasons")
+    public ApiResponse<List<CancellationReasonResponse>> getCancellationReasons(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        return ApiResponse.success(analyticsService.getCancellationReasons(fromDate, toDate));
     }
 }

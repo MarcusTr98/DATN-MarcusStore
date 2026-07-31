@@ -6,6 +6,7 @@ import com.fpoly.marcusstore.dto.ai.AiProductClickRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.service.ai.AiAdvisorService;
 import com.fpoly.marcusstore.service.ai.AiProductClickService;
+import com.fpoly.marcusstore.service.ai.AiUsageEventService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,20 +38,32 @@ public class AiAdvisorController {
     private static final int MAX_REQUESTS_PER_MINUTE = 10;
     private final AiAdvisorService aiAdvisorService;
     private final AiProductClickService aiProductClickService;
+    private final AiUsageEventService usageEventService;
     private final Map<String, Deque<Instant>> requestWindows = new ConcurrentHashMap<>();
 
     @PostMapping("/chat")
     public ResponseEntity<ApiResponse<AiAdvisorResponse>> chat(
             @Valid @RequestBody AiAdvisorRequest request, HttpServletRequest servletRequest) {
         enforceRateLimit(clientKey(servletRequest));
-        return ResponseEntity.ok(ApiResponse.success(aiAdvisorService.advise(request)));
+        long startedAt = System.nanoTime();
+        try {
+            AiAdvisorResponse response = aiAdvisorService.advise(request);
+            recordChatUsage(request.getSessionId(), true, startedAt);
+            return ResponseEntity.ok(ApiResponse.success(response));
+        } catch (RuntimeException exception) {
+            recordChatUsage(request.getSessionId(), false, startedAt);
+            throw exception;
+        }
     }
 
     @PostMapping(value = "/chat-stream", produces = TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(
             @Valid @RequestBody AiAdvisorRequest request, HttpServletRequest servletRequest) {
         enforceRateLimit(clientKey(servletRequest));
-        SseEmitter emitter = new SseEmitter(35_000L);
+        // Marcus sửa: emitter phải sống lâu hơn timeout gọi Gemini để không đóng
+        // kết nối khi nhà cung cấp vẫn đang tạo câu trả lời.
+        SseEmitter emitter = new SseEmitter(75_000L);
+        long startedAt = System.nanoTime();
 
         CompletableFuture.runAsync(() -> {
             try {
@@ -60,7 +73,9 @@ public class AiAdvisorController {
                 }
                 emitter.send(SseEmitter.event().name("done").data(response));
                 emitter.complete();
+                recordChatUsage(request.getSessionId(), true, startedAt);
             } catch (Exception exception) {
+                recordChatUsage(request.getSessionId(), false, startedAt);
                 sendSafeStreamError(emitter, exception);
             }
         });
@@ -85,7 +100,25 @@ public class AiAdvisorController {
     public ResponseEntity<ApiResponse<String>> trackProductClick(
             @Valid @RequestBody AiProductClickRequest request) {
         aiProductClickService.track(request);
+        recordProductClickUsage(request);
         return ResponseEntity.ok(ApiResponse.success("Đã ghi nhận."));
+    }
+
+    private void recordChatUsage(String sessionId, boolean successful, long startedAt) {
+        try {
+            long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
+            usageEventService.recordChatResult(sessionId, successful, elapsedMs);
+        } catch (RuntimeException ignored) {
+            // Marcus sửa: lỗi telemetry không được làm gián đoạn câu trả lời AI.
+        }
+    }
+
+    private void recordProductClickUsage(AiProductClickRequest request) {
+        try {
+            usageEventService.recordProductClick(request.getSessionId(), request.getProductId());
+        } catch (RuntimeException ignored) {
+            // Marcus sửa: thống kê lỗi không được chặn khách mở trang sản phẩm.
+        }
     }
 
     // Marcus thêm: giới hạn MVP theo IP để tránh một trình duyệt làm cạn hạn mức

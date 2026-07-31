@@ -6,7 +6,9 @@ import com.fpoly.marcusstore.dto.analytics.AnalyticsPeriod;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsRateMetric;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsTrendPoint;
 import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
+import com.fpoly.marcusstore.dto.analytics.CancellationReasonResponse;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository;
+import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.CancellationReasonProjection;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.SalesSummaryProjection;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -89,6 +94,32 @@ public class AnalyticsService {
                 .toList();
     }
 
+    public List<CancellationReasonResponse> getCancellationReasons(
+            LocalDate fromDate,
+            LocalDate toDate) {
+        AnalyticsPeriod period = resolvePeriod(fromDate, toDate);
+        Map<String, Long> current = loadCancellationReasons(period.fromDate(), period.toDate());
+        Map<String, Long> previous = loadCancellationReasons(
+                period.previousFromDate(), period.previousToDate());
+        long currentTotal = current.values().stream().mapToLong(Long::longValue).sum();
+
+        LinkedHashSet<String> reasons = new LinkedHashSet<>(current.keySet());
+        reasons.addAll(previous.keySet());
+        return reasons.stream()
+                .map(reason -> {
+                    long currentCount = current.getOrDefault(reason, 0L);
+                    long previousCount = previous.getOrDefault(reason, 0L);
+                    return new CancellationReasonResponse(
+                            reason,
+                            currentCount,
+                            previousCount,
+                            currentTotal == 0 ? 0D : round(currentCount * 100D / currentTotal),
+                            calculateChange(currentCount, previousCount));
+                })
+                .sorted((left, right) -> Long.compare(right.currentCount(), left.currentCount()))
+                .toList();
+    }
+
     /**
      * Marcus thêm: kỳ mặc định là 30 ngày tính cả hôm nay; kỳ so sánh nằm ngay
      * trước đó và luôn có cùng số ngày.
@@ -127,11 +158,24 @@ public class AnalyticsService {
         return new SalesSummary(
                 value(projection.getTotalOrders()),
                 value(projection.getCompletedOrders()),
+                value(projection.getCohortCompletedOrders()),
                 value(projection.getCancelledOrders()),
                 zero(projection.getCompletedSales()),
                 value(projection.getUnitsSold()),
                 value(projection.getOrderingCustomers()),
                 refunds);
+    }
+
+    private Map<String, Long> loadCancellationReasons(LocalDate fromDate, LocalDate toDate) {
+        return analyticsRepository.findCancellationReasons(
+                fromDate.atStartOfDay(),
+                toDate.plusDays(1).atStartOfDay())
+                .stream()
+                .collect(Collectors.toMap(
+                        CancellationReasonProjection::getReason,
+                        reason -> value(reason.getReasonCount()),
+                        Long::sum,
+                        java.util.LinkedHashMap::new));
     }
 
     private static AnalyticsMetric metric(BigDecimal current, BigDecimal previous) {
@@ -180,6 +224,7 @@ public class AnalyticsService {
     private record SalesSummary(
             long totalOrders,
             long completedOrders,
+            long cohortCompletedOrders,
             long cancelledOrders,
             BigDecimal completedSales,
             long unitsSold,
@@ -195,7 +240,7 @@ public class AnalyticsService {
         }
 
         double completionRate() {
-            return percentage(completedOrders, totalOrders);
+            return percentage(cohortCompletedOrders, totalOrders);
         }
 
         double cancellationRate() {

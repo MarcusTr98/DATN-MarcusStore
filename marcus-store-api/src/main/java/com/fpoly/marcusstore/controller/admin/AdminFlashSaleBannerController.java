@@ -23,7 +23,9 @@ public class AdminFlashSaleBannerController {
     private CloudinaryService cloudinaryService;
 
     @PostMapping(consumes = "multipart/form-data")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
+    // Marcus sửa: chỉ người có quyền tạo/cập nhật Flash Sale mới được upload
+    // banner.
+    @PreAuthorize("hasAnyAuthority('FLASHSALE_CREATE', 'FLASHSALE_UPDATE')")
     public ApiResponse<Map<String, String>> uploadBanner(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File ảnh banner không được để trống");

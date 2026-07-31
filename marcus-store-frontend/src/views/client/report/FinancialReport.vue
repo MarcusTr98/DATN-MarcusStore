@@ -1,17 +1,15 @@
 ﻿<template>
   <div class="fin-page">
     <div class="fin-shell">
-      <!-- Hero -->
-      <div class="fin-hero">
-        <div class="fin-hero-bg"></div>
-        <div class="fin-hero-content">
-          <div class="hero-title">
-            <div class="hero-icon"><i class="bi bi-graph-up-arrow"></i></div>
-            <div>
-              <h1>Quản lý Đối soát Tài chính</h1>
-              <p>Theo dõi giao dịch thu hộ, thanh toán và hoàn tiền trong hệ thống.</p>
-            </div>
-          </div>
+      <!-- Marcus sửa: dùng chung header quản trị để đồng nhất với trang Phân tích kinh doanh. -->
+      <AdminPageHeader
+        eyebrow="Tài chính & giao dịch"
+        eyebrow-icon="bi bi-cash-coin"
+        title="Quản lý đối soát"
+        description="Theo dõi dòng tiền thu vào, hoàn tiền và các khoản đang chờ xử lý trong hệ thống."
+        icon="bi bi-graph-up-arrow"
+      >
+        <template #actions>
           <div class="hero-actions">
             <div class="dynamic-total" v-if="filteredTransactions.length > 0">
               Dòng tiền ròng theo bộ lọc:
@@ -31,16 +29,31 @@
               {{ exporting ? 'Đang xuất...' : 'Xuất Báo Cáo Excel' }}
             </button>
           </div>
-        </div>
-      </div>
+        </template>
+      </AdminPageHeader>
 
       <!-- Stats -->
       <div class="stats-grid">
+        <!-- Marcus sửa: ưu tiên nhóm KPI lượt giao dịch trước, sau đó mới tới tiền. -->
         <div class="stat-card">
           <div class="stat-icon stat-icon-blue"><i class="bi bi-receipt"></i></div>
           <div class="stat-body">
             <span>Tổng giao dịch</span>
             <strong>{{ stats.total }}</strong>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle"></i></div>
+          <div class="stat-body">
+            <span>Thành công</span>
+            <strong class="fin-accent">{{ stats.success }}</strong>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon stat-icon-amber"><i class="bi bi-hourglass-split"></i></div>
+          <div class="stat-body">
+            <span>Đang chờ xử lý</span>
+            <strong>{{ stats.pending }}</strong>
           </div>
         </div>
         <div class="stat-card stat-card-money-in">
@@ -57,18 +70,22 @@
             <strong class="amount-outflow">-{{ formatCurrencyVnd(stats.successfulRefund) }}</strong>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-icon stat-icon-green"><i class="bi bi-check-circle"></i></div>
+        <div class="stat-card stat-card-money-in">
+          <div class="stat-icon stat-icon-green"><i class="bi bi-bag-check"></i></div>
           <div class="stat-body">
-            <span>Thành công</span>
-            <strong class="fin-accent">{{ stats.success }}</strong>
+            <span>Doanh thu đơn hoàn tất</span>
+            <strong class="amount-inflow">{{ formatCurrencyVnd(stats.recognizedRevenue) }}</strong>
+            <small>Đã thu tiền và đơn đã hoàn thành</small>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon stat-icon-amber"><i class="bi bi-hourglass-split"></i></div>
+          <div class="stat-icon stat-icon-amber"><i class="bi bi-exclamation-circle"></i></div>
           <div class="stat-body">
-            <span>Đang chờ xử lý</span>
-            <strong>{{ stats.pending }}</strong>
+            <span>Tiền đơn hủy chưa hoàn xong</span>
+            <strong class="amount-outflow">
+              {{ formatCurrencyVnd(stats.unsettledCancellationAmount) }}
+            </strong>
+            <small>Đang chờ refund thành công</small>
           </div>
         </div>
         <div class="stat-card">
@@ -121,6 +138,7 @@
             <select v-model="filters.type" class="form-select" @change="onFilterChange">
               <option value="">Tất cả</option>
               <option value="COD_COLLECTION">Thu hộ (COD)</option>
+              <option value="STORE_PAYMENT">Thanh toán tại cửa hàng</option>
               <option value="VNPAY_PAYMENT">Thanh toán (VNPAY)</option>
               <option value="REFUND">Hoàn tiền</option>
             </select>
@@ -481,6 +499,7 @@
 </template>
 
 <script setup>
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import { useFinancialReport } from '@/composables/useFinancialReport'
 
 // Marcus refactor: component chỉ còn nhiệm vụ render giao diện.

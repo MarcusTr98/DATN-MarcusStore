@@ -17,6 +17,11 @@ const UserOrderApi = {
   cancelOrder(orderCode, payload = {}) {
     return api.post(`/orders/${orderCode}/cancel`, payload)
   },
+
+  // Marcus thêm: endpoint chuyên biệt, không gửi trạng thái từ client.
+  confirmReceived(orderCode) {
+    return api.post(`/orders/${orderCode}/confirm-received`)
+  },
 }
 
 export default UserOrderApi

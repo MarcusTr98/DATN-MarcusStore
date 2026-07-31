@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -74,8 +75,15 @@ public class FinancialService {
                                                                                         : t.getOrder().getTransactionId())
                                                         .orderCode(t.getOrder().getOrderCode())
                                                         .amount(t.getAmount())
-                                                        .type(t.getType())
+                                                        // Marcus sửa riêng lớp báo cáo: COD của đơn tự
+                                                        // nhận là thanh toán tại cửa hàng, không phải
+                                                        // tiền GHN thu hộ. Không đổi transaction gốc để
+                                                        // tránh ảnh hưởng luồng thanh toán hiện hữu.
+                                                        .type(resolveReportTransactionType(t))
                                                         .status(t.getStatus())
+                                                        .orderStatus(t.getOrder().getOrderStatus())
+                                                        .paymentStatus(t.getOrder().getPaymentStatus())
+                                                        .fulfillmentMethod(t.getOrder().getFulfillmentMethod())
                                                         .note(note)
                                                         .createdAt(t.getCreatedAt())
                                                         .recipientName(t.getOrder().getRecipientName())
@@ -149,6 +157,33 @@ public class FinancialService {
                                 .filter(java.util.Objects::nonNull)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+                // Marcus thêm: doanh thu chỉ được ghi nhận khi tiền đã thu thành công
+                // và đơn đã hoàn tất. Đây là cùng quy tắc mà Analytics/AI sử dụng.
+                BigDecimal recognizedRevenue = dtoList.stream()
+                                .filter(t -> SUCCESS.equals(t.getStatus())
+                                                && !REFUND.equals(t.getType())
+                                                && "COMPLETED".equals(t.getOrderStatus()))
+                                .map(TransactionResponse::getAmount)
+                                .filter(java.util.Objects::nonNull)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                // Marcus thêm: tiền của đơn đã hủy vẫn đang nằm trong dòng tiền cho đến
+                // khi refund SUCCESS; gom theo đơn để không trừ nhầm refund của đơn khác.
+                Map<String, BigDecimal> cancelledBalances = dtoList.stream()
+                                .filter(t -> "CANCELLED".equals(t.getOrderStatus())
+                                                && SUCCESS.equals(t.getStatus()))
+                                .collect(Collectors.groupingBy(
+                                                TransactionResponse::getOrderCode,
+                                                Collectors.reducing(
+                                                                BigDecimal.ZERO,
+                                                                t -> REFUND.equals(t.getType())
+                                                                                ? t.getAmount().negate()
+                                                                                : t.getAmount(),
+                                                                BigDecimal::add)));
+                BigDecimal unsettledCancellationAmount = cancelledBalances.values().stream()
+                                .filter(balance -> balance.signum() > 0)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
                 long successCount = dtoList.stream().filter(t -> SUCCESS.equals(t.getStatus())).count();
                 double rate = dtoList.isEmpty() ? 0 : (double) successCount / dtoList.size() * 100;
 
@@ -158,6 +193,8 @@ public class FinancialService {
                                 successfulInflow,
                                 successfulRefund,
                                 successfulInflow.subtract(successfulRefund),
+                                recognizedRevenue,
+                                unsettledCancellationAmount,
                                 pending,
                                 failed,
                                 rate);
@@ -165,6 +202,16 @@ public class FinancialService {
 
         private static boolean isRefund(OrderTransaction transaction) {
                 return REFUND.equalsIgnoreCase(transaction.getType());
+        }
+
+        private static String resolveReportTransactionType(OrderTransaction transaction) {
+                if ("COD_COLLECTION".equalsIgnoreCase(transaction.getType())
+                                && transaction.getOrder() != null
+                                && "STORE_PICKUP".equalsIgnoreCase(
+                                                transaction.getOrder().getFulfillmentMethod())) {
+                        return "STORE_PAYMENT";
+                }
+                return transaction.getType();
         }
 
         public void updateReconciliationStatus(Integer transactionId, boolean status) {

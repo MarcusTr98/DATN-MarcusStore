@@ -62,6 +62,12 @@ vnpay.sandbox=true
 # Marcus sửa: Sandbox dừng ở trạng thái chờ VNPAY, không xác nhận thành công giả trên giao diện.
 vnpay.allowManualRefundConfirmation=false
 
+# Marcus thêm: tự chuyển đơn DELIVERED thành COMPLETED nếu khách không tự xác nhận.
+# Mặc định 72 giờ; scheduler không cho cấu hình thấp hơn 24 giờ để tránh đóng đơn nhầm.
+order.auto-complete.delivered-after-hours=72
+order.auto-complete.initial-delay-ms=60000
+order.auto-complete.scan-delay-ms=1800000
+
 # CẤU HÌNH CLOUDINARY
 cloudinary.cloud-name=dyeb3lju6
 cloudinary.api-key=336949236443174

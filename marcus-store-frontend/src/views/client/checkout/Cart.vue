@@ -633,12 +633,14 @@ const loginRequiredMessage = ref('Vui lòng đăng nhập để truy cập giỏ
 function findCancelledFlashSaleItem() {
   const slots = flashSaleStore.clientSlots
   if (!Array.isArray(slots)) return null
-  return cartItems.value.find(
-    (item) =>
-      item.isFlashSale &&
-      item.flashSaleSlotId &&
-      flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
-  ) || null
+  return (
+    cartItems.value.find(
+      (item) =>
+        item.isFlashSale &&
+        item.flashSaleSlotId &&
+        flashSaleStore.isSlotCancelled(item.flashSaleSlotId),
+    ) || null
+  )
 }
 
 async function handleCancelledConfirm() {
@@ -714,11 +716,7 @@ onMounted(async () => {
 watch(
   () => flashSaleStore.clientSlots,
   () => {
-    if (
-      !showCancelledModal.value &&
-      !hasHandledCancelled.value &&
-      findCancelledFlashSaleItem()
-    ) {
+    if (!showCancelledModal.value && !hasHandledCancelled.value && findCancelledFlashSaleItem()) {
       showCancelledModal.value = true
     }
   },
@@ -737,7 +735,8 @@ onBeforeUnmount(() => {
 // ==== Event listener cho auth-required (từ api interceptor khi guest nhận 401) ====
 function handleAuthRequired(event) {
   loginRequiredTitle.value = event.detail?.title || 'Đăng nhập để tiếp tục'
-  loginRequiredMessage.value = event.detail?.message || 'Vui lòng đăng nhập để truy cập giỏ hàng và thanh toán.'
+  loginRequiredMessage.value =
+    event.detail?.message || 'Vui lòng đăng nhập để truy cập giỏ hàng và thanh toán.'
   showLoginRequiredModal.value = true
 }
 
@@ -1209,6 +1208,9 @@ async function handleCheckout() {
   // Lưu danh sách sản phẩm đã chọn để checkout hiển thị đúng
   const selectedItemsData = selectedItems.value.map((item) => ({
     cartItemId: item.cartItemId,
+    // Marcus sửa tại biên Cart → Checkout: Checkout cần cả cartItemId để tạo
+    // đơn và skuId để xóa/đồng bộ đúng SKU sau Flash Sale hoặc thanh toán.
+    skuId: item.skuId,
     productName: item.name,
     variantName: item.variant,
     skuCode: item.skuCode,
@@ -1223,6 +1225,12 @@ async function handleCheckout() {
     flashSaleSlotName: item.flashSaleSlotName || null,
   }))
   localStorage.setItem('selectedCartItems', JSON.stringify(selectedItemsData))
+  // Marcus thêm: lưu riêng phạm vi lựa chọn. Sau F5, Checkout lấy giá mới nhất
+  // từ server nhưng chỉ giữ các cart item khách thực sự chọn tại Cart.
+  localStorage.setItem(
+    'selectedCartItemIds',
+    JSON.stringify(selectedItemsData.map((item) => item.cartItemId).filter(Boolean)),
+  )
 
   // Lưu thông tin tổng tiền
   localStorage.setItem('selectedSubtotal', subtotal.value.toString())

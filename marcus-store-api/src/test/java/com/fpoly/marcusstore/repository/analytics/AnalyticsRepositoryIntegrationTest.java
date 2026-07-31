@@ -27,10 +27,12 @@ class AnalyticsRepositoryIntegrationTest {
         var overview = analyticsService.getOverview(fromDate, toDate);
         var trend = analyticsService.getSalesTrend(fromDate, toDate);
         var products = analyticsService.getProductTrends(fromDate, toDate, 10);
+        var cancellationReasons = analyticsService.getCancellationReasons(fromDate, toDate);
 
         assertThat(overview.period().numberOfDays()).isEqualTo(30);
         assertThat(overview.completedSales().currentValue()).isNotNull();
         assertThat(trend).hasSize(30);
         assertThat(products).hasSizeLessThanOrEqualTo(10);
+        assertThat(cancellationReasons).isNotNull();
     }
 }

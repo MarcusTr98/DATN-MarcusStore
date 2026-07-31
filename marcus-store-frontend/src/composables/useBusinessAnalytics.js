@@ -28,9 +28,11 @@ export function useBusinessAnalytics() {
   const overview = ref(null)
   const dailyTrend = ref([])
   const products = ref([])
+  const cancellationReasons = ref([])
   const loading = ref(false)
   const errorMessage = ref('')
   const aiReport = ref(null)
+  const aiUsage = ref(null)
   const aiLoading = ref(false)
   const aiError = ref('')
   let requestVersion = 0
@@ -154,7 +156,7 @@ export function useBusinessAnalytics() {
         tone: changeTone(salesChange),
         icon: salesChange >= 0 ? 'bi bi-arrow-up-right' : 'bi bi-arrow-down-right',
         title: 'Đà doanh thu',
-        text: metricNarrative('Doanh thu hoàn tất', salesChange),
+        text: metricNarrative('Doanh thu đã thu của đơn hoàn tất', salesChange),
       },
       {
         tone: cancellationChange > 1 ? 'warning' : 'positive',
@@ -263,16 +265,23 @@ export function useBusinessAnalytics() {
     const params = { fromDate: fromDate.value, toDate: toDate.value }
 
     try {
-      const [overviewResponse, trendResponse, productsResponse] = await Promise.all([
-        analyticsApi.getOverview(params),
-        analyticsApi.getSalesTrend(params),
-        analyticsApi.getProductTrends({ ...params, limit: 12 }),
-      ])
+      const [overviewResponse, trendResponse, productsResponse, cancellationResponse, aiUsageResponse] =
+        await Promise.all([
+          analyticsApi.getOverview(params),
+          analyticsApi.getSalesTrend(params),
+          analyticsApi.getProductTrends({ ...params, limit: 12 }),
+          analyticsApi.getCancellationReasons(params),
+          // Marcus sửa: telemetry là phần bổ sung; chưa chạy migration không được
+          // làm hỏng toàn bộ trang phân tích kinh doanh.
+          analyticsApi.getAiUsageSummary(params).catch(() => null),
+        ])
       if (currentRequest !== requestVersion) return
 
       overview.value = unwrap(overviewResponse)
       dailyTrend.value = unwrap(trendResponse) || []
       products.value = unwrap(productsResponse) || []
+      cancellationReasons.value = unwrap(cancellationResponse) || []
+      aiUsage.value = unwrap(aiUsageResponse) || null
       await loadSavedAiReport(currentRequest)
     } catch (error) {
       if (currentRequest !== requestVersion) return
@@ -312,6 +321,8 @@ export function useBusinessAnalytics() {
     aiError,
     aiLoading,
     aiReport,
+    aiUsage,
+    cancellationReasons,
     errorMessage,
     fromDate,
     forecast,

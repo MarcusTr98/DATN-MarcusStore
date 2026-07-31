@@ -8,9 +8,11 @@ import com.fpoly.marcusstore.dto.analytics.AiAnalyticsReportResponse.ProductOutl
 import com.fpoly.marcusstore.dto.analytics.AiAnalyticsReportResponse.Signal;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsOverviewResponse;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsPeriod;
+import com.fpoly.marcusstore.dto.analytics.AnalyticsTrendPoint;
 import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
 import com.fpoly.marcusstore.entity.analytics.AiAnalyticsReport;
 import com.fpoly.marcusstore.repository.analytics.AiAnalyticsReportRepository;
+import com.fpoly.marcusstore.service.ai.AiUsageEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -37,6 +39,7 @@ import java.util.stream.Collectors;
 public class AiAnalyticsService {
 
     private static final Duration DOUBLE_SUBMIT_GUARD = Duration.ofSeconds(20);
+    private static final String METRIC_SCHEMA_VERSION = "recognized-revenue-v2";
     private static final int PRODUCT_LIMIT = 10;
     private static final Set<String> OUTLOOKS = Set.of("GROWTH", "STEADY", "DECLINE", "UNCERTAIN");
     private static final Set<String> SEVERITIES = Set.of("POSITIVE", "INFO", "WARNING", "CRITICAL");
@@ -46,6 +49,7 @@ public class AiAnalyticsService {
     private final AnalyticsService analyticsService;
     private final ObjectMapper objectMapper;
     private final AiAnalyticsReportRepository reportRepository;
+    private final AiUsageEventService aiUsageEventService;
     private final Map<CacheKey, LocalDateTime> recentGenerations = new ConcurrentHashMap<>();
 
     @Value("${gemini.api-key:}")
@@ -65,9 +69,10 @@ public class AiAnalyticsService {
     public AiAnalyticsReportResponse findLatestReport(LocalDate fromDate, LocalDate toDate) {
         AnalyticsPeriod period = analyticsService.resolvePeriod(fromDate, toDate);
         return reportRepository
-                .findFirstByFromDateAndToDateOrderByGeneratedAtDesc(
+                .findFirstByFromDateAndToDateAndModelNameOrderByGeneratedAtDesc(
                         period.fromDate(),
-                        period.toDate())
+                        period.toDate(),
+                        cacheModelName())
                 .map(this::readStoredReport)
                 .orElse(null);
     }
@@ -94,7 +99,15 @@ public class AiAnalyticsService {
                 overview.period().fromDate(),
                 overview.period().toDate(),
                 PRODUCT_LIMIT);
-        String context = buildSafeContext(overview, products);
+        List<Map<String, Object>> salesTrendBuckets = summarizeSalesTrend(
+                analyticsService.getSalesTrend(
+                        overview.period().fromDate(), overview.period().toDate()));
+        String context = buildSafeContext(
+                overview,
+                products,
+                analyticsService.getCancellationReasons(
+                        overview.period().fromDate(), overview.period().toDate()),
+                salesTrendBuckets);
         JsonNode providerResponse = callGemini(context);
         AiAnalyticsReportResponse report = parseReport(
                 providerResponse,
@@ -109,7 +122,8 @@ public class AiAnalyticsService {
 
     private AiAnalyticsReportResponse findStoredReport(CacheKey key) {
         return reportRepository
-                .findFirstByFromDateAndToDateOrderByGeneratedAtDesc(key.fromDate(), key.toDate())
+                .findFirstByFromDateAndToDateAndModelNameOrderByGeneratedAtDesc(
+                        key.fromDate(), key.toDate(), cacheModelName())
                 .map(this::readStoredReport)
                 .orElse(null);
     }
@@ -120,7 +134,7 @@ public class AiAnalyticsService {
             entity.setFromDate(key.fromDate());
             entity.setToDate(key.toDate());
             entity.setReportJson(objectMapper.writeValueAsString(report));
-            entity.setModelName(model);
+            entity.setModelName(cacheModelName());
             entity.setGeneratedAt(report.generatedAt());
             reportRepository.save(entity);
         } catch (Exception exception) {
@@ -141,8 +155,19 @@ public class AiAnalyticsService {
 
     private String buildSafeContext(
             AnalyticsOverviewResponse overview,
-            List<ProductTrendResponse> products) {
+            List<ProductTrendResponse> products,
+            List<com.fpoly.marcusstore.dto.analytics.CancellationReasonResponse> cancellationReasons,
+            List<Map<String, Object>> salesTrendBuckets) {
         Map<String, Object> context = new LinkedHashMap<>();
+        // Marcus thêm: gửi định nghĩa chỉ số để AI không diễn giải final_amount
+        // của đơn chưa thu được tiền thành doanh thu.
+        context.put("metricPolicy", Map.of(
+                "completedSales",
+                "SUCCESS COD/VNPAY transactions of COMPLETED orders, grouped by transaction date",
+                "successfulRefundAmount",
+                "SUCCESS REFUND transactions, grouped by transaction date",
+                "profitAvailable",
+                false));
         context.put("period", overview.period());
         context.put("completedSales", overview.completedSales());
         context.put("completedOrders", overview.completedOrders());
@@ -153,6 +178,23 @@ public class AiAnalyticsService {
         context.put("successfulRefundAmount", overview.successfulRefundAmount());
         context.put("orderingCustomers", overview.orderingCustomers());
         context.put("productTrends", products);
+        // Marcus nâng cấp: nén chuỗi thời gian thành tối đa 12 giai đoạn để AI
+        // nhận ra đà tăng/giảm mà vẫn tiết kiệm quota Gemini miễn phí.
+        context.put("salesTrendBuckets", salesTrendBuckets);
+        // Marcus thêm: AI chỉ nhận nhóm lý do và số đếm đã chuẩn hóa, không nhận
+        // ghi chú hủy tự do hay thông tin nhận diện khách hàng.
+        context.put("cancellationReasons", cancellationReasons);
+        try {
+            // Marcus thêm: AI chỉ nhận thống kê hành vi đã tổng hợp, không nhận
+            // sessionId hay nội dung câu hỏi của từng khách.
+            context.put(
+                    "aiAdvisorUsage",
+                    aiUsageEventService.summarize(
+                            overview.period().fromDate(),
+                            overview.period().toDate()));
+        } catch (RuntimeException ignored) {
+            // Chưa chạy migration telemetry vẫn cho phép phân tích số liệu bán hàng.
+        }
         try {
             return objectMapper.writeValueAsString(context);
         } catch (Exception exception) {
@@ -160,10 +202,38 @@ public class AiAnalyticsService {
         }
     }
 
+    private List<Map<String, Object>> summarizeSalesTrend(List<AnalyticsTrendPoint> trend) {
+        if (trend == null || trend.isEmpty()) {
+            return List.of();
+        }
+        int bucketSize = Math.max(1, (int) Math.ceil(trend.size() / 12D));
+        List<Map<String, Object>> buckets = new ArrayList<>();
+        for (int start = 0; start < trend.size(); start += bucketSize) {
+            int end = Math.min(start + bucketSize, trend.size());
+            List<AnalyticsTrendPoint> points = trend.subList(start, end);
+            Map<String, Object> bucket = new LinkedHashMap<>();
+            bucket.put("fromDate", points.getFirst().date());
+            bucket.put("toDate", points.getLast().date());
+            bucket.put("completedSales", points.stream()
+                    .map(AnalyticsTrendPoint::completedSales)
+                    .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
+            bucket.put("completedOrders", points.stream()
+                    .mapToLong(AnalyticsTrendPoint::completedOrders)
+                    .sum());
+            bucket.put("unitsSold", points.stream()
+                    .mapToLong(AnalyticsTrendPoint::unitsSold)
+                    .sum());
+            buckets.add(bucket);
+        }
+        return buckets;
+    }
+
     private JsonNode callGemini(String context) {
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(5));
-        requestFactory.setReadTimeout(Duration.ofSeconds(25));
+        requestFactory.setConnectTimeout(Duration.ofSeconds(8));
+        // Marcus sửa: báo cáo dài cần đủ thời gian hoàn thiện JSON, tránh cắt
+        // phản hồi rồi báo sai định dạng.
+        requestFactory.setReadTimeout(Duration.ofSeconds(60));
 
         try {
             return RestClient.builder()
@@ -183,9 +253,9 @@ public class AiAnalyticsService {
                                             "text",
                                             "DỮ LIỆU TỔNG HỢP ĐÃ KIỂM DUYỆT:\n" + context)))),
                             "generationConfig", Map.of(
-                                    "temperature", 0.2,
-                                    "maxOutputTokens", 1_000,
-                                    "responseMimeType", "application/json")))
+                                    "maxOutputTokens", 2_400,
+                                    "responseMimeType", "application/json",
+                                    "responseJsonSchema", analyticsResponseSchema())))
                     .retrieve()
                     .body(JsonNode.class);
         } catch (HttpStatusCodeException exception) {
@@ -200,9 +270,21 @@ public class AiAnalyticsService {
                 Bạn là Marcus AI Business Analyst dành cho chủ cửa hàng thương mại điện tử.
                 Chỉ phân tích JSON tổng hợp được cung cấp. Không yêu cầu hoặc suy đoán dữ liệu khách hàng.
                 Không gọi doanh thu là lợi nhuận vì hệ thống không có giá nhập.
+                completedSales chỉ là tiền đã thu SUCCESS của đơn COMPLETED, không phải tổng final_amount.
+                successfulRefundAmount là tiền REFUND đã SUCCESS; PENDING/FAILED không được coi là đã hoàn.
                 Không bịa tin thị trường, tồn kho, nguyên nhân hoặc con số tương lai.
+                aiAdvisorUsage chỉ là số liệu tổng hợp ẩn danh; dùng để đánh giá mức khách tương tác với tư vấn AI.
+                cancellationReasons là thống kê lý do đã chuẩn hóa; dùng nó để giải thích tỷ lệ hủy, không tự bịa nguyên nhân.
+                salesTrendBuckets là chuỗi thời gian đã nén theo thứ tự cũ đến mới;
+                dùng để nhận diện đà tăng/giảm, điểm bứt phá và mức biến động thay vì chỉ đọc tổng KPI.
+                Không đưa ra con số dự báo doanh thu tuyệt đối nếu chuỗi biến động mạnh hoặc dữ liệu quá ít.
                 Mọi kết luận phải gắn với evidence có số liệu trong JSON.
                 Có thể dự đoán HƯỚNG tăng/đi ngang/giảm của sản phẩm, nhưng phải dùng UNCERTAIN khi dữ liệu yếu.
+                headline và executiveSummary phải ưu tiên triển vọng sắp tới, rủi ro chính và quyết định quản lý;
+                không chỉ liệt kê lại KPI giống dashboard.
+                Sắp xếp productOutlooks theo mức cần hành động: xu hướng tăng rõ, xu hướng giảm rõ, rồi mới chưa chắc chắn.
+                Signals ưu tiên tín hiệu có giá trị dự báo, biến động lý do hủy và hành vi khách; tránh lặp cùng một KPI.
+                Actions phải cụ thể, có thể thực hiện trong kỳ kế tiếp và nói rõ căn cứ dữ liệu.
                 Nếu changePercent là null, hiểu là kỳ trước bằng 0; không tự biến thành phần trăm tăng.
                 Viết tiếng Việt rõ, ngắn, phù hợp người quản lý cửa hàng.
                 Chỉ nhắc productId có trong productTrends.
@@ -224,6 +306,63 @@ public class AiAnalyticsService {
                   ]
                 }
                 """;
+    }
+
+    private String cacheModelName() {
+        return METRIC_SCHEMA_VERSION + "|" + model;
+    }
+
+    // Marcus thêm: structured output khóa hình dạng báo cáo ngay từ Gemini,
+    // thay vì chỉ hy vọng model làm đúng phần mô tả trong prompt.
+    private Map<String, Object> analyticsResponseSchema() {
+        Map<String, Object> signal = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "title", Map.of("type", "string"),
+                        "evidence", Map.of("type", "string"),
+                        "interpretation", Map.of("type", "string"),
+                        "severity", Map.of("type", "string", "enum", List.copyOf(SEVERITIES))),
+                "required", List.of("title", "evidence", "interpretation", "severity"));
+        Map<String, Object> action = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "title", Map.of("type", "string"),
+                        "reason", Map.of("type", "string"),
+                        "priority", Map.of("type", "string", "enum", List.copyOf(PRIORITIES))),
+                "required", List.of("title", "reason", "priority"));
+        Map<String, Object> productOutlook = Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "productId", Map.of("type", "integer"),
+                        "direction", Map.of("type", "string", "enum", List.copyOf(DIRECTIONS)),
+                        "reason", Map.of("type", "string")),
+                "required", List.of("productId", "direction", "reason"));
+
+        return Map.of(
+                "type", "object",
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "headline", Map.of("type", "string"),
+                        "executiveSummary", Map.of("type", "string"),
+                        "outlook", Map.of("type", "string", "enum", List.copyOf(OUTLOOKS)),
+                        "confidence", Map.of("type", "string", "enum", List.copyOf(PRIORITIES)),
+                        "signals", Map.of("type", "array", "maxItems", 4, "items", signal),
+                        "actions", Map.of("type", "array", "maxItems", 3, "items", action),
+                        "productOutlooks", Map.of(
+                                "type", "array",
+                                "maxItems", 5,
+                                "items", productOutlook)),
+                "required", List.of(
+                        "headline",
+                        "executiveSummary",
+                        "outlook",
+                        "confidence",
+                        "signals",
+                        "actions",
+                        "productOutlooks"));
     }
 
     private AiAnalyticsReportResponse parseReport(
@@ -298,7 +437,16 @@ public class AiAnalyticsService {
         if (text.isBlank()) {
             throw new IllegalStateException("Gemini không trả về nội dung phân tích.");
         }
-        return text.replaceFirst("^```(?:json)?\\s*", "").replaceFirst("\\s*```$", "").trim();
+        String normalized = text
+                .replaceFirst("^```(?:json)?\\s*", "")
+                .replaceFirst("\\s*```$", "")
+                .trim();
+        // Marcus sửa: chấp nhận trường hợp provider bọc JSON bằng một câu dẫn.
+        int firstBrace = normalized.indexOf('{');
+        int lastBrace = normalized.lastIndexOf('}');
+        return firstBrace >= 0 && lastBrace > firstBrace
+                ? normalized.substring(firstBrace, lastBrace + 1)
+                : normalized;
     }
 
     private String requiredText(JsonNode node, String field, int maxLength) {

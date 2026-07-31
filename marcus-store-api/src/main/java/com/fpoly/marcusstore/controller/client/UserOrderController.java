@@ -53,4 +53,12 @@ public class UserOrderController {
         String reason = request == null ? null : request.getNote();
         return orderService.cancelUserOrder(orderCode, reason);
     }
+
+    // Marcus thêm: khách chỉ xác nhận đã nhận trên chính đơn của mình; backend
+    // quyết định trạng thái hợp lệ, frontend không được truyền status tùy ý.
+    @PostMapping("/{orderCode}/confirm-received")
+    public OrderDetailResponse confirmReceived(
+            @PathVariable("orderCode") @Size(min = 1, max = 50) String orderCode) {
+        return orderService.confirmUserReceivedOrder(orderCode);
+    }
 }

@@ -29,8 +29,17 @@ const analyticsApi = {
     return get('/admin/analytics/product-trends', params)
   },
 
+  getCancellationReasons(params) {
+    return get('/admin/analytics/cancellation-reasons', params)
+  },
+
   getSavedAiReport(params) {
     return get('/admin/analytics/ai-report', params)
+  },
+
+  // Marcus thêm: đọc telemetry AI đã ẩn danh, không chứa nội dung hội thoại.
+  getAiUsageSummary(params) {
+    return get('/admin/ai-advisor/usage-summary', params)
   },
 
   generateAiReport(params) {
@@ -38,7 +47,9 @@ const analyticsApi = {
     // Marcus thêm: POST là thao tác duy nhất gọi AI; GET phía trên chỉ đọc DB.
     return api.post(`/admin/analytics/ai-report${query ? `?${query}` : ''}`, null, {
       skipGlobalLoading: true,
-      timeout: 35_000,
+      // Marcus sửa: backend chờ Gemini tối đa 60 giây; frontend phải sống lâu
+      // hơn để không tự hủy một báo cáo vẫn đang được nhà cung cấp xử lý.
+      timeout: 75_000,
     })
   },
 }

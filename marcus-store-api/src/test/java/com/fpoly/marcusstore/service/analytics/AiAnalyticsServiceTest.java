@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.service.analytics;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fpoly.marcusstore.repository.analytics.AiAnalyticsReportRepository;
+import com.fpoly.marcusstore.service.ai.AiUsageEventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -23,7 +24,8 @@ class AiAnalyticsServiceTest {
         aiAnalyticsService = new AiAnalyticsService(
                 analyticsService,
                 new ObjectMapper(),
-                reportRepository);
+                reportRepository,
+                mock(AiUsageEventService.class));
         ReflectionTestUtils.setField(aiAnalyticsService, "apiKey", "");
         ReflectionTestUtils.setField(aiAnalyticsService, "model", "gemini-3.5-flash-lite");
         ReflectionTestUtils.setField(

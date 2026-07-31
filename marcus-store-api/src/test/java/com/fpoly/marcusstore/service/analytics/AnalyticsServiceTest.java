@@ -4,6 +4,7 @@ import com.fpoly.marcusstore.dto.analytics.AnalyticsOverviewResponse;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsPeriod;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.SalesSummaryProjection;
+import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.CancellationReasonProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -146,6 +147,28 @@ class AnalyticsServiceTest {
                 assertThat(overview.successfulRefundAmount().changePercent()).isZero();
         }
 
+        @Test
+        void comparesNormalizedCancellationReasonsWithoutExposingFreeText() {
+                LocalDate from = LocalDate.of(2026, 7, 1);
+                LocalDate to = LocalDate.of(2026, 7, 30);
+                CancellationReasonProjection current = cancellationReason("Không còn nhu cầu mua", 6);
+                CancellationReasonProjection previous = cancellationReason("Không còn nhu cầu mua", 3);
+
+                when(analyticsRepository.findCancellationReasons(
+                                from.atStartOfDay(), to.plusDays(1).atStartOfDay()))
+                                .thenReturn(java.util.List.of(current));
+                when(analyticsRepository.findCancellationReasons(
+                                LocalDate.of(2026, 6, 1).atStartOfDay(), from.atStartOfDay()))
+                                .thenReturn(java.util.List.of(previous));
+
+                var reasons = analyticsService.getCancellationReasons(from, to);
+
+                assertThat(reasons).hasSize(1);
+                assertThat(reasons.getFirst().reason()).isEqualTo("Không còn nhu cầu mua");
+                assertThat(reasons.getFirst().sharePercent()).isEqualTo(100);
+                assertThat(reasons.getFirst().changePercent()).isEqualTo(100);
+        }
+
         private static SalesSummaryProjection summary(
                         long totalOrders,
                         long completedOrders,
@@ -155,11 +178,21 @@ class AnalyticsServiceTest {
                         long customers) {
                 SalesSummaryProjection projection = mock(SalesSummaryProjection.class);
                 when(projection.getTotalOrders()).thenReturn(totalOrders);
+                // Marcus thêm: tỷ lệ hoàn tất dùng cùng tập đơn theo ngày tạo, không trộn với
+                // ngày giao dịch.
+                when(projection.getCohortCompletedOrders()).thenReturn(completedOrders);
                 when(projection.getCompletedOrders()).thenReturn(completedOrders);
                 when(projection.getCancelledOrders()).thenReturn(cancelledOrders);
                 when(projection.getCompletedSales()).thenReturn(new BigDecimal(completedSales));
                 when(projection.getUnitsSold()).thenReturn(unitsSold);
                 when(projection.getOrderingCustomers()).thenReturn(customers);
+                return projection;
+        }
+
+        private static CancellationReasonProjection cancellationReason(String reason, long count) {
+                CancellationReasonProjection projection = mock(CancellationReasonProjection.class);
+                when(projection.getReason()).thenReturn(reason);
+                when(projection.getReasonCount()).thenReturn(count);
                 return projection;
         }
 }

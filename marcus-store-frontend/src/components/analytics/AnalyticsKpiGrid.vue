@@ -38,7 +38,7 @@ const integerFormatter = new Intl.NumberFormat('vi-VN')
 const cards = computed(() => [
   metricCard(
     'sales',
-    'Doanh thu hoàn tất',
+    'Doanh thu đã thu & hoàn tất',
     'bi bi-cash-stack',
     'blue',
     props.overview.completedSales,

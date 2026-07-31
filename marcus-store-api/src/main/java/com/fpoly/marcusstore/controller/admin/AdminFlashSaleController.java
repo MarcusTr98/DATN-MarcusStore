@@ -12,11 +12,14 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/admin")
+// Marcus thêm: áp dụng đúng bộ quyền FLASHSALE_* đã có trong database.
+@PreAuthorize("hasAuthority('FLASHSALE_VIEW')")
 public class AdminFlashSaleController {
 
     private final FlashSaleService flashSaleService;
@@ -29,16 +32,14 @@ public class AdminFlashSaleController {
             @RequestParam(required = false) Short status) {
         Pageable pageable = PageRequest.of(
                 Math.max(page, 0),
-                Math.max(size, 1)
-        );
+                Math.max(size, 1));
         return flashSaleService.getFlashSaleSlotsPage(keyword, status, pageable);
     }
 
     @GetMapping("/flashsales/stats")
     public FlashSaleStatsResponse getFlashSaleStats(
             @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) Short status
-    ) {
+            @RequestParam(required = false) Short status) {
         return flashSaleService.getFlashSaleStats(keyword, status);
     }
 
@@ -48,6 +49,7 @@ public class AdminFlashSaleController {
     }
 
     @PostMapping("/flashsale")
+    @PreAuthorize("hasAuthority('FLASHSALE_CREATE')")
     public ResponseEntity<FlashSaleResponse> createFlashSale(
             @RequestBody @Valid FlashSaleSlotRequest request) {
         FlashSaleResponse response = flashSaleService.createFlashSale(request);
@@ -56,13 +58,16 @@ public class AdminFlashSaleController {
 
     // Cập nhật flash sale (admin)
     @PutMapping("/flashsale/{slotId}")
+    @PreAuthorize("hasAuthority('FLASHSALE_UPDATE')")
     public FlashSaleResponse updateFlashSale(
             @PathVariable("slotId") Integer slotId,
             @RequestBody @Valid FlashSaleSlotRequest request) {
         return flashSaleService.updateFlashSale(slotId, request);
     }
+
     // Đổi trạng thái nhanh cho slot (hủy SCHEDULED/ACTIVE -> CANCELLED)
     @PatchMapping("/flashsale/{slotId}/status")
+    @PreAuthorize("hasAuthority('FLASHSALE_DELETE')")
     public FlashSaleResponse updateFlashSaleStatus(
             @PathVariable("slotId") Integer slotId,
             @RequestBody @Valid UpdateFlashSaleStatusRequest request) {
@@ -71,6 +76,7 @@ public class AdminFlashSaleController {
 
     // Khôi phục flash sale đã bị hủy (CANCELLED -> ACTIVE)
     @PostMapping("/flashsale/{slotId}/restore")
+    @PreAuthorize("hasAuthority('FLASHSALE_UPDATE')")
     public FlashSaleResponse restoreFlashSale(@PathVariable("slotId") Integer slotId) {
         return flashSaleService.restoreFlashSale(slotId);
     }

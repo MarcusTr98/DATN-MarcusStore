@@ -1,21 +1,22 @@
 <template>
   <div class="admin-profile-page container-fluid px-4 py-4">
-    <div class="page-header mb-4">
-      <div class="page-header-left">
-        <div class="page-header-icon">
-          <i class="fas fa-user-astronaut"></i>
-        </div>
-        <div>
-          <h3 class="page-header-title">Hồ sơ Quản trị viên</h3>
-          <p class="page-header-sub">Quản lý thông tin cá nhân và bảo mật tài khoản</p>
-        </div>
-      </div>
-      <div class="page-header-meta">
+    <!-- Marcus sửa: header hồ sơ dùng ngôn ngữ thiết kế quản trị thống nhất, rõ vai trò tài khoản. -->
+    <AdminPageHeader
+      class="profile-page-header"
+      eyebrow="Tài khoản quản trị"
+      eyebrow-icon="bi bi-shield-lock"
+      title="Hồ sơ quản trị viên"
+      description="Quản lý danh tính, thông tin liên hệ và lớp bảo mật của tài khoản."
+      icon="bi bi-person-badge"
+    >
+      <template #actions>
         <span class="last-updated-badge">
-          <i class="fas fa-clock me-1"></i> Cập nhật lần cuối: {{ lastUpdated || 'Đang tải...' }}
+          <i class="bi bi-clock-history"></i>
+          <span>Cập nhật lần cuối</span>
+          <strong>{{ lastUpdated || 'Đang tải...' }}</strong>
         </span>
-      </div>
-    </div>
+      </template>
+    </AdminPageHeader>
 
     <div v-if="isLoading" class="loading-overlay">
       <div class="loading-card">
@@ -432,6 +433,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import '@/assets/css/profile-admin.css'
 import { changePassword } from '@/api/authApi'
 import { useRouter } from 'vue-router'

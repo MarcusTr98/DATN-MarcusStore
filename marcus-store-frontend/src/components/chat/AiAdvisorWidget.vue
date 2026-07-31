@@ -152,10 +152,11 @@ const handleProductClick = (product) => {
 // Marcus thêm: AI và Live Chat có bộ câu hỏi riêng, không trộn trạng thái hai kênh.
 const suggestions = [
   'Tư vấn điện thoại phù hợp trong tầm giá 10 triệu',
-  'So sánh giúp tôi các sản phẩm đang có',
+  'So sánh iPhone và Samsung đang có tại cửa hàng',
+  'Màn hình OLED, AMOLED và LTPO khác nhau thế nào?',
+  'Chọn điện thoại ưu tiên camera hay hiệu năng?',
   'Địa chỉ Marcus Store ở đâu?',
-  'Tôi muốn mua và nhận hàng tại cửa hàng',
-  'Tìm sản phẩm phù hợp để học tập và làm việc',
+  'Tìm điện thoại phù hợp để học tập và làm việc',
 ]
 
 const openAdvisor = async () => {
@@ -194,7 +195,7 @@ const sendMessage = async () => {
       products: [],
     }
     messages.value.push(assistantMessage)
-    await streamAiAdvisor(content, history, {
+    await streamAiAdvisor(content, history, getTrackingSessionId(), {
       onToken: (token) => {
         isStreamingText.value = true
         assistantMessage.content += token

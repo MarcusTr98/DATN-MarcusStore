@@ -437,4 +437,53 @@ public class OrderServiceImpl implements OrderService {
                 order.getOrderCode());
         return response;
     }
+
+    @Override
+    @Transactional
+    public OrderDetailResponse confirmUserReceivedOrder(String orderCode) {
+        Integer userId = SecurityUtils.getCurrentUserId();
+        Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        if (order.getUser() == null || !userId.equals(order.getUser().getUserId())) {
+            throw new RuntimeException("Bạn không có quyền xác nhận đơn hàng này");
+        }
+
+        String currentStatus = normalizeStatusValue(order.getOrderStatus());
+        // Marcus thêm idempotency: retry do mạng chậm không tạo lịch sử, thông báo
+        // hay giao dịch thanh toán lần thứ hai.
+        if ("COMPLETED".equals(currentStatus)) {
+            return getOrderDetailResponse(orderCode);
+        }
+
+        boolean storePickup = "STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod());
+        String requiredStatus = storePickup ? "READY_FOR_PICKUP" : "DELIVERED";
+        if (!requiredStatus.equals(currentStatus)) {
+            throw new RuntimeException(storePickup
+                    ? "Chỉ xác nhận khi đơn đã sẵn sàng nhận tại cửa hàng"
+                    : "Chỉ xác nhận khi đơn vị vận chuyển đã giao hàng thành công");
+        }
+
+        if ("VNPAY".equalsIgnoreCase(order.getPaymentMethod())
+                && !"PAID".equalsIgnoreCase(order.getPaymentStatus())) {
+            throw new RuntimeException("Đơn VNPAY chưa được xác nhận thanh toán");
+        }
+
+        UpdateOrderStatusRequest request = UpdateOrderStatusRequest.builder()
+                .status("COMPLETED")
+                .note(storePickup
+                        ? "Khách hàng xác nhận đã nhận hàng tại cửa hàng"
+                        : "Khách hàng xác nhận đã nhận hàng từ đơn vị vận chuyển")
+                .build();
+        OrderDetailResponse response = updateStatusOrder(orderCode, request);
+
+        adminNotificationService.createAndSendNotification(
+                "ORDER_COMPLETED",
+                "Khách xác nhận đã nhận đơn " + order.getOrderCode(),
+                storePickup
+                        ? "Khách hàng đã xác nhận nhận hàng tại Marcus Store."
+                        : "Khách hàng đã xác nhận nhận hàng từ đơn vị vận chuyển.",
+                order.getOrderCode());
+        return response;
+    }
 }
