@@ -18,4 +18,7 @@ public class ProductItemUpdateRequest {
     private String imeiCode;
 
     private Integer status;
+
+    @Size(max = 500, message = "Ghi chú tối đa 500 ký tự")
+    private String note;
 }

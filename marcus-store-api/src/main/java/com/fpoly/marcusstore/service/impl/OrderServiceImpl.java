@@ -1,25 +1,34 @@
 package com.fpoly.marcusstore.service.impl;
 
+import com.fpoly.marcusstore.dto.request.UpdateOrderImeiRequest;
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.*;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.Product;
+import com.fpoly.marcusstore.entity.core.ProductItem;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
+import com.fpoly.marcusstore.entity.shopping.Voucher;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.repository.statistics.CommentEvaluationRepository;
+import com.fpoly.marcusstore.repository.promotion.VoucherRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
-import com.fpoly.marcusstore.service.EmailService;
-import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderPaymentService;
 import com.fpoly.marcusstore.service.OrderService;
 import com.fpoly.marcusstore.service.OrderShippingService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
+import com.fpoly.marcusstore.service.EmailService;
+import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.UserNotificationService;
+import com.fpoly.marcusstore.service.ProductItemService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,9 +48,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
     private final ProductSkuRepository productSkuRepository;
+    private final ProductItemRepository productItemRepository;
+    private final VoucherRepository voucherRepository;
+    private final UserVoucherRepository userVoucherRepository;
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
     private final OrderCancellationService orderCancellationService;
@@ -133,6 +147,12 @@ public class OrderServiceImpl implements OrderService {
         };
     }
 
+    private void markPaymentPaidWhenCompleted(Order order) {
+        if ("COMPLETED".equals(normalizeStatusValue(order.getOrderStatus()))) {
+            order.setPaymentStatus("PAID");
+        }
+    }
+
     private OrderStatusHistory createStatusHistory(Order order, String status, String note) {
         Integer currentUserId = SecurityUtils.getCurrentUserId();
         User currentUser = userRepository.getReferenceById(currentUserId);
@@ -149,7 +169,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
-        Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
+        Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
         String newStatus = normalizeStatusValue(request.getStatus());
@@ -195,35 +215,29 @@ public class OrderServiceImpl implements OrderService {
                 throw new RuntimeException(
                         "Đơn đã có vận đơn GHN; cần hủy vận đơn GHN trước khi hủy đơn trên hệ thống");
             }
-            // Hoàn kho, voucher, giỏ hàng và số lượng Flash Sale tại một nơi
+            // Hoàn kho (theo số lượng), voucher, giỏ hàng, Flash Sale tại một nơi
             orderCancellationService.cancelAndRestore(order, note);
+
+            // Hoàn trạng thái IMEI đã gán về IN_STOCK — chỉ đổi trạng thái, KHÔNG cộng lại
+            // stockQuantity vì cancelAndRestore ở trên đã cộng theo quantity rồi (tránh
+            // cộng trùng)
+            List<OrderItem> orderItemsForImei = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+            for (OrderItem item : orderItemsForImei) {
+                List<ProductItem> assignedImeis = item.getProductItems();
+                if (assignedImeis != null && !assignedImeis.isEmpty()) {
+                    for (ProductItem pi : assignedImeis) {
+                        pi.setStatus(ProductItemService.STATUS_IN_STOCK);
+                        pi.setOrderItem(null);
+                        productItemRepository.save(pi);
+                    }
+                }
+            }
         } else {
             order.setOrderStatus(newStatus);
         }
 
-        if ("COMPLETED".equals(newStatus)) {
-            String transactionType = "COD".equalsIgnoreCase(order.getPaymentMethod())
-                    ? "COD_COLLECTION"
-                    : "VNPAY_PAYMENT";
-            orderPaymentService.handlePaymentSuccess(
-                    order,
-                    transactionType,
-                    "ORDER_COMPLETED:" + order.getOrderCode());
-        }
+        markPaymentPaidWhenCompleted(order);
         orderRepository.save(order);
-
-        // Gửi email thông báo trạng thái đơn hàng cho khách
-        try {
-            emailService.sendOrderStatusUpdate(
-                    order.getUser().getEmail(),
-                    getUserDisplayName(order.getUser()),
-                    order,
-                    newStatus);
-        } catch (Exception e) {
-            // log lỗi, không rollback transaction cập nhật đơn hàng
-            // log.error("Gửi mail cập nhật đơn hàng thất bại cho order {}: {}", orderCode,
-            // e.getMessage());
-        }
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
@@ -367,15 +381,12 @@ public class OrderServiceImpl implements OrderService {
                                     .productId(product.getProductId())
                                     .productSlug(product.getSlug()) // Marcus thêm productSlug vào response
                                     .productName(product.getProductName())
-                                    .productImage(product.getThumbnailUrl())
+                                    .productImage(sku.getSkuImageUrl() != null ? sku.getSkuImageUrl()
+                                            : product.getThumbnailUrl())
                                     .quantity(orderItem.getQuantity())
                                     .priceAtPurchase(orderItem.getPriceAtPurchase())
                                     .lineTotal(orderItem.getPriceAtPurchase()
                                             .multiply(BigDecimal.valueOf(orderItem.getQuantity())))
-                                    .isFlashSale(orderItem.getIsFlashSale())
-                                    .originalPrice(orderItem.getOriginalPrice())
-                                    .flashSaleSlotName(orderItem.getFlashSaleSlotName())
-                                    .variants(variants)
                                     .imeis(orderItem.getProductItems().stream()
                                             .map(item -> ImeiResponse.builder().imeiCode(item.getImeiCode()).build())
                                             .toList())
@@ -412,10 +423,8 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderCodeAndUserUserId(orderCode, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
-        // Marcus sửa: cho phép khách hủy cả COD và VNPAY trong các trạng thái an toàn.
-        if (!("COD".equalsIgnoreCase(order.getPaymentMethod())
-                || "VNPAY".equalsIgnoreCase(order.getPaymentMethod()))) {
-            throw new RuntimeException("Phương thức thanh toán này chưa hỗ trợ tự hủy");
+        if (!"COD".equalsIgnoreCase(order.getPaymentMethod())) {
+            throw new RuntimeException("Chỉ hỗ trợ hủy đơn COD");
         }
 
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
@@ -485,5 +494,159 @@ public class OrderServiceImpl implements OrderService {
                         : "Khách hàng đã xác nhận nhận hàng từ đơn vị vận chuyển.",
                 order.getOrderCode());
         return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderImeiAssignmentResponse> getImeiPreview(String orderCode) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+
+        return orderItems.stream().map(item -> {
+            ProductSku sku = item.getSku();
+            boolean hasImei = sku.getProduct() != null && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
+
+            List<OrderImeiAssignmentResponse.ImeiDetailItem> available = java.util.Collections.emptyList();
+            List<String> assignedImeis = item.getProductItems().stream()
+                    .map(ProductItem::getImeiCode)
+                    .toList();
+            if (hasImei) {
+                List<ProductItem> availableItems = productItemRepository.findAvailableBySkuId(sku.getSkuId());
+                available = availableItems.stream()
+                        .map(pi -> OrderImeiAssignmentResponse.ImeiDetailItem.builder()
+                                .itemId(pi.getItemId())
+                                .imeiCode(pi.getImeiCode())
+                                .status(pi.getStatus())
+                                .statusLabel(ProductItemService.toStatusLabel(pi.getStatus()))
+                                .createdAt(pi.getCreatedAt())
+                                .build())
+                        .toList();
+            }
+
+            return OrderImeiAssignmentResponse.builder()
+                    .orderItemId(item.getOrderItemId())
+                    .skuCode(sku.getSkuCode())
+                    .productName(sku.getProduct() != null ? sku.getProduct().getProductName() : "")
+                    .quantityOrdered(item.getQuantity())
+                    .quantityAssigned(item.getProductItems().size())
+                    .assignedImeis(assignedImeis)
+                    .availableImeis(available)
+                    .build();
+        }).toList();
+    }
+
+    @Override
+    @Transactional
+    public OrderDetailResponse assignOrderImeis(String orderCode, List<UpdateOrderImeiRequest> requests) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        for (UpdateOrderImeiRequest req : requests) {
+            OrderItem orderItem = orderItemRepository.findById(req.getOrderItemId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy dòng đơn hàng: " + req.getOrderItemId()));
+
+            if (!orderItem.getOrder().getOrderId().equals(order.getOrderId())) {
+                throw new RuntimeException("Dòng đơn hàng không thuộc đơn này");
+            }
+
+            ProductSku sku = orderItem.getSku();
+            boolean hasImei = sku.getProduct() != null && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
+            if (!hasImei) {
+                throw new RuntimeException("SKU " + sku.getSkuCode() + " không phải sản phẩm có IMEI");
+            }
+
+            List<String> imeis = req.getImeiCodes().stream()
+                    .map(String::trim)
+                    .filter(s -> s != null && !s.isEmpty())
+                    .distinct()
+                    .toList();
+
+            if (imeis.size() != orderItem.getQuantity()) {
+                throw new RuntimeException("SKU " + sku.getSkuCode() + " cần " + orderItem.getQuantity()
+                        + " IMEI nhưng nhập " + imeis.size() + " mã");
+            }
+
+            List<ProductItem> availableBySku = productItemRepository.findAvailableBySkuId(sku.getSkuId());
+            Map<String, ProductItem> availableMap = availableBySku.stream()
+                    .collect(Collectors.toMap(ProductItem::getImeiCode, pi -> pi));
+
+            List<String> notFound = new java.util.ArrayList<>();
+            List<ProductItem> toAssign = new java.util.ArrayList<>();
+            for (String imei : imeis) {
+                ProductItem pi = availableMap.get(imei);
+                if (pi == null) {
+                    // Thử tìm theo mã IMEI trực tiếp (IMEI nhập tay / chưa có trong kho)
+                    pi = productItemRepository.findAvailableByImeiCode(imei);
+                    if (pi == null) {
+                        notFound.add(imei);
+                        continue;
+                    }
+                    // Verify đúng SKU
+                    if (!pi.getProductSku().getSkuId().equals(sku.getSkuId())) {
+                        throw new RuntimeException("IMEI " + imei + " không thuộc SKU " + sku.getSkuCode());
+                    }
+                }
+                toAssign.add(pi);
+            }
+
+            if (!notFound.isEmpty()) {
+                throw new RuntimeException("IMEI không tồn tại hoặc không khả dụng: " + String.join(", ", notFound));
+            }
+
+            for (ProductItem pi : toAssign) {
+                pi.setOrderItem(orderItem);
+                pi.setStatus(ProductItemService.STATUS_SOLD);
+                productItemRepository.save(pi);
+
+                // Sync sku.stockQuantity giảm xuống (IMEI chuyển từ IN_STOCK → SOLD)
+                Integer skuId = pi.getProductSku().getSkuId();
+                ProductSku piSku = productSkuRepository.findById(skuId)
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU: " + skuId));
+                if (piSku.getStockQuantity() == null || piSku.getStockQuantity() <= 0) {
+                    throw new RuntimeException(
+                            "SKU " + piSku.getSkuCode() + " đã hết tồn kho, không thể gán IMEI");
+                }
+                piSku.setStockQuantity(piSku.getStockQuantity() - 1);
+                productSkuRepository.save(piSku);
+            }
+        }
+
+        // Reload order sau khi gán IMEI với orderItems fresh
+        order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+
+        // Nếu tất cả OrderItem đã gán đủ IMEI (nếu SKU có IMEI) thì auto chuyển sang
+        // PACKED
+        boolean allItemsFullyAssigned = orderItems.stream().allMatch(orderItem -> {
+            ProductSku sku = orderItem.getSku();
+            boolean hasImei = sku.getProduct() != null && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
+            if (!hasImei)
+                return true;
+            // Dùng query count trực tiếp từ DB để tránh lazy collection cache cũ
+            long assignedCount = productItemRepository.countByOrderItemId(orderItem.getOrderItemId());
+            return assignedCount >= orderItem.getQuantity();
+        });
+
+        // Auto transition: PROCESSING/READY_TO_PREPARE/CONFIRMED/READY_TO_SHIP ->
+        // PACKED
+        if (allItemsFullyAssigned) {
+            String currentStatus = normalizeStatusValue(order.getOrderStatus());
+            if ("PROCESSING".equals(currentStatus) || "READY_TO_PREPARE".equals(currentStatus)
+                    || "CONFIRMED".equals(currentStatus) || "READY_TO_SHIP".equals(currentStatus)) {
+                order.setOrderStatus("PACKED");
+                orderRepository.save(order);
+
+                OrderStatusHistory history = createStatusHistory(
+                        order,
+                        "PACKED",
+                        "Auto-transition: gán đủ IMEI cho tất cả dòng đơn");
+                orderStatusHistoryRepository.save(history);
+            }
+        }
+
+        return getOrderDetailResponse(orderCode);
     }
 }

@@ -1,6 +1,5 @@
 package com.fpoly.marcusstore.service;
 
-import java.io.IOException;
 import java.util.List;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -12,6 +11,8 @@ public interface ProductImgService {
     List<ProductImgResponse> getProductImgByIdProduct (Integer productId);
 
     ProductImgResponse createProductImg(Integer productId, MultipartFile file, ProductImgRequest imgRequest);
+
+    List<ProductImgResponse> createMultiProductImg(Integer productId, List<MultipartFile> files, ProductImgRequest imgRequest);
 
     ProductImgResponse updateProductImg (MultipartFile file,ProductImgRequest productImgRequest, Integer id);
 

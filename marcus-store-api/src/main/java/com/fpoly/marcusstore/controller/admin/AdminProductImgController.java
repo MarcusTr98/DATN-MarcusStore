@@ -61,6 +61,21 @@ public class AdminProductImgController {
         return ApiResponse.success(productImgService.updateProductImg(file, productImgRequest, id));
     }
 
+    @PostMapping(value = "/{productId}/images/multi", consumes = { "multipart/form-data" })
+    @PreAuthorize("hasAuthority('PRODUCT_IMAGE_CREATE')")
+    public ApiResponse<List<ProductImgResponse>> createMultiProductImg(
+            @PathVariable Integer productId,
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam(value = "isPrimary", required = false, defaultValue = "false") Boolean isPrimary,
+            @RequestParam(value = "displayOrder", required = false, defaultValue = "0") Integer displayOrder) {
+
+        ProductImgRequest productImgRequest = new ProductImgRequest();
+        productImgRequest.setIsPrimary(isPrimary);
+        productImgRequest.setDisplayOrder(displayOrder);
+
+        return ApiResponse.success(productImgService.createMultiProductImg(productId, files, productImgRequest));
+    }
+
      @DeleteMapping("/images/{id}")
      @PreAuthorize("hasAuthority('PRODUCT_IMAGE_DELETE')")
     public ApiResponse<String> deleteProductImg(@PathVariable Integer id) {

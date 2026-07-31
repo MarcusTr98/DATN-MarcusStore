@@ -991,6 +991,28 @@
   border-radius: 99px;
 }
 
+/* Banner Mua ngay (Buy Now) */
+.buy-now-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #fff7ed, #fef3c7);
+  border: 1px solid #fcd34d;
+  border-left: 3px solid #f59e0b;
+  color: #92400e;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+}
+.buy-now-banner i {
+  color: #f59e0b;
+  font-size: 16px;
+}
+.buy-now-banner strong {
+  color: #b45309;
+}
+
 /* Order items list */
 .order-items {
   max-height: 250px;

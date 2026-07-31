@@ -432,6 +432,12 @@
             <span class="order-summary__badge">{{ cartData.totalQuantity }} sản phẩm</span>
           </div>
 
+          <!-- Banner Mua ngay (Buy Now) -->
+          <div v-if="isBuyNowMode" class="buy-now-banner">
+            <i class="ti ti-bolt"></i>
+            <span>Chế độ <strong>Mua ngay</strong> — chỉ thanh toán sản phẩm này</span>
+          </div>
+
           <!-- Marcus thêm: nhắc lại lựa chọn giao nhận ngay trong phần tổng kết. -->
           <div
             class="fulfillment-summary"
@@ -664,6 +670,7 @@ const {
   modal,
   handleModalConfirm,
   showCancelledModal,
+  handleCancelledClose,
   handleCancelledConfirm,
   handleCancelledRemove,
   // Danh sách cart item bị revert giá
@@ -671,6 +678,7 @@ const {
   fulfillmentMethod,
   isStorePickup,
   storeInfo,
+  isBuyNowMode,
   isVoucherInvalidModalOpen,
   voucherInvalidMessage,
   closeVoucherInvalidModal,

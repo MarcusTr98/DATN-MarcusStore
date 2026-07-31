@@ -27,4 +27,6 @@ public class CreateProduct {
 
     @NotNull(message = "Ko được để trống CategoryId")
     private Integer categoryId;
+
+    private Boolean statusImei;
 }

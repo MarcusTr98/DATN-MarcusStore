@@ -53,6 +53,7 @@ public class InventoryService {
                 .stockQuantity(stock)
                 .isActive(sku.getIsActive())
                 .stockStatus(stockStatus)
+                .statusImei(sku.getProduct() != null ? sku.getProduct().getStatusImei() : null)
                 .build();
     }
 
@@ -72,7 +73,7 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public Page<InventoryResponse> getInventoryList(
-            String keyword, String stockStatus, Pageable pageable) {
+            String keyword, String stockStatus, Boolean hasImei, Pageable pageable) {
 
         final String statusFilter = stockStatus == null ? null : stockStatus.toUpperCase();
 
@@ -94,6 +95,19 @@ public class InventoryService {
                     ));
                     case "OUT_OF_STOCK" -> predicates.add(cb.lessThanOrEqualTo(root.get("stockQuantity"), 0));
                     default -> { /* ignore unknown values */ }
+                }
+            }
+            if (hasImei != null) {
+                // Lọc theo product.statusImei = hasImei
+                // Trong SQL Server, BIT NULL = 0 nếu filter = false, nên IS NOT NULL là đủ để phân biệt true
+                if (hasImei) {
+                    predicates.add(cb.isTrue(root.join("product").get("statusImei")));
+                } else {
+                    // không có IMEI: statusImei = false HOẶC null (chưa set)
+                    predicates.add(cb.or(
+                            cb.isFalse(root.join("product").get("statusImei")),
+                            cb.isNull(root.join("product").get("statusImei"))
+                    ));
                 }
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));

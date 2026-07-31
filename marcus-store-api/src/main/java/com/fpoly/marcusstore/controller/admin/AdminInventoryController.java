@@ -28,11 +28,12 @@ public class AdminInventoryController {
     public ApiResponse<Page<InventoryResponse>> getInventoryList(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String stockStatus,
+            @RequestParam(required = false) Boolean hasImei,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("skuId").descending());
-        Page<InventoryResponse> data = inventorySer.getInventoryList(keyword, stockStatus, pageable);
+        Page<InventoryResponse> data = inventorySer.getInventoryList(keyword, stockStatus, hasImei, pageable);
         return ApiResponse.success(data);
     }
 

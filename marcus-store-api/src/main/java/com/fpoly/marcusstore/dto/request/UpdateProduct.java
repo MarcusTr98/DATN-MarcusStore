@@ -30,4 +30,6 @@ public class UpdateProduct {
 
     @NotNull(message = "Ko được để trống CategoryId")
     private Integer categoryId;
+
+    private Boolean statusImei;
 }

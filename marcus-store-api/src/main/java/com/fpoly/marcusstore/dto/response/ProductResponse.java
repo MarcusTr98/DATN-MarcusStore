@@ -22,5 +22,6 @@ public class ProductResponse {
     private Boolean status;
     private String slug;
     private LocalDateTime createdAt;
-    private String categoryName;     
+    private String categoryName;
+    private Boolean statusImei;
 }

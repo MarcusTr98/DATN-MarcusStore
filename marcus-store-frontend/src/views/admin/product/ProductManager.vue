@@ -269,32 +269,83 @@
                 <div class="invalid-feedback">{{ err.categoryId }}</div>
               </div>
 
-              <!-- Thumbnail URL -->
-              <div class="col-12" v-if="!isEdit">
-                <label class="flabel">Ảnh thumbnail</label>
+              <!-- Ảnh sản phẩm (nhiều ảnh) -->
+              <div class="col-12">
+                <label class="flabel">Ảnh sản phẩm</label>
                 <div class="upload-section">
                   <div class="input-group">
                     <input
                       type="file"
                       class="form-control finput"
                       accept="image/*"
+                      multiple
                       ref="thumbnailFileInput"
-                      @change="onThumbnailSelect"
+                      @change="onThumbnailsSelect"
                     />
-                  </div>
-                  <div v-if="thumbnailPreview" class="upload-preview mt-3">
-                    <img :src="thumbnailPreview" alt="preview" class="preview-thumb" />
-                    <span class="preview-name ms-2 text-muted small">{{
-                      thumbnailFile?.name
-                    }}</span>
                     <button
+                      v-if="thumbnailFiles.length"
                       type="button"
-                      class="btn btn-sm btn-outline-danger ms-auto"
-                      @click="clearThumbnail"
+                      class="btn btn-outline-danger"
+                      @click="clearThumbnails"
+                      title="Xóa tất cả ảnh đã chọn"
                     >
-                      <i class="bi bi-x"></i>
+                      <i class="bi bi-trash"></i>
                     </button>
                   </div>
+
+                  <div v-if="thumbnailFiles.length" class="thumb-preview-grid mt-3">
+                    <div
+                      v-for="(file, idx) in thumbnailFiles"
+                      :key="idx"
+                      class="thumb-preview-item"
+                      :class="{ 'is-primary': idx === primaryIndex }"
+                    >
+                      <img :src="thumbnailPreviews[idx]" :alt="file.name" class="preview-thumb" />
+                      <div class="thumb-preview-meta">
+                        <span class="preview-name small text-muted" :title="file.name">
+                          {{ file.name }}
+                        </span>
+                        <div class="d-flex gap-1 mt-1">
+                          <button
+                            type="button"
+                            class="btn btn-sm"
+                            :class="idx === primaryIndex ? 'btn-pink' : 'btn-outline-pink'"
+                            :disabled="thumbnailFiles.length === 1"
+                            @click="setPrimaryIndex(idx)"
+                            title="Đặt làm ảnh chính"
+                          >
+                            <i class="bi bi-star-fill"></i>
+                            {{ idx === primaryIndex ? 'Ảnh chính' : 'Đặt chính' }}
+                          </button>
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-danger"
+                            @click="removeThumbnail(idx)"
+                            title="Bỏ ảnh này"
+                          >
+                            <i class="bi bi-x"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quản lý IMEI -->
+              <div class="col-12">
+                <label class="flabel">Quản lý IMEI</label>
+                <div class="form-check form-switch mt-2">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    id="statusImei"
+                    v-model="form.statusImei"
+                  />
+                  <label class="form-check-label" for="statusImei">
+                    Sản phẩm có quản lý IMEI / Serial
+                  </label>
                 </div>
               </div>
 
@@ -515,6 +566,10 @@ const productImgApi = {
     api.post(`/admin/products/${productId}/images`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  uploadImages: (productId, formData) =>
+    api.post(`/admin/products/${productId}/images/multi`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
   updateImage: (imageId, formData) =>
     api.put(`/admin/products/images/${imageId}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
@@ -544,6 +599,7 @@ const form = ref({
   thumbnailUrl: '',
   description: '',
   status: true,
+  statusImei: false,
 })
 const err = ref({})
 
@@ -592,21 +648,43 @@ const baseModal = ref({
 })
 
 const thumbnailFileInput = ref(null)
-const thumbnailFile = ref(null)
-const thumbnailPreview = ref(null)
+const thumbnailFiles = ref([])
+const thumbnailPreviews = ref([])
+const primaryIndex = ref(0)
 
-function onThumbnailSelect(event) {
-  const file = event.target.files[0]
-  if (!file) return
-  thumbnailFile.value = file
-  const reader = new FileReader()
-  reader.onload = (e) => { thumbnailPreview.value = e.target.result }
-  reader.readAsDataURL(file)
+function onThumbnailsSelect(event) {
+  const files = Array.from(event.target.files || [])
+  if (!files.length) return
+  files.forEach((file) => {
+    if (!file.type.startsWith('image/')) return
+    thumbnailFiles.value.push(file)
+    const reader = new FileReader()
+    reader.onload = (e) => thumbnailPreviews.value.push(e.target.result)
+    reader.readAsDataURL(file)
+  })
+  if (primaryIndex.value >= thumbnailFiles.value.length) {
+    primaryIndex.value = 0
+  }
 }
 
-function clearThumbnail() {
-  thumbnailFile.value = null
-  thumbnailPreview.value = null
+function removeThumbnail(idx) {
+  thumbnailFiles.value.splice(idx, 1)
+  thumbnailPreviews.value.splice(idx, 1)
+  if (primaryIndex.value === idx) {
+    primaryIndex.value = 0
+  } else if (primaryIndex.value > idx) {
+    primaryIndex.value -= 1
+  }
+}
+
+function setPrimaryIndex(idx) {
+  primaryIndex.value = idx
+}
+
+function clearThumbnails() {
+  thumbnailFiles.value = []
+  thumbnailPreviews.value = []
+  primaryIndex.value = 0
   if (thumbnailFileInput.value) thumbnailFileInput.value.value = ''
 }
 
@@ -670,25 +748,30 @@ async function fetchCategories() {
 async function doCreate() {
   saving.value = true
   try {
-    const res =await productApi.create({
+    const res = await productApi.create({
       productName: form.value.productName,
       brand: form.value.brand,
       categoryId: form.value.categoryId,
       thumbnailUrl: '',
       description: form.value.description,
+      statusImei: form.value.statusImei,
     })
 
     const newProductId = res.data?.data?.productId ?? res.data?.productId
 
-    if (thumbnailFile.value && newProductId) {
+    if (thumbnailFiles.value.length && newProductId) {
       const formData = new FormData()
-      formData.append('file', thumbnailFile.value)
+      // sắp ảnh chính lên đầu để backend đánh isPrimary đúng
+      const ordered = [...thumbnailFiles.value]
+      const [primary] = ordered.splice(primaryIndex.value, 1)
+      ordered.unshift(primary)
+      ordered.forEach((file) => formData.append('files', file))
       formData.append('isPrimary', true)
-      await productImgApi.uploadImage(newProductId, formData)
+      await productImgApi.uploadImages(newProductId, formData)
     }
-    
+
     showToast('Thêm sản phẩm thành công!', 'success')
-    clearThumbnail()
+    clearThumbnails()
     bsModal.hide()
     await Promise.all([fetchProducts(), fetchAllBrands()])
   } catch (e) {
@@ -708,6 +791,7 @@ async function doUpdate() {
       thumbnailUrl: form.value.thumbnailUrl,
       description: form.value.description,
       status: form.value.status,
+      statusImei: form.value.statusImei,
     })
     showToast('Cập nhật thành công!', 'success')
     bsModal.hide()
@@ -747,9 +831,10 @@ function openCreate() {
     thumbnailUrl: '',
     description: '',
     status: true,
+    statusImei: false,
   }
   err.value = {}
-  clearThumbnail()
+  clearThumbnails()
   bsModal.show()
 }
 
@@ -764,8 +849,10 @@ function openEdit(item) {
     thumbnailUrl: item.thumbnailUrl ?? '',
     description: item.description ?? '',
     status: item.status,
+    statusImei: item.statusImei ?? false,
   }
   err.value = {}
+  clearThumbnails()
   bsModal.show()
 }
 

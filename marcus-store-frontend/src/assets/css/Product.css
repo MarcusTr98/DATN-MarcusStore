@@ -706,3 +706,70 @@ textarea.finput { height: auto; }
   background: linear-gradient(135deg, #ec4d8d, #e04580);
   box-shadow: 0 4px 12px rgba(245, 93, 155, .4);
 }
+
+/* ── Multi thumbnail preview grid ── */
+.thumb-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.thumb-preview-item {
+  border: 2px solid #f3d6e3;
+  border-radius: 10px;
+  padding: 8px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.thumb-preview-item.is-primary {
+  border-color: #f55d9b;
+  box-shadow: 0 4px 14px rgba(245, 93, 155, .25);
+}
+
+.thumb-preview-item .preview-thumb {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 6px;
+}
+
+.thumb-preview-meta {
+  width: 100%;
+  text-align: center;
+}
+
+.thumb-preview-meta .preview-name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .75rem;
+}
+
+/* ── Outline pink button (cho nút "Đặt chính") ── */
+.btn-outline-pink {
+  background: #fff;
+  border: 1px solid #f55d9b;
+  color: #f55d9b;
+}
+.btn-outline-pink:hover {
+  background: #fff0f7;
+  color: #d63384;
+  border-color: #d63384;
+}
+
+/* ── Switch form-check-input (bật/tắt IMEI) ── */
+.form-check-input:checked {
+  background-color: #f55d9b;
+  border-color: #f55d9b;
+}
+.form-check-input:focus {
+  border-color: #f5b8d2;
+  box-shadow: 0 0 0 .2rem rgba(245, 93, 155, .2);
+}

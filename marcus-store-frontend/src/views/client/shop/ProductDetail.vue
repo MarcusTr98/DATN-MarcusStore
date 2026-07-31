@@ -344,6 +344,15 @@ async function onBuyNow(quantity) {
     // Thêm vào giỏ trước
     const ok = await cartStore.addToCart(sku.skuId, quantity)
     if (ok) {
+      // Lấy cartItemId của item vừa thêm (cartItem là item có skuId khớp trong cart)
+      const addedItem = cartStore.items.find((i) => i.skuId === sku.skuId)
+      const cartItemId = addedItem?.cartItemId
+      if (cartItemId) {
+        sessionStorage.setItem(
+          'buyNowCartItemIds',
+          JSON.stringify([cartItemId]),
+        )
+      }
       // Đi thẳng sang /checkout
       router.push('/checkout')
     } else {

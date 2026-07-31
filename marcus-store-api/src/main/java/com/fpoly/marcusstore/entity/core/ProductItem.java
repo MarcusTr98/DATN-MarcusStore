@@ -29,6 +29,9 @@ public class ProductItem {
     @Column(name = "status")
     private Integer status = 1; // 1: Trong kho, 2: Đã bán, 3: Bảo hành
 
+    @Column(name = "note", length = 500)
+    private String note; // Ghi chú khi admin cập nhật trạng thái IMEI
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

@@ -105,69 +105,29 @@
                 <table>
                   <thead>
                     <tr>
-                      <th class="col-product">Sản phẩm</th>
-                      <th class="col-sku">SKU</th>
-                      <th class="col-variant">Biến thể</th>
-                      <th class="col-qty">SL</th>
-                      <th class="col-price">Giá mua</th>
-                      <th class="col-total">Thành tiền</th>
+                      <th>Sản phẩm</th>
+                      <th>SKU</th>
+                      <th>Số lượng</th>
+                      <th>Giá mua</th>
+                      <th>Thành tiền</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-for="item in orderDetail.items" :key="item.skuId">
                       <td>
                         <div class="product-cell">
-                          <img
-                            v-if="item.productImage"
-                            :src="item.productImage"
-                            :alt="item.productName"
-                            class="product-thumb-img"
-                          />
-                          <div v-else class="product-thumb-placeholder">
-                            <i class="fa-solid fa-mobile-screen-button"></i>
-                          </div>
-                          <span class="main-line">{{ item.productName }}</span>
+                          <span class="product-thumb no-print">📦</span>
+                          <span>
+                            <span class="main-line">{{ item.productName }}</span>
+                          </span>
                         </div>
                       </td>
-                      <td class="cell-sku">{{ item.skuCode }}</td>
+                      <td>{{ item.skuCode }}</td>
+                      <td>{{ item.quantity }}</td>
                       <td>
-                        <div v-if="item.variants && item.variants.length > 0" class="variant-stack">
-                          <div
-                            v-for="(variant, vIdx) in item.variants || []"
-                            :key="vIdx"
-                            class="variant-row"
-                          >
-                            <span class="variant-label"
-                              >{{ variant.attributeName || 'Phân loại' }}:</span
-                            >
-                            <span class="variant-value">{{ variant.valueString }}</span>
-                          </div>
-                        </div>
-                        <span v-else class="text-muted">---</span>
+                        <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
                       </td>
-                      <td class="cell-center">{{ item.quantity }}</td>
-                      <td class="cell-price">
-                        <div class="price-cell">
-                          <template v-if="item.isFlashSale && item.originalPrice">
-                            <span class="money original-price">{{
-                              formatCurrency(item.originalPrice)
-                            }}</span>
-                            <span class="money flash-price">{{
-                              formatCurrency(item.priceAtPurchase)
-                            }}</span>
-                            <span
-                              v-if="item.flashSaleSlotName"
-                              class="flash-badge"
-                              :title="item.flashSaleSlotName"
-                              >{{ item.flashSaleSlotName }}</span
-                            >
-                          </template>
-                          <template v-else>
-                            <span class="money">{{ formatCurrency(item.priceAtPurchase) }}</span>
-                          </template>
-                        </div>
-                      </td>
-                      <td class="cell-price">
+                      <td>
                         <span class="money">{{ formatCurrency(item.lineTotal) }}</span>
                       </td>
                     </tr>
@@ -388,6 +348,7 @@
               </div>
             </div>
           </section>
+
           <!-- Marcus lam them refund -->
           <section v-if="canManageRefund || refund" class="card section-card no-print">
             <div class="section-header">
@@ -490,12 +451,140 @@
       :message="statusSuccessMessage"
       @close="statusSuccessModal = false"
     />
+
+    <!-- Modal nhập IMEI khi bắt đầu chuẩn bị hàng -->
+    <div class="modal fade" id="imeiPrepareModal" tabindex="-1" ref="imeiPrepareModalRef">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-upc-scan me-2"></i>Nhập IMEI cho đơn hàng
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="loadingImeiPreview" class="text-center py-4">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p class="mt-2 text-muted small">Đang tải IMEI khả dụng...</p>
+            </div>
+
+            <template v-else>
+              <div class="alert alert-info small mb-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Vui lòng nhập đủ IMEI cho các sản phẩm có quản lý IMEI bên dưới.
+                Mỗi sản phẩm cần đúng <strong>số lượng đã đặt</strong> mã IMEI.
+              </div>
+
+              <div v-if="!imeiPreviewItems.length" class="text-center text-muted py-3">
+                Đơn hàng không có sản phẩm nào yêu cầu IMEI.
+              </div>
+
+              <div
+                v-for="item in imeiPreviewItems"
+                :key="item.orderItemId"
+                class="imei-item-card mb-3"
+              >
+                <div class="imei-item-header">
+                  <div>
+                    <strong>{{ item.productName }}</strong>
+                    <span class="sku-badge ms-2">{{ item.skuCode }}</span>
+                  </div>
+                  <div class="text-end">
+                    <span class="badge" :class="item.quantityAssigned >= item.quantityOrdered ? 'bg-success' : 'bg-warning'">
+                      {{ item.quantityAssigned }} / {{ item.quantityOrdered }} IMEI
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Đã gán đủ -->
+                <div v-if="item.quantityAssigned >= item.quantityOrdered" class="imei-assigned-list mt-2">
+                  <div v-for="assigned in item.assignedImeis" :key="assigned" class="imei-tag assigned">
+                    <i class="bi bi-check-circle me-1"></i>{{ assigned }}
+                  </div>
+                </div>
+
+                <!-- Chưa gán đủ -->
+                <template v-else>
+                  <div class="mt-2">
+                    <!-- Nút chọn từ IMEI có sẵn -->
+                    <div v-if="item.availableImeis.length > 0">
+                      <label class="form-label small mb-1 fw-semibold">
+                        Chọn IMEI khả dụng ({{ item.quantityOrdered - item.quantityAssigned }} mã còn thiếu):
+                      </label>
+                      <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button
+                          v-for="avail in item.availableImeis"
+                          :key="avail.itemId"
+                          type="button"
+                          class="btn btn-sm imei-select-btn"
+                          :class="isImeiSelected(item.orderItemId, avail.imeiCode) ? 'btn-success selected' : 'btn-outline-success'"
+                          @click="toggleImei(item.orderItemId, avail)"
+                        >
+                          <i :class="isImeiSelected(item.orderItemId, avail.imeiCode) ? 'bi bi-check-circle-fill' : 'bi bi-circle'"></i>
+                          {{ avail.imeiCode }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Nhập tay IMEI -->
+                    <div class="imei-manual-input">
+                      <label class="form-label small mb-1 fw-semibold">
+                        Nhập IMEI đơn hàng:
+                      </label>
+                      <div class="input-group input-group-sm mb-2">
+                        <input
+                          type="text"
+                          class="form-control"
+                          :placeholder="`Nhập IMEI rồi nhấn Enter (còn thiếu ${item.quantityOrdered - item.quantityAssigned} mã)`"
+                          @keydown.enter.prevent="addManualImei(item.orderItemId, $event)"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- IMEI đã nhập tay -->
+                    <div v-if="getManualImeis(item.orderItemId).length > 0" class="d-flex flex-wrap gap-2 mb-2">
+                      <span
+                        v-for="imei in getManualImeis(item.orderItemId)"
+                        :key="imei"
+                        class="imei-tag manual"
+                      >
+                        {{ imei }}
+                        <button type="button" class="imei-remove-btn" @click="removeManualImei(item.orderItemId, imei)">
+                          <i class="bi bi-x"></i>
+                        </button>
+                      </span>
+                    </div>
+
+                    <div v-if="item.availableImeis.length === 0" class="text-danger small mt-1">
+                      <i class="bi bi-exclamation-triangle me-1"></i>
+                      Không có IMEI khả dụng trong kho.
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
+            <button
+              class="btn btn-primary"
+              :disabled="submittingImei || !canSubmitImei"
+              @click="submitImeiAndProcess"
+            >
+              <span v-if="submittingImei" class="spinner-border spinner-border-sm me-1"></span>
+              Xác nhận IMEI &amp; Bắt đầu chuẩn bị
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup>
 import { computed, ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { Modal } from 'bootstrap'
 import '@/assets/css/OrderDetails.css'
 import OrderDetailApi from '@/api/orderDetailApi.js'
 import BaseModal from '@/components/BaseModal.vue'
@@ -507,9 +596,6 @@ const statusSuccessMessage = ref('')
 const orderDetail = ref(null)
 const loading = ref(false)
 const error = ref(null)
-const refund = ref(null)
-const refundReason = ref('')
-const refundBusy = ref(false)
 
 const selectedStatus = ref('')
 const statusNote = ref('')
@@ -525,13 +611,20 @@ const ADMIN_CANCEL_REASONS = [
 const selectedAdminCancelReason = ref('')
 const updatingStatus = ref(false)
 
+const imeiPrepareModalRef = ref(null)
+let imeiPrepareModalInstance = null
+const loadingImeiPreview = ref(false)
+const submittingImei = ref(false)
+const imeiPreviewItems = ref([])
+const selectedImeis = ref({}) // { [orderItemId]: Set of imeiCodes from available list }
+const manualImeis = ref({})    // { [orderItemId]: Array of manually typed IMEI strings }
+
 async function fetchGetDetailOrder(orderCode) {
   try {
     loading.value = true
     error.value = null
     const response = await OrderDetailApi.getOrderDetail(orderCode)
     orderDetail.value = response.data
-    await fetchRefund(orderCode)
   } catch (e) {
     error.value = 'Không tải được chi tiết đơn hàng'
     console.error(e)
@@ -569,8 +662,6 @@ const paymentStatusMap = {
   UNPAID: { label: 'Chưa thanh toán', className: 'pending' },
   REFUNDED: { label: 'Đã hoàn tiền', className: 'cancelled' },
   FAILED: { label: 'Lỗi thanh toán', className: 'failed' },
-  REFUND_PENDING: { label: 'Đang hoàn tiền', className: 'pending' },
-  REFUND_FAILED: { label: 'Hoàn tiền lỗi', className: 'failed' },
 }
 
 const paymentMethodMap = {
@@ -674,6 +765,15 @@ const finalAmount = computed(() => {
 
 const isStatusNoteRequired = computed(() => statusesRequiringNote.includes(selectedStatus.value))
 
+const canSubmitImei = computed(() => {
+  if (!imeiPreviewItems.value.length) return false
+  return imeiPreviewItems.value.every(item => {
+    const needed = item.quantityOrdered - item.quantityAssigned
+    const selected = (selectedImeis.value[item.orderItemId]?.size || 0) + (manualImeis.value[item.orderItemId]?.length || 0)
+    return selected >= needed
+  })
+})
+
 const orderHistory = computed(() =>
   (orderDetail.value?.history || []).map((item) => ({
     status: item.status,
@@ -710,93 +810,6 @@ const getPaymentStatusLabel = (status) => paymentStatusMap[status]?.label || sta
 const getPaymentStatusClass = (status) => paymentStatusMap[status]?.className || 'pending'
 const getPaymentMethodLabel = (method) => paymentMethodMap[method] || method || '---'
 
-// Marcus lam them refund
-const getRefundStatusLabel = (status) =>
-  ({
-    PENDING_APPROVAL: 'Chờ phê duyệt',
-    PROCESSING: 'Đã gửi - chờ VNPAY xác nhận',
-    SUBMITTING: 'Đang gửi yêu cầu sang VNPAY',
-    RETRY_PENDING: 'Chờ hệ thống gửi lại',
-    MANUAL_REVIEW: 'Cần nhân viên kiểm tra',
-    SUCCESS: 'VNPAY đã xác nhận hoàn tiền',
-    FAILED: 'VNPAY từ chối hoặc gửi thất bại',
-  })[status] ||
-  status ||
-  '---'
-
-// Marcus thêm diễn giải thống nhất theo góc nhìn nghiệp vụ, không lộ trạng thái kỹ thuật.
-const getRefundStatusDescription = (status) =>
-  ({
-    PENDING_APPROVAL: 'Yêu cầu đã được tạo và chưa gửi sang VNPAY.',
-    SUBMITTING: 'Hệ thống đang gửi yêu cầu hoàn tiền sang VNPAY.',
-    PROCESSING: 'VNPAY đã tiếp nhận hoặc hệ thống đã gửi yêu cầu; đang chờ kết quả xác nhận cuối.',
-    RETRY_PENDING: 'Lần gửi trước chưa kết nối được VNPAY; hệ thống sẽ tự động gửi lại.',
-    MANUAL_REVIEW: 'Chưa có kết quả cuối từ VNPAY; nhân viên cần kiểm tra giao dịch.',
-    SUCCESS: 'VNPAY đã trả kết quả xác nhận hoàn tiền thành công.',
-    FAILED: 'Yêu cầu không hoàn tất. Kiểm tra nhật ký kỹ thuật trước khi thao tác lại.',
-  })[status] || 'Đang cập nhật trạng thái hoàn tiền.'
-
-const fetchRefund = async (orderCode) => {
-  try {
-    const response = await OrderDetailApi.getRefund(orderCode)
-    refund.value = response.status === 204 ? null : response.data
-  } catch (e) {
-    refund.value = null
-    if (e.response?.status !== 404) console.error(e)
-  }
-}
-
-const runRefundAction = async (action, successMessage) => {
-  try {
-    refundBusy.value = true
-    const response = await action()
-    refund.value = response.data
-    await fetchGetDetailOrder(orderDetail.value.orderCode)
-    showToast(typeof successMessage === 'function' ? successMessage(response.data) : successMessage)
-  } catch (e) {
-    const message = e.response?.data?.message || e.response?.data || 'Không xử lý được hoàn tiền'
-    showToast(message)
-  } finally {
-    refundBusy.value = false
-  }
-}
-
-const createRefund = () =>
-  runRefundAction(
-    () => OrderDetailApi.createRefund(orderDetail.value.orderCode, refundReason.value.trim()),
-    'Đã tạo yêu cầu hoàn tiền.',
-  )
-const approveRefund = () =>
-  runRefundAction(
-    () => OrderDetailApi.approveRefund(refund.value.refundId),
-    // Marcus sửa toast theo kết quả thật, không báo “đã gửi” khi request thất bại.
-    (result) =>
-      result.status === 'SUCCESS'
-        ? 'VNPAY đã xác nhận hoàn tiền thành công.'
-        : result.status === 'FAILED'
-          ? 'Yêu cầu hoàn tiền chưa thành công. Vui lòng kiểm tra trạng thái.'
-          : 'Đã gửi yêu cầu hoàn tiền. Đang chờ VNPAY xác nhận.',
-  )
-const retryRefund = () =>
-  runRefundAction(
-    () => OrderDetailApi.retryRefund(refund.value.refundId),
-    (result) =>
-      result.status === 'FAILED'
-        ? 'Gửi lại chưa thành công. Vui lòng kiểm tra trạng thái.'
-        : 'Đã thực hiện gửi lại. Đang chờ VNPAY xác nhận.',
-  )
-// Marcus thêm thao tác kiểm tra trạng thái; scheduler backend vẫn tự chạy song song.
-const reconcileRefund = () =>
-  runRefundAction(
-    () => OrderDetailApi.reconcileRefund(refund.value.refundId),
-    (result) =>
-      result.status === 'SUCCESS'
-        ? 'VNPAY đã xác nhận hoàn tiền thành công.'
-        : 'Đã kiểm tra. VNPAY chưa xác nhận hoàn tiền hoàn tất.',
-  )
-// Marcus sửa: đã bỏ helper getVariantText không được giao diện sử dụng để tránh
-// cảnh báo no-unused-vars, phần biến thể vẫn render trực tiếp trong template cũ.
-
 const formatDateTime = (value) => {
   if (!value) return '---'
 
@@ -815,6 +828,113 @@ const showToast = (message) => {
   showToast.timer = window.setTimeout(() => {
     toastMessage.value = ''
   }, 2600)
+}
+
+function isImeiSelected(orderItemId, imeiCode) {
+  return selectedImeis.value[orderItemId]?.has(imeiCode) || false
+}
+
+function getManualImeis(orderItemId) {
+  return manualImeis.value[orderItemId] || []
+}
+
+function addManualImei(orderItemId, event) {
+  const input = event.target
+  const imei = input.value.trim()
+  if (!imei) return
+
+  const item = imeiPreviewItems.value.find(i => i.orderItemId === orderItemId)
+  if (!item) return
+  const needed = item.quantityOrdered - item.quantityAssigned
+  const totalSelected = (selectedImeis.value[orderItemId]?.size || 0) + (manualImeis.value[orderItemId]?.length || 0)
+  if (totalSelected >= needed) {
+    showToast(`Đã đủ ${needed} IMEI cho dòng này`)
+    return
+  }
+
+  if (!manualImeis.value[orderItemId]) {
+    manualImeis.value[orderItemId] = []
+  }
+  if (!manualImeis.value[orderItemId].includes(imei)) {
+    manualImeis.value[orderItemId].push(imei)
+  }
+  input.value = ''
+}
+
+function removeManualImei(orderItemId, imei) {
+  const list = manualImeis.value[orderItemId]
+  if (list) {
+    const idx = list.indexOf(imei)
+    if (idx > -1) list.splice(idx, 1)
+  }
+}
+
+function toggleImei(orderItemId, availItem) {
+  if (!selectedImeis.value[orderItemId]) {
+    selectedImeis.value[orderItemId] = new Set()
+  }
+  const set = selectedImeis.value[orderItemId]
+  if (set.has(availItem.imeiCode)) {
+    set.delete(availItem.imeiCode)
+  } else {
+    // Chỉ cho chọn đúng số lượng còn thiếu
+    const item = imeiPreviewItems.value.find(i => i.orderItemId === orderItemId)
+    if (!item) return
+    const needed = item.quantityOrdered - item.quantityAssigned
+    if (set.size >= needed) {
+      showToast(`Chỉ cần chọn đủ ${needed} IMEI cho dòng này`)
+      return
+    }
+    set.add(availItem.imeiCode)
+  }
+}
+
+async function openImeiPrepareModal() {
+  loadingImeiPreview.value = true
+  selectedImeis.value = {}
+  manualImeis.value = {}
+  try {
+    const res = await OrderDetailApi.getImeiPreview(orderDetail.value.orderCode)
+    imeiPreviewItems.value = res.data || []
+  } catch (e) {
+    showToast('Không tải được danh sách IMEI')
+  } finally {
+    loadingImeiPreview.value = false
+  }
+  imeiPrepareModalInstance?.show()
+}
+
+async function submitImeiAndProcess() {
+  submittingImei.value = true
+  try {
+    const requests = imeiPreviewItems.value
+      .filter(item => {
+        const selected = selectedImeis.value[item.orderItemId]
+        const manual = manualImeis.value[item.orderItemId]
+        return (selected && selected.size > 0) || (manual && manual.length > 0)
+      })
+      .map(item => ({
+        orderItemId: item.orderItemId,
+        imeiCodes: [
+          ...Array.from(selectedImeis.value[item.orderItemId] || []),
+          ...(manualImeis.value[item.orderItemId] || [])
+        ]
+      }))
+
+    if (requests.length > 0) {
+      await OrderDetailApi.assignOrderImeis(orderDetail.value.orderCode, requests)
+    }
+
+    imeiPrepareModalInstance?.hide()
+    await fetchGetDetailOrder(orderDetail.value.orderCode)
+    showToast('Đã xác nhận IMEI. Tiếp tục cập nhật trạng thái...')
+  } catch (e) {
+    showToast(e?.response?.data?.message || 'Gán IMEI thất bại')
+    submittingImei.value = false
+    return
+  }
+  submittingImei.value = false
+  await saveStatusUpdate()
 }
 
 const saveStatusUpdate = async () => {
@@ -836,6 +956,13 @@ const saveStatusUpdate = async () => {
 
     if (isStatusNoteRequired.value && !resolvedNote) {
       showToast('Vui lòng nhập lý do cho trạng thái này.')
+      return
+    }
+
+    // Nếu chuyển sang PROCESSING → mở modal nhập IMEI trước
+    if (selectedStatus.value === 'PROCESSING') {
+      await openImeiPrepareModal()
+      updatingStatus.value = false
       return
     }
 
@@ -951,6 +1078,7 @@ const onAfterPrint = () => {
 }
 
 onMounted(() => {
+  imeiPrepareModalInstance = new Modal(imeiPrepareModalRef.value)
   window.addEventListener('beforeprint', onBeforePrint)
   window.addEventListener('afterprint', onAfterPrint)
 })
@@ -961,3 +1089,5 @@ onBeforeUnmount(() => {
   resetPrintScale()
 })
 </script>
+
+<style scoped></style>

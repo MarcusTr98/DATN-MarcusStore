@@ -97,6 +97,7 @@
                 <th class="th">IMEI / Serial</th>
                 <th class="th">Trạng thái</th>
                 <th class="th">Mã đơn hàng</th>
+                <th class="th">Ghi chú</th>
                 <th class="th">Ngày tạo</th>
                 <th class="th">Cập nhật</th>
                 <th class="th text-center">Thao tác</th>
@@ -104,7 +105,7 @@
             </thead>
             <tbody>
               <tr v-if="!pagedItems.length">
-                <td colspan="7" class="text-center py-5 text-muted">
+                <td colspan="8" class="text-center py-5 text-muted">
                   <div class="empty-state">
                     <i class="bi bi-upc-scan"></i>
                     <h5>Chưa có IMEI nào cho SKU này</h5>
@@ -123,6 +124,12 @@
                 <td>
                   <span v-if="item.orderItemId" class="badge bg-light text-dark">
                     #{{ item.orderItemId }}
+                  </span>
+                  <span v-else class="text-muted small">—</span>
+                </td>
+                <td>
+                  <span v-if="item.note" class="note-cell" :title="item.note">
+                    <i class="bi bi-chat-left-text me-1 text-muted"></i>{{ item.note }}
                   </span>
                   <span v-else class="text-muted small">—</span>
                 </td>
@@ -211,6 +218,23 @@
                 <option :value="4">Lỗi</option>
               </select>
             </div>
+            <div v-if="editing" class="mb-2">
+              <label class="filter-label d-flex align-items-center gap-1">
+                Ghi chú cập nhật trạng thái
+                <span class="text-danger">*</span>
+              </label>
+              <textarea
+                v-model="form.note"
+                class="form-control f-input"
+                rows="3"
+                :class="{ 'is-invalid': errNote }"
+                style="padding-left: 12px; resize: vertical"
+                maxlength="500"
+              ></textarea>
+              <div class="d-flex justify-content-between mt-1">
+                <small v-if="errNote" class="text-danger">{{ errNote }}</small>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
@@ -267,7 +291,8 @@ const imeiModalRef = ref(null)
 let imeiModalInstance = null
 
 const editing = ref(false)
-const form = ref({ itemId: null, imeiCode: '', status: 1 })
+const form = ref({ itemId: null, imeiCode: '', status: 1, note: '' })
+const errNote = ref('')
 
 const counts = computed(() => {
   const c = { total: items.value.length, inStock: 0, sold: 0, warranty: 0, error: 0 }
@@ -339,7 +364,7 @@ async function fetchItems() {
 }
 
 function goBack() {
-  router.push({ name: 'InventoryManager' })
+  router.push({ name: 'InventoryManagerWithImei' })
 }
 
 function goToPage(p) {
@@ -359,7 +384,8 @@ function resetFilter() {
 
 function openAddOneModal() {
   editing.value = false
-  form.value = { itemId: null, imeiCode: '', status: 1 }
+  form.value = { itemId: null, imeiCode: '', status: 1, note: '' }
+  errNote.value = ''
   imeiModalInstance?.show()
 }
 
@@ -369,7 +395,9 @@ function openEditModal(item) {
     itemId: item.itemId,
     imeiCode: item.imeiCode,
     status: item.status || 1,
+    note: '',
   }
+  errNote.value = ''
   imeiModalInstance?.show()
 }
 
@@ -378,12 +406,19 @@ async function submitForm() {
     showToast('Vui lòng nhập mã IMEI')
     return
   }
+  if (editing.value && !form.value.note?.trim()) {
+    errNote.value = 'Vui lòng nhập ghi chú khi cập nhật IMEI.'
+    showToast(errNote.value)
+    return
+  }
+  errNote.value = ''
   submitting.value = true
   try {
     if (editing.value) {
       await itemApi.update(form.value.itemId, {
         imeiCode: form.value.imeiCode.trim(),
         status: form.value.status,
+        note: form.value.note.trim(),
       })
     } else {
       await itemApi.create(skuId.value, {
@@ -481,6 +516,17 @@ onMounted(() => {
 
 .status-text.out-stock {
   color: #f59e0b;
+}
+
+.note-cell {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-size: 0.85rem;
+  color: #374151;
 }
 
 @media (max-width: 575.98px) {

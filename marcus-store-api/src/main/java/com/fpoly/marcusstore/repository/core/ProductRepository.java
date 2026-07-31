@@ -95,4 +95,11 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
         List<Product> findActiveAccessoriesByBrands(
                         @Param("accessoryRootId") Integer accessoryRootId,
                         @Param("brands") Collection<String> brands);
+        
+        /**
+         * Lấy Product theo trạng thái IMEI (dùng cho trang Quản lý kho).
+         */
+        @EntityGraph(attributePaths = { "category" })
+        @Query("SELECT p FROM Product p WHERE (p.statusImei = :statusImei)")
+        List<Product> findByOptionalStatusImei(@Param("statusImei") Boolean statusImei);               
 }

@@ -21,6 +21,24 @@ export function useCheckoutPage() {
   const isFeeLoading = ref(false)
   const feeError = ref('')
 
+  // ==== Mua ngay (Buy Now) ====
+  // Nếu có sessionStorage 'buyNowCartItemIds', trang Checkout chỉ hiển thị/thanh toán
+  // đúng các cartItem này thay vì toàn bộ lựa chọn trong localStorage.selectedCartItemIds.
+  function getBuyNowMode() {
+    try {
+      const raw = sessionStorage.getItem('buyNowCartItemIds')
+      if (!raw) return null
+      const ids = JSON.parse(raw)
+      return Array.isArray(ids) && ids.length > 0 ? ids.map(Number).filter(Number.isInteger) : null
+    } catch {
+      return null
+    }
+  }
+  function clearBuyNowMode() {
+    sessionStorage.removeItem('buyNowCartItemIds')
+  }
+  const isBuyNowMode = computed(() => !!getBuyNowMode())
+
   // ==== Modal thông báo Flash Sale bị admin hủy ====
   // Khi user vào trang thanh toán mà đơn hàng có chứa SP FS từ slot CANCELLED
   // (admin vừa hủy sau khi user checkout từ giỏ) → chặn + hiện modal.
@@ -395,7 +413,11 @@ export function useCheckoutPage() {
 
   function reconcileSelectedItems(fetchedCart) {
     const serverItems = Array.isArray(fetchedCart?.items) ? fetchedCart.items : []
-    const selectedIds = new Set(readSelectedCartItemIds())
+
+    // Marcus thêm: chế độ Mua ngay chỉ lấy đúng cartItemId được truyền qua
+    // sessionStorage, bỏ qua hoàn toàn lựa chọn thường (selectedCartItemIds).
+    const buyNowIds = getBuyNowMode()
+    const selectedIds = buyNowIds ? new Set(buyNowIds) : new Set(readSelectedCartItemIds())
 
     // Marcus sửa: thiếu snapshot không được tự hiểu là khách chọn toàn bộ giỏ.
     if (selectedIds.size === 0) {
@@ -412,7 +434,12 @@ export function useCheckoutPage() {
       totalQuantity: selectedItems.reduce((sum, item) => sum + item.quantity, 0),
       totalAmount: selectedItems.reduce((sum, item) => sum + item.totalPrice, 0),
     }
-    persistCheckoutSelection()
+
+    // Mua ngay: không ghi đè localStorage.selectedCartItems/selectedCartItemIds,
+    // vì đây không phải lựa chọn thường từ giỏ hàng.
+    if (!buyNowIds) {
+      persistCheckoutSelection()
+    }
   }
 
   // Marcus sửa: dữ liệu localStorage hỏng không được làm trang Checkout bị trắng.
@@ -844,7 +871,7 @@ export function useCheckoutPage() {
       const fetchedCart = data?.data ?? data
 
       // Marcus sửa: luôn lấy giá/SKU mới nhất từ server nhưng chỉ giữ đúng tập
-      // cartItemId khách đã chọn, kể cả sau F5 hoặc Flash Sale vừa revert giá.
+      // cartItemId khách đã chọn (kể cả Mua ngay), kể cả sau F5 hoặc Flash Sale vừa revert giá.
       reconcileSelectedItems(fetchedCart)
       if (!cartData.value.items.length) {
         showModal(
@@ -991,6 +1018,7 @@ export function useCheckoutPage() {
       localStorage.removeItem('selectedCartItemIds')
       localStorage.removeItem('selectedSubtotal')
       localStorage.removeItem('selectedVoucher')
+      clearBuyNowMode()
 
       if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
         window.location.href = data.data.paymentUrl
@@ -1155,6 +1183,7 @@ export function useCheckoutPage() {
     fulfillmentMethod,
     isStorePickup,
     storeInfo,
+    isBuyNowMode,
     isVoucherInvalidModalOpen,
     voucherInvalidMessage,
     closeVoucherInvalidModal,

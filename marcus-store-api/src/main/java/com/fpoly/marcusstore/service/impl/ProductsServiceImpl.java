@@ -44,6 +44,7 @@ public class ProductsServiceImpl implements ProductsService {
                 .thumbnailUrl(product.getThumbnailUrl())
                 .createdAt(product.getCreatedAt())
                 .categoryName(categoryName)
+                .statusImei(product.getStatusImei())
                 .build();
     }
 
@@ -80,6 +81,9 @@ public class ProductsServiceImpl implements ProductsService {
         product.setSlug(slug);
         product.setStatus(true);
         product.setCategory(category);
+        if (createProduct.getStatusImei() != null) {
+            product.setStatusImei(createProduct.getStatusImei());
+        }
 
         return toProductResponse(productRepository.save(product));
     }
@@ -119,6 +123,9 @@ public class ProductsServiceImpl implements ProductsService {
         product.setSlug(slug);
         product.setStatus(updateProduct.getStatus());
         product.setCategory(category);
+        if (updateProduct.getStatusImei() != null) {
+            product.setStatusImei(updateProduct.getStatusImei());
+        }
 
         return toProductResponse(productRepository.save(product));
     }

@@ -110,6 +110,29 @@ public class ProductImgServiceImpl implements ProductImgService {
 
     @Override
     @Transactional
+    public List<ProductImgResponse> createMultiProductImg(Integer productId, List<MultipartFile> files, ProductImgRequest imgRequest) {
+        if (files == null || files.isEmpty()) {
+            throw new RuntimeException("Danh sách ảnh trống");
+        }
+
+        List<ProductImgResponse> result = new java.util.ArrayList<>();
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            if (file == null || file.isEmpty()) continue;
+
+            boolean isFirstPrimary = (i == 0) && Boolean.TRUE.equals(imgRequest.getIsPrimary());
+            ProductImgRequest perFileRequest = ProductImgRequest.builder()
+                    .isPrimary(isFirstPrimary)
+                    .displayOrder(imgRequest.getDisplayOrder())
+                    .build();
+
+            result.add(createProductImg(productId, file, perFileRequest));
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional
     public ProductImgResponse updateProductImg(MultipartFile file, ProductImgRequest imgRequest, Integer id) {
         ProductImage productImage = imgRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy ảnh với id: " + id));

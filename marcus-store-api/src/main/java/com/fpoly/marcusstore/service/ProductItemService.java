@@ -44,22 +44,23 @@ public class ProductItemService {
                 .status(item.getStatus())
                 .statusLabel(toStatusLabel(item.getStatus()))
                 .orderItemId(item.getOrderItem() != null ? item.getOrderItem().getOrderItemId() : null)
+                .note(item.getNote())
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
                 .build();
     }
 
-    private void resyncStockFromImeis(ProductSku sku) {
+    public void resyncStockFromImeis(ProductSku sku) {
         if (sku == null) return;
-        List<ProductItem> all = productItemRepo.findByProductSku_SkuIdOrderByItemIdDesc(sku.getSkuId());
-        long inStockCount = all.stream()
-                .filter(i -> i.getStatus() != null && i.getStatus() == STATUS_IN_STOCK)
-                .count();
-        int current = sku.getStockQuantity() == null ? 0 : sku.getStockQuantity();
+        // Đếm trực tiếp từ DB để tránh cache cũ, và load lại ProductSku managed
+        long inStockCount = productItemRepo.countInStockBySkuId(sku.getSkuId());
+        ProductSku managed = skuRepository.findById(sku.getSkuId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU: " + sku.getSkuId()));
+        int current = managed.getStockQuantity() == null ? 0 : managed.getStockQuantity();
         int updated = (int) inStockCount;
         if (updated != current) {
-            sku.setStockQuantity(updated);
-            skuRepository.save(sku);
+            managed.setStockQuantity(updated);
+            skuRepository.save(managed);
         }
     }
 
@@ -94,9 +95,7 @@ public class ProductItemService {
         item.setImeiCode(imei);
         item.setStatus(status);
         ProductItem saved = productItemRepo.save(item);
-        if (status != STATUS_IN_STOCK) {
-            resyncStockFromImeis(sku);
-        }
+        resyncStockFromImeis(sku);
         return toResponse(saved);
     }
 
@@ -111,15 +110,30 @@ public class ProductItemService {
             }
             item.setImeiCode(imei);
         }
+        boolean statusChanged = false;
         if (request.getStatus() != null) {
             Integer oldStatus = item.getStatus();
             Integer newStatus = request.getStatus();
+            if (oldStatus == null || !oldStatus.equals(newStatus)) {
+                statusChanged = true;
+            }
             item.setStatus(newStatus);
             productItemRepo.save(item);
-            if (oldStatus == null || !oldStatus.equals(newStatus)) {
+            if (statusChanged) {
                 resyncStockFromImeis(item.getProductSku());
             }
         }
+        String note = request.getNote() == null ? null : request.getNote().trim();
+        if (statusChanged && (note == null || note.isEmpty())) {
+            throw new RuntimeException("Vui lòng nhập ghi chú khi thay đổi trạng thái IMEI.");
+        }
+        if (note != null && !note.isEmpty()) {
+            if (note.length() > 500) {
+                throw new RuntimeException("Ghi chú tối đa 500 ký tự.");
+            }
+            item.setNote(note);
+        }
+        productItemRepo.save(item);
         return toResponse(item);
     }
 

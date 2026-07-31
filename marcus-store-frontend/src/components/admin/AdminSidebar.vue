@@ -44,11 +44,23 @@
         </div>
       </template>
 
-      <router-link v-if="canAccessRoute('/admin/inventoryManager')" to="/admin/inventoryManager" class="menu-item"
-        active-class="active">
-        <i class="bi bi-box-seam menu-icon" style="font-size: 16px"></i>
-        <span>Quản lý kho</span>
-      </router-link>
+      
+      <template v-if="showInventoryParent">
+        <div class="menu-item menu-parent" :class="{ active: isInventoryMenuActive }" @click="toggleInventoryMenu">
+          <i class="bi bi-box-seam menu-icon" style="font-size: 16px"></i>
+          <span>Quản lý kho</span>
+          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isInventoryMenuOpen }" />
+        </div>
+
+        <div v-if="isInventoryMenuOpen" class="submenu">
+          <router-link v-if="canAccessRoute('/admin/inventoryManager/with-imei')" to="/admin/inventoryManager/with-imei" class="submenu-item" active-class="active">
+            Kho có IMEI
+          </router-link>
+          <router-link v-if="canAccessRoute('/admin/inventoryManager/no-imei')" to="/admin/inventoryManager/no-imei" class="submenu-item" active-class="active">
+            Kho không IMEI
+          </router-link>
+        </div>
+      </template>
     </div>
 
     <div v-if="showKenhBanHang" class="menu-section">
@@ -246,6 +258,13 @@ const showProductParent = computed(() => {
   );
 });
 
+const showInventoryParent = computed(() => {
+  return (
+    canAccessRoute("/admin/inventoryManager/with-imei") ||
+    canAccessRoute("/admin/inventoryManager/no-imei")
+  );
+});
+
 const showAccountParent = computed(() => {
   return (
     canAccessRoute("/admin/employee") ||
@@ -256,7 +275,7 @@ const showAccountParent = computed(() => {
 const showSanPhamKho = computed(() => {
   return (
     canAccessRoute("/admin/category") ||
-    canAccessRoute("/admin/inventoryManager") ||
+    showInventoryParent.value ||
     showProductParent.value
   );
 });
@@ -303,12 +322,18 @@ const isProductMenuOpen = ref(false);
 
 const isAccountMenuOpen = ref(false);
 
+const isInventoryMenuOpen = ref(false);
+
 const isProductMenuActive = computed(() => {
   return [
     "/admin/product",
     "/admin/attribute",
     "/admin/skugenerator",
   ].some(path => route.path.startsWith(path));
+});
+
+const isInventoryMenuActive = computed(() => {
+  return route.path.startsWith("/admin/inventoryManager");
 });
 
 const isAccountMenuActive = computed(() => {
@@ -329,6 +354,10 @@ const toggleAccountMenu = () => {
   isAccountMenuOpen.value = !isAccountMenuOpen.value;
 };
 
+const toggleInventoryMenu = () => {
+  isInventoryMenuOpen.value = !isInventoryMenuOpen.value;
+};
+
 /* ===========================
    INIT
 =========================== */
@@ -337,6 +366,11 @@ onMounted(() => {
   // Tự động mở submenu Sản phẩm nếu đang ở các trang liên quan
   if (isProductMenuActive.value) {
     isProductMenuOpen.value = true;
+  }
+
+  // Tự động mở submenu Quản lý kho nếu đang ở các trang liên quan
+  if (isInventoryMenuActive.value) {
+    isInventoryMenuOpen.value = true;
   }
 
   // Tự động mở submenu Quản lý tài khoản nếu đang ở các trang liên quan

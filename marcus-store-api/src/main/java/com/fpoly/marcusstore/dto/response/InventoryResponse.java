@@ -22,4 +22,5 @@ public class InventoryResponse {
     private Integer stockQuantity;
     private Boolean isActive;
     private String stockStatus;
+    private Boolean statusImei;
 }

@@ -19,6 +19,7 @@ public class ProductItemResponse {
     private Integer status;
     private String statusLabel;
     private Integer orderItemId;
+    private String note;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

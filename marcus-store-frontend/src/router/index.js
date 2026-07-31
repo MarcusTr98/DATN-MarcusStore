@@ -271,9 +271,19 @@ const routes = [
       },
       {
         path: 'inventoryManager',
-        name: 'InventoryManager',
+        redirect: '/admin/inventoryManager/with-imei',
+      },
+      {
+        path: 'inventoryManager/with-imei',
+        name: 'InventoryManagerWithImei',
         component: () => import('@/views/admin/auth/InventoryManager.vue'),
-        meta: { permission: 'INVENTORY_MANAGE' },
+        meta: { permission: 'INVENTORY_MANAGE', imeiScope: true },
+      },
+      {
+        path: 'inventoryManager/no-imei',
+        name: 'InventoryManagerNoImei',
+        component: () => import('@/views/admin/auth/InventoryManager.vue'),
+        meta: { permission: 'INVENTORY_MANAGE', imeiScope: false },
       },
       {
         path: 'inventoryManager/imei/:skuId',
