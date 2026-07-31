@@ -17,7 +17,6 @@ public class PostCategoryService {
     @Autowired
     private PostCategoryRepository postCategoryRepository;
 
-    //Chuyển PostCategory entity → PostCategoryResponseDTO
     private PostCategoryResponseDTO toResponse(PostCategory category) {
         return PostCategoryResponseDTO.builder()
                 .id(category.getPostCategoryId())
@@ -27,13 +26,11 @@ public class PostCategoryService {
                 .build();
     }
 
-    // Lấy tất cả danh mục
     @Transactional(readOnly = true)
     public List<PostCategoryResponseDTO> getAll() {
         return postCategoryRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
     }
 
-    // Lấy chi tiết 1 danh mục theo ID
     @Transactional(readOnly = true)
     public PostCategoryResponseDTO getOne(Integer id) {
         PostCategory category = postCategoryRepository.findById(id)
@@ -41,14 +38,11 @@ public class PostCategoryService {
         return toResponse(category);
     }
 
-    // Thêm danh mục mới
+    @Transactional
     public PostCategoryResponseDTO add(PostCategoryRequestDTO req) {
-        // Kiểm tra name đã tồn tại chưa
         if (postCategoryRepository.existsByName(req.getName())) {
             throw new RuntimeException("Tên danh mục '" + req.getName() + "' đã tồn tại");
         }
-
-        // Kiểm tra slug đã tồn tại chưa
         if (postCategoryRepository.existsBySlug(req.getSlug())) {
             throw new RuntimeException("Slug '" + req.getSlug() + "' đã tồn tại");
         }
@@ -61,18 +55,14 @@ public class PostCategoryService {
         return toResponse(postCategoryRepository.save(category));
     }
 
-    // Sửa danh mục theo ID
+    @Transactional
     public PostCategoryResponseDTO update(Integer id, PostCategoryRequestDTO req) {
-        // Kiểm tra danh mục tồn tại
         PostCategory category = postCategoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục với id: " + id));
 
-        // Kiểm tra name trùng với category khác
         if (postCategoryRepository.existsByNameAndPostCategoryIdNot(req.getName(), id)) {
             throw new RuntimeException("Tên danh mục '" + req.getName() + "' đã tồn tại");
         }
-
-        // Kiểm tra slug trùng với category khác
         if (postCategoryRepository.existsBySlugAndPostCategoryIdNot(req.getSlug(), id)) {
             throw new RuntimeException("Slug '" + req.getSlug() + "' đã tồn tại");
         }
@@ -84,7 +74,8 @@ public class PostCategoryService {
         return toResponse(postCategoryRepository.save(category));
     }
 
-    // Xóa mềm: chỉ set status = false, không xóa khỏi DB
+    // Xoá mềm: chỉ set status = false, không xoá khỏi DB
+    @Transactional
     public void remove(Integer id) {
         PostCategory category = postCategoryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy danh mục với id: " + id));
