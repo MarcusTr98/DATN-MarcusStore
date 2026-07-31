@@ -112,6 +112,11 @@ export function useCheckoutPage() {
     localStorage.removeItem('selectedVoucher')
   }
 
+  // Đóng modal (khi user bấm X hoặc click ngoài overlay) — không thực hiện hành động gì.
+  function handleCancelledClose() {
+    showCancelledModal.value = false
+  }
+
   // Khách chọn "Xóa khỏi giỏ hàng" → xóa thật SP FS khỏi cart server.
   async function handleCancelledRemove() {
     if (hasHandledCancelled.value) return
@@ -979,6 +984,7 @@ export function useCheckoutPage() {
     modal,
     handleModalConfirm,
     showCancelledModal,
+    handleCancelledClose,
     handleCancelledConfirm,
     handleCancelledRemove,
     // Toast cảnh báo giá Flash Sale vừa bị revert do admin hủy

@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.dto.request;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -20,6 +21,7 @@ public class AddVoucherRequest {
     private String discountType; // 'PERCENT', 'AMOUNT', 'FREESHIP',
     private BigDecimal maxDiscountAmount;
     @NotNull(message = "Đơn tối thiểu không đuợc bỏ trống")
+    @DecimalMin(value = "0", message = "Giá trị đơn tối thiểu không được nhỏ hơn 0")
     private BigDecimal minOrderValue;
     @NotNull(message = "Ngày bắt đầu không đuợc bỏ trống")
     private LocalDateTime startDate;

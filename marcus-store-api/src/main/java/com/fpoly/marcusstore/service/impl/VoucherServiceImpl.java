@@ -142,6 +142,8 @@ public class VoucherServiceImpl implements VoucherService {
 
         validateDateRange(request.getStartDate(), request.getEndDate());
 
+        validateMinOrderValue(request.getMinOrderValue());
+
         // Validate targetType
         String targetType = request.getTargetType() != null ? request.getTargetType().toUpperCase() : "ALL";
         if (!"ALL".equals(targetType) && !"SPECIFIC".equals(targetType)) {
@@ -287,10 +289,25 @@ public class VoucherServiceImpl implements VoucherService {
                     "Ngày bắt đầu và ngày kết thúc không được để trống");
         }
 
+        if (startDate.isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Ngày bắt đầu không được ở trong quá khứ");
+        }
+
         if (!endDate.isAfter(startDate)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Ngày kết thúc phải lớn hơn ngày bắt đầu");
+        }
+    }
+
+    // validate minOrderValue không được âm
+    private void validateMinOrderValue(BigDecimal minOrderValue) {
+        if (minOrderValue == null || minOrderValue.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Giá trị đơn tối thiểu không được nhỏ hơn 0");
         }
     }
 
@@ -323,6 +340,8 @@ public class VoucherServiceImpl implements VoucherService {
         }
 
         validateDateRange(request.getStartDate(), request.getEndDate());
+
+        validateMinOrderValue(request.getMinOrderValue());
 
         // Validate targetType
         String targetType = request.getTargetType() != null ? request.getTargetType().toUpperCase() : "ALL";

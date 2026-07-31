@@ -1168,7 +1168,7 @@ onMounted(async () => {
 
   // Tải dữ liệu Flash Sale ACTIVE + sắp diễn ra từ BE
   // (watch(rawFlashSaleItems, ..., { immediate: true }) sẽ tự lo phần merge + animate)
-  await fetchFlashSales(false)
+  await fetchFlashSales()
   createFallingDots()
 
   resizeHandler = () => createFallingDots()

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="checkout-page pt-4">
     <BaseModal
       :visible="modal.show"
@@ -11,7 +11,7 @@
     <CancelledFlashSaleModal
       :visible="showCancelledModal"
       :reverted-items="priceRevertedItems"
-      @close="handleCancelledConfirm"
+      @close="handleCancelledClose"
       @confirm="handleCancelledConfirm"
       @remove="handleCancelledRemove"
     />
