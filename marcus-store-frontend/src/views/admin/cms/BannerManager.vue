@@ -68,6 +68,7 @@
           :positions="positionOptions"
           @edit="openEditModal"
           @toggle="handleToggle"
+          @delete="confirmDelete"
         />
       </template>
     </div>
@@ -82,6 +83,46 @@
       @save="handleSave"
     />
 
+    <!-- MODAL THÔNG BÁO / LỖI THAY THẾ CHO ALERT BROWSER -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div v-if="dialog.show" class="dialog-backdrop" @click.self="dialog.show = false">
+          <div class="dialog-card">
+            <!-- Icon cảnh báo / lỗi -->
+            <div class="dialog-icon" :class="dialog.type">
+              <i v-if="dialog.type === 'error'" class="bi bi-exclamation-triangle-fill"></i>
+              <i v-else-if="dialog.type === 'confirm'" class="bi bi-question-circle-fill"></i>
+              <i v-else class="bi bi-check-circle-fill"></i>
+            </div>
+
+            <!-- Nội dung thông báo -->
+            <div class="dialog-content">
+              <h3 class="dialog-title">{{ dialog.title }}</h3>
+              <p class="dialog-msg">{{ dialog.message }}</p>
+            </div>
+
+            <!-- Nút bấm -->
+            <div class="dialog-actions">
+              <button 
+                v-if="dialog.isConfirm" 
+                class="btn-dialog btn-dialog-cancel" 
+                @click="dialog.show = false"
+              >
+                Hủy
+              </button>
+              <button 
+                class="btn-dialog btn-dialog-ok" 
+                :class="dialog.type"
+                @click="handleDialogOk"
+              >
+                {{ dialog.isConfirm ? 'Xác nhận' : 'Đã hiểu' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -93,21 +134,56 @@ import BannerModal from './Bannermodal.vue';
 import { bannerApi } from '@/api/BannerApi';
 
 // ---- State ----
-const banners    = ref([]);
-const rawPositions = ref([]); // danh sách vị trí thật từ API
-const loading    = ref(true);
-const loadError  = ref('');
+const banners      = ref([]);
+const rawPositions = ref([]); 
+const loading      = ref(true);
+const loadError    = ref('');
 const modalVisible  = ref(false);
 const editingBanner = ref(null);
 
-// positionOptions: lấy từ API /banners/positions → đủ tất cả vị trí kể cả chưa có banner
+// ---- State Custom Dialog Thông Báo (Thay alert) ----
+const dialog = reactive({
+  show: false,
+  title: 'Thông báo',
+  message: '',
+  type: 'error', // 'error' | 'success' | 'confirm'
+  isConfirm: false,
+  onOk: null
+});
+
+function showAlertDialog(message, title = 'Thông báo', type = 'error') {
+  dialog.title = title;
+  dialog.message = message;
+  dialog.type = type;
+  dialog.isConfirm = false;
+  dialog.onOk = null;
+  dialog.show = true;
+}
+
+function showConfirmDialog(message, title = 'Xác nhận xóa', onConfirm) {
+  dialog.title = title;
+  dialog.message = message;
+  dialog.type = 'confirm';
+  dialog.isConfirm = true;
+  dialog.onOk = onConfirm;
+  dialog.show = true;
+}
+
+function handleDialogOk() {
+  if (dialog.isConfirm && typeof dialog.onOk === 'function') {
+    dialog.onOk();
+  }
+  dialog.show = false;
+}
+
+// positionOptions lấy từ API
 const positionOptions = computed(() =>
   rawPositions.value.map(p => ({
     value: p.positionId,
     label: p.description || p.positionCode,
-    code:  p.positionCode,     // giữ lại để hiển thị/debug, không dùng để so sánh logic nữa
-    allowsOrder: !!p.allowsOrder, // true = vị trí có nhiều banner chạy tuần tự (vd: Slider)
-    maxSlots: p.maxSlots || 1,    // số thứ tự tối đa cho phép chọn khi allowsOrder = true
+    code:  p.positionCode,
+    allowsOrder: !!p.allowsOrder,
+    maxSlots: p.maxSlots || 1,
   }))
 );
 
@@ -124,7 +200,6 @@ function computeStatus(b) {
   return 'active';
 }
 
-// Khối KPI tổng quan — tính trên toàn bộ banner, không phụ thuộc bộ lọc đang chọn
 const stats = computed(() => {
   let active = 0, expired = 0, hidden = 0;
   banners.value.forEach(b => {
@@ -196,7 +271,7 @@ async function loadAll() {
       bannerApi.getAll(),
       bannerApi.getPositions(),
     ]);
-    banners.value    = bannerRes.map(mapFromApi);
+    banners.value      = bannerRes.map(mapFromApi);
     rawPositions.value = posRes;
   } catch {
     loadError.value = 'Không tải được dữ liệu banner. Vui lòng thử lại.';
@@ -229,25 +304,39 @@ async function handleSave(formData) {
     }
     modalVisible.value = false;
   } catch (err) {
-    alert(err?.response?.data?.message || 'Lưu banner thất bại. Vui lòng thử lại.');
+    // THAY THẾ ALERT MẶC ĐỊNH BẰNG DIALOG MỚI DỄ NHÌN
+    const msg = err?.response?.data?.message || 'Lưu banner thất bại. Vui lòng thử lại.';
+    showAlertDialog(msg, 'Trùng vị trí / Thứ tự', 'error');
   }
 }
 
-// Toggle isActive trực tiếp không cần confirm
 async function handleToggle(banner) {
   const idx = banners.value.findIndex(b => b.id === banner.id);
   if (idx === -1) return;
   const newActive = !banner.isActive;
-  // Optimistic update: cập nhật UI trước
   banners.value[idx].isActive = newActive;
   try {
     const payload = { ...mapToApi(banners.value[idx]), isActive: newActive };
     await bannerApi.update(banner.id, payload);
   } catch (err) {
-    // Rollback nếu lỗi
     banners.value[idx].isActive = !newActive;
-    alert(err?.response?.data?.message || 'Cập nhật trạng thái thất bại.');
+    showAlertDialog(err?.response?.data?.message || 'Cập nhật trạng thái thất bại.', 'Lỗi hệ thống', 'error');
   }
+}
+
+function confirmDelete(banner) {
+  showConfirmDialog(
+    `Bạn có chắc chắn muốn xóa banner "${banner.title || 'này'}" không?`,
+    'Xác nhận xóa',
+    async () => {
+      try {
+        await bannerApi.delete(banner.id);
+        banners.value = banners.value.filter(b => b.id !== banner.id);
+      } catch (err) {
+        showAlertDialog(err?.response?.data?.message || 'Xóa banner thất bại.', 'Lỗi', 'error');
+      }
+    }
+  );
 }
 </script>
 
@@ -313,7 +402,7 @@ async function handleToggle(banner) {
   overflow: hidden;
 }
 
-/* Khối KPI tổng quan — copy nguyên từ Voucher.css để đồng bộ style */
+/* Khối KPI tổng quan */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -382,4 +471,118 @@ async function handleToggle(banner) {
   cursor: pointer;
 }
 .btn-retry:hover { background: #ec4d8d; }
+
+/* --- STYLES CỦA CUSTOM DIALOG DIALOG THAY ALERT --- */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.dialog-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05);
+  text-align: center;
+  animation: dialog-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dialog-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  margin: 0 auto 16px;
+}
+
+.dialog-icon.error {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.dialog-icon.confirm {
+  background: #fffbebf;
+  color: #d97706;
+}
+
+.dialog-icon.success {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.dialog-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 8px;
+}
+
+.dialog-msg {
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.btn-dialog {
+  flex: 1;
+  padding: 9px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-dialog-cancel {
+  background: #f1f5f9;
+  color: #64748b;
+}
+.btn-dialog-cancel:hover {
+  background: #e2e8f0;
+}
+
+.btn-dialog-ok.error {
+  background: #f55d9b;
+  color: #fff;
+}
+.btn-dialog-ok.error:hover {
+  background: #ec4d8d;
+}
+
+.btn-dialog-ok.confirm {
+  background: #dc2626;
+  color: #fff;
+}
+
+@keyframes dialog-pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-fade-enter-active, .modal-fade-leave-active {
+  transition: opacity 0.2s;
+}
+.modal-fade-enter-from, .modal-fade-leave-to {
+  opacity: 0;
+}
 </style>

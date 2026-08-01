@@ -42,7 +42,7 @@ public class AdminBannerController {
         return ApiResponse.success(bannerService.getOne(id));
     }
 
-    // Lấy tất cả vị trí banner — dùng để đổ vào dropdown khi thêm/sửa
+    // Lấy tất cả vị trí banner
     @GetMapping("/positions")
     public ApiResponse<List<BannerPositionResponseDTO>> getPositions() {
         List<BannerPositionResponseDTO> result = positionRepository.findAll().stream()

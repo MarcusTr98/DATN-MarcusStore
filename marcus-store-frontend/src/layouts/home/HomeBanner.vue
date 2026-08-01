@@ -1,251 +1,208 @@
 <template>
   <div class="row g-3 mb-4">
-    <!-- Main Carousel -->
-    <div class="col-lg-8 col-md-7">
-      <div id="heroCarousel" class="carousel slide hero-carousel" data-bs-ride="carousel">
-        <div class="carousel-indicators">
-          <button
-            v-for="(_, i) in heroBanners"
-            :key="i"
-            type="button"
-            :data-bs-target="'#heroCarousel'"
-            :data-bs-slide-to="i"
-            :class="{ active: i === 0 }"
-          ></button>
-        </div>
-        <div class="carousel-inner rounded-3 overflow-hidden">
-          <div
-            v-for="(banner, i) in heroBanners"
-            :key="i"
-            :class="['carousel-item', { active: i === 0 }]"
-          >
-            <div class="hero-banner-slide" :style="{ background: banner.bg }">
-              <div class="hero-banner-content">
-                <p class="hero-sub">{{ banner.sub }}</p>
-                <h2 class="hero-title">{{ banner.title }}</h2>
-                <p class="hero-desc">{{ banner.desc }}</p>
-                <a href="#" class="hero-cta-btn">Mua ngay</a>
-              </div>
-              <div class="hero-banner-img">
-                <div class="product-placeholder-lg">
-                  <span>{{ banner.emoji }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <button
-          class="carousel-control-prev"
-          type="button"
-          data-bs-target="#heroCarousel"
-          data-bs-slide="prev"
-        >
-          <span class="carousel-control-prev-icon"></span>
-        </button>
-        <button
-          class="carousel-control-next"
-          type="button"
-          data-bs-target="#heroCarousel"
-          data-bs-slide="next"
-        >
-          <span class="carousel-control-next-icon"></span>
-        </button>
-      </div>
+    <!-- Loading state -->
+    <div v-if="loading" class="col-12 text-center py-5">
+      <div class="spinner-border text-danger" role="status"></div>
     </div>
 
-    <!-- Side Banners -->
-    <div class="col-lg-4 col-md-5 d-flex flex-column gap-3">
-      <div
-        v-for="banner in sideBanners"
-        :key="banner.title"
-        class="side-banner rounded-3 d-flex align-items-center justify-content-between p-3"
-        :style="{ background: banner.bg }"
-      >
-        <div>
-          <p class="side-banner-sub mb-1">{{ banner.sub }}</p>
-          <h6 class="side-banner-title mb-2">{{ banner.title }}</h6>
-          <a href="#" class="side-banner-link">Xem ngay →</a>
+    <template v-else>
+      <!-- Main Carousel -->
+      <div class="col-lg-8 col-md-7">
+        <div
+          v-if="heroBanners.length"
+          id="heroCarousel"
+          class="carousel slide hero-carousel"
+          data-bs-ride="carousel"
+        >
+          <div class="carousel-indicators">
+            <button
+              v-for="(_, i) in heroBanners"
+              :key="i"
+              type="button"
+              :data-bs-target="'#heroCarousel'"
+              :data-bs-slide-to="i"
+              :class="{ active: i === 0 }"
+            ></button>
+          </div>
+          <div class="carousel-inner rounded-3 overflow-hidden">
+            <div
+              v-for="(banner, i) in heroBanners"
+              :key="banner.id"
+              :class="['carousel-item', { active: i === 0 }]"
+            >
+              <a
+                :href="banner.linkUrl || '#'"
+                class="d-block hero-banner-slide"
+                :style="{ backgroundImage: `url(${banner.imageUrl})` }"
+              ></a>
+            </div>
+          </div>
+          <button
+            class="carousel-control-prev"
+            type="button"
+            data-bs-target="#heroCarousel"
+            data-bs-slide="prev"
+          >
+            <span class="carousel-control-prev-icon"></span>
+          </button>
+          <button
+            class="carousel-control-next"
+            type="button"
+            data-bs-target="#heroCarousel"
+            data-bs-slide="next"
+          >
+            <span class="carousel-control-next-icon"></span>
+          </button>
         </div>
-        <div class="side-banner-emoji">{{ banner.emoji }}</div>
+
+        <!-- Fallback nếu không có banner slider -->
+        <div v-else class="hero-placeholder rounded-3 d-flex align-items-center justify-content-center">
+          <span class="text-muted">Chưa có banner</span>
+        </div>
       </div>
-    </div>
+
+      <!-- Side Banners -->
+      <div class="col-lg-4 col-md-5 d-flex flex-column gap-3">
+        <!-- Banner Home 1 -->
+        <a
+          v-if="banner1"
+          :href="banner1.linkUrl || '#'"
+          class="side-banner rounded-3 d-block"
+        >
+          <img
+            :src="banner1.imageUrl"
+            :alt="banner1.title"
+            class="side-banner-img"
+          />
+        </a>
+        <div v-else class="side-banner-placeholder rounded-3"></div>
+
+        <!-- Banner Home 2 -->
+        <a
+          v-if="banner2"
+          :href="banner2.linkUrl || '#'"
+          class="side-banner rounded-3 d-block"
+        >
+          <img
+            :src="banner2.imageUrl"
+            :alt="banner2.title"
+            class="side-banner-img"
+          />
+        </a>
+        <div v-else class="side-banner-placeholder rounded-3"></div>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import api from '@/utils/api'
 
-// ---- HERO BANNERS (giữ fix cứng tạm thời) ----
-const heroBanners = ref([
-  {
-    sub: 'Ra mắt chính thức',
-    title: 'iPhone 16 Pro Max',
-    desc: 'Camera 48MP | Chip A18 Pro | Giá từ 28.990.000đ',
-    emoji: '📱',
-    bg: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-  },
-  {
-    sub: 'Deal khủng tháng 6',
-    title: 'Samsung Galaxy S25 Ultra',
-    desc: 'Bút S Pen | AI Galaxy | Giảm đến 5 triệu',
-    emoji: '📱',
-    bg: 'linear-gradient(135deg, #0d1b2a 0%, #1b2838 50%, #2d4a7a 100%)',
-  },
-  {
-    sub: 'Laptop Gaming Hot',
-    title: 'ASUS ROG Strix G16',
-    desc: 'RTX 4070 | i9-14900HX | 240Hz | Trả góp 0%',
-    emoji: '💻',
-    bg: 'linear-gradient(135deg, #1a0a0a 0%, #3d0000 50%, #6b0000 100%)',
-  },
-])
+const loading = ref(true)
+const heroBanners = ref([])  // HOME_SLIDER — nhiều ảnh, chạy tuần tự theo displayOrder
+const banner1 = ref(null)    // HOME_BANNER_1 — 1 ảnh cố định, bên phải trên
+const banner2 = ref(null)    // HOME_BANNER_2 — 1 ảnh cố định, bên phải dưới
 
-const sideBanners = ref([
-  {
-    sub: 'Giảm đến',
-    title: 'iPad Pro M4\n-3.000.000đ',
-    emoji: '📟',
-    bg: 'linear-gradient(135deg, #e8f4fd, #bee3f8)',
-  },
-  {
-    sub: 'Chỉ hôm nay',
-    title: 'AirPods Pro 2\nChỉ 4.490.000đ',
-    emoji: '🎧',
-    bg: 'linear-gradient(135deg, #f0fdf4, #bbf7d0)',
-  },
-])
+async function fetchBanners() {
+  try {
+    // Gọi song song 3 vị trí cùng lúc, không cần chờ tuần tự
+    const [sliderRes, banner1Res, banner2Res] = await Promise.all([
+      api.get('/public/banners', { params: { position: 'HOME_SLIDER' }, skipGlobalLoading: true }),
+      api.get('/public/banners', { params: { position: 'HOME_BANNER_1' }, skipGlobalLoading: true }),
+      api.get('/public/banners', { params: { position: 'HOME_BANNER_2' }, skipGlobalLoading: true }),
+    ])
+
+    // Backend đã filter isActive + ngày + sort theo displayOrder sẵn rồi,
+    // FE chỉ cần dùng trực tiếp, không cần tính toán thêm
+    heroBanners.value = (sliderRes.data?.data || []).map(b => ({
+      id: b.id,
+      title: b.title,
+      imageUrl: b.imageUrl,
+      linkUrl: b.targetUrl || null,
+    }))
+
+    // Mỗi vị trí chỉ lấy banner đầu tiên (index 0) — admin chỉ được tạo 1 banner/vị trí
+    // nhưng phòng hờ trường hợp có nhiều hơn 1 thì lấy cái mới nhất (API trả về đầu tiên)
+    const b1List = banner1Res.data?.data || []
+    banner1.value = b1List.length ? {
+      id: b1List[0].id,
+      title: b1List[0].title,
+      imageUrl: b1List[0].imageUrl,
+      linkUrl: b1List[0].targetUrl || null,
+    } : null
+
+    const b2List = banner2Res.data?.data || []
+    banner2.value = b2List.length ? {
+      id: b2List[0].id,
+      title: b2List[0].title,
+      imageUrl: b2List[0].imageUrl,
+      linkUrl: b2List[0].targetUrl || null,
+    } : null
+
+  } catch (err) {
+    console.error('Lỗi tải banner trang chủ:', err)
+    // Không throw — lỗi banner không nên làm crash toàn bộ trang
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchBanners)
 </script>
 
 <style scoped>
+/* Hero Carousel */
 .hero-carousel {
   border-radius: var(--radius-md);
   overflow: hidden;
 }
+
 .hero-banner-slide {
   height: 320px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2rem 2.5rem;
-  position: relative;
-  overflow: hidden;
-}
-.hero-banner-slide::before {
-  content: '';
-  position: absolute;
-  right: -60px;
-  top: -60px;
-  width: 300px;
-  height: 300px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 50%;
-}
-.hero-banner-content {
-  z-index: 1;
-  max-width: 55%;
-}
-.hero-sub {
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 8px;
-}
-.hero-title {
-  color: #fff;
-  font-size: 1.6rem;
-  font-weight: 800;
-  line-height: 1.2;
-  margin-bottom: 10px;
-}
-.hero-desc {
-  color: rgba(255, 255, 255, 0.75);
-  font-size: 0.82rem;
-  margin-bottom: 18px;
-}
-.hero-cta-btn {
-  display: inline-block;
-  background: var(--cps-red);
-  color: #fff;
-  text-decoration: none;
-  padding: 9px 22px;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
-}
-.hero-cta-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(215, 0, 24, 0.5);
-}
-.hero-banner-img {
-  z-index: 1;
-}
-.product-placeholder-lg {
-  font-size: 7rem;
-  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.4));
-  user-select: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: block;
 }
 
+.hero-placeholder {
+  height: 320px;
+  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
+}
+
+/* Side Banners */
 .side-banner {
   flex: 1;
+  overflow: hidden;
   border: 1px solid var(--cps-border);
-  cursor: pointer;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+  transition: transform 0.2s, box-shadow 0.2s;
+  text-decoration: none;
 }
+
 .side-banner:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
 }
-.side-banner-sub {
-  font-size: 0.72rem;
-  color: #666;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+
+.side-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
-.side-banner-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--cps-dark);
-  white-space: pre-line;
-}
-.side-banner-link {
-  font-size: 0.78rem;
-  color: var(--cps-red);
-  font-weight: 600;
-  text-decoration: none;
-}
-.side-banner-link:hover {
-  text-decoration: underline;
-}
-.side-banner-emoji {
-  font-size: 3.5rem;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+
+.side-banner-placeholder {
+  flex: 1;
+  min-height: 140px;
+  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
 }
 
 @media (max-width: 768px) {
   .hero-banner-slide {
     height: 220px;
-    padding: 1.2rem 1.5rem;
-  }
-  .hero-title {
-    font-size: 1.1rem;
-  }
-  .product-placeholder-lg {
-    font-size: 5rem;
-  }
-}
-
-@media (max-width: 576px) {
-  .hero-banner-img {
-    display: none;
-  }
-  .hero-banner-content {
-    max-width: 100%;
   }
 }
 </style>
