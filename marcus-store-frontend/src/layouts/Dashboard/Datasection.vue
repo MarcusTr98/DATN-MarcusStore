@@ -31,7 +31,6 @@
       </select>
       <div v-else></div>
 
-      <!-- FIX 2: ẩn date filter vì dashboard header đã có filter period rồi -->
       <div></div>
     </div>
 
@@ -67,14 +66,14 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="pagedRows.length === 0">
+            <tr v-if="tableRows.length === 0">
               <td :colspan="activeColumns.length + 1" class="empty-cell">
                 <strong>Không có dữ liệu phù hợp</strong>
                 <span>Hãy thử đổi từ khóa tìm kiếm hoặc đặt lại bộ lọc.</span>
               </td>
             </tr>
             <tr
-              v-for="(row, idx) in pagedRows"
+              v-for="(row, idx) in tableRows"
               v-else
               :key="row.id ?? row.orderCode ?? row.skuCode ?? row.email"
             >
@@ -91,14 +90,15 @@
           </tbody>
         </table>
 
+        <!-- FIX 7: phân trang backend — totalElements và totalPages từ server -->
         <div class="pagination-bar" v-if="totalPages > 1">
           <span class="pagination-info">
-            Hiển thị {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, tableRows.length) }}
-            / {{ tableRows.length }} bản ghi
+            Hiển thị {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, totalElements) }}
+            / {{ totalElements }} bản ghi
           </span>
           <div class="pagination-btns">
-            <button @click="goPage(1)" :disabled="currentPage === 1" class="pg-btn">«</button>
-            <button @click="goPage(currentPage - 1)" :disabled="currentPage === 1" class="pg-btn">‹</button>
+            <button @click="goPage(1)"               :disabled="currentPage === 1"          class="pg-btn">«</button>
+            <button @click="goPage(currentPage - 1)" :disabled="currentPage === 1"          class="pg-btn">‹</button>
             <button
               v-for="p in visiblePages"
               :key="p"
@@ -106,9 +106,9 @@
               :class="['pg-btn', { active: p === currentPage }]"
             >{{ p }}</button>
             <button @click="goPage(currentPage + 1)" :disabled="currentPage === totalPages" class="pg-btn">›</button>
-            <button @click="goPage(totalPages)" :disabled="currentPage === totalPages" class="pg-btn">»</button>
+            <button @click="goPage(totalPages)"       :disabled="currentPage === totalPages" class="pg-btn">»</button>
           </div>
-          <select v-model="pageSize" @change="currentPage = 1" class="page-size-select">
+          <select v-model="pageSize" @change="onPageSizeChange" class="page-size-select">
             <option :value="10">10 / trang</option>
             <option :value="20">20 / trang</option>
             <option :value="50">50 / trang</option>
@@ -177,48 +177,30 @@ const columnMap = {
   ],
 }
 
-const currentTab   = ref('recentOrders')
-const tableRows    = ref([])
-const isLoading    = ref(false)
-const pendingCount = ref(0)
-const currentPage  = ref(1)
-const pageSize     = ref(10)
+const currentTab    = ref('recentOrders')
+const tableRows     = ref([])
+const isLoading     = ref(false)
+const pendingCount  = ref(0)
+// FIX 7: state phân trang backend
+const currentPage   = ref(1)
+const pageSize      = ref(10)
+const totalElements = ref(0)
+const totalPages    = ref(1)
 
-const filters = reactive({
-  search:   '',
-  status:   '',
-  brand:    '',
-})
-
-const totalPages = computed(() => Math.max(1, Math.ceil(tableRows.value.length / pageSize.value)))
-
-const pagedRows = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  return tableRows.value.slice(start, start + pageSize.value)
-})
+const filters = reactive({ search: '', status: '', brand: '' })
 
 const visiblePages = computed(() => {
-  const total = totalPages.value
-  const cur   = currentPage.value
   const pages = []
-  for (let i = Math.max(1, cur - 2); i <= Math.min(total, cur + 2); i++) pages.push(i)
+  for (let i = Math.max(1, currentPage.value - 2); i <= Math.min(totalPages.value, currentPage.value + 2); i++) {
+    pages.push(i)
+  }
   return pages
 })
 
-function goPage(p) {
-  if (p < 1 || p > totalPages.value) return
-  currentPage.value = p
-}
-
-const activeColumns = computed(() => columnMap[currentTab.value] ?? [])
-
-const showStatusFilter = computed(() =>
-  ['recentOrders', 'lowStock'].includes(currentTab.value)
-)
-
-const showBrandFilter = computed(() =>
-  ['recentOrders', 'lowStock'].includes(currentTab.value) && brandOptions.value.length > 0
-)
+const activeColumns    = computed(() => columnMap[currentTab.value] ?? [])
+const showStatusFilter = computed(() => ['recentOrders', 'lowStock'].includes(currentTab.value))
+const showBrandFilter  = computed(() => ['recentOrders', 'lowStock'].includes(currentTab.value) && brandOptions.value.length > 0)
+const brandOptions     = computed(() => props.brandList)
 
 const searchPlaceholder = computed(() => {
   if (currentTab.value === 'pendingOrders') return 'Tìm mã đơn / tên / SĐT...'
@@ -227,8 +209,6 @@ const searchPlaceholder = computed(() => {
   if (currentTab.value === 'lowStock')      return 'Tìm SKU / tên sản phẩm...'
   return 'Tìm mã đơn / tên khách...'
 })
-
-const brandOptions = computed(() => props.brandList)
 
 const statusOptions = computed(() => {
   if (currentTab.value === 'recentOrders') {
@@ -250,7 +230,6 @@ const statusOptions = computed(() => {
   return []
 })
 
-// FIX 2: period lấy từ props thay vì filters.date riêng
 function getActivePeriod() {
   return props.customDate ? 'today' : (props.selectedTime || 'today')
 }
@@ -258,29 +237,48 @@ function getActiveDates() {
   return { sd: props.customDate || '', ed: props.customDate || '' }
 }
 
-async function fetchTableData() {
-  const period  = getActivePeriod()
+// FIX 7: nhận page param, đọc PagedResponseDTO từ backend
+async function fetchTableData(page = 1) {
+  const period     = getActivePeriod()
   const { sd, ed } = getActiveDates()
+  const sz         = pageSize.value
 
-  isLoading.value   = true
-  currentPage.value = 1
+  isLoading.value = true
   try {
     let res
     if (currentTab.value === 'recentOrders') {
-      res = await statisticsApi.getRecentOrders(200, period, sd, ed, filters.search, filters.status, filters.brand)
+      res = await statisticsApi.getRecentOrders(period, sd, ed, filters.search, filters.status, filters.brand, page, sz)
     } else if (currentTab.value === 'pendingOrders') {
-      res = await statisticsApi.getPendingOrders(500, filters.search)
-      pendingCount.value = res?.data?.data?.length ?? 0
+      res = await statisticsApi.getPendingOrders(filters.search, page, sz)
     } else if (currentTab.value === 'topProducts') {
-      res = await statisticsApi.getTopProducts(200, period, sd, ed, filters.search)
+      res = await statisticsApi.getTopProducts(period, sd, ed, filters.search, page, sz)
     } else if (currentTab.value === 'lowStock') {
-      res = await statisticsApi.getLowStockProducts(filters.search, filters.brand, filters.status)
+      res = await statisticsApi.getLowStockProducts(filters.search, filters.brand, filters.status, page, sz)
     } else if (currentTab.value === 'topCustomers') {
-      res = await statisticsApi.getTopCustomers(200, period, sd, ed, filters.search)
+      res = await statisticsApi.getTopCustomers(period, sd, ed, filters.search, page, sz)
     }
-    tableRows.value = res?.data?.data ?? []
+
+    const paged = res?.data?.data
+    if (paged && paged.content !== undefined) {
+      // Backend trả PagedResponseDTO
+      tableRows.value     = paged.content
+      totalElements.value = paged.totalElements ?? 0
+      totalPages.value    = paged.totalPages    ?? 1
+      currentPage.value   = paged.page          ?? page
+      if (currentTab.value === 'pendingOrders') {
+        pendingCount.value = paged.totalElements ?? 0
+      }
+    } else {
+      // Fallback nếu endpoint chưa trả paged
+      tableRows.value     = paged ?? []
+      totalElements.value = tableRows.value.length
+      totalPages.value    = 1
+      currentPage.value   = 1
+    }
   } catch {
-    tableRows.value = []
+    tableRows.value     = []
+    totalElements.value = 0
+    totalPages.value    = 1
   } finally {
     isLoading.value = false
   }
@@ -288,34 +286,36 @@ async function fetchTableData() {
 
 async function fetchPendingCount() {
   try {
-    const res = await statisticsApi.getPendingOrders(500, '')
-    pendingCount.value = res?.data?.data?.length ?? 0
-  } catch {
-    pendingCount.value = 0
-  }
+    const res = await statisticsApi.getPendingOrders('', 1, 1)
+    pendingCount.value = res?.data?.data?.totalElements ?? 0
+  } catch { pendingCount.value = 0 }
 }
 
-function applyFilters() { fetchTableData() }
+function goPage(p) {
+  if (p < 1 || p > totalPages.value || p === currentPage.value) return
+  fetchTableData(p)
+}
+
+function onPageSizeChange() { fetchTableData(1) }
+
+function applyFilters() { fetchTableData(1) }
 
 function switchTab(val) {
-  currentTab.value  = val
-  currentPage.value = 1
-  filters.status    = ''
-  filters.brand     = ''
-  fetchTableData()
+  currentTab.value = val
+  filters.status   = ''
+  filters.brand    = ''
+  fetchTableData(1)
 }
 
 function resetFilters() {
   filters.search = ''
   filters.status = ''
   filters.brand  = ''
-  currentPage.value = 1
-  fetchTableData()
+  fetchTableData(1)
 }
 
-// FIX 2: watch props thay vì filters.date
-watch(() => props.selectedTime, () => fetchTableData())
-watch(() => props.customDate,   () => fetchTableData())
+watch(() => props.selectedTime, () => fetchTableData(1))
+watch(() => props.customDate,   () => fetchTableData(1))
 
 const statusLabels = {
   PENDING: 'Chờ xử lý', CONFIRMED: 'Đã xác nhận', SHIPPING: 'Đang giao hàng',
@@ -352,7 +352,7 @@ defineExpose({
   pendingCount,
 })
 
-fetchTableData()
+fetchTableData(1)
 fetchPendingCount()
 </script>
 
@@ -408,7 +408,7 @@ fetchPendingCount()
 .text-left   { text-align: left; }
 .text-center { text-align: center; }
 .text-right  { text-align: right; font-variant-numeric: tabular-nums; }
-.stt-cell { color: #9ca3af; font-weight: 700; font-size: 13px; }
+.stt-cell  { color: #9ca3af; font-weight: 700; font-size: 13px; }
 .cell-main { color: #374151; font-weight: 800; }
 .money { color: #111827; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .status-badge {

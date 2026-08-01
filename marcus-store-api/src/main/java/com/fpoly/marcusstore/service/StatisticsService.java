@@ -67,6 +67,20 @@ public class StatisticsService {
         return LocalDate.parse(raw.toString());
     }
 
+    // ── Helper phân trang ─────────────────────────────────────────────────────
+    private <T> PagedResponseDTO<T> buildPage(List<T> content, int page, int size, long total) {
+        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 1;
+        return PagedResponseDTO.<T>builder()
+                .content(content)
+                .page(page)
+                .size(size)
+                .totalElements(total)
+                .totalPages(totalPages)
+                .first(page == 1)
+                .last(page >= totalPages)
+                .build();
+    }
+
     @Transactional(readOnly = true)
     public List<StatisticsResponseDTO> getRevenueByDay(LocalDate startDate, LocalDate endDate) {
         return statisticsRepository.getRevenueByDay(startDate, endDate).stream()
@@ -99,7 +113,6 @@ public class StatisticsService {
         String previousLabel;
 
         if (startDate != null && endDate != null) {
-            // Custom range: trừ ngày thô là đúng
             long days     = java.time.temporal.ChronoUnit.DAYS.between(curStart, curEnd) + 1;
             prevStart     = curStart.minusDays(days);
             prevEnd       = curEnd.minusDays(days);
@@ -140,7 +153,7 @@ public class StatisticsService {
                     prevEnd       = today.minusYears(1);
                     previousLabel = "Năm " + (today.getYear() - 1);
                 }
-                default -> { // month
+                default -> {
                     prevStart = today.minusMonths(1).withDayOfMonth(1);
                     int lastDay = today.minusMonths(1).lengthOfMonth();
                     prevEnd   = today.minusMonths(1).withDayOfMonth(
@@ -191,19 +204,6 @@ public class StatisticsService {
     }
 
     @Transactional(readOnly = true)
-    public List<TopProductResponseDTO> getTopSellingProducts(
-            int topN, LocalDate startDate, LocalDate endDate, String keyword) {
-        return statisticsRepository.getTopSellingProducts(topN, startDate, endDate,
-                        toNullIfBlank(keyword)).stream()
-                .map(p -> TopProductResponseDTO.builder()
-                        .productName(p.getProductName())
-                        .totalSold(p.getTotalSold())
-                        .revenue(p.getRevenue())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    @Transactional(readOnly = true)
     public List<OrderByWeekdayResponseDTO> getOrdersByWeekday(LocalDate startDate, LocalDate endDate) {
         return statisticsRepository.getOrdersByWeekday(startDate, endDate).stream()
                 .map(p -> OrderByWeekdayResponseDTO.builder()
@@ -232,27 +232,55 @@ public class StatisticsService {
                 .collect(Collectors.toList());
     }
 
+    // ── FIX 7: phân trang backend — top-products ──────────────────────────────
     @Transactional(readOnly = true)
-    public List<LowStockResponseDTO> getLowStockProducts(String keyword, String brand, String status) {
-        return statisticsRepository.getLowStockProducts(
-                        LOW_STOCK_THRESHOLD, toNullIfBlank(keyword),
-                        toNullIfBlank(brand), toNullIfBlank(status)).stream()
+    public PagedResponseDTO<TopProductResponseDTO> getTopSellingProducts(
+            LocalDate startDate, LocalDate endDate, String keyword, int page, int size) {
+        int offset = (page - 1) * size;
+        String kw = toNullIfBlank(keyword);
+        long total = statisticsRepository.countTopSellingProducts(startDate, endDate, kw);
+        List<TopProductResponseDTO> content = statisticsRepository
+                .getTopSellingProductsPaged(startDate, endDate, kw, offset, size).stream()
+                .map(p -> TopProductResponseDTO.builder()
+                        .productName(p.getProductName())
+                        .totalSold(p.getTotalSold())
+                        .revenue(p.getRevenue())
+                        .build())
+                .collect(Collectors.toList());
+        return buildPage(content, page, size, total);
+    }
+
+    // ── FIX 7: phân trang backend — low-stock ────────────────────────────────
+    @Transactional(readOnly = true)
+    public PagedResponseDTO<LowStockResponseDTO> getLowStockProducts(
+            String keyword, String brand, String status, int page, int size) {
+        int offset = (page - 1) * size;
+        String kw = toNullIfBlank(keyword);
+        String br = toNullIfBlank(brand);
+        String st = toNullIfBlank(status);
+        long total = statisticsRepository.countLowStockProducts(LOW_STOCK_THRESHOLD, kw, br, st);
+        List<LowStockResponseDTO> content = statisticsRepository
+                .getLowStockProductsPaged(LOW_STOCK_THRESHOLD, kw, br, st, offset, size).stream()
                 .map(p -> LowStockResponseDTO.builder()
                         .skuCode(p.getSkuCode()).productName(p.getProductName()).brand(p.getBrand())
                         .stockQuantity(p.getStockQuantity())
                         .status(p.getStockQuantity() == 0 ? "Hết hàng" : "Sắp hết hàng").build())
                 .collect(Collectors.toList());
+        return buildPage(content, page, size, total);
     }
 
+    // ── FIX 7: phân trang backend — top-customers ─────────────────────────────
     @Transactional(readOnly = true)
-    public List<TopCustomerResponseDTO> getTopCustomers(
-            int topN, LocalDate startDate, LocalDate endDate, String keyword) {
-        List<TopCustomerProjection> raw =
-                statisticsRepository.getTopCustomers(topN, startDate, endDate, toNullIfBlank(keyword));
+    public PagedResponseDTO<TopCustomerResponseDTO> getTopCustomers(
+            LocalDate startDate, LocalDate endDate, String keyword, int page, int size) {
+        int offset = (page - 1) * size;
+        String kw = toNullIfBlank(keyword);
+        long total = statisticsRepository.countTopCustomers(startDate, endDate, kw);
         BigDecimal totalShopRevenue = statisticsRepository.getTotalRevenue(startDate, endDate);
         if (totalShopRevenue == null) totalShopRevenue = BigDecimal.ZERO;
         final BigDecimal denominator = totalShopRevenue;
-        return raw.stream()
+        List<TopCustomerResponseDTO> content = statisticsRepository
+                .getTopCustomersPaged(startDate, endDate, kw, offset, size).stream()
                 .map(p -> {
                     double contribution = denominator.compareTo(BigDecimal.ZERO) > 0
                             ? p.getTotalSpent().multiply(BigDecimal.valueOf(100))
@@ -264,32 +292,45 @@ public class StatisticsService {
                             .contributionPercent(contribution).build();
                 })
                 .collect(Collectors.toList());
+        return buildPage(content, page, size, total);
     }
 
+    // ── FIX 7: phân trang backend — recent-orders ─────────────────────────────
     @Transactional(readOnly = true)
-    public List<RecentOrderResponseDTO> getRecentOrders(
-            int limit, LocalDate startDate, LocalDate endDate,
-            String keyword, String status, String brand) {
-        return statisticsRepository.getRecentOrders(
-                        limit, startDate, endDate,
-                        toNullIfBlank(keyword), toNullIfBlank(status), toNullIfBlank(brand)).stream()
+    public PagedResponseDTO<RecentOrderResponseDTO> getRecentOrders(
+            LocalDate startDate, LocalDate endDate,
+            String keyword, String status, String brand, int page, int size) {
+        int offset = (page - 1) * size;
+        String kw = toNullIfBlank(keyword);
+        String st = toNullIfBlank(status);
+        String br = toNullIfBlank(brand);
+        long total = statisticsRepository.countRecentOrders(startDate, endDate, kw, st, br);
+        List<RecentOrderResponseDTO> content = statisticsRepository
+                .getRecentOrdersPaged(startDate, endDate, kw, st, br, offset, size).stream()
                 .map(p -> RecentOrderResponseDTO.builder()
                         .orderCode(p.getOrderCode()).customerName(p.getCustomerName())
                         .phone(p.getPhone()).paymentMethod(p.getPaymentMethod())
                         .orderStatus(p.getOrderStatus()).totalAmount(p.getTotalAmount())
                         .createdAt(p.getCreatedAt().toLocalDateTime()).build())
                 .collect(Collectors.toList());
+        return buildPage(content, page, size, total);
     }
 
+    // ── FIX 7: phân trang backend — pending-orders ────────────────────────────
     @Transactional(readOnly = true)
-    public List<RecentOrderResponseDTO> getPendingOrders(int limit, String keyword) {
-        return statisticsRepository.getPendingOrders(limit, toNullIfBlank(keyword)).stream()
+    public PagedResponseDTO<RecentOrderResponseDTO> getPendingOrders(String keyword, int page, int size) {
+        int offset = (page - 1) * size;
+        String kw = toNullIfBlank(keyword);
+        long total = statisticsRepository.countPendingOrdersList(kw);
+        List<RecentOrderResponseDTO> content = statisticsRepository
+                .getPendingOrdersPaged(kw, offset, size).stream()
                 .map(p -> RecentOrderResponseDTO.builder()
                         .orderCode(p.getOrderCode()).customerName(p.getCustomerName())
                         .phone(p.getPhone()).paymentMethod(p.getPaymentMethod())
                         .orderStatus(p.getOrderStatus()).totalAmount(p.getTotalAmount())
                         .createdAt(p.getCreatedAt().toLocalDateTime()).build())
                 .collect(Collectors.toList());
+        return buildPage(content, page, size, total);
     }
 
     @Transactional(readOnly = true)
@@ -418,7 +459,7 @@ public class StatisticsService {
                 currentLabel  = "Năm " + today.getYear();
                 previousLabel = "Năm " + (today.getYear() - 1);
             }
-            default -> {  // month
+            default -> {
                 currentStart  = today.withDayOfMonth(1);
                 currentEnd    = today;
                 previousStart = today.minusMonths(1).withDayOfMonth(1);
@@ -452,9 +493,7 @@ public class StatisticsService {
             for (int m = 1; m <= 12; m++) monthMap.put(m, 0L);
             for (var p : raw) {
                 LocalDate date = toLocalDate(p.getRegisterDate());
-                if (date != null) {
-                    monthMap.merge(date.getMonthValue(), p.getTotalNewUsers(), Long::sum);
-                }
+                if (date != null) monthMap.merge(date.getMonthValue(), p.getTotalNewUsers(), Long::sum);
             }
             int year = startDate.getYear();
             return monthMap.entrySet().stream()
