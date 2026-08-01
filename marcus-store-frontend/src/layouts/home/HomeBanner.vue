@@ -159,7 +159,7 @@ onMounted(fetchBanners)
 }
 
 .hero-banner-slide {
-  height: 320px;
+  height: 460px;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -167,7 +167,7 @@ onMounted(fetchBanners)
 }
 
 .hero-placeholder {
-  height: 320px;
+  height: 460px;
   background: #f3f4f6;
   border: 1px dashed #d1d5db;
 }
@@ -179,6 +179,7 @@ onMounted(fetchBanners)
   border: 1px solid var(--cps-border);
   transition: transform 0.2s, box-shadow 0.2s;
   text-decoration: none;
+  min-height: 220px;
 }
 
 .side-banner:hover {
@@ -188,14 +189,14 @@ onMounted(fetchBanners)
 
 .side-banner-img {
   width: 100%;
-  height: 100%;
+  height: 220px;
   object-fit: cover;
   display: block;
 }
 
 .side-banner-placeholder {
   flex: 1;
-  min-height: 140px;
+  min-height: 220px;
   background: #f3f4f6;
   border: 1px dashed #d1d5db;
 }
