@@ -44,7 +44,6 @@ public class AdminStatisticsController {
         return ApiResponse.success(statisticsService.getKpiCompare(period, startDate, endDate));
     }
 
-    // ── FIX 7: phân trang backend — top-products ──────────────────────────────
     @GetMapping("/top-products")
     public ApiResponse<PagedResponseDTO<TopProductResponseDTO>> getTopSellingProducts(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -76,7 +75,7 @@ public class AdminStatisticsController {
         return ApiResponse.success(statisticsService.getRevenueByBrand(dates[0], dates[1]));
     }
 
-    // ── FIX 7: phân trang backend — low-stock ────────────────────────────────
+
     @GetMapping("/low-stock")
     public ApiResponse<PagedResponseDTO<LowStockResponseDTO>> getLowStockProducts(
             @RequestParam(required = false) String keyword,
@@ -88,7 +87,6 @@ public class AdminStatisticsController {
                 statisticsService.getLowStockProducts(keyword, brand, status, page, size));
     }
 
-    // ── FIX 7: phân trang backend — top-customers ─────────────────────────────
     @GetMapping("/top-customers")
     public ApiResponse<PagedResponseDTO<TopCustomerResponseDTO>> getTopCustomers(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -102,7 +100,6 @@ public class AdminStatisticsController {
                 statisticsService.getTopCustomers(dates[0], dates[1], keyword, page, size));
     }
 
-    // ── FIX 7: phân trang backend — recent-orders ─────────────────────────────
     @GetMapping("/recent-orders")
     public ApiResponse<PagedResponseDTO<RecentOrderResponseDTO>> getRecentOrders(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
@@ -131,7 +128,7 @@ public class AdminStatisticsController {
         return ApiResponse.success(statisticsService.countPendingOrders());
     }
 
-    // ── FIX 7: phân trang backend — pending-orders ────────────────────────────
+    // phân trang backend
     @GetMapping("/pending-orders")
     public ApiResponse<PagedResponseDTO<RecentOrderResponseDTO>> getPendingOrders(
             @RequestParam(required = false) String keyword,

@@ -60,7 +60,6 @@ const statisticsApi = {
     return api.get('/admin/statistics/pending-orders/count')
   },
 
-  // FIX 7: thêm page + size, bỏ limit
   getPendingOrders(keyword = '', page = 1, size = 10) {
     return api.get(`/admin/statistics/pending-orders${buildQuery({ keyword, page, size })}`)
   },

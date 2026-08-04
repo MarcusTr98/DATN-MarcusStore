@@ -13,7 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class PagedResponseDTO<T> {
     private List<T> content;
-    private int page;           // trang hiện tại (1-based)
+    private int page;           // trang hiện tại 
     private int size;           // số phần tử mỗi trang
     private long totalElements; // tổng số bản ghi
     private int totalPages;     // tổng số trang

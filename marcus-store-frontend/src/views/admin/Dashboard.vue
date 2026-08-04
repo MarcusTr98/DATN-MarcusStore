@@ -11,6 +11,7 @@
         :kpiCompare="kpiCompare"
         :pendingOrdersCount="pendingOrdersCount"
         :lowStockData="lowStockData"
+        :lowStockTotal="lowStockTotal"
         :periodLabel="periodNoteLabel"
         @action="handleKpiAction"
       />
@@ -53,6 +54,7 @@ const weekdayStats       = ref([])
 const brandStats         = ref([])
 const compareData        = ref({ current: [], previous: [], currentLabel: '', previousLabel: '' })
 const lowStockData       = ref([])
+const lowStockTotal      = ref(0)
 const orderStats         = ref([])
 const paymentStats       = ref({ byMethod: [], byStatus: [] })
 const childCategories    = ref([])
@@ -104,7 +106,15 @@ async function fetchDashboardData(period = 'today', startDate = '', endDate = ''
     kpiCompare.value         = kpiCompareRes.data.data
     weekdayStats.value       = weekdayRes.data.data
     brandStats.value         = brandRes.data.data
-    lowStockData.value       = lowStockRes.data.data
+    // FIX: getLowStockProducts trả PagedResponseDTO
+    const lowStockPaged = lowStockRes.data.data
+    if (lowStockPaged && lowStockPaged.content !== undefined) {
+      lowStockData.value  = lowStockPaged.content
+      lowStockTotal.value = lowStockPaged.totalElements ?? 0
+    } else {
+      lowStockData.value  = lowStockPaged ?? []
+      lowStockTotal.value = (lowStockPaged ?? []).length
+    }
     compareData.value        = compareRes.data.data
     pendingOrdersCount.value = pendingRes.data.data
     orderStats.value         = orderStatsRes.data.data

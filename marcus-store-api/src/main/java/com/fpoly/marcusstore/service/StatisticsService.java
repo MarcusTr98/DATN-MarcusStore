@@ -67,7 +67,7 @@ public class StatisticsService {
         return LocalDate.parse(raw.toString());
     }
 
-    // ── Helper phân trang ─────────────────────────────────────────────────────
+    // Helper phân trang 
     private <T> PagedResponseDTO<T> buildPage(List<T> content, int page, int size, long total) {
         int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 1;
         return PagedResponseDTO.<T>builder()
@@ -232,7 +232,6 @@ public class StatisticsService {
                 .collect(Collectors.toList());
     }
 
-    // ── FIX 7: phân trang backend — top-products ──────────────────────────────
     @Transactional(readOnly = true)
     public PagedResponseDTO<TopProductResponseDTO> getTopSellingProducts(
             LocalDate startDate, LocalDate endDate, String keyword, int page, int size) {
@@ -250,7 +249,6 @@ public class StatisticsService {
         return buildPage(content, page, size, total);
     }
 
-    // ── FIX 7: phân trang backend — low-stock ────────────────────────────────
     @Transactional(readOnly = true)
     public PagedResponseDTO<LowStockResponseDTO> getLowStockProducts(
             String keyword, String brand, String status, int page, int size) {
@@ -269,7 +267,6 @@ public class StatisticsService {
         return buildPage(content, page, size, total);
     }
 
-    // ── FIX 7: phân trang backend — top-customers ─────────────────────────────
     @Transactional(readOnly = true)
     public PagedResponseDTO<TopCustomerResponseDTO> getTopCustomers(
             LocalDate startDate, LocalDate endDate, String keyword, int page, int size) {
@@ -295,7 +292,6 @@ public class StatisticsService {
         return buildPage(content, page, size, total);
     }
 
-    // ── FIX 7: phân trang backend — recent-orders ─────────────────────────────
     @Transactional(readOnly = true)
     public PagedResponseDTO<RecentOrderResponseDTO> getRecentOrders(
             LocalDate startDate, LocalDate endDate,
@@ -316,7 +312,6 @@ public class StatisticsService {
         return buildPage(content, page, size, total);
     }
 
-    // ── FIX 7: phân trang backend — pending-orders ────────────────────────────
     @Transactional(readOnly = true)
     public PagedResponseDTO<RecentOrderResponseDTO> getPendingOrders(String keyword, int page, int size) {
         int offset = (page - 1) * size;

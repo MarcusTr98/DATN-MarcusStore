@@ -183,13 +183,13 @@ const statusSlices = computed(() =>
 
 const orderChartSubtitle = computed(() => {
   switch (props.selectedTime) {
-    case 'today':     return 'So don hoan thanh trong hom nay'
-    case 'yesterday': return 'So don hoan thanh trong hom qua'
-    case '7days':     return 'So don hoan thanh trong 7 ngay qua'
-    case '30days':    return 'So don hoan thanh trong 30 ngay qua'
-    case 'week':      return 'So don hoan thanh theo tung ngay trong tuan'
-    case 'year':      return 'So don hoan thanh theo tung thang trong nam'
-    default:          return 'So don hoan thanh theo tung ngay trong thang'
+    case 'today':     return 'Số đơn hoàn thành trong hôm nay'
+    case 'yesterday': return 'Số đơn hoàn thành trong hôm qua'
+    case '7days':     return 'Số đơn hoàn thành trong 7 ngày qua'
+    case '30days':    return 'Số đơn hoàn thành trong 30 ngày qua'
+    case 'week':      return 'Số đơn hoàn thành theo từng ngày trong tuần'
+    case 'year':      return 'Số đơn hoàn thành theo từng tháng trong năm'
+    default:          return 'Số đơn hoàn thành theo từng ngày trong tháng'
   }
 })
 
@@ -203,11 +203,11 @@ function formatCurrency(value) {
 }
 
 function formatShortCurrency(value) {
-  if (!value) return '0d'
+  if (!value) return '0đ'
   const n = Number(value)
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + ' ty'
-  if (n >= 1_000_000)     return (n / 1_000_000).toFixed(0) + ' trieu'
-  if (n >= 1_000)         return (n / 1_000).toFixed(0) + 'k'
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + ' tỷ'
+  if (n >= 1_000_000)     return (n / 1_000_000).toFixed(0) + ' triệu'
+  if (n >= 1_000)         return (n / 1_000).toFixed(0) + 'nghìn'
   return n + 'd'
 }
 
@@ -247,9 +247,9 @@ function findTodayIndex(labels, period) {
 }
 
 const STATUS_LABELS = {
-  PENDING: 'Cho xu ly', CONFIRMED: 'Da xac nhan', SHIPPING: 'Dang giao',
-  COMPLETED: 'Hoan thanh', CANCELLED: 'Da huy', PROCESSING: 'Dang xu ly',
-  PAID: 'Da thanh toan', UNPAID: 'Chua thanh toan',
+  PENDING: 'Chờ xử lý', CONFIRMED: 'Đã xác nhận', SHIPPING: 'Đang giao',
+  COMPLETED: 'Hoàn thành', CANCELLED: 'Đã hủy', PROCESSING: 'Đang xử lý',
+  PAID: 'Đã thanh toán', UNPAID: 'Chưa thanh toán',
 }
 function statusLabel(s) { return STATUS_LABELS[s] || s }
 
@@ -291,7 +291,7 @@ function buildRevenueChart() {
       labels,
       datasets: [
         {
-          label: props.compareData.previousLabel || 'Ky truoc',
+          label: props.compareData.previousLabel || 'Kỳ trước',
           data: prevValues,
           borderColor: COLOR_PREV,
           backgroundColor: 'transparent',
@@ -303,7 +303,7 @@ function buildRevenueChart() {
           fill: false,
         },
         {
-          label: props.compareData.currentLabel || 'Ky nay',
+          label: props.compareData.currentLabel || 'Kỳ này',
           data: curValues,
           borderColor: COLOR_BLUE,
           backgroundColor: COLOR_BLUE_LIGHT,
@@ -365,7 +365,7 @@ function buildOrderChart() {
     const ORDER = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
     const map   = {}
     props.weekdayStats.forEach(d => {
-      const key = d.dayLabel.replace('Thu ', 'T').replace('Chu nhat', 'CN')
+      const key = d.dayLabel.replace('Thứ ', 'T').replace('Chủ nhật', 'CN')
       map[key] = d.totalOrders
     })
     labels = ORDER
@@ -399,7 +399,7 @@ function buildOrderChart() {
       if (!bar) return
       const x       = bar.x
       const barTop  = bar.y
-      const text    = 'Hom nay'
+      const text    = 'Hôm nay'
       const fontSize = 10
       const padX    = 7
       const padY    = 4
@@ -456,12 +456,12 @@ function buildOrderChart() {
           min: 0,
           ticks: { color: tickColor, font: { size: 11, weight: '600' }, stepSize: 1, precision: 0 },
           grid: { color: gridColor },
-          title: { display: true, text: 'So don', color: tickColor, font: { size: 11, weight: '600' } },
+          title: { display: true, text: 'Số đơn', color: tickColor, font: { size: 11, weight: '600' } },
         },
       },
       plugins: {
         ...chartDefaults.plugins,
-        tooltip: { callbacks: { label: (ctx) => ' ' + ctx.parsed.y + ' don' } },
+        tooltip: { callbacks: { label: (ctx) => ' ' + ctx.parsed.y + ' đơn' } },
       },
     },
     plugins: [todayTagPlugin],
@@ -561,7 +561,7 @@ function buildStatusChart() {
           callbacks: {
             label: (ctx) => {
               const item = statusSlices.value[ctx.dataIndex]
-              return ' ' + statusLabel(item.status) + ': ' + item.percentage + '% (' + item.totalOrders + ' don)'
+              return ' ' + statusLabel(item.status) + ': ' + item.percentage + '% (' + item.totalOrders + ' đơn)'
             },
           },
         },
