@@ -291,6 +291,11 @@ const routes = [
         name: 'ReviewManagement',
         component: () => import('@/views/admin/cms/ReviewManagement.vue'),
       },
+      {
+        path: '/admin/rr',
+        name: 'EmployeePositionManagement',
+        component: () => import('@/views/admin/auth/EmployeePositionManagement.vue'),
+      },
     ],
   },
 

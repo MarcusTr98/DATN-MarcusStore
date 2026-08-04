@@ -33,5 +33,9 @@ public class UserResponse {
     private LocalDateTime createdAt;
 
     private BigDecimal totalSpent;
+
+    private Integer positionId;
+
+    private String positionName;
     
 }

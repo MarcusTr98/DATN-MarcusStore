@@ -77,7 +77,8 @@ public class CheckoutService {
         private FlashSaleSlotRepository flashSaleSlotRepository;
         @Autowired
         private SystemSettingRepository systemSettingRepository;
-
+        @Autowired
+        private EmailService emailService;
         @Transactional(readOnly = true)
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
                 Integer currentUserId = SecurityUtils.getCurrentUserId();
@@ -405,6 +406,13 @@ public class CheckoutService {
                 order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
                 Order savedOrder = orderRepository.save(order);
+
+                // Gửi email thông báo có đơn hàng mới cho admin
+try {
+    emailService.sendNewOrderNotification(savedOrder);
+} catch (Exception e) {
+    log.error("Gửi email thông báo đơn hàng mới thất bại", e);
+}
                 // Marcus thêm: khách nhận xác nhận ngay khi backend tạo đơn thành
                 // công; VNPAY vẫn có notification thanh toán riêng sau IPN.
                 userNotificationService.createOrderStatusNotification(

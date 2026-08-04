@@ -71,4 +71,12 @@ private Set<Permission> permissions = new HashSet<>();
 
     @Column(name = "facebook_account_id")
     private String facebookAccountId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+
+@JoinColumn(name = "position_id")
+
+private EmployeePosition position;
+@Column(name = "use_default_permission", nullable = false)
+private Boolean useDefaultPermission = true;
 }

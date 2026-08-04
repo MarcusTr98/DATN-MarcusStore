@@ -21,4 +21,6 @@ public class UpdateUserRequest {
 
     @NotNull(message = "RoleId không được để trống")
     private Integer roleId;
+
+    private Integer positionId;
 }

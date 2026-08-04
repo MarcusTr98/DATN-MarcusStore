@@ -140,6 +140,13 @@
         </div>
       </template>
 
+            <!-- Quản lý chức danh -->
+      <router-link v-if="canAccessRoute('/admin/rr')" to="/admin/rr" class="menu-item"
+        active-class="active">
+        <i class="fa-solid fa-id-badge menu-icon" style="font-size: 16px"></i>
+        <span>Quản lý chức danh</span>
+      </router-link>
+
       <!-- Quản lý phân quyền: route chỉ yêu cầu roles: ['ROLE_ADMIN'], không có permission -->
       <router-link v-if="canAccessRoute('/admin/role')" to="/admin/role" class="menu-item" active-class="active">
         <i class="fa-solid fa-shield-halved menu-icon" style="font-size: 16px"></i>
@@ -289,6 +296,7 @@ const showBaoCao = computed(() => {
 const showHeThong = computed(() => {
   return (
     showAccountParent.value ||
+    canAccessRoute("/admin/rr") ||
     canAccessRoute("/admin/role") ||
     canAccessRoute("/admin/settings") ||
     canAccessRoute("/admin/data-backup")

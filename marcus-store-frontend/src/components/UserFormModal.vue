@@ -65,34 +65,34 @@
             <div v-if="errors.phoneNumber" class="invalid-feedback">{{ errors.phoneNumber }}</div>
           </div>
 
-<div v-if="!isEdit">
-  <label class="form-label">
-    Mật khẩu <span>*</span>
-  </label>
+          <div v-if="!isEdit">
+            <label class="form-label">
+              Mật khẩu <span>*</span>
+            </label>
 
-  <div class="password-wrapper">
-    <input
-      v-model="form.password"
-      :type="showPassword ? 'text' : 'password'"
-      class="form-control finput"
-      :class="{ 'is-invalid': isSubmitted && errors.password }"
-      placeholder="Tối thiểu 6 ký tự"
-    />
+            <div class="password-wrapper">
+              <input
+                v-model="form.password"
+                :type="showPassword ? 'text' : 'password'"
+                class="form-control finput"
+                :class="{ 'is-invalid': isSubmitted && errors.password }"
+                placeholder="Tối thiểu 6 ký tự"
+              />
 
-    <i
-      class="bi password-eye"
-      :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"
-      @click="showPassword = !showPassword"
-    ></i>
-  </div>
+              <i
+                class="bi password-eye"
+                :class="showPassword ? 'bi-eye-slash' : 'bi-eye'"
+                @click="showPassword = !showPassword"
+              ></i>
+            </div>
 
-  <div
-    v-if="errors.password"
-    class="invalid-feedback d-block"
-  >
-    {{ errors.password }}
-  </div>
-</div>
+            <div
+              v-if="errors.password"
+              class="invalid-feedback d-block"
+            >
+              {{ errors.password }}
+            </div>
+          </div>
 
           <div>
             <label class="form-label">Vai trò <span>*</span></label>
@@ -105,6 +105,31 @@
                 {{ role.label }}
               </option>
             </select>
+          </div>
+
+          <div v-if="form.roleName === 'STAFF'">
+            <label class="form-label">
+              Chức danh <span>*</span>
+            </label>
+
+            <select
+              v-model="form.positionId"
+              class="form-select finput"
+              :class="{ 'is-invalid': isSubmitted && errors.positionId }"
+            >
+              <option :value="null">
+                -- Chọn chức danh --
+              </option>
+
+              <option
+                v-for="item in positions"
+                :key="item.positionId"
+                :value="item.positionId"
+              >
+                {{ item.positionName }}
+              </option>
+            </select>
+            <div v-if="errors.positionId" class="invalid-feedback">{{ errors.positionId }}</div>
           </div>
 
         </div>
@@ -126,7 +151,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import PositionApi from '@/api/PositionApi'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
 
 const props = defineProps({
   visible: {
@@ -157,6 +183,26 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'submit'])
 
+const positions = ref([])
+
+async function loadPositions() {
+
+  try {
+
+    const res = await PositionApi.layDanhSach()
+
+    positions.value = res.data.data.filter(item => item.isActive)
+
+  } catch (e) {
+
+    console.error(e)
+
+  }
+
+}
+
+onMounted(loadPositions)
+
 const buildDefaultForm = () => ({
   userId: null,
   fullName: '',
@@ -164,7 +210,8 @@ const buildDefaultForm = () => ({
   email: '',
   phoneNumber: '',
   password: '',
-  roleName: props.allowedRoles[0]?.value || 'STAFF'
+  roleName: props.allowedRoles[0]?.value || 'STAFF',
+  positionId: null
 })
 
 const form = reactive(buildDefaultForm())
@@ -184,7 +231,21 @@ watch(
     }
   }
 )
+watch(
 
+  () => form.roleName,
+
+  (value) => {
+
+    if (value !== "STAFF") {
+
+      form.positionId = null
+
+    }
+
+  }
+
+)
 const errors = computed(() => {
   if (!isSubmitted.value) return {}
 
@@ -194,7 +255,7 @@ const errors = computed(() => {
     result.fullName = 'Vui lòng nhập họ và tên'
   }
 
-  if (!form.username.trim()) {
+  if (!props.isEdit && !form.username.trim()) {
     result.username = 'Vui lòng nhập tên đăng nhập'
   }
 
@@ -215,6 +276,11 @@ if (!props.isEdit) {
     result.password = 'Mật khẩu tối thiểu 6 ký tự'
   }
 }
+
+  if (form.roleName === 'STAFF' && !form.positionId) {
+    result.positionId = 'Vui lòng chọn chức danh'
+  }
+
   return result
 })
 

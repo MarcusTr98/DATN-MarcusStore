@@ -15,9 +15,11 @@ import com.fpoly.marcusstore.dto.request.CreateUserRequest;
 import com.fpoly.marcusstore.dto.request.UpdateUserRequest;
 import com.fpoly.marcusstore.dto.response.UserResponse;
 import com.fpoly.marcusstore.entity.auth.EmailOTP;
+import com.fpoly.marcusstore.entity.auth.EmployeePosition;
 import com.fpoly.marcusstore.entity.auth.Role;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.repository.auth.EmailOTPRepository;
+import com.fpoly.marcusstore.repository.auth.EmployeePositionRepository;
 import com.fpoly.marcusstore.repository.auth.RoleRepository;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
@@ -32,6 +34,7 @@ import lombok.RequiredArgsConstructor;
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final EmployeePositionRepository employeePositionRepository;
     private final PasswordEncoder passwordEncoder;
     private final OrderRepository orderRepository;
     private final EmailService emailService;
@@ -46,6 +49,16 @@ public class UserServiceImpl implements UserService {
                 totalSpent = BigDecimal.ZERO;
         }
 return UserResponse.builder()
+        .positionId(
+                user.getPosition() == null
+                        ? null
+                        : user.getPosition().getPositionId()
+        )
+        .positionName(
+                user.getPosition() == null
+                        ? null
+                        : user.getPosition().getPositionName()
+        )
         .userId(user.getUserId())
         .username(user.getUsername())
         .email(user.getEmail())
@@ -132,6 +145,25 @@ public Page<UserResponse> getALL(
         user.setPhoneNumber(request.getPhoneNumber());
         user.setIsActive(true);
         user.setRole(role);
+        if ("STAFF".equals(role.getRoleName())) {
+
+    if (request.getPositionId() == null) {
+        throw new RuntimeException("Vui lòng chọn chức danh");
+    }
+
+    EmployeePosition position = employeePositionRepository
+            .findById(request.getPositionId())
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy chức danh"));
+
+    user.setPosition(position);
+    user.setUseDefaultPermission(true);
+
+} else {
+
+    user.setPosition(null);
+    user.setUseDefaultPermission(false);
+
+}
         user.setCreatedAt(LocalDateTime.now());
         return toResponse(userRepository.save(user));
     }
@@ -160,6 +192,25 @@ public Page<UserResponse> getALL(
         user.setPhoneNumber(request.getPhoneNumber());
         user.setIsActive(true);
         user.setRole(role);
+        if ("STAFF".equals(role.getRoleName())) {
+
+    if (request.getPositionId() == null) {
+        throw new RuntimeException("Vui lòng chọn chức danh");
+    }
+
+    EmployeePosition position = employeePositionRepository
+            .findById(request.getPositionId())
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy chức danh"));
+
+    user.setPosition(position);
+    user.setUseDefaultPermission(true);
+
+} else {
+
+    user.setPosition(null);
+    user.setUseDefaultPermission(false);
+
+}
         user.setUpdatedAt(LocalDateTime.now());
 
         return toResponse(userRepository.save(user));

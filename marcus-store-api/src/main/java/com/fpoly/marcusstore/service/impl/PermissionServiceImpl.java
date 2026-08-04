@@ -53,6 +53,21 @@ public List<Integer> getPermissionOfUser(Integer userId) {
             .orElseThrow(() ->
                     new RuntimeException("Không tìm thấy nhân viên"));
 
+    // Nếu dùng quyền mặc định theo chức danh
+    if (Boolean.TRUE.equals(user.getUseDefaultPermission())) {
+
+        if (user.getPosition() == null) {
+            return List.of();
+        }
+
+        return user.getPosition()
+                .getPermissions()
+                .stream()
+                .map(Permission::getPermissionId)
+                .toList();
+    }
+
+    // Nếu dùng quyền riêng
     return user.getPermissions()
             .stream()
             .map(Permission::getPermissionId)
@@ -79,7 +94,8 @@ public void updateUserPermission(
             );
 
     user.setPermissions(permissions);
-
+// chuyển sang quyền riêng
+    user.setUseDefaultPermission(false);
     userRepository.save(user);
 }
 

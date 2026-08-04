@@ -54,17 +54,44 @@ public class CustomUserDetails implements UserDetails {
     }
 
     // STAFF lấy quyền riêng
-    else if ("STAFF".equalsIgnoreCase(roleName)) {
+else if ("STAFF".equalsIgnoreCase(roleName)) {
 
-        if (user.getPermissions() != null) {
-            for (Permission permission : user.getPermissions()) {
+    // dùng quyền theo chức danh
+    if (Boolean.TRUE.equals(user.getUseDefaultPermission())) {
+
+        if (user.getPosition() != null &&
+            user.getPosition().getPermissions() != null) {
+
+            for (Permission permission : user.getPosition().getPermissions()) {
+
                 authorities.add(
                         new SimpleGrantedAuthority(permission.getPermissionName())
                 );
+
             }
+
         }
 
     }
+
+    // dùng quyền riêng của user
+    else {
+
+        if (user.getPermissions() != null) {
+
+            for (Permission permission : user.getPermissions()) {
+
+                authorities.add(
+                        new SimpleGrantedAuthority(permission.getPermissionName())
+                );
+
+            }
+
+        }
+
+    }
+
+}
 
     return new CustomUserDetails(
             user.getUserId(),

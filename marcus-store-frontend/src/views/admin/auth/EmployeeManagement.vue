@@ -281,6 +281,7 @@ const openEdit = (user) => {
     username    : user.username,
     email       : user.email,
     phoneNumber : user.phoneNumber,
+    positionId: user.positionId,
     roleName    : user.roleName,
     password    : ''
   }
@@ -297,7 +298,8 @@ const saveUser = async (payload) => {
         fullName    : payload.fullName,
         email       : payload.email,
         phoneNumber : payload.phoneNumber,
-        roleId      : ROLE_MAP[payload.roleName]
+        roleId      : ROLE_MAP[payload.roleName],
+        positionId: payload.positionId
       })
       showModal('success', 'Cập nhật thành công', 'Thông tin nhân viên đã được cập nhật.')
     } else {
@@ -307,7 +309,8 @@ const saveUser = async (payload) => {
         email       : payload.email,
         phoneNumber : payload.phoneNumber,
         fullName    : payload.fullName,
-        roleId      : ROLE_MAP[payload.roleName]
+        roleId      : ROLE_MAP[payload.roleName],
+        positionId  : payload.positionId
       })
       showModal('success', 'Thêm thành công', 'Nhân viên mới đã được tạo.')
     }

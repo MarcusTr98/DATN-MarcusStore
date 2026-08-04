@@ -5,6 +5,8 @@ import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -21,7 +23,13 @@ import java.util.Locale;
 public class EmailService {
 
   private final JavaMailSender mailSender;
+  @Value("${app.admin.email}")
+  private String adminEmail;
+  @Value("${app.store.name:MarcusStore}")
+private String storeName;
 
+@Value("${app.login.url:http://localhost:8080/admin/login}")
+private String loginUrl;
   private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
   private static final NumberFormat CURRENCY_FORMAT = NumberFormat.getInstance(new Locale("vi", "VN"));
 
@@ -654,4 +662,146 @@ public class EmailService {
         """
         .formatted(label);
   }
+public void sendNewOrderNotification(Order order) {
+    try {
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+
+        helper.setTo(adminEmail);
+        helper.setSubject("🛒 Có đơn hàng mới - " + order.getOrderCode());
+
+        String orderTime = order.getCreatedAt() != null
+                ? order.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"))
+                : "";
+
+        String html = """
+            <html>
+            <body style="margin:0; padding:0; background-color:#eef1f5; font-family: Arial, Helvetica, sans-serif;">
+                <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color:#eef1f5; padding:24px 0;">
+                    <tr>
+                        <td align="center">
+                            <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background-color:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+
+                                <!-- Header -->
+                                <tr>
+                                    <td style="background-color:#d70018; padding:32px 24px; text-align:center;">
+                                        <div style="width:64px; height:64px; background-color:#ffffff; border-radius:50%%; margin:0 auto 16px auto; line-height:64px; font-size:28px;">🛒</div>
+                                        <div style="color:#ffffff; font-size:22px; font-weight:bold;">Có đơn hàng mới</div>
+                                        <div style="color:#ffd6d6; font-size:12px; letter-spacing:1px; margin-top:4px;">%s ORDER NOTIFICATION</div>
+                                    </td>
+                                </tr>
+
+                                <!-- Greeting -->
+                                <tr>
+                                    <td style="padding:24px 32px 8px 32px; color:#333333; font-size:14px; line-height:1.6;">
+                                        Xin chào <b>%s</b>,<br/>
+                                        Hệ thống vừa ghi nhận một đơn hàng mới.<br/>
+                                        Vui lòng đăng nhập hệ thống để kiểm tra và xử lý đơn hàng.
+                                    </td>
+                                </tr>
+
+                                <!-- Order info card -->
+                                <tr>
+                                    <td style="padding:16px 32px;">
+                                        <table role="presentation" width="100%%" cellpadding="0" cellspacing="0" style="background-color:#fdf2f2; border-radius:10px; padding:20px;">
+                                            <tr>
+                                                <td colspan="2" style="color:#d70018; font-size:14px; font-weight:bold; padding-bottom:12px; border-bottom:1px dashed #f3c9c9;">
+                                                    📄 THÔNG TIN ĐƠN HÀNG
+                                                </td>
+                                            </tr>
+                                            <tr><td style="height:12px;" colspan="2"></td></tr>
+                                            <tr>
+                                                <td style="color:#555555; font-size:13px; padding:6px 0;">🏷️ Mã đơn hàng</td>
+                                                <td style="color:#111111; font-size:14px; font-weight:bold; text-align:right; padding:6px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#555555; font-size:13px; padding:6px 0;">👤 Khách hàng</td>
+                                                <td style="color:#111111; font-size:14px; font-weight:bold; text-align:right; padding:6px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#555555; font-size:13px; padding:6px 0;">📞 Số điện thoại</td>
+                                                <td style="color:#111111; font-size:14px; font-weight:bold; text-align:right; padding:6px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#555555; font-size:13px; padding:6px 0;">💰 Tổng tiền</td>
+                                                <td style="color:#d70018; font-size:16px; font-weight:bold; text-align:right; padding:6px 0;">%s đ</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#555555; font-size:13px; padding:6px 0;">💳 Phương thức thanh toán</td>
+                                                <td style="color:#111111; font-size:14px; font-weight:bold; text-align:right; padding:6px 0;">%s</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color:#555555; font-size:13px; padding:6px 0;">🕒 Thời gian đặt hàng</td>
+                                                <td style="color:#111111; font-size:14px; font-weight:bold; text-align:right; padding:6px 0;">%s</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <!-- CTA button -->
+                                <tr>
+                                    <td align="center" style="padding:8px 32px 24px 32px;">
+                                        <a href="%s" style="background-color:#d70018; color:#ffffff; text-decoration:none; font-size:14px; font-weight:bold; padding:14px 28px; border-radius:8px; display:inline-block;">
+                                            ➡️ Đăng nhập hệ thống
+                                        </a>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td align="center" style="color:#777777; font-size:13px; padding-bottom:16px;">
+                                        Cảm ơn bạn đã sử dụng <b>%s</b>!
+                                    </td>
+                                </tr>
+
+                                <!-- Footer -->
+                                <tr>
+                                    <td style="background-color:#fdf2f2; padding:16px 24px; border-top:1px solid #f3c9c9;">
+                                        <table role="presentation" width="100%%" cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td style="font-size:13px; color:#333333; font-weight:bold;">
+                                                    🏪 %s
+                                                    <div style="font-weight:normal; color:#888888; font-size:11px;">Uy tín - Chất lượng - Tận tâm</div>
+                                                </td>
+                                                <td align="right" style="font-size:13px;">🌐 &nbsp; 📘 &nbsp; ✉️</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td align="center" style="color:#aaaaaa; font-size:11px; padding:16px;">
+                                        © 2025 %s. All rights reserved.
+                                    </td>
+                                </tr>
+
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </body>
+            </html>
+            """
+            .formatted(
+                    storeName.toUpperCase(),      // "MARCUSSTORE ORDER NOTIFICATION"
+                    order.getRecipientName(),      // Xin chào
+                    order.getOrderCode(),
+                    order.getRecipientName(),
+                    order.getRecipientPhone(),
+                    CURRENCY_FORMAT.format(order.getFinalAmount()),
+                    order.getPaymentMethod(),
+                    orderTime,
+                    loginUrl,                       // link đăng nhập hệ thống
+                    storeName,
+                    storeName,
+                    storeName
+            );
+
+        helper.setText(html, true);
+
+        mailSender.send(mimeMessage);
+
+    } catch (Exception e) {
+        throw new RuntimeException("Gửi mail thông báo đơn hàng mới thất bại", e);
+    }
+}
 }
