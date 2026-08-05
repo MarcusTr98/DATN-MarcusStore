@@ -16,7 +16,6 @@
           :class="item.icon"
           :style="{ background: item.iconBg, color: item.iconColor }"
         ></span>
-        <!-- Badge cảnh báo (ô warning) -->
         <small v-if="item.badge" :class="item.badgeClass ?? 'badge-warning'">
           {{ item.badge }}
         </small>
@@ -24,7 +23,6 @@
       <div class="kpi-body">
         <p class="kpi-title">{{ item.title }}</p>
         <strong class="kpi-value">{{ item.value }}</strong>
-        <!-- Note gộp % tăng/giảm vào câu -->
         <span class="kpi-note">
           <template v-if="item.change !== undefined && item.change !== null">
             <span :class="item.change >= 0 ? 'trend-up' : 'trend-down'">
@@ -49,9 +47,10 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  kpiCompare:         { type: Object, default: () => ({}) },   // từ /kpi-compare
+  kpiCompare:         { type: Object, default: () => ({}) },
   pendingOrdersCount: { type: Number, default: 0 },
   lowStockData:       { type: Array,  default: () => [] },
+  lowStockTotal:      { type: Number, default: 0 },   // ← THÊM: tổng từ PagedResponseDTO
   periodLabel:        { type: String, default: 'hôm nay' },
 })
 
@@ -63,16 +62,8 @@ function formatCurrency(value) {
   }).format(value || 0)
 }
 
-function changeBadgeClass(change) {
-  if (change === null || change === undefined) return 'badge-neutral'
-  if (change > 0)  return 'badge-up'
-  if (change < 0)  return 'badge-down'
-  return 'badge-neutral'
-}
-
 const kd = computed(() => props.kpiCompare)
 
-// Label động theo period
 const periodTitle = computed(() => {
   switch (props.periodLabel) {
     case 'hôm nay':     return 'hôm nay'
@@ -80,29 +71,28 @@ const periodTitle = computed(() => {
     case '7 ngày qua':  return '7 ngày qua'
     case '30 ngày qua': return '30 ngày qua'
     case 'tuần này':    return 'tuần này'
-    case 'tháng này':   return 'tháng này'
     case 'năm nay':     return 'năm nay'
-    default:            return props.periodLabel  // FIX: custom date hiển thị đúng label
+    default:            return 'tháng này'
   }
 })
 
-// Helper: bg + iconBg + iconColor theo trend
 function trendStyle(change, icon) {
   if (change === null || change === undefined) {
-    // Chưa có dữ liệu kỳ trước → vàng
     return { bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', iconBg: '#fde68a', iconColor: '#92400e', icon }
   }
   if (change > 0) {
-    // Tăng → xanh lá
     return { bg: 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)', iconBg: '#86efac', iconColor: '#14532d', icon }
   }
   if (change < 0) {
-    // Giảm → hồng đỏ
     return { bg: 'linear-gradient(135deg, #fff1f2 0%, #fecdd3 100%)', iconBg: '#fda4af', iconColor: '#881337', icon }
   }
-  // Bằng 0 → vàng
   return { bg: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)', iconBg: '#fde68a', iconColor: '#92400e', icon }
 }
+
+// ── FIX: dùng lowStockTotal thay vì lowStockData.length ──────────────────────
+const lowStockCount = computed(() =>
+  props.lowStockTotal > 0 ? props.lowStockTotal : props.lowStockData.length
+)
 
 const kpiItems = computed(() => [
   {
@@ -152,26 +142,26 @@ const kpiItems = computed(() => [
     bg: props.pendingOrdersCount > 0
       ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'
       : 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
-    iconBg: props.pendingOrdersCount > 0 ? '#ffedd5' : '#f3f4f6',
+    iconBg:   props.pendingOrdersCount > 0 ? '#ffedd5' : '#f3f4f6',
     iconColor: props.pendingOrdersCount > 0 ? '#c2410c' : '#6b7280',
   },
   {
     key: 'lowStock',
-    title: 'Sản phẩm sắp hết / hết hàng',
-    value: String(props.lowStockData.length),
-    badge: props.lowStockData.length > 0 ? 'Cần nhập thêm' : '',
+    title: 'Sản phẩm sắp hết / hết kho',
+    value: String(lowStockCount.value),   // ← dùng computed
+    badge: lowStockCount.value > 0 ? 'Cần nhập thêm' : '',
     badgeClass: 'badge-warning',
-    note: props.lowStockData.length > 0
+    note: lowStockCount.value > 0
       ? `${props.lowStockData.filter(i => i.status === 'Hết hàng').length} sản phẩm hết hàng · ${props.lowStockData.filter(i => i.status !== 'Hết hàng').length} sắp hết`
       : 'Tồn kho đang ở mức an toàn',
     icon: 'bi bi-archive',
-    type: props.lowStockData.length > 0 ? 'warning' : 'normal',
+    type: lowStockCount.value > 0 ? 'warning' : 'normal',
     link: null, action: 'lowStock',
-    bg: props.lowStockData.length > 0
+    bg: lowStockCount.value > 0
       ? 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)'
       : 'linear-gradient(135deg, #f0fdf4 0%, #bbf7d0 100%)',
-    iconBg: props.lowStockData.length > 0 ? '#ffedd5' : '#86efac',
-    iconColor: props.lowStockData.length > 0 ? '#c2410c' : '#14532d',
+    iconBg:   lowStockCount.value > 0 ? '#ffedd5' : '#86efac',
+    iconColor: lowStockCount.value > 0 ? '#c2410c' : '#14532d',
   },
 ])
 </script>
@@ -224,7 +214,6 @@ const kpiItems = computed(() => [
 
 .kpi-icon::before { display: block; line-height: 1; }
 
-/* Badge cảnh báo */
 .kpi-top small {
   display: inline-flex;
   align-items: center;
@@ -237,7 +226,6 @@ const kpiItems = computed(() => [
 
 .badge-warning { background: rgba(0,0,0,0.08); color: #c2410c; }
 
-/* Body */
 .kpi-body { display: flex; flex-direction: column; gap: 2px; }
 
 .kpi-title {
@@ -270,7 +258,6 @@ const kpiItems = computed(() => [
   flex-wrap: wrap;
 }
 
-/* Trend inline */
 .trend-up {
   display: inline-flex;
   align-items: center;

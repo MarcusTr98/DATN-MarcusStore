@@ -11,6 +11,7 @@
         :kpiCompare="kpiCompare"
         :pendingOrdersCount="pendingOrdersCount"
         :lowStockData="lowStockData"
+        :lowStockTotal="lowStockTotal"
         :periodLabel="periodNoteLabel"
         @action="handleKpiAction"
       />
@@ -44,7 +45,6 @@ import KpiGrid         from '../../layouts/Dashboard/Kpigrid.vue'
 import ChartsSection   from '../../layouts/Dashboard/Chartssection.vue'
 import DataSection     from '../../layouts/Dashboard/Datasection.vue'
 
-// ── Mặc định "today" khi vào trang ──
 const selectedTime = ref('today')
 const customDate   = ref('')
 
@@ -54,6 +54,7 @@ const weekdayStats       = ref([])
 const brandStats         = ref([])
 const compareData        = ref({ current: [], previous: [], currentLabel: '', previousLabel: '' })
 const lowStockData       = ref([])
+const lowStockTotal      = ref(0)
 const orderStats         = ref([])
 const paymentStats       = ref({ byMethod: [], byStatus: [] })
 const childCategories    = ref([])
@@ -79,6 +80,7 @@ const brandNameList = computed(() =>
   brandStats.value.map(b => b.brand).filter(Boolean)
 )
 
+// ── FIX 1: dùng 1 hàm fetch duy nhất, tránh gọi double ──────
 async function fetchDashboardData(period = 'today', startDate = '', endDate = '') {
   try {
     const [
@@ -91,20 +93,28 @@ async function fetchDashboardData(period = 'today', startDate = '', endDate = ''
       orderStatsRes,
       paymentStatsRes,
     ] = await Promise.all([
-      statisticsApi.getKpiCompare(period, startDate, endDate),        // KPI + % thay đổi
+      statisticsApi.getKpiCompare(period, startDate, endDate),
       statisticsApi.getOrdersByWeekday(period, startDate, endDate),
       statisticsApi.getRevenueByBrand(period, startDate, endDate),
       statisticsApi.getLowStockProducts(),
       statisticsApi.getRevenueCompare(period, startDate, endDate),
       statisticsApi.getPendingOrdersCount(),
       statisticsApi.getRevenueByDay(period, startDate, endDate),
-      statisticsApi.getPaymentStats(period, startDate, endDate),      // MỚI
+      statisticsApi.getPaymentStats(period, startDate, endDate),
     ])
 
     kpiCompare.value         = kpiCompareRes.data.data
     weekdayStats.value       = weekdayRes.data.data
     brandStats.value         = brandRes.data.data
-    lowStockData.value       = lowStockRes.data.data
+    // FIX: getLowStockProducts trả PagedResponseDTO
+    const lowStockPaged = lowStockRes.data.data
+    if (lowStockPaged && lowStockPaged.content !== undefined) {
+      lowStockData.value  = lowStockPaged.content
+      lowStockTotal.value = lowStockPaged.totalElements ?? 0
+    } else {
+      lowStockData.value  = lowStockPaged ?? []
+      lowStockTotal.value = (lowStockPaged ?? []).length
+    }
     compareData.value        = compareRes.data.data
     pendingOrdersCount.value = pendingRes.data.data
     orderStats.value         = orderStatsRes.data.data
@@ -114,16 +124,22 @@ async function fetchDashboardData(period = 'today', startDate = '', endDate = ''
   }
 }
 
-watch(
-  [selectedTime, customDate],
-  ([time, custom]) => {
-    if (custom) {
-      fetchDashboardData('today', custom, custom)
-    } else {
-      fetchDashboardData(time)
-    }
-  },
-)
+// ── FIX 1: tách watch riêng, không dùng watch([a,b]) để tránh gọi double ──
+watch(selectedTime, (val) => {
+  if (!val) return
+  // Khi chọn preset → xóa customDate, fetch theo period
+  if (customDate.value) return  // đang có custom date thì bỏ qua
+  fetchDashboardData(val)
+})
+
+watch(customDate, (val) => {
+  if (val) {
+    fetchDashboardData('today', val, val)
+  } else {
+    // Xóa custom date → fetch lại theo selectedTime hiện tại
+    fetchDashboardData(selectedTime.value)
+  }
+})
 
 function handleKpiAction(action) {
   if (action === 'lowStock') {
@@ -131,10 +147,15 @@ function handleKpiAction(action) {
     const el = document.querySelector('.data-card')
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+  if (action === 'pendingOrders') {
+    dataSectionRef.value?.switchToPendingOrders()
+    const el = document.querySelector('.data-card')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 }
 
 onMounted(async () => {
-  fetchDashboardData(selectedTime.value)   // gọi với 'today'
+  fetchDashboardData(selectedTime.value)
   try {
     const catRes = await statisticsApi.getChildCategories()
     childCategories.value = catRes.data.data

@@ -45,14 +45,16 @@ public class AdminStatisticsController {
     }
 
     @GetMapping("/top-products")
-    public ApiResponse<List<TopProductResponseDTO>> getTopSellingProducts(
-            @RequestParam(defaultValue = "10") int topN,
+    public ApiResponse<PagedResponseDTO<TopProductResponseDTO>> getTopSellingProducts(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false, defaultValue = "month") String period,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "10") int size) {
         LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
-        return ApiResponse.success(statisticsService.getTopSellingProducts(topN, dates[0], dates[1], keyword));
+        return ApiResponse.success(
+                statisticsService.getTopSellingProducts(dates[0], dates[1], keyword, page, size));
     }
 
     @GetMapping("/orders/weekday")
@@ -73,36 +75,44 @@ public class AdminStatisticsController {
         return ApiResponse.success(statisticsService.getRevenueByBrand(dates[0], dates[1]));
     }
 
+
     @GetMapping("/low-stock")
-    public ApiResponse<List<LowStockResponseDTO>> getLowStockProducts(
+    public ApiResponse<PagedResponseDTO<LowStockResponseDTO>> getLowStockProducts(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String brand,
-            @RequestParam(required = false) String status) {
-        return ApiResponse.success(statisticsService.getLowStockProducts(keyword, brand, status));
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.success(
+                statisticsService.getLowStockProducts(keyword, brand, status, page, size));
     }
 
     @GetMapping("/top-customers")
-    public ApiResponse<List<TopCustomerResponseDTO>> getTopCustomers(
-            @RequestParam(defaultValue = "10") int topN,
+    public ApiResponse<PagedResponseDTO<TopCustomerResponseDTO>> getTopCustomers(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false, defaultValue = "month") String period,
-            @RequestParam(required = false) String keyword) {
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "10") int size) {
         LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
-        return ApiResponse.success(statisticsService.getTopCustomers(topN, dates[0], dates[1], keyword));
+        return ApiResponse.success(
+                statisticsService.getTopCustomers(dates[0], dates[1], keyword, page, size));
     }
 
     @GetMapping("/recent-orders")
-    public ApiResponse<List<RecentOrderResponseDTO>> getRecentOrders(
-            @RequestParam(defaultValue = "10") int limit,
+    public ApiResponse<PagedResponseDTO<RecentOrderResponseDTO>> getRecentOrders(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false, defaultValue = "month") String period,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String brand) {
+            @RequestParam(required = false) String brand,
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "10") int size) {
         LocalDate[] dates = StatisticsService.resolveDateRange(startDate, endDate, period);
-        return ApiResponse.success(statisticsService.getRecentOrders(limit, dates[0], dates[1], keyword, status, brand));
+        return ApiResponse.success(
+                statisticsService.getRecentOrders(dates[0], dates[1], keyword, status, brand, page, size));
     }
 
     @GetMapping("/revenue/compare")
@@ -118,11 +128,13 @@ public class AdminStatisticsController {
         return ApiResponse.success(statisticsService.countPendingOrders());
     }
 
+    // phân trang backend
     @GetMapping("/pending-orders")
-    public ApiResponse<List<RecentOrderResponseDTO>> getPendingOrders(
-            @RequestParam(defaultValue = "100") int limit,
-            @RequestParam(required = false) String keyword) {
-        return ApiResponse.success(statisticsService.getPendingOrders(limit, keyword));
+    public ApiResponse<PagedResponseDTO<RecentOrderResponseDTO>> getPendingOrders(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1")  int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.success(statisticsService.getPendingOrders(keyword, page, size));
     }
 
     @GetMapping("/payment-stats")

@@ -12,72 +12,62 @@ function buildQuery(params = {}) {
 }
 
 const statisticsApi = {
-  // KPI summary (cũ — giữ lại)
   getKpiSummary(period = 'month', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/kpi-summary${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // KPI mới: có completedOrders + % so kỳ trước
   getKpiCompare(period = 'today', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/kpi-compare${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // Doanh thu theo ngày
   getRevenueByDay(period = 'month', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/revenue/daily${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // Đơn hàng theo thứ
   getOrdersByWeekday(period = 'month', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/orders/weekday${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // Doanh thu theo thương hiệu
   getRevenueByBrand(period = 'month', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/revenue/by-brand${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // Top sản phẩm bán chạy
-  getTopProducts(topN = 10, period = 'month', startDate = '', endDate = '', keyword = '') {
-    return api.get(`/admin/statistics/top-products${buildQuery({ topN, period, startDate, endDate, keyword })}`)
+  // FIX 7: thêm page + size
+  getTopProducts(period = 'month', startDate = '', endDate = '', keyword = '', page = 1, size = 10) {
+    return api.get(`/admin/statistics/top-products${buildQuery({ period, startDate, endDate, keyword, page, size })}`)
   },
 
-  // Top khách hàng
-  getTopCustomers(topN = 10, period = 'month', startDate = '', endDate = '', keyword = '') {
-    return api.get(`/admin/statistics/top-customers${buildQuery({ topN, period, startDate, endDate, keyword })}`)
+  // FIX 7: thêm page + size
+  getTopCustomers(period = 'month', startDate = '', endDate = '', keyword = '', page = 1, size = 10) {
+    return api.get(`/admin/statistics/top-customers${buildQuery({ period, startDate, endDate, keyword, page, size })}`)
   },
 
-  // Đơn hàng gần nhất
-  getRecentOrders(limit = 10, period = 'month', startDate = '', endDate = '', keyword = '', status = '', brand = '') {
-    return api.get(`/admin/statistics/recent-orders${buildQuery({ limit, period, startDate, endDate, keyword, status, brand })}`)
+  // FIX 7: thêm page + size, bỏ limit
+  getRecentOrders(period = 'month', startDate = '', endDate = '', keyword = '', status = '', brand = '', page = 1, size = 10) {
+    return api.get(`/admin/statistics/recent-orders${buildQuery({ period, startDate, endDate, keyword, status, brand, page, size })}`)
   },
 
-  // Sản phẩm sắp / hết hàng
-  getLowStockProducts(keyword = '', brand = '', status = '') {
-    return api.get(`/admin/statistics/low-stock${buildQuery({ keyword, brand, status })}`)
+  // FIX 7: thêm page + size, bỏ limit
+  getLowStockProducts(keyword = '', brand = '', status = '', page = 1, size = 10) {
+    return api.get(`/admin/statistics/low-stock${buildQuery({ keyword, brand, status, page, size })}`)
   },
 
-  // So sánh doanh thu kỳ này vs kỳ trước
   getRevenueCompare(period, startDate = '', endDate = '') {
     return api.get(`/admin/statistics/revenue/compare${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // Đếm đơn PENDING (dùng cho KPI card)
   getPendingOrdersCount() {
     return api.get('/admin/statistics/pending-orders/count')
   },
 
-  // Đơn cần xử lý: PENDING + CONFIRMED + PROCESSING (dùng cho tab DataSection)
-  getPendingOrders(limit = 100, keyword = '') {
-    return api.get(`/admin/statistics/pending-orders${buildQuery({ limit, keyword })}`)
+  getPendingOrders(keyword = '', page = 1, size = 10) {
+    return api.get(`/admin/statistics/pending-orders${buildQuery({ keyword, page, size })}`)
   },
 
-  // Thống kê phương thức thanh toán + trạng thái đơn (doughnut chart)
   getPaymentStats(period = 'today', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/payment-stats${buildQuery({ period, startDate, endDate })}`)
   },
 
-  // Tài khoản mới đăng ký theo ngày
   getNewUsers(period = 'month', startDate = '', endDate = '') {
     return api.get(`/admin/statistics/users/new${buildQuery({ period, startDate, endDate })}`)
   },
