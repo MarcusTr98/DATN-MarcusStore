@@ -776,7 +776,9 @@ if (!isLoggedIn()) {
   // Nếu không có (hết hàng mọi SKU / sản phẩm mới chưa tạo SKU) → điều hướng
   // sang trang chi tiết để user chọn variant hoặc xem thông báo hết hàng,
   // thay vì "im lặng" khiến nút bấm tưởng như bị hỏng.
-  if (!product?.defaultSkuId) {
+  // Support both APIs: /home returns skuId, /search returns defaultSkuId
+  const skuId = product?.defaultSkuId ?? product?.skuId
+  if (!skuId) {
     if (product?.slug) {
       router.push(`/product/${product.slug}`)
     } else {
@@ -789,7 +791,7 @@ if (!isLoggedIn()) {
     return
   }
 
-  const ok = await cartStore.addToCart(product.defaultSkuId, 1)
+  const ok = await cartStore.addToCart(skuId, 1)
   if (ok) {
     showNotify('success', 'Thêm vào giỏ hàng', `Đã thêm "${product.productName}" vào giỏ hàng`)
   } else {
