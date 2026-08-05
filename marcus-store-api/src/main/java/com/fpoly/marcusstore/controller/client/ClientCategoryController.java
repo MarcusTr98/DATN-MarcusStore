@@ -29,6 +29,11 @@ public class ClientCategoryController {
         return ApiResponse.success(categoriesService.getActiveChildren(parentId));
     }
 
+    @GetMapping("/by-slug/{parentSlug}/children")
+    public ApiResponse<List<CategoryResponse>> getActiveChildrenBySlug(@PathVariable String parentSlug) {
+        return ApiResponse.success(categoriesService.getActiveChildrenBySlug(parentSlug));
+    }
+
     @GetMapping("/main")
     public ApiResponse<List<CategoryResponse>> getMainCategoriesWithProducts() {
         return ApiResponse.success(categoriesService.getMainCategoriesWithProducts());

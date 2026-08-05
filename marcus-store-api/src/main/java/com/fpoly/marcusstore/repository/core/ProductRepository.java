@@ -30,6 +30,28 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
         // Tìm kiếm cơ bản cho thanh Search
         List<Product> findByProductNameContainingIgnoreCaseAndStatusTrue(String keyword);
 
+        // Overload có Pageable + load kèm category, dùng cho search box (gợi ý + trang kết quả)
+        @EntityGraph(attributePaths = { "category" })
+        @Query("SELECT p FROM Product p "
+                        + "WHERE LOWER(p.productName) LIKE LOWER(CONCAT('%', :keyword, '%')) "
+                        + "AND p.status = true "
+                        + "ORDER BY p.productId DESC")
+        List<Product> findByProductNameContainingIgnoreCaseAndStatusTrue(
+                        @Param("keyword") String keyword,
+                        Pageable pageable);
+
+
+        @EntityGraph(attributePaths = { "category", "category.parent" })
+        @Query("SELECT DISTINCT p FROM Product p " +
+                        "WHERE LOWER(p.productName) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+                        "AND p.status = true " +
+                        "AND (:parentCategoryId IS NULL OR p.category.parent.categoryId = :parentCategoryId) " +
+                        "AND (:brandId IS NULL OR p.category.categoryId = :brandId)")
+        List<Product> findByKeywordAndParentCategory(
+                        @Param("keyword") String keyword,
+                        @Param("parentCategoryId") Integer parentCategoryId,
+                        @Param("brandId") Integer brandId);
+
         boolean existsByProductName(String productName);
 
         boolean existsBySlug(String slug);
@@ -61,12 +83,6 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
         List<Product> findByBrandAndStatusTrue(@Param("brand") String brand);
 
         // Gợi ý sản phẩm theo parent category cho trang Cart
-        // - Lọc SP đang active (status = true)
-        // - Lọc SP còn hàng: EXISTS SKU active với stockQuantity > 0
-        // - Load kèm category + category.parent (1 query nhờ EntityGraph) để FE dùng nếu cần
-        // - Truyền vào `categoryIds` có thể gồm cả parent_id lẫn child_id;
-        //   match khi SP gắn vào category trực tiếp (category_id = id)
-        //   HOẶC khi SP gắn vào child của category đó (category.parent_id = id).
         @EntityGraph(attributePaths = { "category", "category.parent" })
         @Query("SELECT DISTINCT p FROM Product p " +
                         "WHERE (p.category.categoryId IN :categoryIds " +
@@ -78,21 +94,31 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
                         "            AND s.stockQuantity > 0)")
         List<Product> findActiveByCategoryIds(@Param("categoryIds") Collection<Integer> categoryIds);
 
-        // Gợi ý phụ kiện cho trang Cart theo brand
-        // - Lọc SP có category.parent_id = accessoryRootId (cây "Phụ kiện")
-        // - Lọc brand trong tập brands (lấy từ giỏ)
-        // - Lọc SP active (status = true) + có SKU active với stockQuantity > 0
-        // - Load kèm category + category.parent (EntityGraph) cho FE nếu cần
-        @EntityGraph(attributePaths = { "category", "category.parent" })
-        @Query("SELECT DISTINCT p FROM Product p " +
-                        "WHERE p.category.parent.categoryId = :accessoryRootId " +
-                        "AND p.brand IN :brands " +
-                        "AND p.status = true " +
-                        "AND EXISTS (SELECT 1 FROM ProductSku s " +
-                        "            WHERE s.product = p " +
-                        "            AND s.isActive = true " +
-                        "            AND s.stockQuantity > 0)")
-        List<Product> findActiveAccessoriesByBrands(
-                        @Param("accessoryRootId") Integer accessoryRootId,
-                        @Param("brands") Collection<String> brands);
+// Gợi ý phụ kiện cho trang Cart theo brand
+
+    @EntityGraph(attributePaths = { "category", "category.parent" })
+    @Query("SELECT DISTINCT p FROM Product p " +
+                    "WHERE p.category.parent.categoryId = :accessoryRootId " +
+                    "AND p.brand IN :brands " +
+                    "AND p.status = true " +
+                    "AND EXISTS (SELECT 1 FROM ProductSku s " +
+                    "            WHERE s.product = p " +
+                    "            AND s.isActive = true " +
+                    "            AND s.stockQuantity > 0)")
+    List<Product> findActiveAccessoriesByBrands(
+                    @Param("accessoryRootId") Integer accessoryRootId,
+                    @Param("brands") Collection<String> brands);
+
+    // Lấy DISTINCT brand của các SP phụ kiện active còn hàng
+    // - dùng cho nhánh "Phụ kiện" trên trang Search (lấy hết, không filter brand)
+    @Query("SELECT DISTINCT p.brand FROM Product p " +
+                    "WHERE p.category.parent.categoryId = :accessoryRootId " +
+                    "AND p.status = true " +
+                    "AND p.brand IS NOT NULL AND p.brand <> '' " +
+                    "AND EXISTS (SELECT 1 FROM ProductSku s " +
+                    "            WHERE s.product = p " +
+                    "            AND s.isActive = true " +
+                    "            AND s.stockQuantity > 0)")
+    List<String> findDistinctBrandsOfActiveAccessories(
+                    @Param("accessoryRootId") Integer accessoryRootId);
 }

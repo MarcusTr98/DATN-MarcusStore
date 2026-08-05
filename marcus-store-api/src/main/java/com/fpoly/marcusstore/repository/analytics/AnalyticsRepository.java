@@ -266,6 +266,43 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
         Long getUnitsSold();
     }
 
+    @Query(value = """
+            SELECT TOP (?)
+                p.product_id    AS productId,
+                p.product_name  AS productName,
+                p.slug          AS slug,
+                p.thumbnail_url AS thumbnailUrl,
+                p.brand         AS brand,
+                COALESCE(SUM(oi.quantity), 0) AS unitsSold
+            FROM Order_Items oi
+            INNER JOIN Order_Transactions t ON t.order_id = oi.order_id
+            INNER JOIN Orders o ON o.order_id = oi.order_id
+            INNER JOIN Product_Skus sku ON sku.sku_id = oi.sku_id
+            INNER JOIN Products p ON p.product_id = sku.product_id
+            WHERE t.status = 'SUCCESS'
+              AND t.type <> 'REFUND'
+              AND o.order_status = 'COMPLETED'
+              AND o.is_hidden = 0
+              AND p.status = 1
+            GROUP BY p.product_id, p.product_name, p.slug, p.thumbnail_url, p.brand
+            ORDER BY unitsSold DESC
+            """, nativeQuery = true)
+    List<BestSellerProjection> findBestSellers(int limit);
+
+    interface BestSellerProjection {
+        Integer getProductId();
+
+        String getProductName();
+
+        String getSlug();
+
+        String getThumbnailUrl();
+
+        String getBrand();
+
+        Long getUnitsSold();
+    }
+
     interface ProductTrendProjection {
         Integer getProductId();
 
