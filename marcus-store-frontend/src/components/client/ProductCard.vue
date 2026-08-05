@@ -1,5 +1,102 @@
 <template>
-  <div class="category-blocks-wrapper">
+  <!-- ============ MODE: list (trang /search?q=...) ============ -->
+  <div v-if="mode === 'list'" class="product-list-wrapper">
+    <div v-if="loading" class="text-center py-5 text-muted">Đang tải...</div>
+    <div v-else-if="error" class="text-center py-5 text-danger">{{ error }}</div>
+    <div v-else-if="!products.length" class="text-center py-5 text-muted">
+      Không tìm thấy sản phẩm nào cho từ khóa "<strong>{{ keyword }}</strong>"
+    </div>
+    <template v-else>
+      <div class="row g-3">
+        <div
+          v-for="product in products"
+          :key="product.productId"
+          class="col-6 col-md-3 col-lg-3 col-xl-3"
+        >
+          <router-link :to="`/product/${product.slug}`" class="product-card">
+            <div v-if="product.discountPercent > 0" class="badge-discount">
+              Giảm {{ product.discountPercent }}%
+            </div>
+
+            <div class="card-actions">
+              <button
+                type="button"
+                class="icon-btn wishlist-btn"
+                :class="{ active: isWished(product.productId) }"
+                title="Yêu thích"
+                @click.stop.prevent="toggleWishlist(product.productId)"
+              >
+                <svg viewBox="0 0 24 24" class="action-icon heart-icon">
+                  <path
+                    d="M12 21s-6.7-4.35-9.3-8.1C0.9 9.9 1.6 6.4 4.6 4.9c2-1 4.4-0.5 5.9 1.2L12 7.6l1.5-1.5c1.5-1.7 3.9-2.2 5.9-1.2 3 1.5 3.7 5 1.9 8-2.6 3.75-9.3 8.1-9.3 8.1z"
+                  />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                class="icon-btn cart-btn"
+                title="Thêm vào giỏ hàng"
+                @click.stop.prevent="addToCart(product)"
+              >
+                <svg viewBox="0 0 24 24" class="action-icon cart-icon">
+                  <circle cx="9" cy="21" r="1" />
+                  <circle cx="19" cy="21" r="1" />
+                  <path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 7H6" />
+                </svg>
+              </button>
+            </div>
+
+            <div class="card-thumbnail">
+              <img :src="product.thumbnailUrl" :alt="product.productName" loading="lazy" />
+            </div>
+
+            <h3 class="card-title">{{ product.productName }}</h3>
+
+            <div class="card-price">
+              <span class="price-sale">{{ formatPrice(product.price) }}</span>
+              <span v-if="product.originalPrice" class="price-original">
+                {{ formatPrice(product.originalPrice) }}
+              </span>
+            </div>
+
+            <div v-if="product.specs?.length" class="card-specs">
+              <span v-for="(spec, idx) in product.specs" :key="idx" class="spec-chip">
+                {{ spec }}
+              </span>
+            </div>
+
+            <VoucherCard />
+
+            <div class="card-footer-row">
+              <div class="card-rating">
+                <span class="star">★</span>
+                <span>{{ product.rating }}</span>
+              </div>
+            </div>
+          </router-link>
+        </div>
+      </div>
+
+      <!-- Pagination được render bên ngoài (Search.vue) qua prop page,
+           nhưng giữ fallback này khi dùng mode list độc lập (không có parent điều khiển) -->
+      <nav v-if="totalPages > 1 && !externalPage" class="d-flex justify-content-center mt-4">
+        <ul class="pagination">
+          <li
+            v-for="p in totalPages"
+            :key="p"
+            class="page-item"
+            :class="{ active: p - 1 === page }"
+          >
+            <button class="page-link" @click="goPage(p - 1)">{{ p }}</button>
+          </li>
+        </ul>
+      </nav>
+    </template>
+  </div>
+
+  <!-- ============ MODE: filter / standalone (giữ nguyên logic cũ) ============ -->
+  <div v-else class="category-blocks-wrapper">
     <div v-if="loadingCategories" class="text-center py-5 text-muted">Đang tải danh mục...</div>
 
     <div v-else-if="mainCategories.length === 0" class="text-center py-5 text-muted">
@@ -226,13 +323,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import api from '@/utils/api'
 import FilterModal from '@/layouts/home/FilterModal.vue'
 import VoucherCard from '@/layouts/home/VoucherCard.vue'
 import { useCartStore } from '@/stores/cartStore'
 import BaseModal from '@/components/BaseModal.vue'
 import wishlist from '@/composables/useWishlistShared'
+import { searchApi } from '@/composables/useSearchBox'
 import LoginRequiredModal from '../LoginRequiredModal.vue'
 const loginModal = reactive({
   visible: false,
@@ -255,9 +354,112 @@ onMounted(() => {
 const props = defineProps({
   mode: {
     type: String,
-    default: 'standalone', // 'filter' | 'standalone'
+    default: 'standalone', // 'filter' | 'standalone' | 'list'
   },
+  // Props cho mode 'list' — Marcus: dùng slug thay id để URL đẹp và đồng nhất.
+  keyword: { type: String, default: '' },
+  size: { type: Number, default: 12 },
+  parentCategorySlug: { type: String, default: null },
+  brandSlug: { type: String, default: null },
+  sortBy: { type: String, default: 'price_desc' },
+  page: { type: Number, default: 0 },
 })
+
+// ---- STATE cho mode 'list' ----
+const listProducts = ref([])
+const listLoading = ref(false)
+const listError = ref(null)
+const listTotalPages = ref(0)
+const listTotalElements = ref(0)
+const listPage = ref(0)
+
+// expose cho Search.vue đọc tổng số sp
+defineExpose({
+  totalElements: listTotalElements,
+  totalPages: listTotalPages,
+})
+
+async function fetchList() {
+  const kw = (props.keyword || '').trim()
+  // Nhánh "Phụ kiện" cho phép trống keyword (BE tự lấy tất cả PK active)
+  const isAccessoryFilter = props.parentCategorySlug === 'phu-kien'
+  if (!kw && !isAccessoryFilter) {
+    listProducts.value = []
+    listTotalPages.value = 0
+    listTotalElements.value = 0
+    return
+  }
+  listLoading.value = true
+  listError.value = null
+  try {
+    const { data } = await searchApi.search(kw, {
+      parentCategorySlug: props.parentCategorySlug,
+      brandSlug: props.brandSlug,
+      sortBy: props.sortBy,
+      page: listPage.value,
+      size: props.size,
+    })
+    const pageData = data?.data || {}
+    listProducts.value = pageData.content || []
+    listTotalPages.value = pageData.totalPages || 0
+    listTotalElements.value = pageData.totalElements || 0
+  } catch (e) {
+    console.warn('search error', e)
+    listError.value = 'Không thể tải kết quả, vui lòng thử lại.'
+    listProducts.value = []
+  } finally {
+    listLoading.value = false
+  }
+}
+
+function goListPage(n) {
+  listPage.value = Math.max(n, 0)
+}
+
+watch(
+  () => [props.keyword, props.parentCategorySlug, props.brandSlug, props.mode],
+  ([kw, , , m]) => {
+    if (m === 'list') {
+      listPage.value = 0
+      fetchList()
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => [props.sortBy, props.mode],
+  ([, m]) => {
+    if (m === 'list') {
+      listPage.value = 0
+      fetchList()
+    }
+  },
+)
+
+watch(
+  () => props.page,
+  (newPage) => {
+    if (props.mode === 'list' && newPage != null) {
+      listPage.value = Math.max(newPage, 0)
+      fetchList()
+    }
+  },
+)
+
+// Alias cho template (giữ nguyên tên ngắn gọn)
+const products = listProducts
+const loading = listLoading
+const error = listError
+const totalPages = listTotalPages
+const totalElements = listTotalElements
+const page = listPage
+// Khi Search.vue đẩy page xuống, ẩn pagination nội bộ của ProductCard (Search.vue tự render)
+// Cách đơn giản: nếu prop page > 0 nghĩa là cha đang điều khiển, fallback là để user click vào chip page
+const externalPage = computed(() => props.page > 0)
+function goPage(n) {
+  goListPage(n)
+}
 
 // ---- VIEW MORE LINK (standalone mode) ----
 function viewMoreLink(block) {
@@ -399,39 +601,58 @@ function resetFilterAndBrand(block) {
 }
 
 // ---- FETCH PRODUCTS (theo từng block) ----
-async function fetchProducts(block) {
-  block.loadingProducts = true
+// Hàm chung: append=false để ghi đè (lần đầu / đổi filter / sort),
+//            append=true  để nối thêm (loadMore).
+function fetchProducts(block, { append = false } = {}) {
+  block.loadingProducts = !append
+  block.loadingMore = append
   block.productError = null
-  try {
-    // Gộp brand click trực tiếp (single) + brand chọn trong filter modal (multi)
-    const allBrandIds = [
-      ...(block.selectedBrandId != null ? [block.selectedBrandId] : []),
-      ...(block.selectedBrandIds ?? []),
-    ]
-    const uniqueBrandIds = [...new Set(allBrandIds)]
-
-    const res = await api.get('/home', {
-      params: {
-        sortBy: block.sortBy,
-        categoryId: block.selectedBrandId,
-        parentCategoryId: block.categoryId,
-        page: block.page,
-        size: block.size,
-        minPrice: block.selectedMinPrice,
-        maxPrice: block.selectedMaxPrice,
-        valueIds: block.selectedValueIds?.length ? block.selectedValueIds.join(',') : null,
-        brandIds: uniqueBrandIds.length ? uniqueBrandIds.join(',') : null,
-      },
+  return api
+    .get('/home', {
+      params: buildHomeParams(block),
     })
-    const pageData = res.data?.data
-    block.products = pageData?.content ?? []
-    block.totalPages = pageData?.totalPages ?? 0
-    block.totalElements = pageData?.totalElements ?? 0
-  } catch (err) {
-    console.error('Lỗi khi tải sản phẩm trang home:', err)
-    block.productError = 'Không thể tải sản phẩm, vui lòng thử lại.'
-  } finally {
-    block.loadingProducts = false
+    .then((res) => {
+      const pageData = res.data?.data
+      const list = pageData?.content ?? []
+      if (append) {
+        block.products.push(...list)
+      } else {
+        block.products = list
+      }
+      block.totalPages = pageData?.totalPages ?? 0
+      block.totalElements = pageData?.totalElements ?? 0
+    })
+    .catch((err) => {
+      console.error(
+        append ? 'Lỗi khi tải thêm sản phẩm:' : 'Lỗi khi tải sản phẩm trang home:',
+        err,
+      )
+      block.productError = 'Không thể tải sản phẩm, vui lòng thử lại.'
+      if (append) block.page -= 1
+    })
+    .finally(() => {
+      block.loadingProducts = false
+      block.loadingMore = false
+    })
+}
+
+// Gộp brand click trực tiếp (single) + brand chọn trong filter modal (multi)
+function buildHomeParams(block) {
+  const allBrandIds = [
+    ...(block.selectedBrandId != null ? [block.selectedBrandId] : []),
+    ...(block.selectedBrandIds ?? []),
+  ]
+  const uniqueBrandIds = [...new Set(allBrandIds)]
+  return {
+    sortBy: block.sortBy,
+    categoryId: block.selectedBrandId,
+    parentCategoryId: block.categoryId,
+    page: block.page,
+    size: block.size,
+    minPrice: block.selectedMinPrice,
+    maxPrice: block.selectedMaxPrice,
+    valueIds: block.selectedValueIds?.length ? block.selectedValueIds.join(',') : null,
+    brandIds: uniqueBrandIds.length ? uniqueBrandIds.join(',') : null,
   }
 }
 
@@ -445,44 +666,7 @@ function loadMore(block) {
   if (block.loadingMore) return
   block.loadingMore = true
   block.page += 1
-  fetchProductsAppend(block)
-}
-
-async function fetchProductsAppend(block) {
-  block.loadingMore = true
-  block.productError = null
-  try {
-    const allBrandIds = [
-      ...(block.selectedBrandId != null ? [block.selectedBrandId] : []),
-      ...(block.selectedBrandIds ?? []),
-    ]
-    const uniqueBrandIds = [...new Set(allBrandIds)]
-
-    const res = await api.get('/home', {
-      params: {
-        sortBy: block.sortBy,
-        categoryId: block.selectedBrandId,
-        parentCategoryId: block.categoryId,
-        page: block.page,
-        size: block.size,
-        minPrice: block.selectedMinPrice,
-        maxPrice: block.selectedMaxPrice,
-        valueIds: block.selectedValueIds?.length ? block.selectedValueIds.join(',') : null,
-        brandIds: uniqueBrandIds.length ? uniqueBrandIds.join(',') : null,
-      },
-    })
-    const pageData = res.data?.data
-    const newProducts = pageData?.content ?? []
-    block.products.push(...newProducts)
-    block.totalPages = pageData?.totalPages ?? 0
-    block.totalElements = pageData?.totalElements ?? 0
-  } catch (err) {
-    console.error('Lỗi khi tải thêm sản phẩm:', err)
-    block.productError = 'Không thể tải sản phẩm, vui lòng thử lại.'
-    block.page -= 1
-  } finally {
-    block.loadingMore = false
-  }
+  fetchProducts(block, { append: true })
 }
 
 function remainingCount(block) {
@@ -512,6 +696,9 @@ async function fetchCategoryById(categoryId) {
 onMounted(() => {
   if (props.mode === 'filter') {
     fetchCategoryById(props.categoryId)
+  } else if (props.mode === 'list') {
+    // mode 'list' được xử lý bởi watch bên dưới, không cần fetch main categories
+    return
   } else {
     fetchMainCategories()
   }
@@ -522,6 +709,9 @@ watch(
   ([newId, newMode]) => {
     if (newMode === 'filter') {
       fetchCategoryById(newId)
+    } else if (newMode === 'list') {
+      // mode 'list' được xử lý bởi watch trên keyword
+      return
     } else {
       fetchMainCategories()
     }
@@ -558,6 +748,7 @@ if (!isLoggedIn()) {
 
 // ---- ADD TO CART (gọi cartStore + cartApi, backend đã sẵn sàng) ----
 const cartStore = useCartStore()
+const router = useRouter()
 
 const notifyModal = reactive({
   visible: false,
@@ -581,12 +772,24 @@ if (!isLoggedIn()) {
   )
   return
 }
-  if (!product?.skuId) {
-    console.warn('Sản phẩm không có skuId, bỏ qua:', product)
+  // Backend trả về defaultSkuId (SKU active + còn hàng + giá thấp nhất).
+  // Nếu không có (hết hàng mọi SKU / sản phẩm mới chưa tạo SKU) → điều hướng
+  // sang trang chi tiết để user chọn variant hoặc xem thông báo hết hàng,
+  // thay vì "im lặng" khiến nút bấm tưởng như bị hỏng.
+  if (!product?.defaultSkuId) {
+    if (product?.slug) {
+      router.push(`/product/${product.slug}`)
+    } else {
+      showNotify(
+        'info',
+        'Sản phẩm tạm hết hàng',
+        'Phiên bản này hiện không còn hàng. Vui lòng chọn sản phẩm khác.',
+      )
+    }
     return
   }
 
-  const ok = await cartStore.addToCart(product.skuId, 1)
+  const ok = await cartStore.addToCart(product.defaultSkuId, 1)
   if (ok) {
     showNotify('success', 'Thêm vào giỏ hàng', `Đã thêm "${product.productName}" vào giỏ hàng`)
   } else {

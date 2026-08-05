@@ -25,4 +25,11 @@ public class ClientSuggestedProductResponse {
     private Boolean inStock;
     private Double rating;
     private Long reviewCount;
+    /**
+     * SKU mặc định để thêm nhanh vào giỏ hàng từ card.
+     * Quy tắc chọn: SKU active + còn hàng + giá thấp nhất.
+     * Có thể null nếu sản phẩm chưa có SKU active/còn hàng
+     * — FE lúc đó phải điều hướng sang trang chi tiết.
+     */
+    private Integer defaultSkuId;
 }

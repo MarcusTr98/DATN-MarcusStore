@@ -123,6 +123,7 @@
 /* Search Area */
 .search-bar-wrapper {
   flex: 1;
+  position: relative;
 }
 
 .search-bar {
@@ -159,16 +160,42 @@
   background: #e11d1d;
   color: #ffffff;
   border: none;
-  padding: 11px 22px;
+  padding: 12px 26px;
   font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition:
+    background 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.08);
 }
 
 .search-btn:hover {
   background: #c0392b;
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.08),
+    0 4px 12px rgba(225, 29, 29, 0.4);
+  transform: translateY(-1px);
+}
+
+.search-btn:active {
+  background: #a52828;
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.05),
+    0 1px 3px rgba(225, 29, 29, 0.35);
+  transform: translateY(0);
+}
+
+.search-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.7);
+  outline-offset: -3px;
 }
 
 /* Search Tags */
@@ -197,6 +224,193 @@
 
 .search-tag:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* --- Search Suggest Panel (dropdown gợi ý + lịch sử) --- */
+.search-suggest-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-radius: 12px;
+  z-index: 1050;
+  max-height: 70vh;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+}
+
+.ss-section {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.ss-section:last-child {
+  border-bottom: 0;
+}
+
+.ss-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #64748b;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-bottom: 6px;
+}
+
+.ss-clear {
+  background: none;
+  border: 0;
+  color: #e11d1d;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: none;
+  padding: 0;
+}
+
+.ss-clear:hover {
+  text-decoration: underline;
+}
+
+.ss-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ss-history li {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.ss-history li:hover {
+  background: #f8fafc;
+}
+
+.ss-history-item {
+  background: none;
+  border: 0;
+  padding: 8px 10px;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #334155;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  text-align: left;
+}
+
+.ss-history-item i {
+  color: #94a3b8;
+  width: 14px;
+}
+
+.ss-history-item:hover {
+  color: #e11d1d;
+}
+
+.ss-remove {
+  background: none;
+  border: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  cursor: pointer;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.ss-remove:hover {
+  color: #e11d1d;
+  background: #fef2f2;
+}
+
+/* Grid sản phẩm - 2 cột thumbnail */
+.ss-products {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ss-product-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px;
+  text-decoration: none;
+  color: inherit;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.ss-product-item:hover {
+  background: #f8fafc;
+  border-color: #e5e7eb;
+}
+
+.ss-product-item img {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  flex-shrink: 0;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+.ss-product-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ss-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: #334155;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ss-price {
+  margin: 4px 0 0;
+  color: #e11d1d;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ss-loading,
+.ss-empty {
+  padding: 18px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 13px;
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 480px) {
+  .ss-products {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* --- 4. HEADER ACTIONS --- */

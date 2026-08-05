@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useCartStore } from '@/stores/cartStore'
 import { useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
+import { useSearchBox } from '@/composables/useSearchBox'
 import BaseModal from '../BaseModal.vue'
 import wishlist from '@/composables/useWishlistShared'
 import { useUserNotifications } from '@/composables/useUserNotifications'
@@ -10,11 +11,26 @@ import { useUserNotifications } from '@/composables/useUserNotifications'
 const router = useRouter()
 const cartStore = useCartStore()
 
+const {
+  query: searchQuery,
+  showPanel,
+  isLoading: suggestLoading,
+  suggestions,
+  history,
+  isTyping,
+  openPanel,
+  closePanel,
+  pushHistory,
+  removeHistory,
+  clearHistory,
+  submit,
+  refreshOnAuth,
+} = useSearchBox()
+
 const totalMoney = computed(() => cartStore.totalAmount)
 const totalQuantity = computed(() => cartStore.totalQuantity)
 const isLoggedIn = ref(false)
 const userName = ref('')
-const searchQuery = ref('')
 const showNotifications = ref(false)
 let notificationCloseTimer = null
 const {
@@ -138,11 +154,22 @@ onMounted(() => {
 
   fetchSettings()
   window.addEventListener('auth-changed', checkAuth)
+  const detachAuth = refreshOnAuth()
+  window.addEventListener('mousedown', handleClickOutside)
+
+  // cleanup khi component unmount
+  return () => {
+    window.removeEventListener('auth-changed', checkAuth)
+    detachAuth?.()
+    window.removeEventListener('mousedown', handleClickOutside)
+    window.clearTimeout(notificationCloseTimer)
+  }
 })
-onUnmounted(() => {
-  window.clearTimeout(notificationCloseTimer)
-  window.removeEventListener('auth-changed', checkAuth)
-})
+
+function handleClickOutside(e) {
+  const wrapper = document.querySelector('.search-bar-wrapper')
+  if (wrapper && !wrapper.contains(e.target)) closePanel()
+}
 </script>
 
 <template>
@@ -205,7 +232,7 @@ onUnmounted(() => {
           </router-link>
 
           <!-- Search Bar -->
-          <div class="search-bar-wrapper">
+          <div class="search-bar-wrapper" @keydown.esc="closePanel">
             <div class="search-bar">
               <i class="fas fa-search search-icon"></i>
               <input
@@ -213,15 +240,57 @@ onUnmounted(() => {
                 type="text"
                 class="search-input"
                 placeholder="Tìm kiếm điện thoại, phụ kiện..."
+                @focus="openPanel"
+                @keydown.enter.prevent="submit()"
               />
-              <button class="search-btn">Tìm kiếm</button>
+              <button class="search-btn" @click="submit()">Tìm kiếm</button>
             </div>
-            <div class="search-tags">
-              <span class="search-tag-label">Hot:</span>
-              <router-link to="/search?q=iphone+16" class="search-tag">iPhone 16</router-link>
-              <router-link to="/search?q=samsung+s25" class="search-tag">Samsung S25</router-link>
-              <router-link to="/search?q=airpods" class="search-tag">AirPods</router-link>
-              <router-link to="/search?q=sac-du-phong" class="search-tag">Sạc dự phòng</router-link>
+
+            <!-- Suggest panel -->
+            <div v-if="showPanel" class="search-suggest-panel shadow">
+              <!-- Lịch sử tìm kiếm (chỉ khi chưa gõ) -->
+              <div v-if="!isTyping && history.length" class="ss-section">
+                <div class="ss-head">
+                  <span>Lịch sử tìm kiếm</span>
+                  <button class="ss-clear" @click="clearHistory">Xóa tất cả</button>
+                </div>
+                <ul class="ss-history">
+                  <li v-for="h in history" :key="h">
+                    <button class="ss-history-item" @click="submit(h)">
+                      <i class="far fa-clock"></i>
+                      <span>{{ h }}</span>
+                    </button>
+                    <button class="ss-remove" @click.stop="removeHistory(h)" aria-label="Xóa">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </li>
+                </ul>
+              </div>
+
+              <!-- Xu hướng / Gợi ý: dữ liệu bán chạy đến từ AnalyticsRepository.findBestSellers -->
+              <div class="ss-section">
+                <div class="ss-head">
+                  <span>{{ isTyping ? 'Kết quả gợi ý' : 'Sản phẩm bán chạy' }}</span>
+                  <small v-if="!isTyping" class="text-muted">Cập nhật liên tục</small>
+                </div>
+                <div v-if="suggestLoading" class="ss-loading">Đang tải...</div>
+                <ul v-else-if="suggestions.length" class="ss-products">
+                  <li v-for="p in suggestions" :key="p.productId">
+                    <router-link
+                      :to="`/product/${p.slug}`"
+                      class="ss-product-item"
+                      @click="closePanel"
+                    >
+                      <img :src="p.thumbnailUrl" :alt="p.productName" />
+                      <div class="ss-product-info">
+                        <p class="ss-name">{{ p.productName }}</p>
+                        <p class="ss-price">{{ Number(p.price).toLocaleString('vi-VN') }}₫</p>
+                      </div>
+                    </router-link>
+                  </li>
+                </ul>
+                <div v-else class="ss-empty">Không có gợi ý phù hợp</div>
+              </div>
             </div>
           </div>
 
