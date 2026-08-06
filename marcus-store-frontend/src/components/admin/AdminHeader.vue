@@ -12,6 +12,17 @@
     </div>
 
     <div class="header-right">
+      <button
+        class="header-btn theme-btn"
+        type="button"
+        :aria-label="isDark ? 'Chuyển sang giao diện sáng' : 'Chuyển sang giao diện tối'"
+        :title="isDark ? 'Light mode' : 'Dark mode'"
+        @click="toggleTheme"
+      >
+        <i :class="isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon'"></i>
+        <span>{{ isDark ? 'Light' : 'Dark' }}</span>
+      </button>
+
       <div class="notification-wrapper" ref="notifWrapperRef">
         <button
           class="header-btn notif-btn"
@@ -133,11 +144,13 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdminNotifications } from '@/composables/useAdminNotifications'
+import { useAdminTheme } from '@/composables/useAdminTheme'
 
 import personCircleIcon from '/src/assets/icons/person-circle.svg'
 import logoutIcon from '/src/assets/icons/logout.svg'
 
 const router = useRouter()
+const { isDark, toggleTheme } = useAdminTheme()
 const username = ref('')
 const currentDate = ref('')
 
@@ -321,6 +334,12 @@ onUnmounted(() => {
   background: #f8fafc;
   color: #0f172a;
   border-color: #94a3b8;
+}
+
+.theme-btn i {
+  width: 16px;
+  color: #2563eb;
+  text-align: center;
 }
 
 .avatar {
@@ -670,6 +689,28 @@ onUnmounted(() => {
 }
 
 @media (max-width: 720px) {
+  .header {
+    margin: 10px;
+    padding: 12px 14px 12px 58px;
+    gap: 12px;
+  }
+  .greeting-title {
+    font-size: 15px;
+  }
+  .greeting-sub {
+    display: none;
+  }
+  .header-right {
+    gap: 6px;
+  }
+  .header-btn {
+    padding: 8px 10px;
+  }
+  .header-btn > span,
+  .profile-btn > span,
+  .logout-btn > span {
+    display: none;
+  }
   .notif-dropdown {
     position: fixed;
     top: 76px;
