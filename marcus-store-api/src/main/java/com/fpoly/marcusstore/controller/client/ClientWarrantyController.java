@@ -2,7 +2,6 @@ package com.fpoly.marcusstore.controller.client;
 
 import com.fpoly.marcusstore.dto.request.CreateWarrantyRequest;
 import com.fpoly.marcusstore.dto.response.WarrantyResponse;
-import com.fpoly.marcusstore.security.jwt.JwtUtils;
 import com.fpoly.marcusstore.service.WarrantyService;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import io.jsonwebtoken.Claims;
@@ -22,7 +21,7 @@ import java.util.List;
 public class ClientWarrantyController {
 
     private final WarrantyService warrantyService;
-    private final JwtUtils jwtUtils;
+
 
     @Value("${marcusstore.app.jwtSecret}")
     private String jwtSecret;
@@ -88,7 +87,7 @@ public class ClientWarrantyController {
                 ApiResponse.success(canRequest)
         );
     }
-    
+
     @GetMapping("/order-item/{orderItemId}")
     public ResponseEntity<ApiResponse<WarrantyResponse>> getWarrantyByOrderItem(
             @RequestHeader("Authorization") String authHeader,

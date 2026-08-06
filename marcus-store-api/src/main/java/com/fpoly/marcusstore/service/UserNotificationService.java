@@ -4,6 +4,8 @@ import com.fpoly.marcusstore.dto.response.UserNotificationResponse;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.contact.UserNotification;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.WarrantyReturn;
+import com.fpoly.marcusstore.entity.shopping.WarrantyReturn.WarrantyStatus;
 import com.fpoly.marcusstore.repository.contact.UserNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -32,6 +34,10 @@ public class UserNotificationService {
             Map.entry("COMPLETED", "Đơn hàng hoàn thành"),
             Map.entry("CANCELLED", "Đơn hàng đã hủy"),
             Map.entry("FAILED", "Giao hàng chưa thành công"));
+    private static final Map<String, String> WARRANTY_STATUS_TITLES = Map.ofEntries(
+            Map.entry("PENDING", "Yêu cầu bảo hành chờ duyệt"),
+            Map.entry("APPROVED", "Yêu cầu bảo hành được duyệt"),
+            Map.entry("REJECTED", "Yêu cầu bảo hành bị từ chối"));
     private static final int MAX_PAGE_SIZE = 30;
     private final UserNotificationRepository repository;
     private final SimpMessagingTemplate messagingTemplate;
@@ -73,6 +79,18 @@ public class UserNotificationService {
                 ? "Đơn " + order.getOrderCode() + " vừa được cập nhật: " + title + "."
                 : detail;
         create(order.getUser(), "ORDER_" + normalized, title, message, order.getOrderCode());
+    }
+
+    // Marcus thêm: phát chuông cho khách khi admin cập nhật trạng thái bảo hành.
+    @Transactional
+    public void notifyWarrantyStatusChanged(WarrantyReturn warranty, WarrantyStatus newStatus, String adminNote) {
+        if (warranty == null || warranty.getUser() == null || newStatus == null) return;
+        String type = "WARRANTY_" + newStatus.name();
+        String title = WARRANTY_STATUS_TITLES.getOrDefault(newStatus.name(), "Cập nhật bảo hành");
+        String message = adminNote != null && !adminNote.isBlank()
+                ? adminNote
+                : "Yêu cầu bảo hành #" + warranty.getWarrantyId() + " vừa được cập nhật: " + title + ".";
+        create(warranty.getUser(), type, title, message, warranty.getOrderItem().getOrder().getOrderCode());
     }
 
     @Transactional

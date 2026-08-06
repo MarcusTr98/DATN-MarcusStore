@@ -19,6 +19,9 @@ public class WarrantyResponse {
     
     private Integer warrantyId;
     private Integer userId;
+    private String userFullName;
+    private String userEmail;
+    private String userPhone;
     private Integer orderItemId;
     private String orderCode;
     private String productName;
@@ -60,10 +63,9 @@ public class WarrantyResponse {
     
     public static String getStatusLabel(WarrantyStatus status) {
         return switch (status) {
-            case PENDING -> "Chờ xử lý";
-            case APPROVED -> "Đã duyệt";
+            case PENDING -> "Chờ duyệt";
+            case APPROVED -> "Đồng ý";
             case REJECTED -> "Từ chối";
-            case COMPLETED -> "Hoàn thành";
         };
     }
 }

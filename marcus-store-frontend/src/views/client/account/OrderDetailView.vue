@@ -686,8 +686,8 @@
                       <div class="warranty-type-icon">
                         <i class="fa-solid fa-coins"></i>
                       </div>
-                      <span class="warranty-type-title">Hoàn tiền</span>
-                      <span class="warranty-type-desc">Nhận lại tiền sản phẩm</span>
+                      <span class="warranty-type-title">Bảo hành</span>
+                      <span class="warranty-type-desc">Gửi yêu cầu bảo hành sản phẩm</span>
                       <div v-if="warrantyForm.type === 'REFUND'" class="warranty-type-check">
                         <i class="fa-solid fa-check"></i>
                       </div>

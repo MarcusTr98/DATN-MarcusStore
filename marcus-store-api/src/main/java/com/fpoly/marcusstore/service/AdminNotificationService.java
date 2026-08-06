@@ -1,7 +1,9 @@
 package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.response.AdminNotificationResponse;
+import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.contact.AdminNotification;
+import com.fpoly.marcusstore.entity.shopping.WarrantyReturn;
 import com.fpoly.marcusstore.repository.contact.AdminNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -87,6 +89,17 @@ public class AdminNotificationService {
         // Marcus sửa: chỉ phát realtime sau khi transaction nghiệp vụ đã commit thành
         // công.
         sendAfterCommit(Map.of("event", "NEW", "data", data));
+    }
+
+    // cổng phát chuông khi khách gửi yêu cầu bảo hành mới,
+    // dùng lại createAndSendNotification nên đảm bảo đúng pattern sau-commit.
+    public void notifyWarrantyCreated(WarrantyReturn warranty, User user) {
+        String title = "Yêu cầu bảo hành mới";
+        String message = String.format(
+                "Khách hàng %s vừa gửi yêu cầu bảo hành cho sản phẩm.",
+                warranty.getUser().getFullName());
+        createAndSendNotification("WARRANTY_REQUEST", title, message,
+                String.valueOf(warranty.getWarrantyId()));
     }
 
     private AdminNotificationResponse toResponse(AdminNotification notification) {

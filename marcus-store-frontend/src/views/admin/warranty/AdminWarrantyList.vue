@@ -1,523 +1,395 @@
 <template>
-  <div class="admin-warranty-list">
-    <div class="page-header">
-      <div class="header-left">
-        <h1 class="page-title">Đổi trả / Bảo hành</h1>
-        <p class="page-subtitle">Quản lý yêu cầu đổi trả và bảo hành từ khách hàng</p>
-      </div>
-      <div class="header-stats">
-        <div class="stat-card stat-total">
-          <span class="stat-number">{{ stats.total }}</span>
-          <span class="stat-label">Tổng yêu cầu</span>
+  <div class="warranty-page">
+    <div class="warranty-shell">
+      <section class="warranty-hero">
+        <div class="warranty-hero-title">
+          <div class="warranty-hero-icon">
+            <i class="bi bi-arrow-repeat"></i>
+          </div>
+          <div>
+            <h1>Đổi trả / Bảo hành</h1>
+            <p>Theo dõi và xử lý các yêu cầu đổi trả, bảo hành từ khách hàng.</p>
+          </div>
         </div>
-        <div class="stat-card stat-pending">
-          <span class="stat-number">{{ stats.pending }}</span>
-          <span class="stat-label">Chờ xử lý</span>
-        </div>
-        <div class="stat-card stat-approved">
-          <span class="stat-number">{{ stats.approved }}</span>
-          <span class="stat-label">Đã duyệt</span>
-        </div>
-        <div class="stat-card stat-rejected">
-          <span class="stat-number">{{ stats.rejected }}</span>
-          <span class="stat-label">Từ chối</span>
-        </div>
-      </div>
-    </div>
+      </section>
 
-    <div class="filter-bar">
-      <div class="filter-group">
-        <label class="filter-label">Trạng thái</label>
-        <select v-model="filterStatus" class="filter-select" @change="fetchWarranties">
-          <option value="">Tất cả</option>
-          <option value="PENDING">Chờ xử lý</option>
-          <option value="APPROVED">Đã duyệt</option>
-          <option value="REJECTED">Từ chối</option>
-          <option value="COMPLETED">Hoàn thành</option>
-        </select>
-      </div>
+      <section class="warranty-stats-grid">
+        <article class="warranty-stat-card">
+          <span>Tổng yêu cầu</span>
+          <strong>{{ totalElements }}</strong>
+        </article>
 
-      <div class="filter-group">
-        <label class="filter-label">Lý do</label>
-        <select v-model="filterReason" class="filter-select" @change="fetchWarranties">
-          <option value="">Tất cả</option>
-          <option value="DEFECTIVE">Sản phẩm lỗi</option>
-          <option value="DAMAGED">Bị hư hỏng</option>
-          <option value="WRONG_ITEM">Giao sai sản phẩm</option>
-          <option value="NOT_AS_DESCRIBED">Không đúng mô tả</option>
-          <option value="ACCESSORY_MISSING">Thiếu phụ kiện</option>
-          <option value="OTHER">Lý do khác</option>
-        </select>
-      </div>
+        <article class="warranty-stat-card">
+          <span>Chờ xử lý</span>
+          <strong class="text-accent">{{ stats.pending }}</strong>
+        </article>
 
-      <div class="filter-group filter-search">
-        <label class="filter-label">Tìm kiếm</label>
-        <input
-          v-model="searchKeyword"
-          @input="onSearchInput"
-          type="text"
-          class="filter-input"
-          placeholder="Mã đơn, tên sản phẩm..."
-        />
-      </div>
+        <article class="warranty-stat-card">
+          <span>Đã duyệt</span>
+          <strong>{{ stats.approved }}</strong>
+        </article>
 
-      <button class="btn-reset" @click="resetFilters">
-        <i class="bi bi-arrow-counterclockwise"></i>
-        Đặt lại
-      </button>
-    </div>
+        <article class="warranty-stat-card">
+          <span>Hoàn thành / Từ chối</span>
+          <strong>{{ stats.rejected }}</strong>
+        </article>
+      </section>
 
-    <div v-if="loading" class="loading-state">
-      <div class="spinner"></div>
-      <p>Đang tải dữ liệu...</p>
-    </div>
-
-    <div v-else-if="filteredWarranties.length === 0" class="empty-state">
-      <i class="bi bi-inbox"></i>
-      <p>Chưa có yêu cầu bảo hành nào</p>
-    </div>
-
-    <div v-else class="table-wrapper">
-      <table class="warranty-table">
-        <thead>
-          <tr>
-            <th>Mã BH</th>
-            <th>Đơn hàng</th>
-            <th>Sản phẩm</th>
-            <th>Lý do</th>
-            <th>Trạng thái</th>
-            <th>Ngày tạo</th>
-            <th>Thao tác</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="w in filteredWarranties" :key="w.warrantyId">
-            <td>
-              <span class="warranty-code">#WR{{ String(w.warrantyId).padStart(4, '0') }}</span>
-            </td>
-            <td>
-              <router-link :to="`/admin/order/${w.orderItemId}`" class="order-link">
-                {{ w.orderCode }}
-              </router-link>
-            </td>
-            <td>
-              <div class="product-cell">
-                <img :src="w.productImage || '/placeholder.png'" :alt="w.productName" class="product-thumb" />
-                <span class="product-name">{{ w.productName }}</span>
-              </div>
-            </td>
-            <td>
-              <span class="reason-text">{{ w.reasonLabel }}</span>
-            </td>
-            <td>
-              <span class="status-badge" :class="`status-${w.status.toLowerCase()}`">
-                {{ w.statusLabel }}
+      <section class="warranty-toolbar">
+        <div class="row g-3 align-items-end">
+          <div class="col-12 col-md-6 col-lg-4">
+            <label class="form-label warranty-form-label">Tìm kiếm</label>
+            <div class="input-group">
+              <span class="input-group-text warranty-input-group-text">
+                <i class="bi bi-search"></i>
               </span>
-            </td>
-            <td>
-              <span class="date-text">{{ formatDate(w.createdAt) }}</span>
-            </td>
-            <td>
-              <button class="btn-view" @click="openDetail(w.warrantyId)">
-                <i class="bi bi-eye"></i>
-                Xem
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              <input
+                v-model.trim="keyword"
+                type="search"
+                class="form-control warranty-form-control"
+                placeholder="Tìm theo mã đơn hoặc tên sản phẩm"
+              />
+            </div>
+          </div>
+
+          <div class="col-12 col-md-6 col-lg">
+            <label class="form-label warranty-form-label">Trạng thái</label>
+            <select v-model="filterStatus" class="form-select warranty-form-select">
+              <option value="">Tất cả</option>
+              <option v-for="item in warrantyStatusList" :key="item" :value="item">
+                {{ warrantyStatusMap[item]?.label || item }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-12 col-md-6 col-lg">
+            <label class="form-label warranty-form-label">Lý do</label>
+            <select v-model="filterReason" class="form-select warranty-form-select">
+              <option value="">Tất cả</option>
+              <option v-for="item in warrantyReasonList" :key="item" :value="item">
+                {{ warrantyReasonMap[item]?.label || item }}
+              </option>
+            </select>
+          </div>
+
+          <div class="col-6 col-md-3 col-lg">
+            <label class="form-label warranty-form-label">Từ ngày</label>
+            <input
+              v-model="fromDate"
+              type="date"
+              class="form-control warranty-form-control"
+              :max="toDate || undefined"
+            />
+          </div>
+
+          <div class="col-6 col-md-3 col-lg">
+            <label class="form-label warranty-form-label">Đến ngày</label>
+            <input
+              v-model="toDate"
+              type="date"
+              class="form-control warranty-form-control"
+              :min="fromDate || undefined"
+            />
+          </div>
+
+          <div class="col-12 col-md-6 col-lg-auto">
+            <button type="button" class="btn warranty-btn-soft w-100" title="Xóa lọc" @click="resetFilters">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="warranty-table-panel">
+        <div class="table-responsive">
+          <table class="table align-middle warranty-data-table mb-0">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Mã đơn</th>
+                <th>Sản phẩm</th>
+                <th>Lý do</th>
+                <th>Trạng thái</th>
+                <th>Ngày tạo</th>
+                <th class="text-end">Thao tác</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              <tr v-for="(w, index) in warranties" :key="w.warrantyId">
+                <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
+                
+                <td>
+                  <router-link :to="`/admin/order/${w.orderItemId}`" class="warranty-link">
+                    {{ w.orderCode }}
+                  </router-link>
+                </td>
+                <td>
+                  <div class="warranty-product-cell">
+                    <img
+                      v-if="w.productImage"
+                      :src="w.productImage"
+                      :alt="w.productName"
+                      class="warranty-thumb"
+                    />
+                    <div v-else class="warranty-thumb-placeholder">
+                      <i class="fa-solid fa-mobile-screen-button"></i>
+                    </div>
+                    <span class="warranty-product-name">{{ w.productName }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span>{{ w.reasonLabel }}</span>
+                </td>
+                <td>
+                  <span
+                    class="warranty-status-badge"
+                    :class="warrantyStatusMap[w.status]?.className || 'warranty-status-pending'"
+                  >
+                    {{ w.statusLabel }}
+                  </span>
+                </td>
+                <td>
+                  <div class="warranty-date-line">{{ formatDate(w.createdAt) }}</div>
+                  <div class="warranty-date-line">{{ formatTime(w.createdAt) }}</div>
+                </td>
+                <td>
+                  <div class="d-flex justify-content-end gap-2">
+                    <button
+                      type="button"
+                      class="warranty-icon-button"
+                      title="Xem chi tiết"
+                      @click="openDetail(w.warrantyId)"
+                    >
+                      <i class="bi bi-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="warranties.length === 0 && !loading" class="warranty-empty-state">
+          <i class="bi bi-inbox"></i>
+          <h3>Chưa có yêu cầu bảo hành</h3>
+          <p>Hãy thay đổi bộ lọc hoặc làm mới danh sách.</p>
+        </div>
+
+        <div v-if="loading" class="warranty-empty-state">
+          <i class="bi bi-arrow-clockwise"></i>
+          <h3>Đang tải dữ liệu...</h3>
+        </div>
+
+        <div v-if="totalPages > 0" class="warranty-pagination">
+          <div class="pagination-summary">
+            Tổng <strong>{{ totalElements }}</strong> yêu cầu
+          </div>
+          <div class="pagination-controls">
+            <label class="page-size-control">
+              <span>Hiển thị</span>
+              <select v-model.number="pageSize" class="form-select form-select-sm">
+                <option :value="5">5</option>
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              class="pagination-button"
+              :disabled="currentPage === 0"
+              @click="goToPage(currentPage - 1)"
+            >
+              Trước
+            </button>
+            <span class="page-indicator">
+              Trang <strong>{{ currentPage + 1 }}</strong> / {{ totalPages }}
+            </span>
+            <button
+              type="button"
+              class="pagination-button"
+              :disabled="currentPage + 1 >= totalPages"
+              @click="goToPage(currentPage + 1)"
+            >
+              Sau
+            </button>
+          </div>
+        </div>
+      </section>
     </div>
+
+    <div class="warranty-toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { AdminWarrantyApi } from '@/api/warrantyApi'
+import { getWarrantyStats } from '@/api/warrantyStatsApi'
+import '@/assets/css/WarrantyList.css'
 
 const router = useRouter()
+const toastMessage = ref('')
 
-const loading = ref(false)
 const warranties = ref([])
-
+const loading = ref(false)
+const keyword = ref('')
 const filterStatus = ref('')
 const filterReason = ref('')
-const searchKeyword = ref('')
-let searchTimer = null
+const fromDate = ref('')
+const toDate = ref('')
 
-const stats = computed(() => {
-  return {
-    total: warranties.value.length,
-    pending: warranties.value.filter(w => w.status === 'PENDING').length,
-    approved: warranties.value.filter(w => w.status === 'APPROVED').length,
-    rejected: warranties.value.filter(w => w.status === 'REJECTED').length,
-  }
-})
+const currentPage = ref(0)
+const pageSize = ref(10)
+const totalPages = ref(0)
+const totalElements = ref(0)
 
-const filteredWarranties = computed(() => {
-  let result = warranties.value
-  if (filterReason.value) {
-    result = result.filter(w => w.reason === filterReason.value)
-  }
-  if (searchKeyword.value.trim()) {
-    const kw = searchKeyword.value.toLowerCase().trim()
-    result = result.filter(
-      w =>
-        (w.orderCode && w.orderCode.toLowerCase().includes(kw)) ||
-        (w.productName && w.productName.toLowerCase().includes(kw))
-    )
-  }
-  return result
+const warrantyStatusList = ['PENDING', 'APPROVED', 'REJECTED']
+const warrantyReasonList = [
+  'DEFECTIVE',
+  'DAMAGED',
+  'WRONG_ITEM',
+  'NOT_AS_DESCRIBED',
+  'ACCESSORY_MISSING',
+  'OTHER',
+]
+
+const warrantyStatusMap = {
+  PENDING: { label: 'Chờ xử lý', className: 'warranty-status-pending' },
+  APPROVED: { label: 'Đã duyệt', className: 'warranty-status-approved' },
+  REJECTED: { label: 'Từ chối', className: 'warranty-status-rejected' },
+}
+
+const warrantyReasonMap = {
+  DEFECTIVE: { label: 'Sản phẩm lỗi' },
+  DAMAGED: { label: 'Bị hư hỏng' },
+  WRONG_ITEM: { label: 'Giao sai sản phẩm' },
+  NOT_AS_DESCRIBED: { label: 'Không đúng mô tả' },
+  ACCESSORY_MISSING: { label: 'Thiếu phụ kiện' },
+  OTHER: { label: 'Lý do khác' },
+}
+
+const stats = ref({
+  pending: 0,
+  approved: 0,
+  rejected: 0,
 })
 
 async function fetchWarranties() {
   loading.value = true
   try {
-    const params = {}
+    const params = {
+      page: currentPage.value,
+      size: pageSize.value,
+    }
     if (filterStatus.value) params.status = filterStatus.value
+    if (filterReason.value) params.reason = filterReason.value
+    if (keyword.value.trim()) params.keyword = keyword.value.trim()
     const res = await AdminWarrantyApi.getAllWarranties(params)
-    warranties.value = res.data?.data || res.data || []
+    const data = res.data?.data || res.data || {}
+    warranties.value = data.content || []
+    totalPages.value = data.totalPages ?? 0
+    totalElements.value = data.totalElements ?? 0
   } catch (err) {
     console.error('Lỗi tải danh sách bảo hành:', err)
     warranties.value = []
+    totalPages.value = 0
+    totalElements.value = 0
+    showToast('Không thể tải danh sách yêu cầu.')
   } finally {
     loading.value = false
   }
 }
 
-function onSearchInput() {
+async function fetchStats() {
+  try {
+    const res = await getWarrantyStats()
+    const data = res.data?.data || res.data || {}
+    stats.value = {
+      pending: data.pending || 0,
+      approved: data.approved || 0,
+      rejected: data.rejected || 0,
+    }
+  } catch (err) {
+    console.error('Lỗi tải thống kê bảo hành:', err)
+  }
+}
+
+let searchTimer = null
+watch(keyword, () => {
   clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {}, 300)
+  searchTimer = setTimeout(() => {
+    currentPage.value = 0
+    fetchWarranties()
+  }, 400)
+})
+
+watch([filterStatus, filterReason, fromDate, toDate], () => {
+  currentPage.value = 0
+  fetchWarranties()
+})
+
+watch(pageSize, () => {
+  currentPage.value = 0
+  fetchWarranties()
+})
+
+function goToPage(page) {
+  if (page < 0 || page >= totalPages.value) return
+  currentPage.value = page
+  fetchWarranties()
 }
 
 function resetFilters() {
+  keyword.value = ''
   filterStatus.value = ''
   filterReason.value = ''
-  searchKeyword.value = ''
+  fromDate.value = ''
+  toDate.value = ''
+  currentPage.value = 0
+  showToast('Đã làm mới bộ lọc.')
   fetchWarranties()
+  fetchStats()
 }
 
 function openDetail(warrantyId) {
   router.push(`/admin/warranty/${warrantyId}`)
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+function formatDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return String(value).split('T')[0]
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+function formatTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return String(value).split('T')[1]?.split('.')[0] || ''
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${hours}:${minutes}:${seconds}`
+}
+
+function showToast(message) {
+  toastMessage.value = message
+  window.clearTimeout(showToast.timer)
+  showToast.timer = window.setTimeout(() => {
+    toastMessage.value = ''
+  }, 2600)
 }
 
 onMounted(() => {
   fetchWarranties()
+  fetchStats()
 })
 </script>
 
-<style scoped>
-.admin-warranty-list {
-  padding: 24px 28px;
-  background: #fff7fa;
-  min-height: 100%;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 24px;
-  gap: 24px;
-  flex-wrap: wrap;
-}
-
-.page-title {
-  font-size: 24px;
-  font-weight: 800;
-  color: #111827;
-  margin: 0 0 4px;
-}
-
-.page-subtitle {
-  font-size: 14px;
-  color: #6b7280;
-  margin: 0;
-}
-
-.header-stats {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.stat-card {
-  background: #fff;
-  border: 1px solid #fee2e2;
-  border-radius: 12px;
-  padding: 12px 20px;
-  min-width: 110px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(255, 77, 148, 0.06);
-}
-
-.stat-number {
-  font-size: 22px;
-  font-weight: 900;
-  color: #111827;
-  line-height: 1.2;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #6b7280;
-  margin-top: 2px;
-  font-weight: 600;
-}
-
-.stat-pending .stat-number { color: #f59e0b; }
-.stat-approved .stat-number { color: #10b981; }
-.stat-rejected .stat-number { color: #ef4444; }
-
-.filter-bar {
-  background: #fff;
-  border: 1px solid #fee2e2;
-  border-radius: 14px;
-  padding: 16px 20px;
-  display: flex;
-  gap: 16px;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  margin-bottom: 20px;
-  box-shadow: 0 2px 8px rgba(255, 77, 148, 0.04);
-}
-
-.filter-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 160px;
-}
-
-.filter-search {
-  flex: 1;
-  min-width: 220px;
-}
-
-.filter-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: #374151;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.filter-select,
-.filter-input {
-  height: 40px;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 8px;
-  padding: 0 12px;
-  font-size: 14px;
-  color: #111827;
-  background: #fff;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.filter-select:focus,
-.filter-input:focus {
-  border-color: #ff4d94;
-}
-
-.btn-reset {
-  height: 40px;
-  padding: 0 18px;
-  border: 1.5px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fff;
-  color: #6b7280;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-
-.btn-reset:hover {
-  background: #f9fafb;
-  border-color: #ff4d94;
-  color: #ff4d94;
-}
-
-.loading-state,
-.empty-state {
-  background: #fff;
-  border: 1px solid #fee2e2;
-  border-radius: 14px;
-  padding: 60px 20px;
-  text-align: center;
-  color: #6b7280;
-}
-
-.empty-state i {
-  font-size: 56px;
-  color: #fee2e2;
-  margin-bottom: 12px;
-}
-
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid #fee2e2;
-  border-top-color: #ff4d94;
-  border-radius: 50%;
-  margin: 0 auto 12px;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.table-wrapper {
-  background: #fff;
-  border: 1px solid #fee2e2;
-  border-radius: 14px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(255, 77, 148, 0.04);
-}
-
-.warranty-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.warranty-table thead {
-  background: #fff5f8;
-}
-
-.warranty-table th {
-  padding: 14px 16px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 800;
-  color: #111827;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 1.5px solid #fee2e2;
-}
-
-.warranty-table td {
-  padding: 14px 16px;
-  font-size: 14px;
-  color: #374151;
-  border-bottom: 1px solid #fef2f3;
-  vertical-align: middle;
-}
-
-.warranty-table tbody tr:hover {
-  background: #fff5f8;
-}
-
-.warranty-code {
-  font-weight: 800;
-  color: #ff4d94;
-  font-family: 'Courier New', monospace;
-}
-
-.order-link {
-  color: #3b82f6;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.order-link:hover {
-  text-decoration: underline;
-}
-
-.product-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.product-thumb {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  object-fit: cover;
-  background: #f5f5f5;
-  border: 1px solid #fee2e2;
-}
-
-.product-name {
-  font-weight: 600;
-  color: #111827;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.reason-text {
-  font-size: 13px;
-  color: #374151;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.status-pending {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.status-approved {
-  background: #d1fae5;
-  color: #047857;
-}
-
-.status-rejected {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.status-completed {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.date-text {
-  font-size: 13px;
-  color: #6b7280;
-  white-space: nowrap;
-}
-
-.btn-view {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  background: linear-gradient(135deg, #ff4d94 0%, #ff1a75 100%);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(255, 77, 148, 0.25);
-}
-
-.btn-view:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(255, 77, 148, 0.4);
-}
-</style>
+<style scoped></style>
