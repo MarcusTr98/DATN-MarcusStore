@@ -146,7 +146,7 @@
           <div class="modal-body text-center pt-0">
             <!-- Khối Logo Marcus Store mô phỏng chính xác ảnh của bạn -->
             <div class="brand-logo-wrapper mb-4">
-              <div class="logo-icon-box shadow-sm">
+              <div class="logo-icon-box shadow-sm" :class="{ 'has-site-logo': siteLogoUrl }">
                 <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
                 <i v-else class="fas fa-mobile-alt"></i>
               </div>
@@ -723,6 +723,18 @@ onBeforeUnmount(() => clearFloatingContactPanel('live'))
   justify-content: center;
   color: #fff;
   font-size: 24px;
+}
+
+/* Marcus sửa: logo cấu hình không đặt trực tiếp trên nền đỏ của fallback icon. */
+.logo-icon-box.has-site-logo {
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 5px 14px rgba(215, 0, 24, 0.12);
+}
+
+.logo-icon-box.has-site-logo .site-logo-image {
+  border-radius: 6px;
 }
 
 .logo-text-box {

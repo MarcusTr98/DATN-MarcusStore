@@ -353,7 +353,7 @@
     <!-- Footer -->
     <footer class="flash-footer">
       <div class="footer-left">
-        <router-link to="/" class="footer-logo">
+        <router-link to="/" class="footer-logo" :class="{ 'has-site-logo': siteLogoUrl }">
           <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
           <i v-else class="fas fa-mobile-alt"></i>
           <span>{{ siteName }}</span>

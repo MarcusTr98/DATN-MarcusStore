@@ -3,7 +3,7 @@
     <div class="cp-card">
 
       <div class="cp-logo">
-        <div class="cp-logo-box">
+        <div class="cp-logo-box" :class="{ 'has-site-logo': siteLogoUrl }">
           <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
           <svg v-else viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"
             stroke-linejoin="round" style="width:22px;height:22px;">
@@ -337,6 +337,17 @@ const submit = async () => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.cp-logo-box.has-site-logo {
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 4px 12px rgba(215, 0, 24, 0.1);
+}
+
+.cp-logo-box.has-site-logo .site-logo-image {
+  border-radius: 6px;
 }
 
 .cp-logo-name {

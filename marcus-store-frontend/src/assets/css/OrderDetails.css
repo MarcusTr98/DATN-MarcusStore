@@ -705,6 +705,17 @@ tbody tr:hover {
   display: none;
 }
 
+.print-site-logo {
+  width: 58px;
+  height: 58px;
+  padding: 4px;
+  margin: 0 auto 5px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
 @media print {
   /* Reset nền và màu chữ cho bản in */
   html,

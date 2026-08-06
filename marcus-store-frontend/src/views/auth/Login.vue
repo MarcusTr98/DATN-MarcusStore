@@ -5,7 +5,7 @@
       <div class="deco-circle circle-2" ref="circle2"></div>
       <div class="content">
         <router-link to="/" class="brand brand-logo-link">
-          <div class="logo-icon-box">
+          <div class="logo-icon-box" :class="{ 'has-site-logo': siteLogoUrl }">
             <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
             <i v-else class="fas fa-mobile-alt"></i>
           </div>
@@ -373,6 +373,15 @@ const handleLogin = async () => {
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s ease;
+}
+
+.logo-icon-box.has-site-logo {
+  padding: 7px;
+  border: 1px solid #fee2e2;
+}
+
+.logo-icon-box.has-site-logo .site-logo-image {
+  border-radius: 7px;
 }
 
 .logo-icon-box i {

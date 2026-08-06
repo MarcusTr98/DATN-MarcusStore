@@ -10,7 +10,7 @@
 
           <!-- Logo -->
           <div class="logo-box">
-            <div class="logo-icon">
+            <div class="logo-icon" :class="{ 'has-site-logo': siteLogoUrl }">
               <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
               <i v-else class="fa-solid fa-mobile-screen-button"></i>
             </div>
@@ -137,6 +137,18 @@ defineEmits(['close'])
   justify-content: center;
   align-items: center;
   font-size: 26px;
+}
+
+/* Marcus sửa: ảnh nhận diện có nền trắng, fallback icon vẫn giữ nền đỏ. */
+.logo-icon.has-site-logo {
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 5px 14px rgba(215, 0, 24, 0.12);
+}
+
+.logo-icon.has-site-logo .site-logo-image {
+  border-radius: 7px;
 }
 
 .logo-text {

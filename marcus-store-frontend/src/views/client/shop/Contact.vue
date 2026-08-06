@@ -4,7 +4,7 @@
       <div class="cps-container">
         <div class="section-header">
           <h2 class="title">
-            <i class="fa-solid fa-location-dot"></i> Hệ thống cửa hàng Marcus Store
+            <i class="fa-solid fa-location-dot"></i> Hệ thống cửa hàng {{ siteName }}
           </h2>
           <p class="subtitle">
             Đến trực tiếp để trải nghiệm dịch vụ và sản phẩm công nghệ đỉnh cao
@@ -20,11 +20,11 @@
             </div>
             <div class="store-detail">
               <i class="fa-solid fa-phone-volume"></i>
-              <span>Hotline: 1800.xxxx (Miễn phí)</span>
+              <span>Hotline: {{ sysSettings.HOTLINE || 'Đang cập nhật' }}</span>
             </div>
             <div class="store-detail">
               <i class="fa-solid fa-clock"></i>
-              <span>Giờ mở cửa: 08:00 - 22:00</span>
+              <span>Giờ mở cửa: {{ sysSettings.WORKING_HOURS || 'Đang cập nhật' }}</span>
             </div>
             <a
               :href="`http://maps.google.com/maps?q=${storeInfo.lat},${storeInfo.lng}`"
@@ -51,19 +51,22 @@
         <div class="contact-grid">
           <div class="company-info-col card-shadow">
             <h3 class="col-title">Thông tin liên hệ</h3>
-            <div class="company-name">CÔNG TY CỔ PHẦN CÔNG NGHỆ MARCUS</div>
+            <div class="company-name">{{ siteName.toUpperCase() }}</div>
 
             <ul class="info-list">
               <li>
                 <div class="info-icon"><i class="fa-solid fa-building"></i></div>
                 <div class="info-text">
-                  <strong>Trụ sở chính:</strong> 118 Cát Bi, Hải An, Hải Phòng<br />
+                  <strong>Trụ sở chính:</strong> {{ sysSettings.ADDRESS || storeInfo.address }}<br />
                   <small class="text-muted">GPĐKKD số 0123456789 do Sở KHĐT Hải Phòng cấp</small>
                 </div>
               </li>
               <li>
                 <div class="info-icon"><i class="fa-solid fa-envelope-open-text"></i></div>
-                <div class="info-text"><strong>Email hỗ trợ:</strong> cskh@marcusstore.com</div>
+                <div class="info-text">
+                  <strong>Email hỗ trợ:</strong>
+                  <a :href="`mailto:${sysSettings.EMAIL}`">{{ sysSettings.EMAIL || 'Đang cập nhật' }}</a>
+                </div>
               </li>
             </ul>
 
@@ -75,21 +78,21 @@
                 <i class="fa-solid fa-headset"></i>
                 <div>
                   <span>Gọi mua hàng</span>
-                  <strong>1800.1111</strong>
+                  <strong>{{ sysSettings.HOTLINE || 'Đang cập nhật' }}</strong>
                 </div>
               </div>
               <div class="hotline-box">
                 <i class="fa-solid fa-screwdriver-wrench"></i>
                 <div>
                   <span>Hỗ trợ kỹ thuật</span>
-                  <strong>1800.2222</strong>
+                  <strong>{{ sysSettings.HOTLINE || 'Đang cập nhật' }}</strong>
                 </div>
               </div>
               <div class="hotline-box full-width">
                 <i class="fa-solid fa-comments"></i>
                 <div>
                   <span>Góp ý, Khiếu nại (8h00 - 22h00)</span>
-                  <strong>1800.3333</strong>
+                  <strong>{{ sysSettings.HOTLINE || 'Đang cập nhật' }}</strong>
                 </div>
               </div>
             </div>
@@ -186,6 +189,9 @@ import { ref, reactive, onMounted, nextTick } from 'vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '@/utils/api'
+import { useSettings } from '@/composables/useSettings'
+
+const { sysSettings, siteName, fetchSettings } = useSettings()
 
 //Cấu hình Icon Leaflet
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -205,7 +211,7 @@ let mapInstance = null
 const storeInfo = ref({
   lat: 20.82716,
   lng: 106.70466,
-  name: 'Marcus Store Hải Phòng',
+  name: 'Marcus Store',
   address: '118 Cát Bi, Hải An, Hải Phòng',
 })
 
@@ -229,12 +235,14 @@ const form = reactive({
 // --- Logic Map ---
 const fetchMapLocation = async () => {
   try {
-    const res = await api.get('/public/settings/STORE_LOCATION')
-    const rawValue = res.data?.data?.settingValue || res.data?.settingValue
+    await fetchSettings()
+    const rawValue = sysSettings.value.STORE_LOCATION
     if (rawValue) {
       const dbLocation = JSON.parse(rawValue)
       storeInfo.value = { ...storeInfo.value, ...dbLocation }
     }
+    storeInfo.value.name = storeInfo.value.name || siteName.value
+    storeInfo.value.address = sysSettings.value.ADDRESS || storeInfo.value.address
   } catch (error) {
     console.error('Không tải được tọa độ từ DB, dùng mặc định', error)
   } finally {

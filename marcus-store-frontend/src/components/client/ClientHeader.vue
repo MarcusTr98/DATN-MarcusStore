@@ -235,7 +235,7 @@ function handleClickOutside(e) {
         <div class="main-header-inner">
           <!-- Logo -->
           <router-link to="/" class="ms-logo">
-            <div class="logo-icon">
+            <div class="logo-icon" :class="{ 'has-site-logo': siteLogoUrl }">
               <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
               <i v-else class="fas fa-mobile-alt"></i>
             </div>
@@ -579,12 +579,13 @@ function handleClickOutside(e) {
 
           <div class="modal-body text-center pt-0">
             <div class="brand-logo-wrapper mb-4">
-              <div class="logo-icon-box shadow-sm">
-                <i class="fas fa-mobile-alt"></i>
+              <div class="logo-icon-box shadow-sm" :class="{ 'has-site-logo': siteLogoUrl }">
+                <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+                <i v-else class="fas fa-mobile-alt"></i>
               </div>
               <div class="logo-text-box">
-                <span class="text-marcus">Marcus</span>
-                <span class="text-store">STORE</span>
+                <span class="text-marcus">{{ siteNameParts.primary }}</span>
+                <span v-if="siteNameParts.secondary" class="text-store">{{ siteNameParts.secondary }}</span>
               </div>
             </div>
 

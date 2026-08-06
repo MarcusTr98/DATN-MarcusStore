@@ -14,6 +14,13 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
+    // Marcus sửa: instance mặc định gửi JSON, nhưng upload phải để trình duyệt tự
+    // sinh Content-Type multipart/form-data kèm boundary. Nếu giữ application/json,
+    // Spring sẽ báo "Current request is not a multipart request".
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      delete config.headers['Content-Type']
+    }
+
     // 1. Kích hoạt hiệu ứng loading khi bắt đầu gọi API
     if (!config.skipGlobalLoading) useLoadingStore().show()
 

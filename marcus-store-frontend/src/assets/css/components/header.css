@@ -88,8 +88,8 @@
 }
 
 .logo-icon {
-  width: 46px;
-  height: 46px;
+  width: 54px;
+  height: 54px;
   background: #ffffff;
   border-radius: 12px;
   display: flex;
@@ -98,26 +98,39 @@
   font-size: 22px;
   color: #e11d1d;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  flex: 0 0 54px;
+}
+
+/* Marcus sửa: tạo khoảng thở riêng cho ảnh logo trên nền header đỏ. */
+.logo-icon.has-site-logo {
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 5px 16px rgba(100, 10, 18, 0.22);
 }
 
 .logo-icon .site-logo-image {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: inherit;
+  border-radius: 8px;
 }
 
 .logo-text {
   display: flex;
   flex-direction: column;
   line-height: 1;
+  min-width: 0;
 }
 
 .logo-brand {
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 800;
   color: #ffffff;
   letter-spacing: -0.5px;
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .logo-store {
@@ -864,6 +877,18 @@
   justify-content: center;
   color: #fff;
   font-size: 24px;
+}
+
+/* Marcus sửa: modal yêu cầu đăng nhập dùng cùng quy tắc nền logo với header. */
+.logo-icon-box.has-site-logo {
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 5px 14px rgba(215, 0, 24, 0.12);
+}
+
+.logo-icon-box.has-site-logo .site-logo-image {
+  border-radius: 6px;
 }
 
 .logo-text-box {

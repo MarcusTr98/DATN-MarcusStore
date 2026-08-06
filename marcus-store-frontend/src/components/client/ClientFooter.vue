@@ -50,7 +50,7 @@
           <!-- Brand Column -->
           <div class="footer-col footer-brand-col">
             <div class="footer-logo">
-              <div class="footer-logo-icon">
+              <div class="footer-logo-icon" :class="{ 'has-site-logo': siteLogoUrl }">
                 <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
                 <i v-else class="fas fa-mobile-alt"></i>
               </div>
