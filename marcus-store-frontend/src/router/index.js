@@ -209,6 +209,18 @@ const routes = [
         meta: { permission: 'ORDER_VIEW' },
       },
       {
+        path: 'warranty',
+        name: 'AdminWarrantyList',
+        component: () => import('@/views/admin/warranty/AdminWarrantyList.vue'),
+        meta: { permission: 'ORDER_VIEW' },
+      },
+      {
+        path: 'warranty/:id',
+        name: 'AdminWarrantyDetail',
+        component: () => import('@/views/admin/warranty/AdminWarrantyDetail.vue'),
+        meta: { permission: 'ORDER_VIEW' },
+      },
+      {
         path: 'voucher',
         name: 'VoucherManager',
         component: () => import('@/views/admin/promotion/VoucherManager.vue'),

@@ -188,8 +188,6 @@
                       </div>
                       <strong class="product-total">{{ formatMoney(item.lineTotal) }}</strong>
                       <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
-
-                      <!-- ===== Vùng thao tác đánh giá: tạo mới / xem / sửa ===== -->
                       <div v-if="selectedOrder.orderStatus === 'COMPLETED'" class="review-action">
                         <!-- chưa đánh giá -->
                         <button v-if="!item.reviewed" class="review-btn" @click="openReview(item)">
@@ -206,6 +204,37 @@
                           <button class="review-edit-btn" @click="editReview(item)">
                             Sửa đánh giá
                           </button>
+                        </template>
+
+                        <!-- ===== Nút Yêu cầu bảo hành ===== -->
+                        <button
+                          v-if="canRequestWarranty(item)"
+                          class="warranty-btn"
+                          @click="openWarrantyModal(item)"
+                        >
+                          <i class="fa-solid fa-shield-halved"></i>
+                          Yêu cầu bảo hành
+                        </button>
+
+                        <!-- Nút Xem bảo hành (khi đã có yêu cầu) -->
+                        <button
+                          v-else-if="item.warrantyStatus"
+                          class="warranty-view-btn"
+                          @click="openWarrantyModal(item)"
+                        >
+                          <i class="fa-solid fa-eye"></i>
+                          Xem bảo hành
+                        </button>
+
+                        <!-- Hiển thị trạng thái bảo hành nếu đã có yêu cầu -->
+                        <template v-if="item.warrantyStatus">
+                          <span
+                            class="warranty-status-pill"
+                            :class="getWarrantyStatus(item).className"
+                          >
+                            <i :class="getWarrantyStatus(item).icon"></i>
+                            {{ getWarrantyStatus(item).label }}
+                          </span>
                         </template>
                       </div>
                       <!-- ===== Hết vùng thao tác đánh giá ===== -->
@@ -479,6 +508,329 @@
           </div>
         </div>
       </div>
+
+      <!-- ===== Modal Yêu cầu / Xem bảo hành ===== -->
+      <div v-if="warrantyModal.visible" class="modal-backdrop" @click.self="closeWarrantyModal">
+        <div class="modal-card warranty-modal" role="dialog" aria-modal="true">
+          <div class="modal-header">
+            <h4 class="modal-title">
+              <i class="fa-solid fa-shield-halved"></i>
+              <!-- VIEW mode: Hiển thị chi tiết -->
+              <template v-if="warrantyModal.mode === 'view'">
+                Chi tiết bảo hành
+              </template>
+              <!-- CREATE mode: Tạo mới -->
+              <template v-else-if="warrantyModal.mode === 'create'">
+                Yêu cầu đổi trả bảo hành
+              </template>
+              <!-- LOADING mode -->
+              <template v-else>
+                Đang tải...
+              </template>
+            </h4>
+            <button
+              type="button"
+              class="modal-close"
+              :disabled="warrantySubmitting"
+              @click="closeWarrantyModal"
+            >
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+
+          <div class="modal-body" v-if="warrantyModal.mode === 'loading'">
+            <div class="warranty-loading">
+              <i class="fa-solid fa-spinner fa-spin"></i>
+              <span>Đang kiểm tra thông tin bảo hành...</span>
+            </div>
+          </div>
+
+          <template v-else>
+            <!-- Thông tin sản phẩm -->
+            <div class="warranty-product-card">
+              <div class="warranty-product-thumb">
+                <img
+                  v-if="warrantyModal.selectedItem?.productImage"
+                  :src="warrantyModal.selectedItem.productImage"
+                  :alt="warrantyModal.selectedItem?.productName"
+                  @error="handleImageError"
+                />
+                <div v-else class="warranty-product-thumb-placeholder">
+                  <i class="fa-solid fa-mobile-screen-button"></i>
+                </div>
+              </div>
+              <div class="warranty-product-info-content">
+                <h5 class="warranty-product-title">
+                  {{ warrantyModal.selectedItem?.productName }}
+                </h5>
+                <div class="warranty-product-specs">
+                  <span class="spec-item">
+                    <i class="fa-solid fa-barcode"></i>
+                    SKU: {{ warrantyModal.selectedItem?.skuCode }}
+                  </span>
+                  <span class="spec-item">
+                    <i class="fa-solid fa-cube"></i>
+                    SL: {{ warrantyModal.selectedItem?.quantity }}
+                  </span>
+                </div>
+                <div class="warranty-product-price-row">
+                  <span class="price-label">Đơn giá:</span>
+                  <span class="price-value">{{ formatMoney(warrantyModal.selectedItem?.priceAtPurchase) }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- ===== VIEW MODE: Hiển thị thông tin đã gửi ===== -->
+            <template v-if="warrantyModal.mode === 'view' && existingWarranty">
+              <!-- Trạng thái bảo hành -->
+              <div class="warranty-status-card" :class="getWarrantyStatusClass(existingWarranty.status)">
+                <div class="warranty-status-header">
+                  <i :class="getWarrantyStatusIcon(existingWarranty.status)"></i>
+                  <span class="warranty-status-label">{{ existingWarranty.statusLabel }}</span>
+                </div>
+                <div class="warranty-status-meta">
+                  <span><i class="fa-solid fa-calendar"></i> Ngày gửi: {{ formatDateTime(existingWarranty.createdAt) }}</span>
+                  <span v-if="existingWarranty.processedAt"><i class="fa-solid fa-clock"></i> Xử lý: {{ formatDateTime(existingWarranty.processedAt) }}</span>
+                </div>
+                <div v-if="existingWarranty.processedByName" class="warranty-status-admin">
+                  <i class="fa-solid fa-user-shield"></i>
+                  {{ existingWarranty.processedByName }}
+                </div>
+              </div>
+
+              <!-- Thông tin đã gửi -->
+              <div class="warranty-view-section">
+                <div class="warranty-view-item">
+                  <label class="warranty-view-label">Lý do:</label>
+                  <span class="warranty-view-value">{{ existingWarranty.reasonLabel }}</span>
+                </div>
+
+                <div class="warranty-view-item">
+                  <label class="warranty-view-label">Mô tả chi tiết:</label>
+                  <p class="warranty-view-description">{{ existingWarranty.description }}</p>
+                </div>
+
+                <!-- Ảnh/Video đã gửi -->
+                <div v-if="existingWarranty.attachments?.length > 0" class="warranty-view-item">
+                  <label class="warranty-view-label">Ảnh/Video đã gửi:</label>
+                  <div class="warranty-view-attachments">
+                    <div
+                      v-for="(att, index) in existingWarranty.attachments"
+                      :key="index"
+                      class="warranty-view-attachment"
+                    >
+                      <img v-if="att.fileType === 'IMAGE'" :src="att.fileUrl" :alt="att.fileName" />
+                      <video v-else :src="att.fileUrl" controls></video>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Ghi chú từ admin -->
+                <div v-if="existingWarranty.adminNote" class="warranty-view-item">
+                  <label class="warranty-view-label"><i class="fa-solid fa-comment-dots"></i> Phản hồi từ cửa hàng:</label>
+                  <div class="warranty-admin-note">{{ existingWarranty.adminNote }}</div>
+                </div>
+              </div>
+
+              <!-- Thông báo VIEW mode -->
+              <div class="warranty-notice">
+                <div class="warranty-notice-icon">
+                  <i class="fa-solid fa-circle-info"></i>
+                </div>
+                <div class="warranty-notice-text">
+                  <strong>Đã gửi yêu cầu.</strong> Bạn chỉ có thể xem lại thông tin đã gửi. Nếu cần hỗ trợ thêm, vui lòng liên hệ cửa hàng.
+                </div>
+              </div>
+            </template>
+
+            <!-- ===== CREATE MODE: Form nhập liệu ===== -->
+            <template v-else-if="warrantyModal.mode === 'create'">
+              <!-- Loại yêu cầu -->
+              <div class="warranty-form-group">
+                <label class="warranty-label">
+                  Loại yêu cầu <span class="required">*</span>
+                </label>
+                <div class="warranty-type-options">
+                  <label
+                    class="warranty-type-option"
+                    :class="{ active: warrantyForm.type === 'EXCHANGE' }"
+                  >
+                    <input
+                      v-model="warrantyForm.type"
+                      type="radio"
+                      value="EXCHANGE"
+                      class="warranty-type-radio"
+                    />
+                    <div class="warranty-type-content">
+                      <div class="warranty-type-icon">
+                        <i class="fa-solid fa-repeat"></i>
+                      </div>
+                      <span class="warranty-type-title">Đổi sản phẩm mới</span>
+                      <span class="warranty-type-desc">Nhận sản phẩm thay thế</span>
+                      <div v-if="warrantyForm.type === 'EXCHANGE'" class="warranty-type-check">
+                        <i class="fa-solid fa-check"></i>
+                      </div>
+                    </div>
+                  </label>
+                  <label
+                    class="warranty-type-option"
+                    :class="{ active: warrantyForm.type === 'REFUND' }"
+                  >
+                    <input
+                      v-model="warrantyForm.type"
+                      type="radio"
+                      value="REFUND"
+                      class="warranty-type-radio"
+                    />
+                    <div class="warranty-type-content">
+                      <div class="warranty-type-icon">
+                        <i class="fa-solid fa-coins"></i>
+                      </div>
+                      <span class="warranty-type-title">Hoàn tiền</span>
+                      <span class="warranty-type-desc">Nhận lại tiền sản phẩm</span>
+                      <div v-if="warrantyForm.type === 'REFUND'" class="warranty-type-check">
+                        <i class="fa-solid fa-check"></i>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Lý do -->
+              <div class="warranty-form-group">
+                <label class="warranty-label">
+                  Lý do <span class="required">*</span>
+                </label>
+                <div class="warranty-reason-grid">
+                  <button
+                    v-for="reason in WARRANTY_REASONS"
+                    :key="reason.value"
+                    type="button"
+                    class="warranty-reason-option"
+                    :class="{ active: warrantyForm.reason === reason.value }"
+                    :disabled="warrantySubmitting"
+                    @click="warrantyForm.reason = reason.value"
+                  >
+                    <i :class="reason.icon"></i>
+                    <span>{{ reason.label }}</span>
+                    <div v-if="warrantyForm.reason === reason.value" class="reason-check">
+                      <i class="fa-solid fa-check"></i>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Mô tả chi tiết -->
+              <div class="warranty-form-group">
+                <label class="warranty-label">
+                  Mô tả chi tiết vấn đề <span class="required">*</span>
+                </label>
+                <textarea
+                  v-model="warrantyForm.description"
+                  class="warranty-textarea"
+                  rows="4"
+                  maxlength="500"
+                  placeholder="Mô tả chi tiết vấn đề bạn gặp phải với sản phẩm (ví dụ: màn hình bị chết pixel, loa có tiếng ồn lạ...)"
+                  :disabled="warrantySubmitting"
+                ></textarea>
+                <div class="warranty-textarea-footer">
+                  <span class="warranty-char-count">{{ warrantyForm.description.length }}/500</span>
+                  <button
+                    type="button"
+                    class="warranty-attach-btn"
+                    :disabled="warrantySubmitting"
+                    @click="triggerFileInput"
+                  >
+                    <i class="fa-solid fa-camera"></i>
+                    Đính kèm ảnh/video
+                  </button>
+                  <input
+                    ref="warrantyFileInput"
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    class="warranty-file-input"
+                    @change="handleFileSelect"
+                  />
+                </div>
+                <!-- Preview files đã chọn -->
+                <div v-if="warrantyForm.attachments.length > 0" class="warranty-attachments-preview">
+                  <div
+                    v-for="(file, index) in warrantyForm.attachments"
+                    :key="index"
+                    class="attachment-item"
+                  >
+                    <img v-if="file.preview" :src="file.preview" :alt="file.name" />
+                    <video v-else-if="file.type.startsWith('video')" :src="file.preview" />
+                    <i v-else class="fa-solid fa-file"></i>
+                    <button
+                      type="button"
+                      class="attachment-remove"
+                      @click="removeAttachment(index)"
+                    >
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Lưu ý -->
+              <div class="warranty-notice">
+                <div class="warranty-notice-icon">
+                  <i class="fa-solid fa-circle-info"></i>
+                </div>
+                <div class="warranty-notice-text">
+                  <strong>Lưu ý:</strong> Chúng tôi chỉ chấp nhận đổi trả bảo hành cho các sản phẩm còn trong thời gian bảo hành và lỗi phải thuộc về nhà sản xuất. Chúng tôi không chịu trách nhiệm nếu lỗi sản phẩm do người dùng gây ra.
+                </div>
+              </div>
+            </template>
+
+            <!-- Feedback -->
+            <div
+              v-if="warrantyModal.feedback.message"
+              class="warranty-feedback"
+              :class="`warranty-feedback-${warrantyModal.feedback.type}`"
+              role="alert"
+            >
+              <i
+                class="fa-solid"
+                :class="
+                  warrantyModal.feedback.type === 'error'
+                    ? 'fa-circle-exclamation'
+                    : 'fa-circle-check'
+                "
+              ></i>
+              <span>{{ warrantyModal.feedback.message }}</span>
+            </div>
+          </template>
+
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn-ghost"
+              :disabled="warrantySubmitting"
+              @click="closeWarrantyModal"
+            >
+              <i class="fa-solid fa-xmark"></i>
+              {{ warrantyModal.mode === 'view' ? 'Đóng' : 'Hủy' }}
+            </button>
+            <!-- Nút gửi chỉ hiển thị ở CREATE mode -->
+            <button
+              v-if="warrantyModal.mode === 'create'"
+              type="button"
+              class="btn-primary"
+              :disabled="!canSubmitWarranty || warrantySubmitting"
+              @click="submitWarranty"
+            >
+              <i v-if="warrantySubmitting" class="fa-solid fa-spinner fa-spin"></i>
+              <i v-else class="fa-solid fa-paper-plane"></i>
+              {{ warrantySubmitting ? 'Đang gửi...' : 'Gửi yêu cầu' }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- ===== Hết Modal Yêu cầu bảo hành ===== -->
+
       <BaseModal
         :visible="receiptModal.visible"
         :type="receiptModal.type"
@@ -504,22 +856,263 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import UserOrderApi from '@/api/userOrder.js'
+import WarrantyApi from '@/api/warrantyApi.js'
 import '@/assets/css/OrderDetailView.css'
 import ReviewModal from './ReviewModal.vue'
 import reviewService from '@/stores/reviewService'
+import cloudinaryService from '@/stores/cloudinaryService'
 import BaseModal from '@/components/BaseModal.vue'
-const selectedOrder = ref(null)
 
+// ===== Marcus thêm state bảo hành =====
+const selectedOrder = ref(null)
 const showReviewModal = ref(false)
 const editMode = ref(false)
-const viewOnly = ref(false) // true khi chỉ đang XEM đánh giá (không cho sửa)
+const viewOnly = ref(false)
 const selectedOrderItem = ref(null)
-// Marcus thêm state refund tách khỏi chi tiết đơn để không ảnh hưởng API cũ của thành viên.
 const refund = ref(null)
 const loading = ref(false)
 const error = ref(null)
 const route = useRoute()
 let refundPollingTimer = null
+
+// ===== State modal bảo hành =====
+const warrantyModal = ref({
+  visible: false,
+  selectedItem: null,
+  mode: 'create', // 'create' | 'view'
+  feedback: { type: '', message: '' },
+})
+
+const existingWarranty = ref(null) // Lưu thông tin warranty đã gửi
+
+const warrantyForm = ref({
+  type: 'EXCHANGE',
+  reason: '',
+  description: '',
+  attachments: [], // Array of { file, preview, name, type }
+})
+
+const warrantySubmitting = ref(false)
+const warrantyFileInput = ref(null)
+const warrantyDescriptionMinLength = 10
+
+// Các lý do bảo hành
+const WARRANTY_REASONS = [
+  { value: 'DEFECTIVE', label: 'Sản phẩm lỗi', icon: 'fa-solid fa-triangle-exclamation' },
+  { value: 'DAMAGED', label: 'Bị hư hỏng', icon: 'fa-solid fa-kit-medical' },
+  { value: 'WRONG_ITEM', label: 'Giao sai sản phẩm', icon: 'fa-solid fa-right-left' },
+  { value: 'NOT_AS_DESCRIBED', label: 'Không đúng mô tả', icon: 'fa-solid fa-circle-question' },
+  { value: 'ACCESSORY_MISSING', label: 'Thiếu phụ kiện', icon: 'fa-solid fa-box-open' },
+  { value: 'OTHER', label: 'Lý do khác', icon: 'fa-solid fa-ellipsis' },
+]
+
+// Kiểm tra điều kiện hiển thị nút yêu cầu bảo hành
+function canRequestWarranty(item) {
+  const order = selectedOrder.value
+  if (!order) return false
+  
+  // Chỉ đơn COMPLETED mới được yêu cầu bảo hành
+  if (order.orderStatus !== 'COMPLETED') return false
+  
+  // Kiểm tra trong thời hạn bảo hành (6 tháng)
+  const warrantyPeriodMonths = 6
+  const orderDate = new Date(order.createdAt)
+  const expiryDate = new Date()
+  expiryDate.setMonth(expiryDate.getMonth() - warrantyPeriodMonths)
+  if (orderDate < expiryDate) return false
+  
+  // Kiểm tra sản phẩm chưa có yêu cầu BH đang xử lý
+  if (item.hasActiveWarrantyRequest) return false
+  
+  return true
+}
+
+// Lấy trạng thái bảo hành của sản phẩm (nếu có)
+function getWarrantyStatus(item) {
+  if (!item.warrantyStatus) return null
+  
+  const statusConfig = {
+    PENDING: {
+      label: 'Chờ xử lý BH',
+      className: 'warranty-pending',
+      icon: 'fa-solid fa-clock',
+    },
+    APPROVED: {
+      label: 'Đã duyệt BH',
+      className: 'warranty-approved',
+      icon: 'fa-solid fa-circle-check',
+    },
+    REJECTED: {
+      label: 'Từ chối BH',
+      className: 'warranty-rejected',
+      icon: 'fa-solid fa-circle-xmark',
+    },
+  }
+  
+  return statusConfig[item.warrantyStatus] || null
+}
+
+// Lấy CSS class cho trạng thái bảo hành (VIEW mode)
+function getWarrantyStatusClass(status) {
+  const classMap = {
+    PENDING: 'warranty-status-pending',
+    APPROVED: 'warranty-status-approved',
+    REJECTED: 'warranty-status-rejected',
+    COMPLETED: 'warranty-status-completed',
+  }
+  return classMap[status] || 'warranty-status-pending'
+}
+
+// Lấy icon cho trạng thái bảo hành (VIEW mode)
+function getWarrantyStatusIcon(status) {
+  const iconMap = {
+    PENDING: 'fa-solid fa-clock',
+    APPROVED: 'fa-solid fa-circle-check',
+    REJECTED: 'fa-solid fa-circle-xmark',
+    COMPLETED: 'fa-solid fa-flag-checkered',
+  }
+  return iconMap[status] || 'fa-solid fa-question-circle'
+}
+
+// Mở modal bảo hành - tự detect mode
+async function openWarrantyModal(item) {
+  warrantyModal.value = {
+    visible: true,
+    selectedItem: item,
+    mode: 'loading', // đang kiểm tra
+    feedback: { type: '', message: '' },
+  }
+  existingWarranty.value = null
+  warrantyForm.value = {
+    type: 'EXCHANGE',
+    reason: '',
+    description: '',
+    attachments: [],
+  }
+  
+  // Kiểm tra xem đã có yêu cầu BH chưa
+  try {
+    const orderItemId = item.orderItemId || item.skuId
+    const response = await WarrantyApi.getWarrantyByOrderItem(orderItemId)
+    existingWarranty.value = response.data.data
+    warrantyModal.value.mode = 'view'
+    
+    // Điền thông tin đã gửi vào form (chỉ để hiển thị, không cho sửa)
+    warrantyForm.value.reason = existingWarranty.value.reason
+    warrantyForm.value.description = existingWarranty.value.description
+  } catch (error) {
+    // 404 = chưa có yêu cầu BH, cho phép tạo mới
+    if (error.response?.status === 404) {
+      warrantyModal.value.mode = 'create'
+    } else {
+      warrantyModal.value.mode = 'create'
+      console.error('Lỗi khi kiểm tra bảo hành:', error)
+    }
+  }
+}
+
+// Đóng modal bảo hành
+function closeWarrantyModal() {
+  if (warrantySubmitting.value) return
+  warrantyModal.value.visible = false
+}
+
+// Xử lý lỗi ảnh fallback
+function handleImageError(event) {
+  event.target.style.display = 'none'
+  event.target.parentElement.querySelector('.warranty-product-thumb-placeholder')?.classList.add('show')
+}
+
+// Trigger file input
+function triggerFileInput() {
+  warrantyFileInput.value?.click()
+}
+
+// Xử lý chọn file
+function handleFileSelect(event) {
+  const files = Array.from(event.target.files)
+  files.forEach((file) => {
+    if (warrantyForm.value.attachments.length >= 5) return // Max 5 files
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      warrantyForm.value.attachments.push({
+        file,
+        preview: e.target.result,
+        name: file.name,
+        type: file.type,
+      })
+    }
+    reader.readAsDataURL(file)
+  })
+  // Reset input
+  event.target.value = ''
+}
+
+// Xóa attachment
+function removeAttachment(index) {
+  warrantyForm.value.attachments.splice(index, 1)
+}
+
+// Kiểm tra form có thể submit
+const canSubmitWarranty = computed(() => {
+  return (
+    warrantyForm.value.reason &&
+    warrantyForm.value.description.trim().length >= warrantyDescriptionMinLength
+  )
+})
+
+// Submit yêu cầu bảo hành
+async function submitWarranty() {
+  if (!canSubmitWarranty.value || warrantySubmitting.value) return
+  
+  warrantySubmitting.value = true
+  warrantyModal.value.feedback = { type: '', message: '' }
+  
+  try {
+    // 1. Upload ảnh/video lên Cloudinary trước
+    const attachmentUrls = []
+    for (const attachment of warrantyForm.value.attachments) {
+      if (attachment.file) {
+        try {
+          const url = await cloudinaryService.upload(attachment.file)
+          attachmentUrls.push(url)
+        } catch (uploadError) {
+          console.error('Upload failed for:', attachment.name, uploadError)
+          throw new Error(`Không thể tải lên file ${attachment.name}. Vui lòng thử lại.`)
+        }
+      }
+    }
+    
+    // 2. Gửi request tạo bảo hành với URLs đã upload
+    const payload = {
+      orderItemId: warrantyModal.value.selectedItem.orderItemId || warrantyModal.value.selectedItem.skuId,
+      reason: warrantyForm.value.reason,
+      description: warrantyForm.value.description,
+      attachmentUrls: attachmentUrls,
+    }
+    
+    const response = await WarrantyApi.createWarranty(payload)
+    
+    warrantyModal.value.feedback = {
+      type: 'success',
+      message: 'Yêu cầu bảo hành đã được gửi thành công! Chúng tôi sẽ phản hồi trong thời gian sớm nhất.',
+    }
+    
+    // Đóng modal sau 2 giây
+    setTimeout(() => {
+      closeWarrantyModal()
+      // Refresh lại trang để cập nhật trạng thái
+      quietRefreshOrder()
+    }, 2000)
+  } catch (e) {
+    warrantyModal.value.feedback = {
+      type: 'error',
+      message: e?.response?.data?.message || e?.message || 'Gửi yêu cầu thất bại. Vui lòng thử lại.',
+    }
+  } finally {
+    warrantySubmitting.value = false
+  }
+}
 
 // ===== Mở modal để TẠO MỚI đánh giá =====
 // ===== Mở modal để TẠO MỚI đánh giá =====
@@ -1350,4 +1943,919 @@ function getVariantText(item) {
   background: #12b4d1;
 }
 /* ===== Hết vùng nút đánh giá ===== */
+
+/* ===== Marcus thêm CSS cho Bảo hành ===== */
+
+/* Nút yêu cầu bảo hành */
+.warranty-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 160px;
+  height: 38px;
+  padding: 0 16px;
+  border: 2px solid #e60012;
+  border-radius: 8px;
+  background: #fff;
+  color: #e60012;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.warranty-btn:hover {
+  background: #e60012;
+  color: #fff;
+}
+
+.warranty-btn i {
+  font-size: 14px;
+}
+
+/* Pill trạng thái bảo hành */
+.warranty-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.warranty-status-pill i {
+  font-size: 11px;
+}
+
+.warranty-pending {
+  background: #fff1f2;
+  color: #e60012;
+}
+
+.warranty-approved {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.warranty-rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* Modal bảo hành */
+.warranty-modal {
+  max-width: 760px;
+  width: 96%;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 28px;
+}
+
+/* Căn lại header và footer của modal bảo hành */
+.warranty-modal .modal-header {
+  padding: 0 0 18px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.warranty-modal .modal-body {
+  padding: 0 4px;
+}
+
+.warranty-modal .modal-footer {
+  padding: 18px 0 0;
+  margin-top: 20px;
+  border-top: 1px solid #f1f5f9;
+  gap: 12px;
+}
+
+/* Scrollbar tùy chỉnh cho modal */
+.warranty-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.warranty-modal::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.warranty-modal::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.warranty-modal::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Product Card trong modal */
+.warranty-product-card {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fff7f7 0%, #fff 100%);
+  border: 1.5px solid #fee2e2;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.warranty-product-thumb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f5f5f5;
+}
+
+.warranty-product-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.warranty-product-thumb-placeholder {
+  display: none;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  color: #ccc;
+  background: #fafafa;
+}
+
+.warranty-product-thumb-placeholder.show {
+  display: flex;
+}
+
+.warranty-product-info-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.warranty-product-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.warranty-product-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.spec-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.spec-item i {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.spec-item strong {
+  color: #334155;
+  font-weight: 600;
+}
+
+.warranty-product-price-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.price-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.price-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e60012;
+}
+
+/* Form groups */
+.warranty-form-group {
+  margin-bottom: 20px;
+}
+
+.warranty-label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.required {
+  color: #e60012;
+}
+
+/* Loại yêu cầu (radio cards) - Đỏ thương hiệu */
+.warranty-type-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.warranty-type-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.warranty-type-radio {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.warranty-type-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border: 2px solid #e2e8f0;
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+  transition: all 0.25s ease;
+}
+
+.warranty-type-option:hover .warranty-type-content {
+  border-color: #f87171;
+  background: #fff5f5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(230, 0, 18, 0.1);
+}
+
+.warranty-type-option.active .warranty-type-content {
+  border-color: #e60012;
+  background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+  box-shadow: 0 4px 16px rgba(230, 0, 18, 0.15);
+}
+
+.warranty-type-icon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f5f5f5;
+  transition: all 0.25s ease;
+}
+
+.warranty-type-option:hover .warranty-type-icon {
+  background: #fee2e2;
+}
+
+.warranty-type-option.active .warranty-type-icon {
+  background: linear-gradient(135deg, #e60012, #ff1a1a);
+}
+
+.warranty-type-icon i {
+  font-size: 22px;
+  color: #94a3b8;
+  transition: color 0.25s ease;
+}
+
+.warranty-type-option:hover .warranty-type-icon i {
+  color: #e60012;
+}
+
+.warranty-type-option.active .warranty-type-icon i {
+  color: #fff;
+}
+
+.warranty-type-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.warranty-type-option.active .warranty-type-title {
+  color: #e60012;
+}
+
+.warranty-type-desc {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.warranty-type-check {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e60012;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 12px;
+  box-shadow: 0 2px 8px rgba(230, 0, 18, 0.3);
+  animation: scaleIn 0.2s ease;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Lý do bảo hành - Card bấm chọn với tick */
+.warranty-reason-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.warranty-reason-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.warranty-reason-option i {
+  font-size: 16px;
+  color: #9ca3af;
+  transition: color 0.2s ease;
+}
+
+.warranty-reason-option span {
+  flex: 1;
+}
+
+.reason-check {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e60012;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 11px;
+  box-shadow: 0 2px 6px rgba(230, 0, 18, 0.3);
+  animation: scaleIn 0.2s ease;
+}
+
+/* Active state - Đỏ nhạt + viền đỏ */
+.warranty-reason-option:hover {
+  border-color: #f87171;
+  background: #fff5f5;
+  color: #e60012;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(230, 0, 18, 0.1);
+}
+
+.warranty-reason-option:hover i {
+  color: #e60012;
+}
+
+.warranty-reason-option.active {
+  border-color: #e60012;
+  background: linear-gradient(135deg, #fff5f5 0%, #fff 100%);
+  color: #e60012;
+  box-shadow: 0 4px 12px rgba(230, 0, 18, 0.12);
+}
+
+.warranty-reason-option.active i {
+  color: #e60012;
+}
+
+/* Textarea */
+.warranty-textarea {
+  width: 100%;
+  padding: 14px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e293b;
+  resize: vertical;
+  min-height: 100px;
+  transition: all 0.2s ease;
+}
+
+.warranty-textarea:focus {
+  outline: none;
+  border-color: #e60012;
+  box-shadow: 0 0 0 4px rgba(230, 0, 18, 0.1);
+}
+
+.warranty-textarea:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.warranty-textarea::placeholder {
+  color: #94a3b8;
+}
+
+.warranty-textarea-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.warranty-char-count {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.warranty-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.warranty-attach-btn:hover {
+  border-color: #e60012;
+  color: #e60012;
+  background: #fff5f5;
+}
+
+.warranty-file-input {
+  display: none;
+}
+
+/* Preview attachments */
+.warranty-attachments-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.attachment-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f5f5f5;
+  border: 1px solid #e5e7eb;
+}
+
+.attachment-item img,
+.attachment-item video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.attachment-item i {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 24px;
+  color: #94a3b8;
+}
+
+.attachment-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.attachment-item:hover .attachment-remove {
+  opacity: 1;
+}
+
+/* Lưu ý bảo hành */
+.warranty-notice {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fefce8 100%);
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  margin-bottom: 16px;
+}
+
+.warranty-notice-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fef3c7;
+  border-radius: 50%;
+  color: #d97706;
+  font-size: 14px;
+}
+
+.warranty-notice-text {
+  flex: 1;
+  font-size: 13px;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+.warranty-notice-text strong {
+  color: #b45309;
+}
+
+/* Feedback */
+.warranty-feedback {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+.warranty-feedback i {
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.warranty-feedback-success {
+  background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
+  border: 1px solid #86efac;
+  color: #166534;
+}
+
+.warranty-feedback-error {
+  background: linear-gradient(135deg, #fee2e2 0%, #fff5f5 100%);
+  border: 1px solid #fca5a5;
+  color: #991b1b;
+}
+
+/* Nút ghost cho modal */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 28px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: #e60012;
+  color: #e60012;
+  background: #fff5f5;
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Nút primary cho modal - Đỏ thương hiệu */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 32px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e60012 0%, #cc0000 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(230, 0, 18, 0.35);
+  min-width: 140px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #cc0000 0%, #a80000 100%);
+  box-shadow: 0 6px 20px rgba(230, 0, 18, 0.45);
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
+  background: #e5e7eb;
+  color: #94a3b8;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .warranty-type-options,
+  .warranty-reason-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .warranty-product-card {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .warranty-product-specs {
+    justify-content: center;
+  }
+  
+  .warranty-product-price-row {
+    justify-content: center;
+  }
+  
+  .warranty-textarea-footer {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+}
+
+/* ===== CSS cho VIEW mode ===== */
+
+/* Loading state */
+.warranty-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: #64748b;
+  font-size: 15px;
+}
+
+.warranty-loading i {
+  font-size: 24px;
+  color: #e60012;
+}
+
+/* Trạng thái card trong VIEW mode */
+.warranty-status-card {
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
+
+.warranty-status-card.warranty-status-pending {
+  background: linear-gradient(135deg, #fff1f2 0%, #fff 100%);
+  border: 1.5px solid #fecdd3;
+}
+
+.warranty-status-card.warranty-status-approved {
+  background: linear-gradient(135deg, #dcfce7 0%, #fff 100%);
+  border: 1.5px solid #bbf7d0;
+}
+
+.warranty-status-card.warranty-status-rejected {
+  background: linear-gradient(135deg, #fee2e2 0%, #fff 100%);
+  border: 1.5px solid #fecaca;
+}
+
+.warranty-status-card.warranty-status-completed {
+  background: linear-gradient(135deg, #dbeafe 0%, #fff 100%);
+  border: 1.5px solid #bfdbfe;
+}
+
+.warranty-status-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.warranty-status-header i {
+  font-size: 20px;
+}
+
+.warranty-status-pending .warranty-status-header i { color: #e60012; }
+.warranty-status-approved .warranty-status-header i { color: #16a34a; }
+.warranty-status-rejected .warranty-status-header i { color: #dc2626; }
+.warranty-status-completed .warranty-status-header i { color: #2563eb; }
+
+.warranty-status-label {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.warranty-status-pending .warranty-status-label { color: #be123c; }
+.warranty-status-approved .warranty-status-label { color: #166534; }
+.warranty-status-rejected .warranty-status-label { color: #991b1b; }
+.warranty-status-completed .warranty-status-label { color: #1e40af; }
+
+.warranty-status-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.warranty-status-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.warranty-status-meta i {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.warranty-status-admin {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.7);
+  border-radius: 6px;
+  font-size: 13px;
+  color: #475569;
+}
+
+.warranty-status-admin i {
+  color: #64748b;
+}
+
+/* Section xem thông tin đã gửi */
+.warranty-view-section {
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.warranty-view-item {
+  margin-bottom: 16px;
+}
+
+.warranty-view-item:last-child {
+  margin-bottom: 0;
+}
+
+.warranty-view-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.warranty-view-label i {
+  margin-right: 4px;
+}
+
+.warranty-view-value {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.warranty-view-description {
+  margin: 0;
+  padding: 12px;
+  background: #fff;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* Ảnh/Video đã gửi */
+.warranty-view-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.warranty-view-attachment {
+  width: 100px;
+  height: 100px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid #e5e7eb;
+  background: #f5f5f5;
+}
+
+.warranty-view-attachment img,
+.warranty-view-attachment video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Ghi chú từ admin */
+.warranty-admin-note {
+  padding: 14px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fff 100%);
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #92400e;
+  line-height: 1.5;
+}
+
+/* Nút xem bảo hành */
+.warranty-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 140px;
+  height: 38px;
+  padding: 0 16px;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  background: #fff;
+  color: #3b82f6;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.warranty-view-btn:hover {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.warranty-view-btn i {
+  font-size: 14px;
+}
 </style>
