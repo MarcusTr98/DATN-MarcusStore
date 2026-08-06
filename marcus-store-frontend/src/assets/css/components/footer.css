@@ -123,10 +123,14 @@
 }
 .footer-logo-store {
   display: block;
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: #e11d1d;
-  letter-spacing: 3px;
+  margin-top: 5px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #f04444;
+  letter-spacing: 2px;
+  line-height: 1.15;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 .footer-about {
   font-size: 13px;
