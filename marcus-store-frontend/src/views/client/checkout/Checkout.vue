@@ -57,7 +57,7 @@
     <div class="checkout-header">
       <div class="checkout-header__inner">
         <router-link to="/" class="checkout-header__brand">
-          <i class="fas fa-shopping-bag me-2"></i> Marcus Store
+          <i class="fas fa-shopping-bag me-2"></i> {{ siteName }}
         </router-link>
         <div class="checkout-header__steps">
           <div class="step step--done">
@@ -300,7 +300,7 @@
                 <span class="store-pickup-panel__icon"><i class="fas fa-store"></i></span>
                 <div>
                   <span class="store-pickup-panel__eyebrow">ĐỊA ĐIỂM NHẬN HÀNG</span>
-                  <strong>Marcus Store</strong>
+                  <strong>{{ siteName }}</strong>
                 </div>
                 <span class="store-pickup-panel__free">0₫</span>
               </div>
@@ -420,6 +420,7 @@
           <CheckoutPaymentMethods
             v-model="orderForm.paymentMethod"
             :is-store-pickup="isStorePickup"
+            :site-name="siteName"
           />
         </div>
       </div>
@@ -442,7 +443,7 @@
             </span>
             <span>
               <small>Phương thức nhận hàng</small>
-              <strong>{{ isStorePickup ? 'Nhận tại Marcus Store' : 'Giao hàng tận nơi' }}</strong>
+              <strong>{{ isStorePickup ? `Nhận tại ${siteName}` : 'Giao hàng tận nơi' }}</strong>
             </span>
             <button
               type="button"
@@ -644,15 +645,19 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import BaseModal from '@/components/BaseModal.vue'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import CheckoutPaymentMethods from '@/components/client/checkout/CheckoutPaymentMethods.vue'
 import VoucherModal from '@/components/VoucherModal.vue'
 import { expandColorName } from '@/utils/colorUtils'
 import { useCheckoutPage } from '@/composables/useCheckoutPage'
+import { useSettings } from '@/composables/useSettings'
 import '@/assets/css/CheckOut.css'
 import '@/assets/css/cart.css'
+
+const { siteName, fetchSettings } = useSettings()
+onMounted(fetchSettings)
 
 function formatPrice(value) {
   if (value == null) return '0'

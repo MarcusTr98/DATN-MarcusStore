@@ -24,7 +24,29 @@
 
         <form v-else id="system-settings-form" @submit.prevent="saveSettings">
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            1. Thông tin liên hệ (Header & Footer)
+            1. Nhận diện Website
+          </h5>
+          <div class="row g-3 mb-4">
+            <div class="col-md-5">
+              <label class="form-label fw-semibold">Tên Website</label>
+              <input type="text" class="form-control" v-model="settings.SITE_NAME" required maxlength="255" />
+            </div>
+            <div class="col-md-7">
+              <label class="form-label fw-semibold">URL Logo</label>
+              <input
+                type="url"
+                class="form-control"
+                v-model="settings.SITE_LOGO_URL"
+                placeholder="https://.../logo.png (để trống sẽ dùng icon mặc định)"
+              />
+            </div>
+            <div v-if="settings.SITE_LOGO_URL" class="col-12">
+              <img :src="settings.SITE_LOGO_URL" :alt="settings.SITE_NAME" class="site-logo-preview" />
+            </div>
+          </div>
+
+          <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
+            2. Thông tin liên hệ (Header & Footer)
           </h5>
           <div class="row g-3 mb-4">
             <div class="col-md-4">
@@ -308,6 +330,9 @@ import { ref, reactive, onMounted } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
+import { useSettings } from '@/composables/useSettings'
+
+const { fetchSettings: refreshPublicSettings } = useSettings()
 
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -331,6 +356,8 @@ const showAlert = (type, title, msg) => {
 const mapData = ref({ lat: '', lng: '', name: '', address: '' })
 
 const settings = ref({
+  SITE_NAME: 'Marcus Store',
+  SITE_LOGO_URL: '',
   HOTLINE: '',
   EMAIL: '',
   ADDRESS: '',
@@ -434,6 +461,8 @@ const saveSettings = async () => {
     // ĐÃ FIX: Bỏ "const res =" đi
     // Marcus sửa đồng bộ DTO backend: payload cấu hình nằm trong field settings.
     await api.put('/admin/settings/bulk-update', { settings: settings.value })
+    // Marcus thêm: cập nhật cache nhận diện dùng chung ngay, không bắt Admin F5.
+    await refreshPublicSettings(true)
 
     // ĐÃ FIX: Dùng Modal thay cho alert()
     showAlert('success', 'Thành công', 'Đã cập nhật cấu hình hệ thống thành công!')
@@ -455,6 +484,16 @@ onMounted(() => {
   min-height: 100%;
   padding: 28px;
   background: #f4f7fb;
+}
+
+.site-logo-preview {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  padding: 8px;
+  border: 1px solid #dbe6f5;
+  border-radius: 14px;
+  background: #fff;
 }
 
 .settings-card {

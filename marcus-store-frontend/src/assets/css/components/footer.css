@@ -93,6 +93,13 @@
   font-size: 20px;
   color: #fff;
 }
+
+.footer-logo-icon .site-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+}
 .footer-logo-brand {
   display: block;
   font-size: 1.4rem;

@@ -22,7 +22,8 @@
 
     <!-- PRINT-ONLY HEADER -->
     <div class="print-only-header">
-      <h1>Marcus Store</h1>
+      <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="print-site-logo" />
+      <h1>{{ siteName }}</h1>
       <p>Hóa đơn bán hàng</p>
       <p v-if="orderDetail">
         Mã đơn: <strong>{{ orderDetail.orderCode }}</strong>
@@ -653,7 +654,11 @@ import '@/assets/css/OrderDetails.css'
 import OrderDetailApi from '@/api/orderDetailApi.js'
 import BaseModal from '@/components/BaseModal.vue'
 import * as bootstrap from 'bootstrap'
+import { useSettings } from '@/composables/useSettings'
+
+// Marcus giữ Bootstrap cho modal IMEI của luồng kho và Settings cho logo in động.
 window.bootstrap = bootstrap
+const { siteName, siteLogoUrl, fetchSettings } = useSettings()
 
 const route = useRoute()
 const toastMessage = ref('')
@@ -1232,6 +1237,7 @@ const onAfterPrint = () => {
 }
 
 onMounted(() => {
+  fetchSettings()
   window.addEventListener('beforeprint', onBeforePrint)
   window.addEventListener('afterprint', onAfterPrint)
 })

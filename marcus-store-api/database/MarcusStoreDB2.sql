@@ -374,6 +374,12 @@ CREATE TABLE System_Settings (
     CONSTRAINT PK_System_Settings PRIMARY KEY (setting_key)
 );
 
+-- Marcus thêm: nhận diện Website dùng chung cho Header, Footer, Admin và loading.
+INSERT INTO System_Settings (setting_key, setting_value, setting_group, description)
+VALUES
+    ('SITE_NAME', N'Marcus Store', 'GENERAL', N'Tên Website hiển thị trên toàn hệ thống'),
+    ('SITE_LOGO_URL', N'', 'GENERAL', N'URL Logo Website; để trống dùng icon mặc định');
+
 CREATE TABLE Post_Categories (
     post_category_id INT IDENTITY(1,1),
     name             NVARCHAR(100) NOT NULL UNIQUE,

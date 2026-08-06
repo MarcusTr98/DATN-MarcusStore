@@ -30,7 +30,7 @@
               <span class="status-dot" :class="{ 'is-offline': !chatStore.isAdminOnline }"></span>
             </div>
             <div>
-              <h6 class="mb-0 fw-bold text-white">CSKH Marcus Store</h6>
+              <h6 class="mb-0 fw-bold text-white">CSKH {{ siteName }}</h6>
               <span class="status-text">
                 {{ chatStore.isAdminOnline ? 'Đang trực tuyến' : 'Tạm ngoại tuyến' }}
               </span>
@@ -147,11 +147,12 @@
             <!-- Khối Logo Marcus Store mô phỏng chính xác ảnh của bạn -->
             <div class="brand-logo-wrapper mb-4">
               <div class="logo-icon-box shadow-sm">
-                <i class="fas fa-mobile-alt"></i>
+                <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+                <i v-else class="fas fa-mobile-alt"></i>
               </div>
               <div class="logo-text-box">
-                <span class="text-marcus">Marcus</span>
-                <span class="text-store">STORE</span>
+                <span class="text-marcus">{{ siteNameParts.primary }}</span>
+                <span v-if="siteNameParts.secondary" class="text-store">{{ siteNameParts.secondary }}</span>
               </div>
             </div>
 
@@ -184,13 +185,17 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import BaseModal from '@/components/BaseModal.vue'
+import { useSettings } from '@/composables/useSettings'
 import {
   clearFloatingContactPanel,
   setFloatingContactPanelOpen,
 } from '@/utils/floatingContactVisibility'
+
+const { siteName, siteLogoUrl, siteNameParts, fetchSettings } = useSettings()
+onMounted(fetchSettings)
 
 const props = defineProps({
   isLoggedIn: {

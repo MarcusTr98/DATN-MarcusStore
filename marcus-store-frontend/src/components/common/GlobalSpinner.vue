@@ -6,12 +6,13 @@
           <div class="spinner-box">
             <div class="spinner-ring"></div>
             <div class="spinner-logo">
-              <i class="fas fa-mobile-alt"></i>
+              <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" />
+              <i v-else class="fas fa-mobile-alt"></i>
             </div>
           </div>
 
           <div class="spinner-text-wrap">
-            <p class="spinner-title">Marcus Store</p>
+            <p class="spinner-title">{{ siteName }}</p>
             <p class="spinner-subtitle">
               Đang xử lý dữ liệu<span>.</span><span>.</span><span>.</span>
             </p>
@@ -24,8 +25,13 @@
 
 <script setup>
 import { useLoadingStore } from '@/stores/useLoadingStore'
+import { onMounted } from 'vue'
+import { useSettings } from '@/composables/useSettings'
 
 const loadingStore = useLoadingStore()
+const { siteName, siteLogoUrl, fetchSettings } = useSettings()
+
+onMounted(fetchSettings)
 </script>
 
 <style scoped>
@@ -70,6 +76,12 @@ const loadingStore = useLoadingStore()
   color: #d70018;
   font-size: 20px;
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+.spinner-logo img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
 }
 
 /* Cụm Text */

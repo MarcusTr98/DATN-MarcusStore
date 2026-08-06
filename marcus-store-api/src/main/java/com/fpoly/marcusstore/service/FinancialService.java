@@ -217,6 +217,11 @@ public class FinancialService {
         public void updateReconciliationStatus(Integer transactionId, boolean status) {
                 OrderTransaction tx = transactionRepository.findById(transactionId)
                                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch"));
+                // Marcus sửa: đối soát là xác nhận dòng tiền đã phát sinh, vì vậy
+                // request trực tiếp cũng không được tích PENDING/FAILED.
+                if (!"SUCCESS".equalsIgnoreCase(tx.getStatus())) {
+                        throw new IllegalStateException("Chỉ giao dịch thành công mới được đối soát");
+                }
                 tx.setIsReconciled(status);
                 transactionRepository.save(tx);
         }

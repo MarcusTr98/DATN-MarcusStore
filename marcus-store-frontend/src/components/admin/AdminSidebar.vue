@@ -2,10 +2,11 @@
   <aside class="sidebar">
     <div class="logo">
       <div class="logo-icon">
-        <i class="fa-solid fa-mobile-screen-button"></i>
+        <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+        <i v-else class="fa-solid fa-mobile-screen-button"></i>
       </div>
       <div class="logo-text">
-        <h2>Marcus Store</h2>
+        <h2>{{ siteName }}</h2>
         <span>Admin Panel</span>
       </div>
     </div>
@@ -181,6 +182,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useSettings } from "@/composables/useSettings";
 
 import pieChartIcon from "/src/assets/icons/pie-chart.svg";
 import layersIcon from "/src/assets/icons/layers.svg";
@@ -195,6 +197,9 @@ import gearIcon from "/src/assets/icons/gear.svg";
 
 const route = useRoute();
 const router = useRouter();
+const { siteName, siteLogoUrl, fetchSettings } = useSettings();
+
+onMounted(fetchSettings);
 
 /* ===========================
    USER INFO
@@ -415,6 +420,13 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   font-size: 20px;
+}
+
+.logo-icon .site-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
 }
 
 .logo-text h2 {

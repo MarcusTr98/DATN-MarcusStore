@@ -46,7 +46,7 @@ const {
 
 const wishlistCount = computed(() => (wishlist.isLoaded() ? wishlist.totalCount() : 0))
 
-const { sysSettings, fetchSettings } = useSettings()
+const { sysSettings, fetchSettings, siteName, siteLogoUrl, siteNameParts } = useSettings()
 
 const checkAuth = () => {
   const token = localStorage.getItem('ACCESS_TOKEN')
@@ -235,10 +235,13 @@ function handleClickOutside(e) {
         <div class="main-header-inner">
           <!-- Logo -->
           <router-link to="/" class="ms-logo">
-            <div class="logo-icon"><i class="fas fa-mobile-alt"></i></div>
+            <div class="logo-icon">
+              <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+              <i v-else class="fas fa-mobile-alt"></i>
+            </div>
             <div class="logo-text">
-              <span class="logo-brand">Marcus</span>
-              <span class="logo-store">STORE</span>
+              <span class="logo-brand">{{ siteNameParts.primary }}</span>
+              <span v-if="siteNameParts.secondary" class="logo-store">{{ siteNameParts.secondary }}</span>
             </div>
           </router-link>
 

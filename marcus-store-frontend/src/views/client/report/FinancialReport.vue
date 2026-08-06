@@ -279,11 +279,13 @@
                     <i class="bi bi-check-circle-fill" style="font-size: 1.3rem"></i>
                   </div>
                   <input
-                    v-else
+                    v-else-if="item.status === 'SUCCESS'"
                     type="checkbox"
                     @change="confirmReconciliation(item)"
                     class="form-check-input"
+                    aria-label="Đánh dấu giao dịch thành công đã đối soát"
                   />
+                  <span v-else class="text-muted" aria-label="Giao dịch chưa thành công, không thể đối soát">—</span>
                 </td>
 
                 <td class="fw-bold">{{ item.orderCode }}</td>

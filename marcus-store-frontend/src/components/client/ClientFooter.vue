@@ -50,10 +50,13 @@
           <!-- Brand Column -->
           <div class="footer-col footer-brand-col">
             <div class="footer-logo">
-              <div class="footer-logo-icon"><i class="fas fa-mobile-alt"></i></div>
+              <div class="footer-logo-icon">
+                <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+                <i v-else class="fas fa-mobile-alt"></i>
+              </div>
               <div>
-                <span class="footer-logo-brand">Marcus</span>
-                <span class="footer-logo-store">STORE</span>
+                <span class="footer-logo-brand">{{ siteNameParts.primary }}</span>
+                <span v-if="siteNameParts.secondary" class="footer-logo-store">{{ siteNameParts.secondary }}</span>
               </div>
             </div>
             <p class="footer-about">
@@ -190,12 +193,12 @@
         <div class="footer-bottom-inner">
           <span>
             &copy; 2026
-            <router-link to="/about-us" class="footer-bottom-brand">Marcus Store</router-link>
-            — Bản quyền thuộc về Marcus Store.
+            <router-link to="/about-us" class="footer-bottom-brand">{{ siteName }}</router-link>
+            — Bản quyền thuộc về {{ siteName }}.
           </span>
           <span>
             Thiết kế bởi
-            <router-link to="/about-us" class="footer-bottom-brand">Marcus Store Team</router-link>
+            <router-link to="/about-us" class="footer-bottom-brand">{{ siteName }} Team</router-link>
           </span>
         </div>
       </div>
@@ -221,7 +224,7 @@ import Paymentmodal from '../Paymentmodal.vue'
 import Privacymodal from '../Privacymodal.vue'
 
 
-const { sysSettings, fetchSettings } = useSettings()
+const { sysSettings, fetchSettings, siteName, siteLogoUrl, siteNameParts } = useSettings()
 const router = useRouter()
 
 // ---- Chính sách & hỗ trợ: cờ bật/tắt từng modal ----
@@ -252,5 +255,7 @@ const subscribeNewsletter = () => {
     },
   })
 }
+
+onMounted(fetchSettings)
 
 </script>

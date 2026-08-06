@@ -11,12 +11,13 @@
           <!-- Logo -->
           <div class="logo-box">
             <div class="logo-icon">
-              <i class="fa-solid fa-mobile-screen-button"></i>
+              <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+              <i v-else class="fa-solid fa-mobile-screen-button"></i>
             </div>
 
             <div class="logo-text">
-              <div class="brand">Marcus</div>
-              <div class="store">STORE</div>
+              <div class="brand">{{ siteNameParts.primary }}</div>
+              <div v-if="siteNameParts.secondary" class="store">{{ siteNameParts.secondary }}</div>
             </div>
           </div>
 
@@ -54,6 +55,11 @@
 </template>
 
 <script setup>
+import { onMounted } from 'vue'
+import { useSettings } from '@/composables/useSettings'
+
+const { siteName, siteLogoUrl, siteNameParts, fetchSettings } = useSettings()
+onMounted(fetchSettings)
 defineProps({
   visible: {
     type: Boolean,

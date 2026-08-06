@@ -343,7 +343,7 @@
         <p>Nhận hàng ngay trong 2 giờ tại nội thành. Miễn phí vận chuyển cho đơn hàng Flash Sale.</p>
       </div>
       <div class="promo promo-b">
-        <div class="tag">Độc quyền MarcusStore
+        <div class="tag">Độc quyền {{ siteName }}
         </div>
         <h3>BẢO HÀNH 1 ĐỔI 1</h3>
         <p>Lỗi là đổi mới trong 30 ngày đầu tiên. Bảo hành chính hãng lên đến 24 tháng.</p>
@@ -354,8 +354,9 @@
     <footer class="flash-footer">
       <div class="footer-left">
         <router-link to="/" class="footer-logo">
-          <i class="fas fa-mobile-alt"></i>
-          <span>Marcus<strong>STORE</strong></span>
+          <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+          <i v-else class="fas fa-mobile-alt"></i>
+          <span>{{ siteName }}</span>
         </router-link>
         <p>Hệ thống cửa hàng công nghệ hàng đầu Việt Nam</p>
       </div>
@@ -420,7 +421,10 @@ import { useFlashSaleModals } from '@/composables/useFlashSaleModals'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 import { expandVariantColorNames } from '@/utils/colorUtils'
+import { useSettings } from '@/composables/useSettings'
 import '@/assets/css/FlashSalePage.css'
+
+const { siteName, siteLogoUrl, fetchSettings } = useSettings()
 
 const router = useRouter()
 const flashSaleStore = useFlashSaleStore()
@@ -1163,6 +1167,7 @@ watch(
 )
 
 onMounted(async () => {
+  await fetchSettings()
   // Lắng nghe event auth-required (khi guest nhận 401 từ API)
   window.addEventListener('auth-required', handleAuthRequiredPage)
 

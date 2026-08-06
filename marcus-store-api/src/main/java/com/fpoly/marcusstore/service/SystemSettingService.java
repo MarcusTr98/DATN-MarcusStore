@@ -19,18 +19,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class SystemSettingService {
 
     private static final Set<String> PUBLIC_SETTING_KEYS = Set.of(
+            "SITE_NAME", "SITE_LOGO_URL",
             "HOTLINE", "EMAIL", "ADDRESS", "WORKING_HOURS", "PROMO_TEXT",
             "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL",
             "STORE_LOCATION", "HOME_HERO_BADGE", "HOME_HERO_TITLE",
             "HOME_HERO_TITLE_ACCENT", "HOME_HERO_LEAD", "HOME_HERO_SLIDES");
     private static final Set<String> ADMIN_EDITABLE_KEYS = Set.of(
+            "SITE_NAME", "SITE_LOGO_URL",
             "HOTLINE", "EMAIL", "ADDRESS", "WORKING_HOURS", "PROMO_TEXT",
             "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL",
             "STORE_LOCATION", "HOME_HERO_BADGE", "HOME_HERO_TITLE",
             "HOME_HERO_TITLE_ACCENT", "HOME_HERO_LEAD", "HOME_HERO_SLIDES",
             "AI_ADVISOR_POLICY");
     private static final Set<String> URL_KEYS = Set.of(
-            "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL");
+            "SITE_LOGO_URL", "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL");
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
             "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
 
@@ -109,7 +111,7 @@ public class SystemSettingService {
             throw new IllegalArgumentException("Giá trị cấu hình " + key + " không được để trống.");
         }
         String value = rawValue.trim();
-        if (Set.of("HOTLINE", "EMAIL", "ADDRESS").contains(key) && value.isBlank()) {
+        if (Set.of("SITE_NAME", "HOTLINE", "EMAIL", "ADDRESS").contains(key) && value.isBlank()) {
             throw new IllegalArgumentException(key + " không được để trống.");
         }
         if ("EMAIL".equals(key) && !EMAIL_PATTERN.matcher(value).matches()) {

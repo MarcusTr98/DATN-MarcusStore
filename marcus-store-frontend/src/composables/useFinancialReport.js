@@ -526,6 +526,11 @@ export function useFinancialReport() {
     status === 'SUCCESS' ? 'bg-success' : status === 'PENDING' ? 'bg-warning' : 'bg-danger'
 
   const confirmReconciliation = async (item) => {
+    // Marcus sửa: backend/UI chỉ cho đối soát giao dịch đã phát sinh dòng tiền thật.
+    if (item?.status !== 'SUCCESS') {
+      showToast('warning', 'Chưa thể đối soát', 'Chỉ giao dịch thành công mới được đối soát.')
+      return
+    }
     const originalStatus = item.isReconciled
     item.isReconciled = true // Tích V ngay trên UI
 
