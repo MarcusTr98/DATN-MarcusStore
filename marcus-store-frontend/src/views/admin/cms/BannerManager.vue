@@ -1,21 +1,19 @@
 <template>
   <div class="bm-page">
 
-    <!-- Page Header (đồng nhất với Quản lý đơn hàng) -->
-    <div class="page-header">
-      <div class="page-header-left">
-        <div class="page-icon">
-          <i class="bi bi-images"></i>
-        </div>
-        <div>
-          <h2 class="page-title">Quản lý Banner</h2>
-          <p class="page-sub">Quản lý banner quảng cáo hiển thị trên website.</p>
-        </div>
-      </div>
-      <button class="btn-add" @click="openAddModal">
-        <i class="bi bi-plus-lg"></i> Thêm banner
-      </button>
-    </div>
+    <AdminPageHeader
+      eyebrow="Marketing Visual"
+      eyebrow-icon="bi bi-megaphone"
+      title="Quản lý Banner"
+      description="Điều phối hình ảnh quảng bá, vị trí hiển thị và thời gian áp dụng trên website."
+      icon="bi bi-image"
+    >
+      <template #actions>
+        <button type="button" @click="openAddModal">
+          <i class="bi bi-plus-lg"></i> Thêm banner
+        </button>
+      </template>
+    </AdminPageHeader>
 
     <!-- Khối tổng quan nhanh (đồng bộ style với Quản lý Voucher) -->
     <section class="stats-grid">
@@ -132,6 +130,7 @@ import BannerFilter from './Bannerfilter.vue';
 import BannerTable from './Bannertable.vue';
 import BannerModal from './Bannermodal.vue';
 import { bannerApi } from '@/api/BannerApi';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue';
 
 // ---- State ----
 const banners      = ref([]);

@@ -3,20 +3,19 @@
 
     <!-- Danh sách -->
     <template v-if="view === 'list'">
-      <div class="page-header">
-        <div class="page-header-left">
-          <div class="page-icon">
-            <i class="bi bi-file-earmark-text"></i>
-          </div>
-          <div>
-            <h2 class="page-title">Quản lý bài viết</h2>
-            <p class="page-sub">Quản lý bài viết tin tức, thủ thuật, đánh giá sản phẩm trên website.</p>
-          </div>
-        </div>
-        <button class="btn-add" @click="goCreate">
-          <i class="bi bi-plus-lg"></i> Thêm bài viết
-        </button>
-      </div>
+      <AdminPageHeader
+        eyebrow="Content Management"
+        eyebrow-icon="bi bi-journal-text"
+        title="Quản lý bài viết"
+        description="Biên tập tin tức, nội dung tư vấn và bài viết sản phẩm hiển thị trên website."
+        icon="bi bi-file-earmark-richtext"
+      >
+        <template #actions>
+          <button type="button" @click="goCreate">
+            <i class="bi bi-plus-lg"></i> Thêm bài viết
+          </button>
+        </template>
+      </AdminPageHeader>
 
       <section class="stats-grid">
         <article class="stat-card">
@@ -131,6 +130,7 @@ import PostFilter from './PostFilter.vue';
 import PostTable from './PostTable.vue';
 import PostForm from './PostForm.vue';
 import { postApi } from '@/api/PostApi';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.vue';
 
 const view = ref('list');
 const editingPost = ref(null);

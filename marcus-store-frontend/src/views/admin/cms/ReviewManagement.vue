@@ -1,26 +1,19 @@
 <template>
   <div class="review-page">
 
-    <!-- Header -->
-    <div class="page-header">
-      <div class="header-left">
-        <div class="icon-box">
-          <i class="fas fa-star"></i>
-        </div>
-
-        <div>
-          <h2>Quản lý đánh giá</h2>
-          <p>
-            Quản lý đánh giá và phản hồi của khách hàng.
-          </p>
-        </div>
-      </div>
-
-      <button class="btn-refresh" @click="loadReviews">
-        <i class="fas fa-rotate-right"></i>
-        Làm mới
-      </button>
-    </div>
+    <AdminPageHeader
+      eyebrow="Customer Experience"
+      eyebrow-icon="bi bi-chat-heart"
+      title="Đánh giá & bình luận"
+      description="Theo dõi mức độ hài lòng, phản hồi khách hàng và chất lượng tư vấn sau bán."
+      icon="bi bi-star"
+    >
+      <template #actions>
+        <button type="button" @click="loadReviews">
+          <i class="bi bi-arrow-clockwise"></i> Làm mới dữ liệu
+        </button>
+      </template>
+    </AdminPageHeader>
 
     <!-- Statistic -->
     <div class="stats-grid">
@@ -184,6 +177,7 @@ import ReviewTable from "@/views/admin/cms/ReviewTable.vue";
 import api from "@/utils/api";
 import ReviewDetailModal from "./ReviewDetailModal.vue";
 import ReviewStatisticByProduct from "./ReviewStatisticByProduct.vue";
+import AdminPageHeader from "@/components/admin/AdminPageHeader.vue";
 const page = ref(0)
 const size = ref(5)
 
