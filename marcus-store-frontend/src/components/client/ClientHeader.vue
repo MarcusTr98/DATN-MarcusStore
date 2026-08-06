@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useCartStore } from '@/stores/cartStore'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
 import { useSearchBox } from '@/composables/useSearchBox'
 import BaseModal from '../BaseModal.vue'
@@ -9,6 +9,7 @@ import wishlist from '@/composables/useWishlistShared'
 import { useUserNotifications } from '@/composables/useUserNotifications'
 
 const router = useRouter()
+const route = useRoute()
 const cartStore = useCartStore()
 
 const {
@@ -32,6 +33,8 @@ const totalQuantity = computed(() => cartStore.totalQuantity)
 const isLoggedIn = ref(false)
 const userName = ref('')
 const showNotifications = ref(false)
+const showAccountMenu = ref(false)
+const showCategoryMenu = ref(false)
 let notificationCloseTimer = null
 const {
   notifications,
@@ -102,6 +105,17 @@ const closeGuestModal = () => {
   showGuestModal.value = false
 }
 
+// Marcus thêm: đóng các lớp nổi khi chuyển trang để header không giữ trạng thái cũ.
+watch(
+  () => route.fullPath,
+  () => {
+    showAccountMenu.value = false
+    showCategoryMenu.value = false
+    showNotifications.value = false
+    closePanel()
+  },
+)
+
 const openNotificationsOnHover = async () => {
   window.clearTimeout(notificationCloseTimer)
   if (!showNotifications.value) {
@@ -168,18 +182,24 @@ onMounted(() => {
   const detachAuth = refreshOnAuth()
   window.addEventListener('mousedown', handleClickOutside)
 
-  // cleanup khi component unmount
-  return () => {
-    window.removeEventListener('auth-changed', checkAuth)
-    detachAuth?.()
-    window.removeEventListener('mousedown', handleClickOutside)
-    window.clearTimeout(notificationCloseTimer)
-  }
+  detachAuthListener = detachAuth
+})
+
+let detachAuthListener = null
+
+// Marcus sửa: onMounted không nhận cleanup trả về; tách đúng lifecycle để tránh listener bị nhân đôi.
+onUnmounted(() => {
+  window.removeEventListener('auth-changed', checkAuth)
+  detachAuthListener?.()
+  window.removeEventListener('mousedown', handleClickOutside)
+  window.clearTimeout(notificationCloseTimer)
 })
 
 function handleClickOutside(e) {
   const wrapper = document.querySelector('.search-bar-wrapper')
   if (wrapper && !wrapper.contains(e.target)) closePanel()
+  if (!e.target.closest('.account-dropdown')) showAccountMenu.value = false
+  if (!e.target.closest('.category-dropdown')) showCategoryMenu.value = false
 }
 </script>
 
@@ -390,15 +410,15 @@ function handleClickOutside(e) {
                 </a>
               </template>
               <template v-else>
-                <div class="dropdown dropdown-hover">
-                  <a href="#" class="h-action-btn" @click.prevent>
+                <div class="dropdown dropdown-hover account-dropdown" :class="{ show: showAccountMenu }">
+                  <a href="#" class="h-action-btn" @click.prevent="showAccountMenu = !showAccountMenu">
                     <div class="h-action-icon active"><i class="far fa-user"></i></div>
                     <div class="h-action-text">
                       <span class="h-action-sub">Xin chào,</span>
                       <span class="h-action-main">{{ userName }}</span>
                     </div>
                   </a>
-                  <ul class="dropdown-menu dropdown-menu-end ms-dropdown shadow">
+                  <ul class="dropdown-menu dropdown-menu-end ms-dropdown shadow" :class="{ show: showAccountMenu }">
                     <li class="dropdown-user-header">
                       <i class="fas fa-user-circle me-2"></i>{{ userName }}
                     </li>
@@ -484,18 +504,18 @@ function handleClickOutside(e) {
           </li>
 
           <!-- 2. Danh mục (Dropdown Hover) -->
-          <li class="nav-item dropdown dropdown-hover">
+          <li class="nav-item dropdown dropdown-hover category-dropdown" :class="{ show: showCategoryMenu }">
             <a
               href="#"
               class="nav-link fw-semibold text-dark px-1 py-2 rounded d-flex align-items-center"
-              @click.prevent
+              @click.prevent="showCategoryMenu = !showCategoryMenu"
             >
               <i class="fas fa-bars me-2"></i> Danh mục
               <i class="fas fa-chevron-down ms-2" style="font-size: 10px"></i>
             </a>
 
             <!-- Menu xổ xuống -->
-            <ul class="dropdown-menu border-0 shadow-lg mt-0 rounded-3 p-2">
+            <ul class="dropdown-menu border-0 shadow-lg mt-0 rounded-3 p-2" :class="{ show: showCategoryMenu }">
               <li>
                 <router-link to="/category/dien-thoai" class="dropdown-item rounded py-2">
                   <i class="fas fa-mobile-alt fa-fw text-danger me-2"></i> Điện thoại

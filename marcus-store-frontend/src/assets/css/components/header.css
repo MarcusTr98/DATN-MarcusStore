@@ -790,6 +790,193 @@
   color: #d70018;
 }
 
+/* Marcus nâng cấp: Header Client thích ứng desktop, tablet và mobile. */
+@media (max-width: 1199px) {
+  .main-header-inner {
+    gap: 14px;
+  }
+
+  .h-action-btn {
+    padding-inline: 8px;
+  }
+
+  .logo-brand {
+    max-width: 150px;
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 991px) {
+  .topbar-right .topbar-divider,
+  .topbar-right .topbar-link:not(:first-child) {
+    display: none;
+  }
+
+  .main-header {
+    padding: 10px 0 12px;
+  }
+
+  .main-header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+  }
+
+  .ms-logo {
+    min-width: 0;
+  }
+
+  .search-bar-wrapper {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .search-suggest-panel {
+    width: 100%;
+    max-height: min(62vh, 520px);
+    overflow-y: auto;
+  }
+
+  .header-actions {
+    justify-self: end;
+    gap: 2px;
+  }
+
+  .header-actions .h-action-text {
+    display: none !important;
+  }
+
+  .h-action-btn {
+    padding: 5px;
+  }
+
+  .h-action-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .client-notification-panel {
+    position: fixed;
+    top: 76px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: min(70vh, 520px);
+  }
+
+  .main-nav .container {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .nav-list {
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    padding: 6px 12px !important;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-list > .nav-item {
+    flex: 0 0 auto;
+  }
+
+  .nav-link {
+    padding: 7px 12px !important;
+    white-space: nowrap;
+  }
+
+  .dropdown-hover > .dropdown-menu.show {
+    display: block;
+  }
+}
+
+@media (max-width: 575px) {
+  .topbar {
+    padding: 5px 0;
+  }
+
+  .topbar-inner {
+    justify-content: center;
+  }
+
+  .topbar-left {
+    min-width: 0;
+  }
+
+  .topbar-left .topbar-item {
+    max-width: 100%;
+    font-size: 11px;
+  }
+
+  .topbar-left .topbar-item span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .topbar-right {
+    display: none;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+  }
+
+  .logo-brand {
+    max-width: 118px;
+    font-size: 1.12rem;
+  }
+
+  .logo-store {
+    font-size: 0.55rem;
+    letter-spacing: 2px;
+  }
+
+  .header-actions {
+    gap: 0;
+  }
+
+  .h-action-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+  }
+
+  .search-bar {
+    min-height: 44px;
+  }
+
+  .search-input {
+    min-width: 0;
+    padding-left: 38px;
+    font-size: 13px;
+  }
+
+  .search-btn {
+    padding: 0 14px;
+    font-size: 12px;
+  }
+
+  .ss-products {
+    grid-template-columns: 1fr;
+  }
+
+  .client-notification-panel {
+    top: 64px;
+    right: 8px;
+    left: 8px;
+    border-radius: 14px;
+  }
+}
+
 /* Dropdown Items (Các mục con bên trong Danh mục) */
 .dropdown-item {
   font-size: 14px;

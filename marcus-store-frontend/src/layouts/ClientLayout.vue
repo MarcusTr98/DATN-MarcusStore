@@ -21,6 +21,24 @@ import WelcomeVoucherModal from '@/components/WelcomeVoucherModal.vue'
 </script>
 
 <style>
+.client-layout {
+  min-width: 0;
+  min-height: 100vh;
+  overflow-x: clip;
+  background: #f8fafc;
+}
+
+.client-layout > main {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .client-layout > main {
+    min-height: calc(100vh - 150px) !important;
+  }
+}
+
 body.marcus-contact-panel-open .ai-trigger,
 body.marcus-contact-panel-open .chat-trigger-btn,
 body.marcus-contact-panel-open #marcus-floating-actions,
