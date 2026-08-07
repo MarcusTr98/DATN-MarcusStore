@@ -120,7 +120,7 @@
                 <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
                 
                 <td>
-                  <router-link :to="`/admin/order/${w.orderItemId}`" class="warranty-link">
+                  <router-link :to="`/admin/order/${w.orderCode}`" class="warranty-link">
                     {{ w.orderCode }}
                   </router-link>
                 </td>

@@ -763,8 +763,8 @@
                     :key="index"
                     class="attachment-item"
                   >
-                    <img v-if="file.preview" :src="file.preview" :alt="file.name" />
-                    <video v-else-if="file.type.startsWith('video')" :src="file.preview" />
+                    <img v-if="file.type && file.type.startsWith('image/')" :src="file.preview" :alt="file.name" />
+                    <video v-else-if="file.type && file.type.startsWith('video/')" :src="file.preview" muted playsinline></video>
                     <i v-else class="fa-solid fa-file"></i>
                     <button
                       type="button"
@@ -909,6 +909,28 @@ const WARRANTY_REASONS = [
   { value: 'OTHER', label: 'Lý do khác', icon: 'fa-solid fa-ellipsis' },
 ]
 
+// Giới hạn dung lượng upload file đính kèm bảo hành
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024        // 5MB cho ảnh
+const MAX_VIDEO_SIZE = 25 * 1024 * 1024       // 25MB cho video
+const MAX_TOTAL_SIZE = 50 * 1024 * 1024       // 50MB tổng dung lượng
+const MAX_FILE_COUNT = 5                        // Tối đa 5 files
+
+// Định dạng dung lượng file để hiển thị
+function formatFileSize(bytes) {
+  if (!bytes || bytes === 0) return ''
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
+// Hiện toast thông báo lỗi trong modal bảo hành
+function showWarrantyToast(message) {
+  warrantyModal.value.feedback = {
+    type: 'error',
+    message,
+  }
+}
+
 // Kiểm tra điều kiện hiển thị nút yêu cầu bảo hành
 function canRequestWarranty(item) {
   const order = selectedOrder.value
@@ -1033,9 +1055,56 @@ function triggerFileInput() {
 
 // Xử lý chọn file
 function handleFileSelect(event) {
+  // Reset feedback cũ trước khi validate file mới
+  warrantyModal.value.feedback = { type: '', message: '' }
+  
   const files = Array.from(event.target.files)
+  
+  // Tính tổng dung lượng hiện tại
+  const currentTotalSize = warrantyForm.value.attachments.reduce(
+    (sum, att) => sum + (att.file?.size || 0), 0
+  )
+  
   files.forEach((file) => {
-    if (warrantyForm.value.attachments.length >= 5) return // Max 5 files
+    // 1. Kiểm tra số lượng file
+    if (warrantyForm.value.attachments.length >= MAX_FILE_COUNT) {
+      showWarrantyToast(`Chỉ được đính kèm tối đa ${MAX_FILE_COUNT} file.`)
+      return
+    }
+    
+    // 2. Kiểm tra định dạng file (image/* hoặc video/*)
+    const isImage = file.type.startsWith('image/')
+    const isVideo = file.type.startsWith('video/')
+    
+    if (!isImage && !isVideo) {
+      showWarrantyToast(`"${file.name}" không phải là ảnh hoặc video.`)
+      return
+    }
+    
+    // 3. Kiểm tra dung lượng từng file
+    const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_VIDEO_SIZE
+    if (file.size > maxSize) {
+      const limitMB = isImage 
+        ? (MAX_IMAGE_SIZE / 1024 / 1024).toFixed(0) 
+        : (MAX_VIDEO_SIZE / 1024 / 1024).toFixed(0)
+      showWarrantyToast(
+        `"${file.name}" vượt quá ${limitMB}MB (file: ${formatFileSize(file.size)})`
+      )
+      return
+    }
+    
+    // 4. Kiểm tra tổng dung lượng
+    if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
+      const currentMB = (currentTotalSize / 1024 / 1024).toFixed(1)
+      const addMB = (file.size / 1024 / 1024).toFixed(1)
+      const maxMB = (MAX_TOTAL_SIZE / 1024 / 1024).toFixed(0)
+      showWarrantyToast(
+        `Tổng dung lượng vượt quá ${maxMB}MB (hiện tại: ${currentMB}MB + thêm: ${addMB}MB)`
+      )
+      return
+    }
+    
+    // 5. File hợp lệ → đọc preview và thêm vào danh sách
     const reader = new FileReader()
     reader.onload = (e) => {
       warrantyForm.value.attachments.push({
@@ -1043,10 +1112,12 @@ function handleFileSelect(event) {
         preview: e.target.result,
         name: file.name,
         type: file.type,
+        size: file.size,
       })
     }
     reader.readAsDataURL(file)
   })
+  
   // Reset input
   event.target.value = ''
 }
