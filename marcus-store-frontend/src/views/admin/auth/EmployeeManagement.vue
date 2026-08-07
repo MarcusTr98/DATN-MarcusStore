@@ -297,8 +297,15 @@ const saveUser = async (payload) => {
         fullName    : payload.fullName,
         email       : payload.email,
         phoneNumber : payload.phoneNumber,
-        roleId      : ROLE_MAP[payload.roleName]
+        roleId      : ROLE_MAP[payload.roleName],
+        moduleNames : payload.moduleNames || []
       })
+      
+      // Nếu là Staff -> cập nhật permissions riêng
+      if (payload.roleName === 'STAFF' && payload.moduleNames?.length > 0) {
+        await adminUserApi.updatePermissions(payload.userId, payload.moduleNames)
+      }
+      
       showModal('success', 'Cập nhật thành công', 'Thông tin nhân viên đã được cập nhật.')
     } else {
       await adminUserApi.create({
@@ -307,7 +314,8 @@ const saveUser = async (payload) => {
         email       : payload.email,
         phoneNumber : payload.phoneNumber,
         fullName    : payload.fullName,
-        roleId      : ROLE_MAP[payload.roleName]
+        roleId      : ROLE_MAP[payload.roleName],
+        moduleNames : payload.moduleNames || []
       })
       showModal('success', 'Thêm thành công', 'Nhân viên mới đã được tạo.')
     }

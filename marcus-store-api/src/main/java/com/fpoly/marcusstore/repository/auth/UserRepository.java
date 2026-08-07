@@ -99,4 +99,12 @@ LEFT JOIN FETCH u.permissions
 WHERE u.googleAccountId = :googleAccountId
 """)
 Optional<User> findByGoogleAccountId(@Param("googleAccountId") String googleAccountId);
+// Load user với permissions (dùng cho phân quyền)
+@Query("""
+SELECT u
+FROM User u
+LEFT JOIN FETCH u.permissions
+WHERE u.userId = :userId
+""")
+Optional<User> findByIdWithPermissions(@Param("userId") Integer userId);
 }
