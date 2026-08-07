@@ -753,6 +753,9 @@
                     @change="handleFileSelect"
                   />
                 </div>
+                <p class="warranty-attach-hint">
+                  Vui lòng cập nhật ít nhất một video và một ảnh
+                </p>
                 <!-- Preview files đã chọn -->
                 <div v-if="warrantyForm.attachments.length > 0" class="warranty-attachments-preview">
                   <div
@@ -2439,6 +2442,13 @@ function getVariantText(item) {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+}
+
+.warranty-attach-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
 }
 
 .attachment-item {

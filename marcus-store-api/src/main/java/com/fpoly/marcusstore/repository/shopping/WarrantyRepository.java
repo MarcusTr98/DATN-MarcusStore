@@ -17,11 +17,6 @@ public interface WarrantyRepository extends JpaRepository<WarrantyReturn, Intege
 
     List<WarrantyReturn> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
 
-    List<WarrantyReturn> findByStatusOrderByCreatedAtDesc(WarrantyReturn.WarrantyStatus status);
-
-    @Query("SELECT w FROM WarrantyReturn w ORDER BY CASE WHEN w.status = 'PENDING' THEN 0 ELSE 1 END, w.createdAt DESC")
-    List<WarrantyReturn> findAllOrderByPendingFirst();
-
     @Query("SELECT w FROM WarrantyReturn w WHERE " +
             "(:reason IS NULL OR w.reason = :reason) AND " +
             "(:keyword IS NULL OR LOWER(w.orderItem.order.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +

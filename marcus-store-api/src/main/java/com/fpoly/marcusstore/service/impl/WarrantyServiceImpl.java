@@ -65,14 +65,25 @@ public class WarrantyServiceImpl implements WarrantyService {
 
         warranty = warrantyRepository.save(warranty);
 
-        if (request.getAttachmentUrls() != null && !request.getAttachmentUrls().isEmpty()) {
-            for (String url : request.getAttachmentUrls()) {
-                WarrantyAttachment attachment = new WarrantyAttachment();
-                attachment.setWarrantyReturn(warranty);
-                attachment.setFileUrl(url);
-                attachment.setFileType(url.contains("video") ? FileType.VIDEO : FileType.IMAGE);
-                warrantyAttachmentRepository.save(attachment);
-            }
+        if (request.getAttachmentUrls() == null || request.getAttachmentUrls().isEmpty()) {
+            throw new RuntimeException("Yêu cầu bảo hành phải có ít nhất 1 ảnh và 1 video");
+        }
+        boolean hasImage = false;
+        boolean hasVideo = false;
+        for (String url : request.getAttachmentUrls()) {
+            FileType type = detectTypeFromUrl(url);
+
+            WarrantyAttachment attachment = new WarrantyAttachment();
+            attachment.setWarrantyReturn(warranty);
+            attachment.setFileUrl(url);
+            attachment.setFileType(type);
+            warrantyAttachmentRepository.save(attachment);
+
+            if (type == FileType.IMAGE) hasImage = true;
+            if (type == FileType.VIDEO) hasVideo = true;
+        }
+        if (!hasImage || !hasVideo) {
+            throw new RuntimeException("Yêu cầu bảo hành phải có ít nhất 1 ảnh và 1 video");
         }
 
         // bắn chuông cho admin khi có yêu cầu bảo hành mới.
@@ -89,6 +100,7 @@ public class WarrantyServiceImpl implements WarrantyService {
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
+
     }
 
 
@@ -157,7 +169,7 @@ public class WarrantyServiceImpl implements WarrantyService {
 
         warranty = warrantyRepository.save(warranty);
 
-        // Marcus thêm: bắn chuông cho khách khi admin cập nhật trạng thái bảo hành.
+        // bắn chuông cho khách khi admin cập nhật trạng thái bảo hành.
         userNotificationService.notifyWarrantyStatusChanged(
                 warranty, request.getStatus(), request.getAdminNote());
 
@@ -220,7 +232,9 @@ public class WarrantyServiceImpl implements WarrantyService {
                 .orderItemId(orderItem.getOrderItemId())
                 .orderCode(order.getOrderCode())
                 .productName(product.getProductName())
-                .productImage(sku.getSkuImageUrl())
+                .productImage(product.getThumbnailUrl() != null && !product.getThumbnailUrl().isBlank()
+                        ? product.getThumbnailUrl()
+                        : sku.getSkuImageUrl())
                 .reason(warranty.getReason())
                 .reasonLabel(WarrantyResponse.getReasonLabel(warranty.getReason()))
                 .description(warranty.getDescription())
@@ -235,31 +249,14 @@ public class WarrantyServiceImpl implements WarrantyService {
                 .build();
     }
 
-    private String extractPublicId(String cloudinaryUrl) {
-        if (cloudinaryUrl == null || cloudinaryUrl.isEmpty()) return null;
-        try {
-            String[] parts = cloudinaryUrl.split("/");
-            int uploadIndex = -1;
-            for (int i = 0; i < parts.length; i++) {
-                if ("upload".equals(parts[i])) {
-                    uploadIndex = i;
-                    break;
-                }
-            }
-            if (uploadIndex == -1 || uploadIndex + 2 >= parts.length) return null;
-            StringBuilder publicId = new StringBuilder();
-            for (int i = uploadIndex + 2; i < parts.length; i++) {
-                String part = parts[i];
-                int extIndex = part.lastIndexOf('.');
-                if (extIndex > 0) {
-                    part = part.substring(0, extIndex);
-                }
-                if (publicId.length() > 0) publicId.append("/");
-                publicId.append(part);
-            }
-            return "marcus-store/" + publicId;
-        } catch (Exception e) {
-            return null;
-        }
+    private FileType detectTypeFromUrl(String url) {
+        if (url == null) return FileType.IMAGE;
+        String lower = url.toLowerCase();
+        if (lower.contains("/video/upload/")) return FileType.VIDEO;
+        if (lower.contains("/image/upload/")) return FileType.IMAGE;
+        if (lower.matches(".*\\.(mp4|mov|webm|mkv|avi|m4v|3gp|ogv)(\\?.*)?$")) return FileType.VIDEO;
+        if (lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif)(\\?.*)?$")) return FileType.IMAGE;
+        return FileType.IMAGE;
     }
 }
+
