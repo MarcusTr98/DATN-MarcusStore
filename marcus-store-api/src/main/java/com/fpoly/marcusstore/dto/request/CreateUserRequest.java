@@ -1,5 +1,7 @@
 package com.fpoly.marcusstore.dto.request;
 
+import java.util.Set;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -30,4 +32,7 @@ public class CreateUserRequest {
 
     @NotNull(message = "RoleId không được để trống")
     private Integer roleId;
+
+        // Các module được chọn khi tạo nhân viên
+    private Set<String> moduleNames;
 }

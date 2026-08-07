@@ -34,5 +34,11 @@ export default {
 
   verifyEmail(email, otp) {
     return api.post(`${API_URL}/verify-email`, { email, otp })
+  },
+  getPermissions() {
+    return api.get("/admin/permissions")
+  },
+  updatePermissions(userId, moduleNames) {
+    return api.put(`/admin/staff-permissions/${userId}`, { moduleNames })
   }
 }
