@@ -59,6 +59,11 @@
         <span>Quản lý đơn hàng</span>
       </router-link>
 
+      <router-link v-if="canAccessRoute('/admin/warranty')" to="/admin/warranty" class="menu-item" active-class="active">
+        <i class="bi bi-arrow-repeat menu-icon" style="font-size: 16px"></i>
+        <span>Đổi trả / Bảo hành</span>
+      </router-link>
+
       <router-link v-if="canAccessRoute('/admin/voucher')" to="/admin/voucher" class="menu-item" active-class="active">
         <img :src="tagsIcon" class="menu-icon" />
         <span>Quản lý voucher</span>
@@ -264,6 +269,7 @@ const showSanPhamKho = computed(() => {
 const showKenhBanHang = computed(() => {
   return (
     canAccessRoute("/admin/order") ||
+    canAccessRoute("/admin/warranty") ||
     canAccessRoute("/admin/voucher") ||
     canAccessRoute("/admin/flash-sale")
   );

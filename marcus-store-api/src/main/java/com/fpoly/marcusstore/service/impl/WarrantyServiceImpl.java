@@ -1,0 +1,262 @@
+package com.fpoly.marcusstore.service.impl;
+
+import com.fpoly.marcusstore.dto.request.CreateWarrantyRequest;
+import com.fpoly.marcusstore.dto.request.UpdateWarrantyStatusRequest;
+import com.fpoly.marcusstore.dto.response.WarrantyResponse;
+import com.fpoly.marcusstore.dto.response.WarrantyResponse.AttachmentResponse;
+import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.entity.shopping.OrderItem;
+import com.fpoly.marcusstore.entity.shopping.WarrantyAttachment;
+import com.fpoly.marcusstore.entity.shopping.WarrantyAttachment.FileType;
+import com.fpoly.marcusstore.entity.shopping.WarrantyReturn;
+import com.fpoly.marcusstore.entity.shopping.WarrantyReturn.WarrantyReason;
+import com.fpoly.marcusstore.entity.shopping.WarrantyReturn.WarrantyStatus;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
+import com.fpoly.marcusstore.repository.shopping.WarrantyAttachmentRepository;
+import com.fpoly.marcusstore.repository.shopping.WarrantyRepository;
+import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.service.AdminNotificationService;
+import com.fpoly.marcusstore.service.UserNotificationService;
+import com.fpoly.marcusstore.service.WarrantyService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class WarrantyServiceImpl implements WarrantyService {
+
+    private final WarrantyRepository warrantyRepository;
+    private final WarrantyAttachmentRepository warrantyAttachmentRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final UserRepository userRepository;
+    private final AdminNotificationService adminNotificationService;
+    private final UserNotificationService userNotificationService;
+    private static final int WARRANTY_MONTHS = 6;
+
+    @Override
+    @Transactional
+    public WarrantyResponse createWarranty(Integer userId, CreateWarrantyRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        OrderItem orderItem = orderItemRepository.findById(request.getOrderItemId())
+                .orElseThrow(() -> new RuntimeException("Order item not found"));
+
+        if (!canRequestWarranty(userId, request.getOrderItemId())) {
+            throw new RuntimeException("Bạn không thể yêu cầu bảo hành cho sản phẩm này");
+        }
+
+        WarrantyReturn warranty = new WarrantyReturn();
+        warranty.setUser(user);
+        warranty.setOrderItem(orderItem);
+        warranty.setReason(request.getReason());
+        warranty.setDescription(request.getDescription());
+        warranty.setStatus(WarrantyStatus.PENDING);
+
+        warranty = warrantyRepository.save(warranty);
+
+        if (request.getAttachmentUrls() == null || request.getAttachmentUrls().isEmpty()) {
+            throw new RuntimeException("Yêu cầu bảo hành phải có ít nhất 1 ảnh và 1 video");
+        }
+        boolean hasImage = false;
+        boolean hasVideo = false;
+        for (String url : request.getAttachmentUrls()) {
+            FileType type = detectTypeFromUrl(url);
+
+            WarrantyAttachment attachment = new WarrantyAttachment();
+            attachment.setWarrantyReturn(warranty);
+            attachment.setFileUrl(url);
+            attachment.setFileType(type);
+            warrantyAttachmentRepository.save(attachment);
+
+            if (type == FileType.IMAGE) hasImage = true;
+            if (type == FileType.VIDEO) hasVideo = true;
+        }
+        if (!hasImage || !hasVideo) {
+            throw new RuntimeException("Yêu cầu bảo hành phải có ít nhất 1 ảnh và 1 video");
+        }
+
+        // bắn chuông cho admin khi có yêu cầu bảo hành mới.
+        // notifyWarrantyCreated chạy trong transaction hiện tại và tự chờ commit
+        // rồi mới phát realtime, tránh trường hợp DB rollback mà WS vẫn phát.
+        adminNotificationService.notifyWarrantyCreated(warranty, user);
+
+        return mapToResponse(warranty);
+    }
+
+    @Override
+    public List<WarrantyResponse> getWarrantiesByUser(Integer userId) {
+        return warrantyRepository.findByUserUserIdOrderByCreatedAtDesc(userId)
+                .stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<WarrantyResponse> getWarrantiesPage(WarrantyStatus status, WarrantyReason reason, String keyword, Pageable pageable) {
+        String safeKeyword = (keyword == null || keyword.isBlank()) ? null : keyword.trim();
+
+        // Nếu filter theo status cụ thể, dùng query riêng
+        if (status != null) {
+            Page<WarrantyReturn> page = warrantyRepository.searchWarranties(status, reason, safeKeyword, pageable);
+            return page.map(this::mapToResponse);
+        }
+
+        // Lấy tất cả với sort PENDING-first từ DB
+        List<WarrantyReturn> allSorted = warrantyRepository.findAllWithFiltersOrderByPendingFirst(reason, safeKeyword);
+
+        // Phân trang sau khi sort
+        int total = allSorted.size();
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), total);
+
+        List<WarrantyReturn> pageContent = (start >= total)
+                ? java.util.Collections.emptyList()
+                : allSorted.subList(start, end);
+
+        List<WarrantyResponse> content = pageContent.stream()
+                .map(this::mapToResponse)
+                .collect(Collectors.toList());
+
+        return new org.springframework.data.domain.PageImpl<>(content, pageable, total);
+    }
+
+    @Override
+    public long countByStatus(WarrantyStatus status) {
+        if (status == null) return 0L;
+        return warrantyRepository.countByStatus(status);
+    }
+
+    @Override
+    public long countAll() {
+        return warrantyRepository.count();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WarrantyResponse getWarrantyById(Integer warrantyId) {
+        WarrantyReturn warranty = warrantyRepository.findById(warrantyId)
+                .orElseThrow(() -> new RuntimeException("Warranty request not found"));
+        return mapToResponse(warranty);
+    }
+
+    @Override
+    @Transactional
+    public WarrantyResponse updateWarrantyStatus(Integer warrantyId, Integer adminId, UpdateWarrantyStatusRequest request) {
+        WarrantyReturn warranty = warrantyRepository.findById(warrantyId)
+                .orElseThrow(() -> new RuntimeException("Warranty request not found"));
+
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        warranty.setStatus(request.getStatus());
+        warranty.setAdminNote(request.getAdminNote());
+        warranty.setProcessedBy(admin);
+        warranty.setProcessedAt(LocalDateTime.now());
+
+        warranty = warrantyRepository.save(warranty);
+
+        // bắn chuông cho khách khi admin cập nhật trạng thái bảo hành.
+        userNotificationService.notifyWarrantyStatusChanged(
+                warranty, request.getStatus(), request.getAdminNote());
+
+        return mapToResponse(warranty);
+    }
+
+    @Override
+    public boolean canRequestWarranty(Integer userId, Integer orderItemId) {
+        OrderItem orderItem = orderItemRepository.findById(orderItemId).orElse(null);
+        if (orderItem == null) return false;
+
+        var order = orderItem.getOrder();
+        if (order == null || !order.getUser().getUserId().equals(userId)) return false;
+
+        if (!"COMPLETED".equals(order.getOrderStatus())) return false;
+
+        LocalDateTime warrantyEndDate = order.getUpdatedAt().plusMonths(WARRANTY_MONTHS);
+
+        if (LocalDateTime.now().isAfter(warrantyEndDate)) return false;
+
+        List<WarrantyStatus> activeStatuses = Arrays.asList(
+                WarrantyStatus.PENDING, WarrantyStatus.APPROVED);
+        return !warrantyRepository.existsByOrderItemOrderItemIdAndUserUserIdAndStatusIn(
+                orderItemId, userId, activeStatuses);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public WarrantyResponse getWarrantyByOrderItemId(Integer userId, Integer orderItemId) {
+        WarrantyReturn warranty = warrantyRepository
+                .findByOrderItemOrderItemIdAndUserUserId(orderItemId, userId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy yêu cầu bảo hành cho sản phẩm này"));
+        return mapToResponse(warranty);
+    }
+
+    private WarrantyResponse mapToResponse(WarrantyReturn warranty) {
+        OrderItem orderItem = warranty.getOrderItem();
+        var order = orderItem.getOrder();
+        var sku = orderItem.getSku();
+        var product = sku.getProduct();
+
+        List<AttachmentResponse> attachments = warranty.getAttachments().stream()
+                .map(a -> AttachmentResponse.builder()
+                        .attachmentId(a.getAttachmentId())
+                        .fileUrl(a.getFileUrl())
+                        .fileType(a.getFileType().name())
+                        .fileName(a.getFileName())
+                        .fileSize(a.getFileSize())
+                        .build())
+                .collect(Collectors.toList());
+
+        return WarrantyResponse.builder()
+                .warrantyId(warranty.getWarrantyId())
+                .userId(warranty.getUser().getUserId())
+                .userFullName(warranty.getUser().getFullName())
+                .userEmail(warranty.getUser().getEmail())
+                .userPhone(warranty.getUser().getPhoneNumber())
+                .orderItemId(orderItem.getOrderItemId())
+                .orderCode(order.getOrderCode())
+                .productName(product.getProductName())
+                .productImage(product.getThumbnailUrl() != null && !product.getThumbnailUrl().isBlank()
+                        ? product.getThumbnailUrl()
+                        : sku.getSkuImageUrl())
+                .reason(warranty.getReason())
+                .reasonLabel(WarrantyResponse.getReasonLabel(warranty.getReason()))
+                .description(warranty.getDescription())
+                .status(warranty.getStatus())
+                .statusLabel(WarrantyResponse.getStatusLabel(warranty.getStatus()))
+                .adminNote(warranty.getAdminNote())
+                .processedByName(warranty.getProcessedBy() != null ? warranty.getProcessedBy().getFullName() : null)
+                .processedAt(warranty.getProcessedAt())
+                .createdAt(warranty.getCreatedAt())
+                .updatedAt(warranty.getUpdatedAt())
+                .attachments(attachments)
+                .build();
+    }
+
+    private FileType detectTypeFromUrl(String url) {
+        if (url == null) return FileType.IMAGE;
+        String lower = url.toLowerCase();
+        if (lower.contains("/video/upload/")) return FileType.VIDEO;
+        if (lower.contains("/image/upload/")) return FileType.IMAGE;
+        if (lower.matches(".*\\.(mp4|mov|webm|mkv|avi|m4v|3gp|ogv)(\\?.*)?$")) return FileType.VIDEO;
+        if (lower.matches(".*\\.(jpg|jpeg|png|gif|webp|bmp|svg|heic|heif)(\\?.*)?$")) return FileType.IMAGE;
+        return FileType.IMAGE;
+    }
+}
+

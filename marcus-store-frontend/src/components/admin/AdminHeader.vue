@@ -199,6 +199,8 @@ const handleNotifClick = async (item) => {
     router.push(`/admin/order/${item.referenceId}`)
   } else if (item.type === 'CONTACT') {
     router.push('/admin/contact-management')
+  } else if (typeof item.type === 'string' && item.type.startsWith('WARRANTY_') && item.referenceId) {
+    router.push(`/admin/warranty/${item.referenceId}`)
   }
 }
 
@@ -209,6 +211,8 @@ const getNotificationIcon = (type) => {
   if (type === 'ORDER_FAILED') return 'fa-solid fa-triangle-exclamation'
   if (type === 'CONTACT') return 'fa-solid fa-envelope-open-text'
   if (type === 'REFUND') return 'fa-solid fa-money-bill-transfer'
+  if (type === 'WARRANTY_REQUEST') return 'fa-solid fa-shield-halved'
+  if (typeof type === 'string' && type.startsWith('WARRANTY_')) return 'fa-solid fa-shield-halved'
   return 'fa-solid fa-bell'
 }
 
@@ -598,6 +602,9 @@ onUnmounted(() => {
 }
 .notif-icon.REFUND {
   background: #8b5cf6;
+}
+.notif-icon.WARRANTY_REQUEST {
+  background: #e60012;
 }
 
 .notif-content {

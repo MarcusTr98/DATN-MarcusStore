@@ -29,11 +29,22 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationExceptions(
             MethodArgumentNotValidException ex) {
         Map<String, String> errors = new HashMap<>();
+        // tích lũy tất cả message để tránh FE chỉ nhận được message cuối
+        java.util.List<String> globalMessages = new java.util.ArrayList<>();
         ex.getBindingResult().getAllErrors().forEach((error) -> {
-            String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+            if (error instanceof FieldError fe) {
+                String fieldName = fe.getField();
+                errors.merge(fieldName, errorMessage, (oldV, newV) -> oldV + "; " + newV);
+            } else {
+                // ObjectError (vd: @AssertTrue trên method) -> gom vào nhóm "_global"
+                globalMessages.add(errorMessage);
+            }
         });
+        if (!globalMessages.isEmpty()) {
+            String combined = String.join("; ", globalMessages);
+            errors.merge("_global", combined, (oldV, newV) -> oldV + "; " + newV);
+        }
 
         // Đóng gói vào ApiResponse
         ApiResponse<Map<String, String>> response = new ApiResponse<>(400, "Dữ liệu đầu vào không hợp lệ", errors);
