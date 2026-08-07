@@ -31,6 +31,13 @@ public class Order {
     @Column(name = "order_code", nullable = false, unique = true, length = 50)
     private String orderCode;
 
+    // Marcus thêm: khóa idempotency do Checkout client sinh. Một request được
+    // gửi lại do double click, F5 hoặc retry mạng chỉ được ánh xạ tới một đơn.
+    // Marcus sửa: SQL Server dùng filtered unique index để vẫn cho phép nhiều đơn
+    // cũ có NULL.
+    @Column(name = "checkout_request_id", length = 64)
+    private String checkoutRequestId;
+
     @Column(name = "recipient_name", nullable = false, length = 100)
     private String recipientName;
 
@@ -88,6 +95,19 @@ public class Order {
 
     @Column(name = "tracking_code", length = 100)
     private String trackingCode;
+
+    // Marcus thêm: trạng thái kỹ thuật GHN tách khỏi vòng đời đơn hàng.
+    @Column(name = "ghn_integration_status", nullable = false, length = 30)
+    private String ghnIntegrationStatus = "NOT_REQUIRED";
+
+    @Column(name = "ghn_retry_count", nullable = false)
+    private Integer ghnRetryCount = 0;
+
+    @Column(name = "ghn_last_error", length = 500)
+    private String ghnLastError;
+
+    @Column(name = "ghn_last_attempt_at")
+    private LocalDateTime ghnLastAttemptAt;
 
     @Column(name = "payment_date")
     private LocalDateTime paymentDate;

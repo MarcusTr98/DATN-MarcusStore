@@ -306,6 +306,13 @@ CREATE TABLE Orders (
     order_status     NVARCHAR(50)   DEFAULT N'PENDING',
     fulfillment_method VARCHAR(30)  NOT NULL
         CONSTRAINT DF_Orders_FulfillmentMethod DEFAULT 'DELIVERY',
+    -- Marcus thêm: khóa idempotency Checkout và trạng thái tích hợp GHN.
+    checkout_request_id VARCHAR(64) NULL,
+    ghn_integration_status VARCHAR(30) NOT NULL
+        CONSTRAINT DF_Orders_GhnIntegrationStatus DEFAULT 'NOT_REQUIRED',
+    ghn_retry_count INT NOT NULL CONSTRAINT DF_Orders_GhnRetryCount DEFAULT 0,
+    ghn_last_error NVARCHAR(500) NULL,
+    ghn_last_attempt_at DATETIME2 NULL,
     created_at       DATETIME2      DEFAULT GETDATE(),
     updated_at       DATETIME2      DEFAULT GETDATE(),
     CONSTRAINT PK_Orders          PRIMARY KEY (order_id),
@@ -314,6 +321,9 @@ CREATE TABLE Orders (
     CONSTRAINT CK_Orders_FulfillmentMethod
         CHECK (fulfillment_method IN ('DELIVERY', 'STORE_PICKUP'))
 );
+CREATE UNIQUE INDEX UX_Orders_CheckoutRequestId
+    ON Orders(checkout_request_id)
+    WHERE checkout_request_id IS NOT NULL;
 ALTER TABLE Orders ADD shipping_fee DECIMAL(18,2) DEFAULT 0 CHECK (shipping_fee >= 0);
 ALTER TABLE Orders ADD tracking_code VARCHAR(100) NULL;
 ALTER TABLE Orders ADD payment_date DATETIME2;

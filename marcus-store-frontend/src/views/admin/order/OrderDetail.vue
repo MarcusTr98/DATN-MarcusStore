@@ -335,6 +335,32 @@
                   <span class="mini-label">Mã vận đơn</span
                   ><span class="mini-value">{{ orderDetail.trackingCode || '---' }}</span>
                 </div>
+                <!-- Marcus thêm: hiển thị rõ trạng thái tích hợp, lỗi và thao tác retry GHN. -->
+                <div class="mini-row" v-if="orderDetail.fulfillmentMethod !== 'STORE_PICKUP'">
+                  <span class="mini-label">Kết nối GHN</span>
+                  <span class="mini-value">
+                    <span class="badge" :class="getGhnStatusClass(orderDetail.ghnIntegrationStatus)">
+                      {{ getGhnStatusLabel(orderDetail.ghnIntegrationStatus) }}
+                    </span>
+                  </span>
+                </div>
+                <div
+                  class="mini-row align-items-start"
+                  v-if="orderDetail.ghnIntegrationStatus === 'FAILED'"
+                >
+                  <span class="mini-label mt-1">Lỗi gần nhất</span>
+                  <span class="mini-value text-danger">
+                    {{ orderDetail.ghnLastError || 'GHN chưa tạo được vận đơn' }}
+                    <button
+                      type="button"
+                      class="primary-btn ghn-retry-btn"
+                      :disabled="retryingGhn"
+                      @click="retryGhnShipment"
+                    >
+                      {{ retryingGhn ? 'Đang thử lại...' : 'Thử tạo lại vận đơn' }}
+                    </button>
+                  </span>
+                </div>
                 <div class="mini-row">
                   <span class="mini-label">Phí ship gốc</span>
                   <span class="mini-value">{{ formatCurrency(orderDetail.shippingFee) }}</span>
@@ -670,6 +696,7 @@ const error = ref(null)
 const refund = ref(null)
 const refundReason = ref('')
 const refundBusy = ref(false)
+const retryingGhn = ref(false)
 
 const selectedStatus = ref('')
 const statusNote = ref('')
@@ -748,6 +775,36 @@ const paymentMethodMap = {
   COD: 'COD',
   MoMo: 'MoMo',
   BankTransfer: 'Chuyển khoản',
+}
+
+const ghnStatusMap = {
+  NOT_REQUIRED: { label: 'Không sử dụng GHN', className: 'completed' },
+  PENDING: { label: 'Chờ tạo vận đơn', className: 'pending' },
+  CREATING: { label: 'Đang kết nối GHN', className: 'processing' },
+  CREATED: { label: 'Đã tạo vận đơn', className: 'completed' },
+  FAILED: { label: 'Tạo vận đơn thất bại', className: 'failed' },
+}
+
+const getGhnStatusLabel = (status) =>
+  ghnStatusMap[String(status || '').toUpperCase()]?.label || 'Chưa xác định'
+const getGhnStatusClass = (status) =>
+  ghnStatusMap[String(status || '').toUpperCase()]?.className || 'pending'
+
+// Marcus thêm: retry tại đúng màn chi tiết và tải lại trạng thái mới sau thao tác.
+const retryGhnShipment = async () => {
+  if (!orderDetail.value || retryingGhn.value) return
+  try {
+    retryingGhn.value = true
+    const response = await OrderDetailApi.retryGhnShipment(orderDetail.value.orderCode)
+    orderDetail.value = response.data
+    statusSuccessMessage.value = `Đã tạo vận đơn GHN ${response.data.trackingCode}.`
+    statusSuccessModal.value = true
+  } catch (e) {
+    const message = e.response?.data?.message || e.response?.data || 'GHN vẫn chưa tạo được vận đơn'
+    showToast(message)
+  } finally {
+    retryingGhn.value = false
+  }
 }
 
 const allowedTransitions = {

@@ -21,6 +21,8 @@ import jakarta.persistence.LockModeType;
 public interface OrderRepository extends JpaRepository<Order, Integer> {
   Optional<Order> findByOrderCode(String orderCode);
 
+  Optional<Order> findByCheckoutRequestIdAndUserUserId(String checkoutRequestId, Integer userId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode")
   Optional<Order> findByOrderCodeForUpdate(@Param("orderCode") String orderCode);
@@ -50,6 +52,18 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   List<Order> findByOrderStatus(String orderStatus);
 
   List<Order> findByOrderStatusIn(List<String> orderStatuses);
+
+  // Marcus thêm: polling chỉ lấy mã vận đơn, không giữ entity/transaction trong
+  // lúc gọi HTTP sang GHN.
+  @Query(value = """
+      SELECT TOP (100) tracking_code
+      FROM Orders
+      WHERE order_status IN ('PACKED', 'SHIPPING', 'FAILED')
+        AND tracking_code IS NOT NULL
+        AND LTRIM(RTRIM(tracking_code)) <> ''
+      ORDER BY order_id
+      """, nativeQuery = true)
+  List<String> findTrackingCodesForGhnPolling();
 
   List<Order> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
 

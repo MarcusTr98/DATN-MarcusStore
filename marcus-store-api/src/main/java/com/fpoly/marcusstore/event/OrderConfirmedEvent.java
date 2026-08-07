@@ -1,19 +1,14 @@
 package com.fpoly.marcusstore.event;
 
-import com.fpoly.marcusstore.entity.shopping.Order;
 import lombok.Getter;
 import org.springframework.context.ApplicationEvent;
 
 @Getter
 public class OrderConfirmedEvent extends ApplicationEvent {
-    private final Order order;
+    private final Integer orderId;
 
-    public OrderConfirmedEvent(Object source, Order order) {
+    public OrderConfirmedEvent(Object source, Integer orderId) {
         super(source);
-        this.order = order;
-    }
-
-    public Order order() {
-        return order;
+        this.orderId = orderId;
     }
 }

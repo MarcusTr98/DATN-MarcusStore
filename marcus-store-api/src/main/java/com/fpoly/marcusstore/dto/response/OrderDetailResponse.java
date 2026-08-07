@@ -32,6 +32,11 @@ public class OrderDetailResponse {
     private String transactionId;
     private LocalDateTime paymentDate;
     private String trackingCode;
+    // Marcus thêm: Admin nhìn được tình trạng kết nối GHN và quyết định retry.
+    private String ghnIntegrationStatus;
+    private Integer ghnRetryCount;
+    private String ghnLastError;
+    private LocalDateTime ghnLastAttemptAt;
     private Integer userId;
     private String fullName;
     private String email;

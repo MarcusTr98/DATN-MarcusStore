@@ -11,6 +11,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.repository.statistics.CommentEvaluationRepository;
 import com.fpoly.marcusstore.service.impl.OrderServiceImpl;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
 
@@ -38,6 +39,7 @@ class OrderServicePaymentGuardTest {
                                 mock(OrderStatusHistoryRepository.class),
                                 mock(UserRepository.class),
                                 mock(ProductSkuRepository.class),
+                                mock(ApplicationEventPublisher.class),
                                 mock(OrderShippingService.class),
                                 mock(OrderPaymentService.class),
                                 mock(OrderCancellationService.class),
@@ -76,6 +78,7 @@ class OrderServicePaymentGuardTest {
                                 mock(OrderStatusHistoryRepository.class),
                                 mock(UserRepository.class),
                                 mock(ProductSkuRepository.class),
+                                mock(ApplicationEventPublisher.class),
                                 mock(OrderShippingService.class),
                                 mock(OrderPaymentService.class),
                                 cancellationService,

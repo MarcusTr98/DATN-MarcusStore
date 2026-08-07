@@ -92,6 +92,26 @@ public class CheckoutService {
 
         @Transactional
         public Order processCheckout(CheckoutRequestDTO req) {
+                Integer currentUserId = SecurityUtils.getCurrentUserId();
+                String checkoutRequestId = req.getCheckoutRequestId().trim();
+
+                // Marcus thêm: đường tắt cho retry đã hoàn tất. Không đọc Cart và
+                // tuyệt đối không đụng lại kho/voucher/Flash Sale.
+                Order existingOrder = findExistingCheckout(checkoutRequestId, currentUserId);
+                if (existingOrder != null) {
+                        return existingOrder;
+                }
+
+                // Marcus thêm: khóa giỏ theo user rồi kiểm tra idempotency lần hai.
+                // Request đồng thời sẽ chờ request đầu commit và nhận lại cùng đơn.
+                cartRepository.findByUserIdForCheckout(currentUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST, "Giỏ hàng rỗng."));
+                existingOrder = findExistingCheckout(checkoutRequestId, currentUserId);
+                if (existingOrder != null) {
+                        return existingOrder;
+                }
+
                 // Marcus thêm: client cũ không gửi fulfillmentMethod vẫn được xem là giao tận
                 // nơi.
                 String fulfillmentMethod = req.getFulfillmentMethod() == null
@@ -114,7 +134,6 @@ public class CheckoutService {
                                         "Lỗi hệ thống: Dữ liệu Quận/Huyện hoặc Phường/Xã bị trống từ Frontend gửi lên!");
                 }
 
-                Integer currentUserId = SecurityUtils.getCurrentUserId();
                 User user = userRepository.findById(currentUserId)
                                 .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
 
@@ -139,6 +158,7 @@ public class CheckoutService {
 
                 Order order = new Order();
                 order.setOrderCode("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                order.setCheckoutRequestId(checkoutRequestId);
                 order.setUser(user);
                 order.setRecipientName(req.getRecipientName());
                 order.setRecipientPhone(req.getRecipientPhone());
@@ -162,6 +182,8 @@ public class CheckoutService {
                 order.setPaymentMethod(paymentMethod);
                 order.setPaymentStatus("COD".equals(paymentMethod) ? "UNPAID" : "PENDING");
                 order.setOrderStatus("PENDING");
+                order.setGhnIntegrationStatus(isStorePickup ? "NOT_REQUIRED" : "PENDING");
+                order.setGhnRetryCount(0);
                 order.setDeliveryNote(req.getNote());
 
                 BigDecimal totalAmount = BigDecimal.ZERO;
@@ -453,5 +475,11 @@ public class CheckoutService {
                 }
 
                 return savedOrder;
+        }
+
+        private Order findExistingCheckout(String checkoutRequestId, Integer userId) {
+                return orderRepository
+                                .findByCheckoutRequestIdAndUserUserId(checkoutRequestId, userId)
+                                .orElse(null);
         }
 }

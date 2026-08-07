@@ -10,6 +10,7 @@ import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
+import com.fpoly.marcusstore.event.OrderConfirmedEvent;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
@@ -30,6 +31,7 @@ import com.fpoly.marcusstore.service.UserNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +51,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
     private final ProductSkuRepository productSkuRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    // Marcus thêm: Admin có thể retry GHN sau khi lần tạo vận đơn tự động thất bại.
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
     private final OrderCancellationService orderCancellationService;
@@ -65,6 +69,15 @@ public class OrderServiceImpl implements OrderService {
     // Marcus thêm: IMEI chỉ gồm chữ số, độ dài 8-20. Validate chặt để FE gõ nhầm
     // IMEI ngắn/dài/ký tự đặc biệt sẽ bị BE chặn ngay tại đầu vào.
     private static final java.util.regex.Pattern IMEI_PATTERN = java.util.regex.Pattern.compile("^[0-9]{8,20}$");
+
+    // Marcus thêm: retry GHN độc lập, không làm mất bước kiểm soát IMEI của module kho.
+    @Override
+    public OrderDetailResponse retryGhnShipment(String orderCode) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+        orderShippingService.createOrRetryGhnOrder(order.getOrderId());
+        return getOrderDetailResponse(orderCode);
+    }
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -186,11 +199,10 @@ public class OrderServiceImpl implements OrderService {
                 && !"STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod());
 
         if (isPackingNow) {
-            try {
-                orderShippingService.processCreateGhnOrder(order);
-            } catch (Exception e) {
-                throw new RuntimeException("Lỗi tạo mã vận đơn GHN: " + e.getMessage());
-            }
+            // Marcus sửa: PACKED là nghiệp vụ của đơn và phải commit độc lập với
+            // HTTP GHN. Listener sau-commit sẽ tạo vận đơn và lưu FAILED nếu lỗi.
+            order.setGhnIntegrationStatus("PENDING");
+            order.setGhnLastError(null);
         }
 
         String note = request.getNote();
@@ -248,6 +260,10 @@ public class OrderServiceImpl implements OrderService {
                 "CANCELLED".equals(newStatus)
                         ? "Đơn " + order.getOrderCode() + " đã hủy. Lý do: " + note
                         : null);
+
+        if (isPackingNow) {
+            eventPublisher.publishEvent(new OrderConfirmedEvent(this, order.getOrderId()));
+        }
 
         return getOrderDetailResponse(orderCode);
     }
@@ -340,6 +356,10 @@ public class OrderServiceImpl implements OrderService {
                 .transactionId(order.getTransactionId())
                 .paymentDate(order.getPaymentDate())
                 .trackingCode(order.getTrackingCode())
+                .ghnIntegrationStatus(order.getGhnIntegrationStatus())
+                .ghnRetryCount(order.getGhnRetryCount())
+                .ghnLastError(order.getGhnLastError())
+                .ghnLastAttemptAt(order.getGhnLastAttemptAt())
                 .userId(order.getUser().getUserId())
                 .fullName(order.getUser().getFullName())
                 .email(order.getUser().getEmail())

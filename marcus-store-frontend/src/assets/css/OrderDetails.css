@@ -1185,3 +1185,10 @@ tbody tr:hover {
   color: #fff;
 }
 }
+.ghn-retry-btn {
+  display: block;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+}

@@ -77,6 +77,15 @@ public class AdminOrderController {
         return orderService.updateStatusOrder(orderCode, request);
     }
 
+    // Marcus thêm: retry chỉ là thao tác xử lý đơn, không mở cho tài khoản chỉ có
+    // quyền xem.
+    @PostMapping("/orders/{orderCode}/ghn/retry")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public OrderDetailResponse retryGhnShipment(
+            @PathVariable @Size(min = 1, max = 50) String orderCode) {
+        return orderService.retryGhnShipment(orderCode);
+    }
+
     // Marcus lam refund
     // Marcus thêm nhóm API quản trị refund: xem, tạo, duyệt và retry.
     @GetMapping("/refunds")

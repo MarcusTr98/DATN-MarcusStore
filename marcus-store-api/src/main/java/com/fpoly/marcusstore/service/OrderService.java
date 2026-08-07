@@ -28,6 +28,9 @@ public interface OrderService {
 
     OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request);
 
+    // Marcus thêm: cho phép Admin chủ động thử tạo lại vận đơn GHN bị lỗi.
+    OrderDetailResponse retryGhnShipment(String orderCode);
+
     List<OrderResponse> getUserOrder();
 
     OrderDetailResponse getUserOrderDetail(String orderCode);

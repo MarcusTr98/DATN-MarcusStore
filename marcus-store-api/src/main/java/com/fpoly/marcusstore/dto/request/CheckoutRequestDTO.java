@@ -6,6 +6,13 @@ import java.util.List;
 
 @Data
 public class CheckoutRequestDTO {
+    // Marcus thêm: UUID ổn định trong suốt một lần Checkout để backend nhận ra
+    // request retry và không tạo hai đơn.
+    @NotBlank(message = "Mã yêu cầu Checkout không được để trống")
+    @Size(max = 64, message = "Mã yêu cầu Checkout không hợp lệ")
+    @Pattern(regexp = "^[A-Za-z0-9_-]{16,64}$", message = "Mã yêu cầu Checkout sai định dạng")
+    private String checkoutRequestId;
+
     @NotEmpty(message = "Giỏ hàng không được để trống")
     @Size(max = 100, message = "Mỗi đơn hàng chỉ được có tối đa 100 dòng sản phẩm")
     private List<@NotNull(message = "ID sản phẩm trong giỏ không được để trống") @Positive(message = "ID sản phẩm trong giỏ không hợp lệ") Integer> cartItemIds;

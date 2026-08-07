@@ -8,8 +8,9 @@ import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -19,9 +20,54 @@ public class OrderShippingService {
         private final GhnService ghnService;
         private final OrderRepository orderRepository;
         private final ShippingConfigRepository shippingConfigRepository;
+        private final TransactionTemplate transactionTemplate;
 
-        @Transactional
-        public void processCreateGhnOrder(Order order) {
+        // Marcus làm: transaction 1 chỉ khóa/đánh dấu attempt và dựng payload;
+        // HTTP GHN chạy ngoài transaction; transaction 2 chỉ chốt kết quả.
+        public Order createOrRetryGhnOrder(Integer orderId) {
+                GhnAttempt attempt = transactionTemplate.execute(status -> prepareAttempt(orderId));
+                if (attempt == null) {
+                        return transactionTemplate.execute(status -> orderRepository.findById(orderId).orElse(null));
+                }
+
+                try {
+                        String trackingCode = ghnService.createOrderOnGhn(attempt.request());
+                        if (trackingCode == null || trackingCode.isBlank()) {
+                                throw new IllegalStateException("GHN không trả về mã vận đơn");
+                        }
+                        return transactionTemplate.execute(status -> markCreated(orderId, trackingCode));
+                } catch (RuntimeException exception) {
+                        transactionTemplate.executeWithoutResult(status -> markFailed(orderId, exception));
+                        throw exception;
+                }
+        }
+
+        private GhnAttempt prepareAttempt(Integer orderId) {
+                Order order = orderRepository.findByIdForUpdate(orderId)
+                                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+
+                if (order.getTrackingCode() != null && !order.getTrackingCode().isBlank()) {
+                        order.setGhnIntegrationStatus("CREATED");
+                        order.setGhnLastError(null);
+                        orderRepository.save(order);
+                        return null;
+                }
+                if ("STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod())) {
+                        order.setGhnIntegrationStatus("NOT_REQUIRED");
+                        orderRepository.save(order);
+                        return null;
+                }
+                if (!"PACKED".equalsIgnoreCase(order.getOrderStatus())) {
+                        throw new IllegalStateException("Chỉ tạo vận đơn khi đơn đã đóng gói");
+                }
+
+                // Marcus thêm: chặn hai worker cùng tạo vận đơn; attempt CREATING bị
+                // treo quá hai phút mới được phép thử lại.
+                if ("CREATING".equalsIgnoreCase(order.getGhnIntegrationStatus())
+                                && order.getGhnLastAttemptAt() != null
+                                && order.getGhnLastAttemptAt().isAfter(LocalDateTime.now().minusMinutes(2))) {
+                        return null;
+                }
 
                 boolean isVnPay = "VNPAY".equalsIgnoreCase(order.getPaymentMethod());
                 boolean isPaid = "PAID".equalsIgnoreCase(order.getPaymentStatus());
@@ -51,6 +97,12 @@ public class OrderShippingService {
                                 })
                                 .sum();
 
+                order.setGhnIntegrationStatus("CREATING");
+                order.setGhnRetryCount((order.getGhnRetryCount() == null ? 0 : order.getGhnRetryCount()) + 1);
+                order.setGhnLastAttemptAt(LocalDateTime.now());
+                order.setGhnLastError(null);
+                orderRepository.save(order);
+
                 // 3. Khởi tạo Request với dữ liệu động
                 GhnCreateOrderRequest request = GhnCreateOrderRequest.builder()
                                 .paymentTypeId(1) // Shop trả phí (1)
@@ -73,13 +125,32 @@ public class OrderShippingService {
                                                                 .build())
                                                 .collect(Collectors.toList()))
                                 .build();
+                return new GhnAttempt(request);
+        }
 
-                // 4. đẨY sang GHN và lưu Tracking Code
-                String trackingCode = ghnService.createOrderOnGhn(request);
-                if (trackingCode != null) {
-                        order.setTrackingCode(trackingCode);
+        private Order markCreated(Integer orderId, String trackingCode) {
+                Order order = orderRepository.findByIdForUpdate(orderId)
+                                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+                order.setTrackingCode(trackingCode);
+                order.setGhnIntegrationStatus("CREATED");
+                order.setGhnLastError(null);
+                return orderRepository.save(order);
+        }
+
+        private void markFailed(Integer orderId, RuntimeException exception) {
+                orderRepository.findByIdForUpdate(orderId).ifPresent(order -> {
+                        order.setGhnIntegrationStatus("FAILED");
+                        order.setGhnLastError(safeError(exception));
                         orderRepository.save(order);
+                });
+        }
+
+        private String safeError(RuntimeException exception) {
+                String message = exception.getMessage();
+                if (message == null || message.isBlank()) {
+                        return "Không thể kết nối GHN";
                 }
+                return message.length() <= 500 ? message : message.substring(0, 500);
         }
 
         private int calculateCodAmount(Order order, boolean isPaid) {
@@ -104,5 +175,8 @@ public class OrderShippingService {
                 BigDecimal integerLimit = BigDecimal.valueOf(Integer.MAX_VALUE);
                 BigDecimal safeLimit = configuredLimit.min(integerLimit);
                 return orderAmount.min(safeLimit).intValue();
+        }
+
+        private record GhnAttempt(GhnCreateOrderRequest request) {
         }
 }

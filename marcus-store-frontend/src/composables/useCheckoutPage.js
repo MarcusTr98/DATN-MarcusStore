@@ -8,6 +8,8 @@ import api from '@/utils/api'
 import { useCartStore } from '@/stores/cartStore'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 
+const CHECKOUT_REQUEST_STORAGE_KEY = 'MARCUS_CHECKOUT_REQUEST'
+
 // Marcus refactor: gom luồng địa chỉ, vận chuyển, voucher và đặt hàng khỏi Checkout.vue.
 export function useCheckoutPage() {
   const router = useRouter()
@@ -1047,6 +1049,9 @@ export function useCheckoutPage() {
     }
 
     const payload = {
+      // Marcus thêm: cùng tập cart item trong cùng phiên luôn dùng lại một UUID,
+      // kể cả F5 hoặc retry sau timeout.
+      checkoutRequestId: getOrCreateCheckoutRequestId(cartData.value.items),
       cartItemIds: cartData.value.items.map((i) => i.cartItemId),
       recipientName: orderForm.value.recipientName,
       recipientPhone: orderForm.value.recipientPhone,
@@ -1064,6 +1069,8 @@ export function useCheckoutPage() {
     isProcessing.value = true
     try {
       const { data } = await api.post('/checkout', payload)
+
+      sessionStorage.removeItem(CHECKOUT_REQUEST_STORAGE_KEY)
 
       const paidSkuIds = cartData.value.items
         .map((item) => Number(item.skuId))
@@ -1128,6 +1135,26 @@ export function useCheckoutPage() {
     } finally {
       isProcessing.value = false
     }
+  }
+
+  function getOrCreateCheckoutRequestId(items) {
+    const fingerprint = items
+      .map((item) => Number(item.cartItemId))
+      .filter(Number.isInteger)
+      .sort((left, right) => left - right)
+      .join('-')
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(CHECKOUT_REQUEST_STORAGE_KEY) || 'null')
+      if (stored?.fingerprint === fingerprint && stored?.requestId) return stored.requestId
+    } catch {
+      sessionStorage.removeItem(CHECKOUT_REQUEST_STORAGE_KEY)
+    }
+    const requestId = crypto.randomUUID()
+    sessionStorage.setItem(
+      CHECKOUT_REQUEST_STORAGE_KEY,
+      JSON.stringify({ fingerprint, requestId }),
+    )
+    return requestId
   }
 
   onMounted(async () => {
