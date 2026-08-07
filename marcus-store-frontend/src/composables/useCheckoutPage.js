@@ -178,16 +178,18 @@ export function useCheckoutPage() {
   // server revert giá về gốc nhưng localStorage vẫn còn isFlashSale=true. Logic cũ
   // dựa vào localStorage để chặn ngay → user kẹt vĩnh viễn không mua được.
   async function findCancelledFlashSaleItem() {
-    let serverItems = []
+    let response
     try {
-      const res = await cartApi.getCart()
-      const freshData = res.data?.data ?? res.data
-      serverItems = Array.isArray(freshData?.items) ? freshData.items : []
+      response = await cartApi.getCart()
     } catch (e) {
       console.warn('Không thể refetch cart để kiểm tra Flash Sale:', e)
       // Lỗi mạng → fallback dùng localStorage (giữ hành vi cũ an toàn)
       return findCancelledFromLocal()
     }
+    // Marcus sửa: chỉ khởi tạo dữ liệu sau khi request thành công, tránh state
+    // trung gian thừa và giữ rõ nhánh fallback khi Cart API gián đoạn.
+    const freshData = response.data?.data ?? response.data
+    const serverItems = Array.isArray(freshData?.items) ? freshData.items : []
 
     // Sync cartData cục bộ với server (đảm bảo UI đúng giá)
     const revertedItems = [] // Lưu các cartItemId vừa bị revert giá (để hiện cảnh báo)

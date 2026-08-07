@@ -81,8 +81,8 @@ ghn.api.url.create=https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shippin
 ghn.store.district-id=1526
 ghn.store.ward-code=20310
 
-# token verify webhook từ GHN Dashboard
-# Nếu chưa có thì để trống, webhook sẽ không verify (dùng khi test Ngrok)
+# Marcus sửa: token xác thực webhook GHN là bắt buộc, kể cả khi demo bằng
+# Postman/ngrok. Request phải gửi cùng giá trị trong header X-Verification-Token.
 ghn.webhook.token=MARCUS_GHN_TEST_2026_SECRET
 
 # cấu hình đăng nhập đăng ký GG

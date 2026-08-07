@@ -659,11 +659,6 @@ import '@/assets/css/cart.css'
 const { siteName, fetchSettings } = useSettings()
 onMounted(fetchSettings)
 
-function formatPrice(value) {
-  if (value == null) return '0'
-  return Number(value).toLocaleString('vi-VN')
-}
-
 // Marcus refactor: Checkout.vue chỉ còn nhiệm vụ kết nối giao diện với luồng checkout.
 const {
   modal,

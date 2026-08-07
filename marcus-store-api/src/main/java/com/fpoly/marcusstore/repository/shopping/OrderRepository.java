@@ -25,6 +25,14 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode")
   Optional<Order> findByOrderCodeForUpdate(@Param("orderCode") String orderCode);
 
+  // Marcus thêm: khóa đơn đồng thời kiểm tra chủ sở hữu để khách hủy đơn không
+  // chạy song song với VNPAY IPN, scheduler hết hạn hoặc thao tác của Admin.
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode AND o.user.userId = :userId")
+  Optional<Order> findByOrderCodeAndUserIdForUpdate(
+      @Param("orderCode") String orderCode,
+      @Param("userId") Integer userId);
+
   // Marcus thêm: scheduler khóa đúng một đơn trước khi quyết định hủy thanh toán
   // treo.
   @Lock(LockModeType.PESSIMISTIC_WRITE)

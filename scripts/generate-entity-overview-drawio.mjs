@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pages } from "./generate-entity-relations-drawio.mjs";
 
-const output = path.join(process.cwd(), "docs", "marcus-so-do-tong-quan-quan-he-thuc-the.drawio");
+const output = path.join(process.cwd(), "docs", "marcus-docs", "marcus-so-do-tong-quan-quan-he-thuc-the.drawio");
 const esc = (s = "") => String(s).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 const geo = (x, y, w, h, relative = false) => `<mxGeometry x="${x}" y="${y}" width="${w}" height="${h}"${relative ? ' relative="1"' : ""} as="geometry"/>`;
 const cell = (attrs, geometry = "") => `<mxCell ${attrs}>${geometry}</mxCell>`;
@@ -28,9 +28,6 @@ const displayNames = {
   AiProductClick: "AI_Product_Clicks",
   AiAnalyticsReport: "AI_Analytics_Reports",
   AiUsageEvent: "AI_Usage_Events",
-  InventoryRun: "Inventory_Reconciliation_Runs",
-  InventoryStockLog: "Inventory_Stock_Reconciliation_Log",
-  InventoryImeiLog: "Inventory_Imei_Reconciliation_Log",
   OrderData: "Order / Transaction / Behavior Data",
 };
 
@@ -44,11 +41,6 @@ pages.forEach((page, groupIndex) => {
   }
 });
 
-// Bốn bảng có trong database dự án nhưng không phải entity JPA chính.
-for (const entity of ["InventoryRun", "InventoryStockLog", "InventoryImeiLog"]) {
-  entityGroup.set(entity, 1);
-  orderedByGroup[1].push(entity);
-}
 entityGroup.set("AiUsageEvent", 5);
 orderedByGroup[5].push("AiUsageEvent");
 
@@ -74,11 +66,6 @@ for (let i = relations.length - 1; i >= 0; i--) {
 addRelation("User", "ContactRequest", "0..1", "N", "người gửi", false);
 addRelation("Product", "AiProductClick", "1", "N", "sản phẩm AI gợi ý", false);
 addRelation("Product", "AiUsageEvent", "0..1", "N", "sự kiện sử dụng AI", false);
-addRelation("InventoryRun", "InventoryStockLog", "1", "N", "lần đối soát", false);
-addRelation("ProductSku", "InventoryStockLog", "1", "N", "đối soát tồn SKU", false);
-addRelation("InventoryRun", "InventoryImeiLog", "1", "N", "lần đối soát", false);
-addRelation("ProductItem", "InventoryImeiLog", "1", "N", "đối soát IMEI", false);
-
 const cells = [];
 const entityIds = new Map();
 const pageWidth = 4100;

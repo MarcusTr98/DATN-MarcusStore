@@ -24,12 +24,12 @@ import com.fpoly.marcusstore.repository.shopping.CartRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
@@ -43,40 +43,28 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class CheckoutService {
 
-        @Autowired
-        private CartItemRepository cartItemRepository;
-        @Autowired
-        private CartRepository cartRepository;
-        @Autowired
-        private ProductSkuRepository productSkuRepository;
-        @Autowired
-        private OrderRepository orderRepository;
-        @Autowired
-        private OrderStatusHistoryRepository orderStatusHistoryRepository;
-        @Autowired
-        private UserRepository userRepository;
-        @Autowired
-        private VoucherRepository voucherRepository;
-        @Autowired
-        private VoucherService voucherService;
-        @Autowired
-        private GhnService ghnService;
-        @Autowired
-        private AdminNotificationService notificationService;
-        @Autowired
-        private UserNotificationService userNotificationService;
-        @Autowired
-        private ShippingService shippingService; // NÂNG CẤP: Thêm ShippingService để tính trợ giá
-        @Autowired
-        private OrderTransactionService orderTransactionService;
-        @Autowired
-        private FlashSaleItemRepository flashSaleItemRepository;
-        @Autowired
-        private FlashSaleSlotRepository flashSaleSlotRepository;
-        @Autowired
-        private SystemSettingRepository systemSettingRepository;
+        // Marcus sửa: dùng constructor injection để dependency bắt buộc, bất biến và dễ
+        // kiểm thử hơn; không thay đổi nghiệp vụ Cart/Voucher/Flash Sale của thành
+        // viên.
+        private final CartItemRepository cartItemRepository;
+        private final CartRepository cartRepository;
+        private final ProductSkuRepository productSkuRepository;
+        private final OrderRepository orderRepository;
+        private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+        private final UserRepository userRepository;
+        private final VoucherRepository voucherRepository;
+        private final VoucherService voucherService;
+        private final GhnService ghnService;
+        private final AdminNotificationService notificationService;
+        private final UserNotificationService userNotificationService;
+        private final ShippingService shippingService;
+        private final OrderTransactionService orderTransactionService;
+        private final FlashSaleItemRepository flashSaleItemRepository;
+        private final FlashSaleSlotRepository flashSaleSlotRepository;
+        private final SystemSettingRepository systemSettingRepository;
 
         @Transactional(readOnly = true)
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -115,9 +103,8 @@ public class CheckoutService {
                 }
                 boolean isStorePickup = "STORE_PICKUP".equals(fulfillmentMethod);
 
-                log.info("📥 [CHECKOUT API] Dữ liệu Frontend gửi lên: Name={}, Phone={}, District={}, Ward={}",
-                                req.getRecipientName(), req.getRecipientPhone(), req.getToDistrictId(),
-                                req.getToWardCode());
+                // Marcus sửa: không ghi tên, số điện thoại và địa chỉ khách vào log hệ
+                // thống. Khi cần truy vết chỉ dùng userId/orderCode ở các bước phía sau.
 
                 if (!isStorePickup
                                 && (req.getShippingAddress() == null || req.getShippingAddress().isBlank()

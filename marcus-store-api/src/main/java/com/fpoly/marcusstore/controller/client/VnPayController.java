@@ -75,7 +75,8 @@ public class VnPayController {
         String computedHash = vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), rawData.toString());
 
         if (!computedHash.equalsIgnoreCase(receivedHash)) {
-            log.warn("[VNPAY IPN] Chữ ký không hợp lệ. Received={}", receivedHash);
+            // Marcus sửa: không ghi chữ ký thanh toán nhận được vào log.
+            log.warn("[VNPAY IPN] Chữ ký callback không hợp lệ.");
             return ok("97", "Invalid Checksum");
         }
 

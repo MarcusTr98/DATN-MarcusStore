@@ -21,7 +21,6 @@ const {
   isTyping,
   openPanel,
   closePanel,
-  pushHistory,
   removeHistory,
   clearHistory,
   submit,

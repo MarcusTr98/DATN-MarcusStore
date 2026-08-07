@@ -421,7 +421,9 @@ public class OrderServiceImpl implements OrderService {
     public OrderDetailResponse cancelUserOrder(String orderCode, String reason) {
         Integer userId = SecurityUtils.getCurrentUserId();
 
-        Order order = orderRepository.findByOrderCodeAndUserUserId(orderCode, userId)
+        // Marcus sửa: khóa dòng Order trước khi kiểm tra và hoàn tài nguyên. Nhờ đó
+        // retry của khách không thể đua với IPN VNPAY, scheduler hoặc Admin hủy đơn.
+        Order order = orderRepository.findByOrderCodeAndUserIdForUpdate(orderCode, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
         // Marcus sửa: cho phép khách hủy cả COD và VNPAY trong các trạng thái an toàn.
