@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service.impl;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
@@ -15,9 +16,11 @@ import com.fpoly.marcusstore.dto.request.CreateUserRequest;
 import com.fpoly.marcusstore.dto.request.UpdateUserRequest;
 import com.fpoly.marcusstore.dto.response.UserResponse;
 import com.fpoly.marcusstore.entity.auth.EmailOTP;
+import com.fpoly.marcusstore.entity.auth.Permission;
 import com.fpoly.marcusstore.entity.auth.Role;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.repository.auth.EmailOTPRepository;
+import com.fpoly.marcusstore.repository.auth.PermissionRepository;
 import com.fpoly.marcusstore.repository.auth.RoleRepository;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
@@ -37,6 +40,7 @@ public class UserServiceImpl implements UserService {
     private final EmailService emailService;
     private final OtpService otpService;
     private final EmailOTPRepository emailOtpRepository;
+    private final PermissionRepository permissionRepository;
 
     private UserResponse toResponse(User user) {
         BigDecimal totalSpent = BigDecimal.ZERO;
@@ -132,6 +136,14 @@ public Page<UserResponse> getALL(
         user.setPhoneNumber(request.getPhoneNumber());
         user.setIsActive(true);
         user.setRole(role);
+        // Gán quyền theo các module được chọn
+if (request.getModuleNames() != null && !request.getModuleNames().isEmpty()) {
+
+    List<Permission> permissions =
+            permissionRepository.findByModuleNameIn(request.getModuleNames());
+
+    user.setPermissions(new HashSet<>(permissions));
+}
         user.setCreatedAt(LocalDateTime.now());
         return toResponse(userRepository.save(user));
     }
@@ -160,6 +172,16 @@ public Page<UserResponse> getALL(
         user.setPhoneNumber(request.getPhoneNumber());
         user.setIsActive(true);
         user.setRole(role);
+        // Cập nhật lại quyền theo module
+user.getPermissions().clear();
+
+if (request.getModuleNames() != null && !request.getModuleNames().isEmpty()) {
+
+    List<Permission> permissions =
+            permissionRepository.findByModuleNameIn(request.getModuleNames());
+
+    user.getPermissions().addAll(permissions);
+}
         user.setUpdatedAt(LocalDateTime.now());
 
         return toResponse(userRepository.save(user));

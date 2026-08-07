@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.service.impl;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.HashSet;
 import org.springframework.stereotype.Service;
 
@@ -49,7 +50,7 @@ public class PermissionServiceImpl
 @Override
 public List<Integer> getPermissionOfUser(Integer userId) {
 
-    User user = userRepository.findById(userId)
+    User user = userRepository.findByIdWithPermissions(userId)
             .orElseThrow(() ->
                     new RuntimeException("Không tìm thấy nhân viên"));
 
@@ -73,14 +74,26 @@ public void updateUserPermission(
         throw new RuntimeException("Chỉ được phân quyền cho STAFF");
     }
 
-    Set<Permission> permissions =
-            new HashSet<>(
-                    permissionRepository.findAllById(request.getPermissionIds())
-            );
+    Set<Permission> permissions;
+
+    // Ưu tiên xử lý moduleNames (từ frontend)
+    if (request.getModuleNames() != null && !request.getModuleNames().isEmpty()) {
+        permissions = new HashSet<>(
+                permissionRepository.findByModuleNameIn(request.getModuleNames())
+        );
+    } 
+    // Fallback: xử lý permissionIds (cách cũ)
+    else if (request.getPermissionIds() != null && !request.getPermissionIds().isEmpty()) {
+        permissions = new HashSet<>(
+                permissionRepository.findAllById(request.getPermissionIds())
+        );
+    } else {
+        // Không có quyền nào -> clear all
+        permissions = new HashSet<>();
+    }
 
     user.setPermissions(permissions);
 
     userRepository.save(user);
 }
-
 }
