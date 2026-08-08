@@ -1,5 +1,7 @@
 <template>
-  <section class="ai-briefing" :class="{ 'ai-briefing--ready': report }">
+  <section class="ai-briefing analysis-source-host" :class="{ 'ai-briefing--ready': report }">
+    <!-- Marcus thêm: nhãn nguồn giúp người dùng không nhầm nội dung Gemini với thuật toán. -->
+    <AnalysisSourceBadge source="ai" />
     <div class="ai-briefing__hero">
       <div class="ai-briefing__identity">
         <span class="ai-briefing__robot"><i class="bi bi-robot"></i></span>
@@ -155,6 +157,8 @@
 </template>
 
 <script setup>
+import AnalysisSourceBadge from '@/components/analytics/AnalysisSourceBadge.vue'
+
 defineProps({
   error: { type: String, default: '' },
   loading: { type: Boolean, default: false },

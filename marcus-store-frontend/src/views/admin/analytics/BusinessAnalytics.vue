@@ -59,7 +59,9 @@
         <div>
           <span>Dữ liệu hệ thống</span>
           <h2>Số liệu dùng để kiểm chứng phân tích</h2>
-          <p>KPI và lịch sử bán hàng được đặt sau phần kết luận để tránh biến trang thành Dashboard.</p>
+          <p>
+            KPI và lịch sử bán hàng được đặt sau phần kết luận để tránh biến trang thành Dashboard.
+          </p>
         </div>
         <i class="bi bi-database-check"></i>
       </div>
@@ -67,6 +69,8 @@
       <AnalyticsKpiGrid :overview="overview" />
 
       <AnalyticsCancellationReasons :reasons="cancellationReasons" />
+
+      <AnalyticsWarrantyQuality :data="warrantyQuality" />
 
       <AnalyticsSalesChart :monthly="numberOfDays > 120" :trend="trend" />
 
@@ -104,6 +108,7 @@ import AnalyticsKpiGrid from '@/components/analytics/AnalyticsKpiGrid.vue'
 import AnalyticsProductTable from '@/components/analytics/AnalyticsProductTable.vue'
 import AnalyticsCancellationReasons from '@/components/analytics/AnalyticsCancellationReasons.vue'
 import AnalyticsSalesChart from '@/components/analytics/AnalyticsSalesChart.vue'
+import AnalyticsWarrantyQuality from '@/components/analytics/AnalyticsWarrantyQuality.vue'
 import { useBusinessAnalytics } from '@/composables/useBusinessAnalytics'
 
 const {
@@ -126,6 +131,7 @@ const {
   toDate,
   today,
   trend,
+  warrantyQuality,
   applyCustomRange,
   applyPreset,
   generateAiReport,

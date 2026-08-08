@@ -31,7 +31,7 @@
 
 - `AiAdvisorServiceTest`: AI tư vấn chỉ dùng dữ liệu catalog công khai.
 - `AiUsageEventServiceTest`: ghi nhận lượt sử dụng/tư vấn theo tiêu chí hệ thống.
-- `AnalyticsServiceTest`: KPI, kỳ so sánh và dữ liệu xu hướng.
+- `AnalyticsServiceTest`: KPI, kỳ so sánh, xu hướng và chỉ số chất lượng bảo hành tổng hợp.
 - `AiAnalyticsServiceTest`: cấu hình, cache và payload gửi AI phân tích.
 - `AnalyticsRepositoryIntegrationTest`: kiểm tra truy vấn native của Analytics
   khi có database test phù hợp.

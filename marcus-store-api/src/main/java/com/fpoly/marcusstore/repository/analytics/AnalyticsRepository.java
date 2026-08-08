@@ -240,6 +240,69 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
             @Param("fromDateTime") LocalDateTime fromDateTime,
             @Param("toDateTimeExclusive") LocalDateTime toDateTimeExclusive);
 
+    /**
+     * Marcus thêm: Analytics chỉ đọc trạng thái/lý do bảo hành đã chuẩn hóa;
+     * không lấy mô tả khách nhập, admin_note, người dùng hay file đính kèm.
+     */
+    @Query(value = """
+            SELECT
+                COUNT_BIG(*) AS totalRequests,
+                COALESCE(SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END), 0) AS pendingRequests,
+                COALESCE(SUM(CASE WHEN status = 'CONFIRMED' THEN 1 ELSE 0 END), 0) AS processingRequests,
+                COALESCE(SUM(CASE WHEN status = 'APPROVED' THEN 1 ELSE 0 END), 0) AS approvedRequests,
+                COALESCE(SUM(CASE WHEN status = 'REJECTED' THEN 1 ELSE 0 END), 0) AS rejectedRequests
+            FROM Warranty_Returns
+            WHERE created_at >= :fromDateTime
+              AND created_at < :toDateTimeExclusive
+            """, nativeQuery = true)
+    WarrantySummaryProjection summarizeWarranties(
+            @Param("fromDateTime") LocalDateTime fromDateTime,
+            @Param("toDateTimeExclusive") LocalDateTime toDateTimeExclusive);
+
+    @Query(value = """
+            SELECT reason, COUNT_BIG(*) AS reasonCount
+            FROM Warranty_Returns
+            WHERE created_at >= :fromDateTime
+              AND created_at < :toDateTimeExclusive
+            GROUP BY reason
+            ORDER BY reasonCount DESC, reason
+            """, nativeQuery = true)
+    List<WarrantyReasonProjection> findWarrantyReasons(
+            @Param("fromDateTime") LocalDateTime fromDateTime,
+            @Param("toDateTimeExclusive") LocalDateTime toDateTimeExclusive);
+
+    @Query(value = """
+            SELECT
+                p.product_id AS productId,
+                p.product_name AS productName,
+                p.brand AS brand,
+                SUM(CASE WHEN warranty.created_at >= :currentFrom
+                          AND warranty.created_at < :currentToExclusive THEN 1 ELSE 0 END) AS currentRequests,
+                SUM(CASE WHEN warranty.created_at >= :previousFrom
+                          AND warranty.created_at < :previousToExclusive THEN 1 ELSE 0 END) AS previousRequests,
+                SUM(CASE WHEN warranty.created_at >= :currentFrom
+                          AND warranty.created_at < :currentToExclusive
+                          AND warranty.status = 'APPROVED' THEN 1 ELSE 0 END) AS approvedRequests,
+                SUM(CASE WHEN warranty.created_at >= :currentFrom
+                          AND warranty.created_at < :currentToExclusive
+                          AND warranty.status = 'REJECTED' THEN 1 ELSE 0 END) AS rejectedRequests
+            FROM Warranty_Returns warranty
+            INNER JOIN Order_Items item ON item.order_item_id = warranty.order_item_id
+            INNER JOIN Product_Skus sku ON sku.sku_id = item.sku_id
+            INNER JOIN Products p ON p.product_id = sku.product_id
+            WHERE warranty.created_at >= :previousFrom
+              AND warranty.created_at < :currentToExclusive
+            GROUP BY p.product_id, p.product_name, p.brand
+            HAVING SUM(CASE WHEN warranty.created_at >= :currentFrom
+                             AND warranty.created_at < :currentToExclusive THEN 1 ELSE 0 END) > 0
+            ORDER BY currentRequests DESC, productName
+            """, nativeQuery = true)
+    List<ProductWarrantyProjection> findProductWarrantyQuality(
+            @Param("currentFrom") LocalDateTime currentFrom,
+            @Param("currentToExclusive") LocalDateTime currentToExclusive,
+            @Param("previousFrom") LocalDateTime previousFrom,
+            @Param("previousToExclusive") LocalDateTime previousToExclusive);
+
     interface SalesSummaryProjection {
         Long getTotalOrders();
 
@@ -323,5 +386,39 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
         String getReason();
 
         Long getReasonCount();
+    }
+
+    interface WarrantySummaryProjection {
+        Long getTotalRequests();
+
+        Long getPendingRequests();
+
+        Long getProcessingRequests();
+
+        Long getApprovedRequests();
+
+        Long getRejectedRequests();
+    }
+
+    interface WarrantyReasonProjection {
+        String getReason();
+
+        Long getReasonCount();
+    }
+
+    interface ProductWarrantyProjection {
+        Integer getProductId();
+
+        String getProductName();
+
+        String getBrand();
+
+        Long getCurrentRequests();
+
+        Long getPreviousRequests();
+
+        Long getApprovedRequests();
+
+        Long getRejectedRequests();
     }
 }

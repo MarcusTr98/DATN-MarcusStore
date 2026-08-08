@@ -1,8 +1,10 @@
 <template>
   <section
-    class="analytics-insight-panel"
+    class="analytics-insight-panel analysis-source-host"
     :class="`analytics-insight-panel--${analysis.status.key}`"
   >
+    <!-- Marcus thêm: kết luận tại panel này do công thức so sánh KPI, không phải Gemini. -->
+    <AnalysisSourceBadge source="algorithm" />
     <div class="analytics-insight-panel__summary">
       <span class="analytics-insight-panel__status-icon">
         <i :class="analysis.status.icon"></i>
@@ -54,6 +56,8 @@
 </template>
 
 <script setup>
+import AnalysisSourceBadge from '@/components/analytics/AnalysisSourceBadge.vue'
+
 defineProps({
   analysis: { type: Object, required: true },
   forecast: { type: Object, default: null },

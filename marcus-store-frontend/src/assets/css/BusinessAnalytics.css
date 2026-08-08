@@ -674,7 +674,8 @@
   --insight-color: #1769ca;
   --insight-soft: #eef6ff;
   margin-top: 16px;
-  overflow: hidden;
+  /* Marcus sửa: cho tooltip nguồn phân tích thoát khỏi card thay vì bị cắt mất. */
+  overflow: visible;
   border: 1px solid #cddded;
   border-radius: 16px;
   background: #fff;
@@ -735,6 +736,9 @@
   display: flex;
   align-items: flex-end;
   flex-direction: column;
+  /* Marcus sửa: chừa vùng hiển thị cho nhãn nguồn "Thuật toán", tránh che số dự báo. */
+  min-width: 150px;
+  padding-top: 30px;
   padding-left: 18px;
   border-left: 1px solid #dbe5ef;
 }
@@ -862,6 +866,9 @@
   display: flex;
   align-items: flex-end;
   flex-direction: column;
+  /* Marcus sửa: badge nguồn đặt ở góc phải nên khối số liệu bắt đầu thấp hơn badge. */
+  min-width: 170px;
+  padding-top: 30px;
 }
 
 .analytics-forecast-total small,
@@ -1493,7 +1500,7 @@
   .ai-briefing__hero {
     align-items: flex-start;
     flex-direction: column;
-    padding: 18px;
+    padding: 50px 18px 18px;
   }
 
   .ai-briefing__identity {
@@ -1552,6 +1559,7 @@
   .analytics-insight-panel__summary {
     align-items: flex-start;
     flex-wrap: wrap;
+    padding-top: 50px;
   }
 
   .analytics-insight-panel__forecast {
@@ -1560,6 +1568,10 @@
     padding: 10px 0 0;
     border-top: 1px solid #dbe5ef;
     border-left: 0;
+  }
+
+  .analytics-forecast-chart .analytics-panel__header {
+    padding-top: 34px;
   }
 
   .analytics-insight-grid,
@@ -1604,3 +1616,14 @@
     inset: 160px 14px auto;
   }
 }
+.analysis-source-host {
+  position: relative;
+}
+
+/* Marcus sửa: các panel có hành động/số liệu bên phải đều dành riêng khoảng trống cho badge nguồn. */
+.ai-briefing.analysis-source-host .ai-briefing__action,
+.warranty-quality.analysis-source-host header > strong {
+  padding-top: 32px;
+}
+
+.analytics-table-pagination{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:14px}.analytics-table-pagination>span{font-size:13px;color:#6d7f98}.analytics-table-pagination>div{display:flex;gap:6px}.analytics-table-pagination button{display:grid;place-items:center;min-width:34px;height:34px;padding:0 8px;border:1px solid #dbe5f2;border-radius:9px;background:#fff;color:#4e6079;font-weight:700}.analytics-table-pagination button:hover:not(:disabled),.analytics-table-pagination button.active{border-color:#6f4bc4;background:#6f4bc4;color:#fff}.analytics-table-pagination button:disabled{opacity:.4;cursor:not-allowed}

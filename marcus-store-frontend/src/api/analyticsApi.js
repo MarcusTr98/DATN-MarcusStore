@@ -33,6 +33,11 @@ const analyticsApi = {
     return get('/admin/analytics/cancellation-reasons', params)
   },
 
+  // Marcus thêm: đọc dữ liệu bảo hành đã tổng hợp cho Analytics.
+  getWarrantyQuality(params) {
+    return get('/admin/analytics/warranty-quality', params)
+  },
+
   getSavedAiReport(params) {
     return get('/admin/analytics/ai-report', params)
   },

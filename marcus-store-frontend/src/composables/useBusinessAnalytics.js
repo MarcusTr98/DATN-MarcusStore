@@ -29,6 +29,7 @@ export function useBusinessAnalytics() {
   const dailyTrend = ref([])
   const products = ref([])
   const cancellationReasons = ref([])
+  const warrantyQuality = ref(null)
   const loading = ref(false)
   const errorMessage = ref('')
   const aiReport = ref(null)
@@ -265,22 +266,30 @@ export function useBusinessAnalytics() {
     const params = { fromDate: fromDate.value, toDate: toDate.value }
 
     try {
-      const [overviewResponse, trendResponse, productsResponse, cancellationResponse, aiUsageResponse] =
-        await Promise.all([
-          analyticsApi.getOverview(params),
-          analyticsApi.getSalesTrend(params),
-          analyticsApi.getProductTrends({ ...params, limit: 12 }),
-          analyticsApi.getCancellationReasons(params),
-          // Marcus sửa: telemetry là phần bổ sung; chưa chạy migration không được
-          // làm hỏng toàn bộ trang phân tích kinh doanh.
-          analyticsApi.getAiUsageSummary(params).catch(() => null),
-        ])
+      const [
+        overviewResponse,
+        trendResponse,
+        productsResponse,
+        cancellationResponse,
+        warrantyResponse,
+        aiUsageResponse,
+      ] = await Promise.all([
+        analyticsApi.getOverview(params),
+        analyticsApi.getSalesTrend(params),
+        analyticsApi.getProductTrends({ ...params, limit: 12 }),
+        analyticsApi.getCancellationReasons(params),
+        analyticsApi.getWarrantyQuality({ ...params, limit: 10 }),
+        // Marcus sửa: telemetry là phần bổ sung; chưa chạy migration không được
+        // làm hỏng toàn bộ trang phân tích kinh doanh.
+        analyticsApi.getAiUsageSummary(params).catch(() => null),
+      ])
       if (currentRequest !== requestVersion) return
 
       overview.value = unwrap(overviewResponse)
       dailyTrend.value = unwrap(trendResponse) || []
       products.value = unwrap(productsResponse) || []
       cancellationReasons.value = unwrap(cancellationResponse) || []
+      warrantyQuality.value = unwrap(warrantyResponse) || null
       aiUsage.value = unwrap(aiUsageResponse) || null
       await loadSavedAiReport(currentRequest)
     } catch (error) {
@@ -335,6 +344,7 @@ export function useBusinessAnalytics() {
     toDate,
     today,
     trend,
+    warrantyQuality,
     applyCustomRange,
     applyPreset,
     generateAiReport,

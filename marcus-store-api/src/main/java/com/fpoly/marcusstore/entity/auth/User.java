@@ -55,20 +55,13 @@ public class User {
     @JoinColumn(name = "role_id", nullable = false)
     @JsonIgnore
     private Role role;
-@ManyToMany(fetch = FetchType.LAZY)
-@JoinTable(
-        name = "User_Permissions",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "permission_id")
-)
-@JsonIgnore
-private Set<Permission> permissions = new HashSet<>();
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "User_Permissions", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "permission_id"))
+    @JsonIgnore
+    private Set<Permission> permissions = new HashSet<>();
     @Column(name = "email_verified")
     private Boolean emailVerified;
-    
+
     @Column(name = "google_account_id")
     private String googleAccountId;
-
-    @Column(name = "facebook_account_id")
-    private String facebookAccountId;
 }

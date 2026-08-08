@@ -39,7 +39,9 @@ import java.util.stream.Collectors;
 public class AiAnalyticsService {
 
     private static final Duration DOUBLE_SUBMIT_GUARD = Duration.ofSeconds(20);
-    private static final String METRIC_SCHEMA_VERSION = "recognized-revenue-v2";
+    // Marcus sửa: đổi version để báo cáo cache cũ không che mất dữ liệu bảo hành
+    // mới.
+    private static final String METRIC_SCHEMA_VERSION = "recognized-revenue-warranty-v3";
     private static final int PRODUCT_LIMIT = 10;
     private static final Set<String> OUTLOOKS = Set.of("GROWTH", "STEADY", "DECLINE", "UNCERTAIN");
     private static final Set<String> SEVERITIES = Set.of("POSITIVE", "INFO", "WARNING", "CRITICAL");
@@ -184,6 +186,12 @@ public class AiAnalyticsService {
         // Marcus thêm: AI chỉ nhận nhóm lý do và số đếm đã chuẩn hóa, không nhận
         // ghi chú hủy tự do hay thông tin nhận diện khách hàng.
         context.put("cancellationReasons", cancellationReasons);
+        // Marcus thêm: chỉ chuyển các số đếm/lý do enum theo sản phẩm; tuyệt đối
+        // không gửi description, admin_note, user hay attachment của bảo hành.
+        context.put(
+                "warrantyQuality",
+                analyticsService.getWarrantyAnalytics(
+                        overview.period().fromDate(), overview.period().toDate(), PRODUCT_LIMIT));
         try {
             // Marcus thêm: AI chỉ nhận thống kê hành vi đã tổng hợp, không nhận
             // sessionId hay nội dung câu hỏi của từng khách.
@@ -275,6 +283,11 @@ public class AiAnalyticsService {
                 Không bịa tin thị trường, tồn kho, nguyên nhân hoặc con số tương lai.
                 aiAdvisorUsage chỉ là số liệu tổng hợp ẩn danh; dùng để đánh giá mức khách tương tác với tư vấn AI.
                 cancellationReasons là thống kê lý do đã chuẩn hóa; dùng nó để giải thích tỷ lệ hủy, không tự bịa nguyên nhân.
+                warrantyQuality là dữ liệu bảo hành tổng hợp theo ngày tạo yêu cầu và theo sản phẩm.
+                Dùng warrantyQuality để phát hiện áp lực hậu mãi, nhóm lý do nổi bật và sản phẩm cần kiểm tra chất lượng.
+                Không gọi số yêu cầu bảo hành là tỷ lệ lỗi tuyệt đối vì yêu cầu có thể phát sinh sau kỳ bán hàng.
+                approvalRate chỉ tính trên yêu cầu đã APPROVED hoặc REJECTED; PENDING/CONFIRMED chưa có kết luận.
+                Nếu một sản phẩm có ít yêu cầu, phải ghi rõ dữ liệu còn ít và không kết luận chất lượng kém.
                 salesTrendBuckets là chuỗi thời gian đã nén theo thứ tự cũ đến mới;
                 dùng để nhận diện đà tăng/giảm, điểm bứt phá và mức biến động thay vì chỉ đọc tổng KPI.
                 Không đưa ra con số dự báo doanh thu tuyệt đối nếu chuỗi biến động mạnh hoặc dữ liệu quá ít.

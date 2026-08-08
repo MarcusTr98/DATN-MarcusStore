@@ -1,5 +1,7 @@
 <template>
-  <article class="analytics-panel analytics-forecast-chart">
+  <article class="analytics-panel analytics-forecast-chart analysis-source-host">
+    <!-- Marcus thêm: dự báo hồi quy tuyến tính được ghi rõ là Thuật toán. -->
+    <AnalysisSourceBadge source="algorithm" />
     <div class="analytics-panel__header">
       <div>
         <span class="analytics-panel__eyebrow">Dự báo thống kê</span>
@@ -25,6 +27,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import AnalysisSourceBadge from '@/components/analytics/AnalysisSourceBadge.vue'
 
 const props = defineProps({
   forecast: { type: Object, required: true },
