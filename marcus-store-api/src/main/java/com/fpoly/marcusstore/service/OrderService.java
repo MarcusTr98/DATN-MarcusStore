@@ -1,7 +1,9 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.dto.request.UpdateOrderImeiRequest;
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
+import com.fpoly.marcusstore.dto.response.OrderImeiAssignmentResponse;
 import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
 import org.springframework.data.domain.Page;
@@ -34,4 +36,8 @@ public interface OrderService {
 
     OrderDetailResponse confirmUserReceivedOrder(String orderCode);
 
+    //Đức thêm xử lý imei cho order
+    List<OrderImeiAssignmentResponse> getImeiPreview(String orderCode);
+
+    OrderDetailResponse assignOrderImeis(String orderCode, List<UpdateOrderImeiRequest> requests);
 }

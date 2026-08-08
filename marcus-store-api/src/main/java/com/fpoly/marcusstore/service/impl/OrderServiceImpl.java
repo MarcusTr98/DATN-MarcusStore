@@ -1,14 +1,19 @@
 package com.fpoly.marcusstore.service.impl;
 
+import com.fpoly.marcusstore.dto.request.UpdateOrderImeiRequest;
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.*;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.Product;
+import com.fpoly.marcusstore.entity.core.ProductItem;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.repository.statistics.CommentEvaluationRepository;
@@ -18,6 +23,7 @@ import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderPaymentService;
 import com.fpoly.marcusstore.service.OrderService;
 import com.fpoly.marcusstore.service.OrderShippingService;
+import com.fpoly.marcusstore.service.ProductItemService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
 import com.fpoly.marcusstore.service.UserNotificationService;
 
@@ -37,6 +43,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
+    private final OrderItemRepository orderItemRepository;
+    private final ProductItemRepository productItemRepository;
     private final OrderRepository orderRepository;
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
@@ -53,6 +61,11 @@ public class OrderServiceImpl implements OrderService {
     // nên không thể chỉ hủy nội bộ rồi để vận đơn tiếp tục giao.
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of(
             "PENDING", "CONFIRMED", "PROCESSING", "READY_FOR_PICKUP");
+
+    // Marcus thêm: IMEI chỉ gồm chữ số, độ dài 8-20. Validate chặt để FE gõ nhầm
+    // IMEI ngắn/dài/ký tự đặc biệt sẽ bị BE chặn ngay tại đầu vào.
+    private static final java.util.regex.Pattern IMEI_PATTERN =
+            java.util.regex.Pattern.compile("^[0-9]{8,20}$");
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -485,5 +498,237 @@ public class OrderServiceImpl implements OrderService {
                         : "Khách hàng đã xác nhận nhận hàng từ đơn vị vận chuyển.",
                 order.getOrderCode());
         return response;
+    }
+
+    //Đức thêm xử lý imei cho order
+    @Override
+    @Transactional(readOnly = true)
+    public List<OrderImeiAssignmentResponse> getImeiPreview(String orderCode) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+
+        return orderItems.stream().map(item -> {
+            ProductSku sku = item.getSku();
+            boolean hasImei = sku.getProduct() != null && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
+
+            List<OrderImeiAssignmentResponse.ImeiDetailItem> available = java.util.Collections.emptyList();
+            List<String> assignedImeis = item.getProductItems().stream()
+                    .map(ProductItem::getImeiCode)
+                    .toList();
+            if (hasImei) {
+                List<ProductItem> availableItems = productItemRepository.findAvailableBySkuId(sku.getSkuId());
+                available = availableItems.stream()
+                        .map(pi -> OrderImeiAssignmentResponse.ImeiDetailItem.builder()
+                                .itemId(pi.getItemId())
+                                .imeiCode(pi.getImeiCode())
+                                .status(pi.getStatus())
+                                .statusLabel(ProductItemService.toStatusLabel(pi.getStatus()))
+                                .createdAt(pi.getCreatedAt())
+                                .build())
+                        .toList();
+            }
+
+            return OrderImeiAssignmentResponse.builder()
+                    .orderItemId(item.getOrderItemId())
+                    .skuCode(sku.getSkuCode())
+                    .productName(sku.getProduct() != null ? sku.getProduct().getProductName() : "")
+                    .quantityOrdered(item.getQuantity())
+                    .quantityAssigned(item.getProductItems().size())
+                    .assignedImeis(assignedImeis)
+                    .availableImeis(available)
+                    .build();
+        }).toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OrderDetailResponse assignOrderImeis(String orderCode, List<UpdateOrderImeiRequest> requests) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+
+        // Marcus sửa: chỉ cho phép gán IMEI khi đơn đang ở PROCESSING hoặc READY_FOR_PICKUP.
+        // - PROCESSING: flow COD (PROCESSING → PACKED) hoặc STORE_PICKUP (PROCESSING → READY_FOR_PICKUP).
+        // - READY_FOR_PICKUP: trường hợp admin đã chuyển READY_FOR_PICKUP trước đó nhưng sau
+        //   đó muốn bổ sung IMEI cho dòng chưa có IMEI (fix gán bổ sung sau auto-transition).
+        // Tránh gán IMEI trên đơn đã SHIPPING/DELIVERED/COMPLETED — lúc đó IMEI thực tế đang
+        // ở kho khách, việc đụng vào IMEI là sai nghiệp vụ.
+        String currentStatus = normalizeStatusValue(order.getOrderStatus());
+        if (!"PROCESSING".equals(currentStatus) && !"READY_FOR_PICKUP".equals(currentStatus)) {
+            throw new RuntimeException(
+                    "Chỉ có thể gán IMEI khi đơn đang ở trạng thái Đang chuẩn bị hoặc Sẵn sàng nhận tại cửa hàng");
+        }
+
+        if (requests == null || requests.isEmpty()) {
+            // Không có dòng nào cần gán → bỏ qua, đơn vẫn ở trạng thái hiện tại.
+            return getOrderDetailResponse(orderCode);
+        }
+
+        // Marcus gom tất cả IMEI của toàn bộ request để check trùng giữa các dòng đơn
+        // (Bug 3: admin nhập nhầm cùng IMEI cho 2 dòng khác nhau).
+        Map<Integer, List<String>> imeisByOrderItem = new java.util.LinkedHashMap<>();
+        for (UpdateOrderImeiRequest req : requests) {
+            OrderItem orderItem = orderItemRepository.findById(req.getOrderItemId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Không tìm thấy dòng đơn hàng: " + req.getOrderItemId()));
+
+            if (!orderItem.getOrder().getOrderId().equals(order.getOrderId())) {
+                throw new RuntimeException("Dòng đơn hàng không thuộc đơn này");
+            }
+
+            ProductSku sku = orderItem.getSku();
+            boolean hasImei = sku.getProduct() != null
+                    && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
+            if (!hasImei) {
+                throw new RuntimeException("SKU " + sku.getSkuCode() + " không phải sản phẩm có IMEI");
+            }
+
+            // Marcus sửa: cho phép gán bổ sung — chỉ validate số lượng mới nhập, không
+            // yêu cầu bằng tổng quantity. Admin có thể gán dần qua nhiều lần.
+            long alreadyAssigned = productItemRepository.countByOrderItemId(orderItem.getOrderItemId());
+            int remaining = orderItem.getQuantity() - (int) alreadyAssigned;
+            if (remaining <= 0) {
+                throw new RuntimeException("SKU " + sku.getSkuCode() + " đã gán đủ IMEI");
+            }
+
+            List<String> cleaned = req.getImeiCodes() == null ? java.util.Collections.emptyList()
+                    : req.getImeiCodes().stream()
+                            .map(s -> s == null ? "" : s.trim())
+                            .filter(s -> !s.isEmpty())
+                            .distinct()
+                            .toList();
+
+            for (String code : cleaned) {
+                if (!IMEI_PATTERN.matcher(code).matches()) {
+                    throw new RuntimeException(
+                            "IMEI '" + code + "' không hợp lệ (chỉ chấp nhận chữ số, 8-20 ký tự)");
+                }
+            }
+
+            if (cleaned.size() > remaining) {
+                throw new RuntimeException("SKU " + sku.getSkuCode() + " chỉ còn "
+                        + remaining + " IMEI cần gán nhưng nhập " + cleaned.size() + " mã");
+            }
+
+            imeisByOrderItem.put(orderItem.getOrderItemId(), cleaned);
+        }
+
+        List<String> allImeis = imeisByOrderItem.values().stream()
+                .flatMap(List::stream)
+                .toList();
+        Set<String> uniqueImeis = new java.util.HashSet<>(allImeis);
+        if (uniqueImeis.size() != allImeis.size()) {
+            Set<String> seen = new java.util.HashSet<>();
+            Set<String> duplicates = new java.util.LinkedHashSet<>();
+            for (String code : allImeis) {
+                if (!seen.add(code)) {
+                    duplicates.add(code);
+                }
+            }
+            throw new RuntimeException(
+                    "IMEI bị trùng giữa các dòng đơn: " + String.join(", ", duplicates));
+        }
+
+        Set<Integer> skuIds = requests.stream()
+                .map(req -> orderItemRepository.findById(req.getOrderItemId())
+                        .orElseThrow(() -> new RuntimeException(
+                                "Không tìm thấy dòng đơn hàng: " + req.getOrderItemId()))
+                        .getSku().getSkuId())
+                .collect(Collectors.toSet());
+
+        Map<Integer, ProductSku> lockedSkus = skuIds.isEmpty()
+                ? Map.of()
+                : productSkuRepository.findByIdsForUpdate(new java.util.ArrayList<>(skuIds)).stream()
+                        .collect(Collectors.toMap(ProductSku::getSkuId, s -> s));
+
+        List<ProductItem> lockedImeis = productItemRepository
+                .findAvailableByImeiCodesForUpdate(allImeis);
+        Map<String, ProductItem> imeiMap = lockedImeis.stream()
+                .collect(Collectors.toMap(ProductItem::getImeiCode, pi -> pi));
+
+        Set<String> missing = new java.util.LinkedHashSet<>();
+        for (String code : allImeis) {
+            if (!imeiMap.containsKey(code)) {
+                missing.add(code);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new RuntimeException(
+                    "IMEI không tồn tại hoặc không khả dụng: " + String.join(", ", missing));
+        }
+
+        for (Map.Entry<Integer, List<String>> entry : imeisByOrderItem.entrySet()) {
+            Integer orderItemId = entry.getKey();
+            OrderItem orderItem = orderItemRepository.findById(orderItemId).orElseThrow();
+            Integer skuId = orderItem.getSku().getSkuId();
+            for (String code : entry.getValue()) {
+                ProductItem pi = imeiMap.get(code);
+                if (!pi.getProductSku().getSkuId().equals(skuId)) {
+                    throw new RuntimeException(
+                            "IMEI " + code + " không thuộc SKU " + orderItem.getSku().getSkuCode());
+                }
+            }
+        }
+
+        for (UpdateOrderImeiRequest req : requests) {
+            OrderItem orderItem = orderItemRepository.findById(req.getOrderItemId())
+                    .orElseThrow(() -> new RuntimeException(
+                            "Không tìm thấy dòng đơn hàng: " + req.getOrderItemId()));
+            List<String> codes = imeisByOrderItem.get(orderItem.getOrderItemId());
+
+            for (String code : codes) {
+                ProductItem pi = imeiMap.get(code);
+                pi.setOrderItem(orderItem);
+                pi.setStatus(ProductItemService.STATUS_SOLD);
+                productItemRepository.save(pi);
+            }
+        }
+
+        order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+
+        boolean allItemsFullyAssigned = orderItems.stream().allMatch(orderItem -> {
+            ProductSku sku = orderItem.getSku();
+            boolean hasImei = sku.getProduct() != null
+                    && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
+            if (!hasImei)
+                return true;
+            long assignedCount = productItemRepository.countByOrderItemId(orderItem.getOrderItemId());
+            return assignedCount >= orderItem.getQuantity();
+        });
+
+        if (allItemsFullyAssigned) {
+            String status = normalizeStatusValue(order.getOrderStatus());
+            boolean storePickup = "STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod());
+            String nextStatus = null;
+            String note = null;
+            if ("PROCESSING".equals(status)) {
+                nextStatus = storePickup ? "READY_FOR_PICKUP" : "PACKED";
+                note = storePickup
+                        ? "Auto-transition: gán đủ IMEI cho đơn nhận tại cửa hàng"
+                        : "Auto-transition: gán đủ IMEI cho tất cả dòng đơn";
+            }
+
+            if (nextStatus != null) {
+                order.setOrderStatus(nextStatus);
+                orderRepository.save(order);
+
+                OrderStatusHistory history = createStatusHistory(order, nextStatus, note);
+                orderStatusHistoryRepository.save(history);
+
+                if ("PACKED".equals(nextStatus) && !storePickup) {
+                    try {
+                        orderShippingService.processCreateGhnOrder(order);
+                    } catch (Exception e) {
+                        System.err.println("Auto-create GHN order failed for "
+                                + order.getOrderCode() + ": " + e.getMessage());
+                    }
+                }
+            }
+        }
+
+        return getOrderDetailResponse(orderCode);
     }
 }

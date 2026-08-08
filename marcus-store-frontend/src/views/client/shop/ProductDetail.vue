@@ -115,13 +115,12 @@
 
       <!-- Reviews (panel riêng bên dưới) -->
       <div class="pd-reviews-section">
-<ProductReviews
-  :product-id="product.productId"
-  :product-name="product.productName"
-  :rating="product.rating || 0"
-  :review-count="product.reviewCount || 0"
-  :review-distribution="product.reviewDistribution || []"
-/>
+        <ProductReviews
+          :product-name="product.productName"
+          :rating="product.rating || 0"
+          :review-count="product.reviewCount || 0"
+          :review-distribution="product.reviewDistribution || []"
+        />
       </div>
     </div>
 
@@ -344,6 +343,25 @@ async function onBuyNow(quantity) {
     // Thêm vào giỏ trước
     const ok = await cartStore.addToCart(sku.skuId, quantity)
     if (ok) {
+      // Lấy cartItemId của item vừa thêm (cartItem là item có skuId khớp trong cart)
+      const addedItem = cartStore.items.find((i) => i.skuId === sku.skuId)
+      const cartItemId = addedItem?.cartItemId
+      if (cartItemId) {
+        // Marcus thêm: lưu quantity Buy Now riêng (đã chốt số lượng user chọn).
+        // Nếu SP đã tồn tại trong giỏ, backend có thể cộng dồn quantity → cartItem
+        // thật trong DB sẽ có quantity > quantity Buy Now. Checkout sẽ dùng quantity
+        // Buy Now tại đây để KHÔNG lấy nhầm số lượng từ cart hiện tại.
+        sessionStorage.setItem(
+          'buyNowCartItemIds',
+          JSON.stringify([cartItemId]),
+        )
+        sessionStorage.setItem(
+          'buyNowCartItemQuantities',
+          JSON.stringify({
+            [cartItemId]: quantity,
+          }),
+        )
+      }
       // Đi thẳng sang /checkout
       router.push('/checkout')
     } else {

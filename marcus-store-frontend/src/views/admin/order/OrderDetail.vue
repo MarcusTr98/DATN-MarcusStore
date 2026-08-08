@@ -483,6 +483,133 @@
 
     <div class="order-detail-toast" :class="{ show: toastMessage }">{{ toastMessage }}</div>
 
+    <!-- Modal nhập IMEI khi bắt đầu chuẩn bị hàng -->
+    <div class="modal fade" id="imeiPrepareModal" tabindex="-1" ref="imeiPrepareModalRef">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="bi bi-upc-scan me-2"></i>Nhập IMEI cho đơn hàng
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="loadingImeiPreview" class="text-center py-4">
+              <div class="spinner-border text-primary" role="status"></div>
+              <p class="mt-2 text-muted small">Đang tải IMEI khả dụng...</p>
+            </div>
+
+            <template v-else>
+              <div class="alert alert-info small mb-3">
+                <i class="bi bi-info-circle me-1"></i>
+                Vui lòng nhập đủ IMEI cho các sản phẩm có quản lý IMEI bên dưới.
+                Mỗi sản phẩm cần đúng <strong>số lượng đã đặt</strong> mã IMEI.
+              </div>
+
+              <div v-if="!imeiPreviewItems.length" class="text-center text-muted py-3">
+                Đơn hàng không có sản phẩm nào yêu cầu IMEI.
+              </div>
+
+              <div
+                v-for="item in imeiPreviewItems"
+                :key="item.orderItemId"
+                class="imei-item-card mb-3"
+              >
+                <div class="imei-item-header">
+                  <div>
+                    <strong>{{ item.productName }}</strong>
+                    <span class="sku-badge ms-2">{{ item.skuCode }}</span>
+                  </div>
+                  <div class="text-end">
+                    <span class="badge" :class="item.quantityAssigned >= item.quantityOrdered ? 'bg-success' : 'bg-warning'">
+                      {{ item.quantityAssigned }} / {{ item.quantityOrdered }} IMEI
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Đã gán đủ -->
+                <div v-if="item.quantityAssigned >= item.quantityOrdered" class="imei-assigned-list mt-2">
+                  <div v-for="assigned in item.assignedImeis" :key="assigned" class="imei-tag assigned">
+                    <i class="bi bi-check-circle me-1"></i>{{ assigned }}
+                  </div>
+                </div>
+
+                <!-- Chưa gán đủ -->
+                <template v-else>
+                  <div class="mt-2">
+                    <!-- Nút chọn từ IMEI có sẵn -->
+                    <div v-if="item.availableImeis.length > 0">
+                      <label class="form-label small mb-1 fw-semibold">
+                        Chọn IMEI khả dụng ({{ item.quantityOrdered - item.quantityAssigned }} mã còn thiếu):
+                      </label>
+                      <div class="d-flex flex-wrap gap-2 mb-3">
+                        <button
+                          v-for="avail in item.availableImeis"
+                          :key="avail.itemId"
+                          type="button"
+                          class="btn btn-sm imei-select-btn"
+                          :class="isImeiSelected(item.orderItemId, avail.imeiCode) ? 'btn-success selected' : 'btn-outline-success'"
+                          @click="toggleImei(item.orderItemId, avail)"
+                        >
+                          <i :class="isImeiSelected(item.orderItemId, avail.imeiCode) ? 'bi bi-check-circle-fill' : 'bi bi-circle'"></i>
+                          {{ avail.imeiCode }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Nhập tay IMEI -->
+                    <div class="imei-manual-input">
+                      <label class="form-label small mb-1 fw-semibold">
+                        Nhập IMEI đơn hàng:
+                      </label>
+                      <div class="input-group input-group-sm mb-2">
+                        <input
+                          type="text"
+                          class="form-control"
+                          :placeholder="`Nhập IMEI rồi nhấn Enter (còn thiếu ${item.quantityOrdered - item.quantityAssigned} mã)`"
+                          @keydown.enter.prevent="addManualImei(item.orderItemId, $event)"
+                        />
+                      </div>
+                    </div>
+
+                    <!-- IMEI đã nhập/đã chọn -->
+                    <div v-if="(imeiInputByOrderItem[item.orderItemId] || []).length > 0" class="d-flex flex-wrap gap-2 mb-2">
+                      <span
+                        v-for="imei in imeiInputByOrderItem[item.orderItemId]"
+                        :key="imei"
+                        class="imei-tag manual"
+                      >
+                        {{ imei }}
+                        <button type="button" class="imei-remove-btn" @click="removeManualImei(item.orderItemId, imei)">
+                          <i class="bi bi-x"></i>
+                        </button>
+                      </span>
+                    </div>
+
+                    <div v-if="item.availableImeis.length === 0" class="text-danger small mt-1">
+                      <i class="bi bi-exclamation-triangle me-1"></i>
+                      Không có IMEI khả dụng trong kho.
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Hủy</button>
+            <button
+              class="btn btn-primary"
+              :disabled="submittingImei || !canSubmitImei"
+              @click="submitImeiAndProcess"
+            >
+              <span v-if="submittingImei" class="spinner-border spinner-border-sm me-1"></span>
+              Xác nhận IMEI &amp; Bắt đầu chuẩn bị
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <BaseModal
       :visible="statusSuccessModal"
       type="success"
@@ -524,6 +651,15 @@ const ADMIN_CANCEL_REASONS = [
 ]
 const selectedAdminCancelReason = ref('')
 const updatingStatus = ref(false)
+
+const imeiPrepareModalRef = ref(null)
+let imeiPrepareModalInstance = null
+const loadingImeiPreview = ref(false)
+const submittingImei = ref(false)
+const imeiPreviewItems = ref([])
+// Marcus thu gọn: chỉ lưu mảng IMEI user đã chọn/gõ cho mỗi orderItemId.
+// Mọi validate distinct/số lượng đều do backend đảm nhận — FE không tự tính.
+const imeiInputByOrderItem = ref({})
 
 async function fetchGetDetailOrder(orderCode) {
   try {
@@ -674,6 +810,17 @@ const finalAmount = computed(() => {
 
 const isStatusNoteRequired = computed(() => statusesRequiringNote.includes(selectedStatus.value))
 
+const canSubmitImei = computed(() => {
+  if (!imeiPreviewItems.value.length) return false
+  // FE chỉ check "đã đủ số lượng theo yêu cầu hay chưa" để khoá nút submit.
+  // Mọi validate nặng (IMEI trùng, format, thuộc SKU) do backend đảm nhận.
+  return imeiPreviewItems.value.every(item => {
+    const needed = item.quantityOrdered - item.quantityAssigned
+    const picked = (imeiInputByOrderItem.value[item.orderItemId] || []).length
+    return picked >= needed
+  })
+})
+
 const orderHistory = computed(() =>
   (orderDetail.value?.history || []).map((item) => ({
     status: item.status,
@@ -817,6 +964,99 @@ const showToast = (message) => {
   }, 2600)
 }
 
+// Marcus thu gọn FE: chỉ quản lý một mảng IMEI cho mỗi orderItemId.
+// Mọi check distinct/số lượng/FK đều đẩy về backend.
+function isImeiSelected(orderItemId, imeiCode) {
+  return (imeiInputByOrderItem.value[orderItemId] || []).includes(imeiCode)
+}
+
+function addManualImei(orderItemId, event) {
+  const input = event.target
+  const imei = input.value.trim()
+  if (!imei) return
+
+  const list = imeiInputByOrderItem.value[orderItemId] || []
+  const item = imeiPreviewItems.value.find(i => i.orderItemId === orderItemId)
+  if (!item) return
+  const needed = item.quantityOrdered - item.quantityAssigned
+  // Khoá cứng theo số lượng tối đa để tránh nhập dư quá nhiều → payload nặng.
+  if (list.length >= needed) {
+    showToast(`Đã đủ ${needed} IMEI cho dòng này`)
+    return
+  }
+  imeiInputByOrderItem.value[orderItemId] = [...list, imei]
+  input.value = ''
+}
+
+function removeManualImei(orderItemId, imei) {
+  const list = imeiInputByOrderItem.value[orderItemId] || []
+  imeiInputByOrderItem.value[orderItemId] = list.filter(code => code !== imei)
+}
+
+function toggleImei(orderItemId, availItem) {
+  const list = imeiInputByOrderItem.value[orderItemId] || []
+  if (list.includes(availItem.imeiCode)) {
+    imeiInputByOrderItem.value[orderItemId] = list.filter(code => code !== availItem.imeiCode)
+    return
+  }
+  const item = imeiPreviewItems.value.find(i => i.orderItemId === orderItemId)
+  if (!item) return
+  const needed = item.quantityOrdered - item.quantityAssigned
+  if (list.length >= needed) {
+    showToast(`Chỉ cần chọn đủ ${needed} IMEI cho dòng này`)
+    return
+  }
+  imeiInputByOrderItem.value[orderItemId] = [...list, availItem.imeiCode]
+}
+
+async function openImeiPrepareModal() {
+  loadingImeiPreview.value = true
+  imeiInputByOrderItem.value = {}
+  try {
+    const res = await OrderDetailApi.getImeiPreview(orderDetail.value.orderCode)
+    imeiPreviewItems.value = res.data || []
+  } catch (e) {
+    showToast('Không tải được danh sách IMEI')
+  } finally {
+    loadingImeiPreview.value = false
+  }
+  // Đợi Vue flush DOM (template `v-if/v-else` đã update) rồi mới show modal
+  await nextTick()
+  const inst = ensureImeiPrepareModalInstance()
+  inst?.show()
+}
+
+async function submitImeiAndProcess() {
+  submittingImei.value = true
+  try {
+    const requests = imeiPreviewItems.value
+      .map(item => ({
+        orderItemId: item.orderItemId,
+        imeiCodes: imeiInputByOrderItem.value[item.orderItemId] || [],
+      }))
+      .filter(req => req.imeiCodes.length > 0)
+
+    if (requests.length > 0) {
+      await OrderDetailApi.assignOrderImeis(orderDetail.value.orderCode, requests)
+    }
+
+    const inst = ensureImeiPrepareModalInstance()
+    inst?.hide()
+    await fetchGetDetailOrder(orderDetail.value.orderCode)
+    statusNote.value = ''
+    selectedAdminCancelReason.value = ''
+    // Marcus sửa: BE đã tự auto-transition (COD → PACKED, STORE_PICKUP → READY_FOR_PICKUP)
+    // và tạo vận đơn GHN cho COD khi gán đủ IMEI. Chỉ cần hiển thị thông báo.
+    statusSuccessMessage.value = `Đơn ${orderDetail.value.orderCode} đã gán IMEI thành công.`
+    statusSuccessModal.value = true
+  } catch (e) {
+    showToast(e?.response?.data?.message || 'Gán IMEI thất bại')
+    submittingImei.value = false
+    return
+  }
+  submittingImei.value = false
+}
+
 const saveStatusUpdate = async () => {
   try {
     updatingStatus.value = true
@@ -836,6 +1076,32 @@ const saveStatusUpdate = async () => {
 
     if (isStatusNoteRequired.value && !resolvedNote) {
       showToast('Vui lòng nhập lý do cho trạng thái này.')
+      return
+    }
+
+    // Nếu chuyển sang PROCESSING → cập nhật trạng thái trước, sau đó mở modal
+    // nhập IMEI. Việc gọi IMEI nằm sau khi đơn đã sang PROCESSING để admin có
+    // thể gán IMEI ngay trên trạng thái mới và nhận toast/thông báo thành công.
+    if (selectedStatus.value === 'PROCESSING') {
+      const orderCode = orderDetail.value.orderCode
+      try {
+        const response = await OrderDetailApi.updateStatusOrder(orderCode, {
+          status: selectedStatus.value,
+          note: null,
+        })
+        orderDetail.value = response.data
+        await fetchGetDetailOrder(orderCode)
+      } catch (e) {
+        const message =
+          e.response?.data?.message ||
+          e.response?.data ||
+          'Cập nhật trạng thái đơn hàng không thành công'
+        error.value = message
+        showToast(message)
+        return
+      }
+      await openImeiPrepareModal()
+      updatingStatus.value = false
       return
     }
 
@@ -959,5 +1225,18 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeprint', onBeforePrint)
   window.removeEventListener('afterprint', onAfterPrint)
   resetPrintScale()
+  imeiPrepareModalInstance?.dispose?.()
+  imeiPrepareModalInstance = null
 })
+
+function ensureImeiPrepareModalInstance() {
+  if (imeiPrepareModalInstance) return imeiPrepareModalInstance
+  const el = imeiPrepareModalRef.value
+  if (!el || !window.bootstrap?.Modal) {
+    console.warn('[OrderDetail] Modal element chưa sẵn sàng hoặc Bootstrap JS chưa load')
+    return null
+  }
+  imeiPrepareModalInstance = window.bootstrap.Modal.getOrCreateInstance(el)
+  return imeiPrepareModalInstance
+}
 </script>
