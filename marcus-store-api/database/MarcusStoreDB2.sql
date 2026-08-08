@@ -304,35 +304,65 @@ CREATE TABLE Orders (
     payment_status   NVARCHAR(50)   DEFAULT N'UNPAID',
     transaction_id   VARCHAR(100)   NULL,
     order_status     NVARCHAR(50)   DEFAULT N'PENDING',
-    fulfillment_method VARCHAR(30)  NOT NULL
-        CONSTRAINT DF_Orders_FulfillmentMethod DEFAULT 'DELIVERY',
-    -- Marcus thêm: khóa idempotency Checkout và trạng thái tích hợp GHN.
+    -- Marcus thêm: khóa idempotency Checkout; thông tin giao nhận/GHN nằm ở
+    -- Order_Shipping_Details để Orders chỉ giữ dữ liệu lõi.
     checkout_request_id VARCHAR(64) NULL,
-    ghn_integration_status VARCHAR(30) NOT NULL
-        CONSTRAINT DF_Orders_GhnIntegrationStatus DEFAULT 'NOT_REQUIRED',
-    ghn_retry_count INT NOT NULL CONSTRAINT DF_Orders_GhnRetryCount DEFAULT 0,
-    ghn_last_error NVARCHAR(500) NULL,
-    ghn_last_attempt_at DATETIME2 NULL,
     created_at       DATETIME2      DEFAULT GETDATE(),
     updated_at       DATETIME2      DEFAULT GETDATE(),
     CONSTRAINT PK_Orders          PRIMARY KEY (order_id),
     CONSTRAINT FK_Orders_Users    FOREIGN KEY (user_id)    REFERENCES Users(user_id),
-    CONSTRAINT FK_Orders_Vouchers FOREIGN KEY (voucher_id) REFERENCES Vouchers(voucher_id) ON DELETE SET NULL,
-    CONSTRAINT CK_Orders_FulfillmentMethod
-        CHECK (fulfillment_method IN ('DELIVERY', 'STORE_PICKUP'))
+    CONSTRAINT FK_Orders_Vouchers FOREIGN KEY (voucher_id) REFERENCES Vouchers(voucher_id) ON DELETE SET NULL
 );
 CREATE UNIQUE INDEX UX_Orders_CheckoutRequestId
     ON Orders(checkout_request_id)
     WHERE checkout_request_id IS NOT NULL;
-ALTER TABLE Orders ADD shipping_fee DECIMAL(18,2) DEFAULT 0 CHECK (shipping_fee >= 0);
-ALTER TABLE Orders ADD tracking_code VARCHAR(100) NULL;
 ALTER TABLE Orders ADD payment_date DATETIME2;
--- transaction GHN Marcus
-ALTER TABLE Orders ADD to_district_id INT NULL;
-ALTER TABLE Orders ADD to_ward_code VARCHAR(20) NULL;
-ALTER TABLE Orders ADD shipping_subsidy DECIMAL(18,2) DEFAULT 0 CHECK (shipping_subsidy >= 0);
-ALTER TABLE Orders ADD customer_shipping_fee DECIMAL(18,2) NULL;
-ALTER TABLE Orders ADD delivery_note NVARCHAR(500) NULL;
+
+-- Marcus thêm: snapshot giao nhận và trạng thái tích hợp GHN tách khỏi Orders.
+CREATE TABLE Order_Shipping_Details (
+    order_id                 INT NOT NULL,
+    fulfillment_method       VARCHAR(30) NOT NULL DEFAULT 'DELIVERY',
+    shipping_fee             DECIMAL(18,2) NULL,
+    shipping_subsidy         DECIMAL(18,2) NOT NULL DEFAULT 0,
+    customer_shipping_fee    DECIMAL(18,2) NULL,
+    tracking_code            VARCHAR(100) NULL,
+    to_district_id           INT NULL,
+    to_ward_code             VARCHAR(20) NULL,
+    delivery_note            NVARCHAR(500) NULL,
+    ghn_integration_status   VARCHAR(30) NOT NULL DEFAULT 'NOT_REQUIRED',
+    ghn_retry_count          INT NOT NULL DEFAULT 0,
+    ghn_last_error           NVARCHAR(500) NULL,
+    ghn_last_attempt_at      DATETIME2 NULL,
+    CONSTRAINT PK_Order_Shipping_Details PRIMARY KEY (order_id),
+    CONSTRAINT FK_OrderShipping_Orders FOREIGN KEY (order_id)
+        REFERENCES Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT CK_OrderShipping_Fulfillment
+        CHECK (fulfillment_method IN ('DELIVERY', 'STORE_PICKUP')),
+    CONSTRAINT CK_OrderShipping_Fees CHECK (
+        (shipping_fee IS NULL OR shipping_fee >= 0)
+        AND shipping_subsidy >= 0
+        AND (customer_shipping_fee IS NULL OR customer_shipping_fee >= 0)
+    ),
+    CONSTRAINT CK_OrderShipping_GhnRetry CHECK (ghn_retry_count >= 0)
+);
+CREATE UNIQUE INDEX UX_OrderShipping_TrackingCode
+    ON Order_Shipping_Details(tracking_code)
+    WHERE tracking_code IS NOT NULL;
+
+-- Marcus thêm: một quyết định hủy có cấu trúc cho mỗi đơn; timeline trình bày
+-- vẫn nằm ở Order_Status_History.
+CREATE TABLE Order_Cancellations (
+    order_id       INT NOT NULL,
+    reason_code    VARCHAR(50) NOT NULL,
+    actor_type     VARCHAR(20) NOT NULL,
+    detail         NVARCHAR(500) NULL,
+    cancelled_at   DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT PK_Order_Cancellations PRIMARY KEY (order_id),
+    CONSTRAINT FK_OrderCancellations_Orders FOREIGN KEY (order_id)
+        REFERENCES Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT CK_OrderCancellations_Actor
+        CHECK (actor_type IN ('CUSTOMER', 'ADMIN', 'SYSTEM', 'GHN'))
+);
 
 
 CREATE TABLE Order_Items (

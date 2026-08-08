@@ -20,6 +20,8 @@ public class BackupOverviewResponse {
     public static class TableOverview {
         private String schema;
         private String table;
+        // Marcus thêm: giúp Admin biết quy mô cấu trúc, không chỉ số bản ghi.
+        private int columnCount;
         private long records;
     }
 }

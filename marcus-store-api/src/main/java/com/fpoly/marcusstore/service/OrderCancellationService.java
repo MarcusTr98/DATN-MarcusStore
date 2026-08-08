@@ -73,6 +73,9 @@ public class OrderCancellationService {
         order.setOrderStatus("CANCELLED");
         order.setCancellationActor(normalizeActor(actor));
         order.setCancellationReasonCode(CancellationReasonCatalog.normalizeCode(reasonCode, actor));
+        // Marcus thêm: ghi chú nghiệp vụ chi tiết nằm ở bảng hủy riêng; timeline
+        // vẫn giữ bản trình bày lịch sử cho Admin/khách hàng.
+        order.setCancellationDetail(normalizeDetail(reason));
         order.setCancelledAt(LocalDateTime.now());
         orderRepository.save(order);
         if (paidByVnPay) {
@@ -89,6 +92,14 @@ public class OrderCancellationService {
             case "CUSTOMER", "ADMIN", "SYSTEM", "GHN" -> actor.trim().toUpperCase();
             default -> "SYSTEM";
         };
+    }
+
+    private String normalizeDetail(String detail) {
+        if (detail == null || detail.isBlank()) {
+            return null;
+        }
+        String normalized = detail.trim().replaceAll("\\s+", " ");
+        return normalized.length() <= 500 ? normalized : normalized.substring(0, 500);
     }
 
     // Marcus thêm: IPN thành công đến sau scheduler không được hoàn kho/voucher lần

@@ -50,11 +50,9 @@ public class AttributeValueController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ATTRIBUTE_VALUE_DELETE')")
     public ResponseEntity<ApiResponse<String>> delete(@PathVariable @Positive Integer id) {
-        try {
-            valueService.deleteValue(id);
-            return ResponseEntity.ok(ApiResponse.success("Xóa giá trị thuộc tính thành công!"));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(400, e.getMessage()));
-        }
+        // Marcus sửa: để GlobalExceptionHandler chuẩn hóa mã lỗi nghiệp vụ; controller
+        // chỉ điều phối request, không bắt RuntimeException và làm mất error code.
+        valueService.deleteValue(id);
+        return ResponseEntity.ok(ApiResponse.success("Xóa giá trị thuộc tính thành công!"));
     }
 }

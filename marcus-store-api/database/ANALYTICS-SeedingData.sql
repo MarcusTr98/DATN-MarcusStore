@@ -27,10 +27,13 @@ BEGIN
     THROW 51000, N'Ngày kết thúc seed phải từ 01/01/2025 trở đi.', 1;
 END;
 
-IF COL_LENGTH('dbo.Orders', 'fulfillment_method') IS NULL
+IF OBJECT_ID(N'dbo.Order_Shipping_Details', N'U') IS NULL
 BEGIN
-    THROW 51001, N'Chưa có Orders.fulfillment_method. Hãy chạy STORE-PICKUP.sql trước.', 1;
+    THROW 51001, N'Chưa có Order_Shipping_Details. Hãy chạy ORDER-NORMALIZE-SHIPPING-CANCELLATION.sql trước.', 1;
 END;
+
+IF OBJECT_ID(N'dbo.Order_Cancellations', N'U') IS NULL
+    THROW 51005, N'Chưa có Order_Cancellations. Hãy chạy file chuẩn hóa Orders trước.', 1;
 
 IF NOT EXISTS (
     SELECT 1
@@ -415,9 +418,7 @@ BEGIN TRY
             s.payment_method,
             s.payment_status,
             s.order_status,
-            s.order_date,
-            s.shipping_fee,
-            s.fulfillment_method
+            s.order_date
         FROM #SeedOrders s
     ) AS source
         ON 1 = 0
@@ -437,11 +438,7 @@ BEGIN TRY
             order_status,
             created_at,
             updated_at,
-            shipping_fee,
-            customer_shipping_fee,
-            shipping_subsidy,
-            payment_date,
-            fulfillment_method
+            payment_date
         )
         VALUES (
             source.user_id,
@@ -458,12 +455,8 @@ BEGIN TRY
             source.order_status,
             source.order_date,
             source.order_date,
-            source.shipping_fee,
-            source.shipping_fee,
-            0,
             CASE WHEN source.payment_status IN (N'PAID', N'REFUNDED')
-                THEN DATEADD(MINUTE, 5, source.order_date) ELSE NULL END,
-            source.fulfillment_method
+                THEN DATEADD(MINUTE, 5, source.order_date) ELSE NULL END
         )
     OUTPUT
         inserted.order_id,
@@ -482,6 +475,43 @@ BEGIN TRY
         order_status,
         payment_status
     );
+
+    /* Marcus sửa: snapshot giao nhận của dữ liệu seed nằm ở bảng chuyên biệt,
+       không tiếp tục làm phình Orders. */
+    INSERT INTO dbo.Order_Shipping_Details (
+        order_id, fulfillment_method, shipping_fee, shipping_subsidy,
+        customer_shipping_fee, ghn_integration_status, ghn_retry_count
+    )
+    SELECT
+        inserted.order_id,
+        seed.fulfillment_method,
+        seed.shipping_fee,
+        0,
+        seed.shipping_fee,
+        CASE WHEN seed.fulfillment_method = 'STORE_PICKUP' THEN 'NOT_REQUIRED' ELSE 'SUCCESS' END,
+        0
+    FROM #InsertedOrders inserted
+    INNER JOIN #SeedOrders seed ON seed.seed_no = inserted.seed_no;
+
+    /* Marcus thêm: dữ liệu hủy seed có lý do cấu trúc để Analytics đọc đúng
+       nguồn mới; không sửa timeline/module đơn hàng của thành viên. */
+    INSERT INTO dbo.Order_Cancellations (order_id, reason_code, actor_type, detail, cancelled_at)
+    SELECT
+        inserted.order_id,
+        CASE inserted.seed_no % 5
+            WHEN 0 THEN 'CUSTOMER_WRONG_ITEM'
+            WHEN 1 THEN 'CUSTOMER_CHANGE_ADDRESS'
+            WHEN 2 THEN 'CUSTOMER_DELIVERY_TIME'
+            WHEN 3 THEN 'SYSTEM_VNPAY_EXPIRED'
+            ELSE 'ADMIN_CANNOT_CONTACT'
+        END,
+        CASE WHEN inserted.seed_no % 5 = 3 THEN 'SYSTEM'
+             WHEN inserted.seed_no % 5 = 4 THEN 'ADMIN'
+             ELSE 'CUSTOMER' END,
+        N'Dữ liệu lịch sử tổng hợp phục vụ Analytics.',
+        DATEADD(MINUTE, 30, inserted.order_date)
+    FROM #InsertedOrders inserted
+    WHERE inserted.order_status = N'CANCELLED';
 
     INSERT INTO dbo.Order_Items (
         order_id,

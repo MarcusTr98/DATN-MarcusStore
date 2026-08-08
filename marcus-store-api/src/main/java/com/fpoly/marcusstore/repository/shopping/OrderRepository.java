@@ -41,11 +41,12 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Query("SELECT o FROM Order o WHERE o.orderId = :orderId")
   Optional<Order> findByIdForUpdate(@Param("orderId") Integer orderId);
 
-  // Được thêm từ nhánh GHN Webhook
-  Optional<Order> findByTrackingCode(String trackingCode);
+  // Marcus sửa: tracking code đã được tách sang bảng giao nhận.
+  @Query("SELECT o FROM Order o JOIN o.shippingDetail shipping WHERE shipping.trackingCode = :trackingCode")
+  Optional<Order> findByTrackingCode(@Param("trackingCode") String trackingCode);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("SELECT o FROM Order o WHERE o.trackingCode = :trackingCode")
+  @Query("SELECT o FROM Order o JOIN o.shippingDetail shipping WHERE shipping.trackingCode = :trackingCode")
   Optional<Order> findByTrackingCodeForUpdate(@Param("trackingCode") String trackingCode);
 
   // marcus thêm
@@ -56,12 +57,13 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   // Marcus thêm: polling chỉ lấy mã vận đơn, không giữ entity/transaction trong
   // lúc gọi HTTP sang GHN.
   @Query(value = """
-      SELECT TOP (100) tracking_code
-      FROM Orders
-      WHERE order_status IN ('PACKED', 'SHIPPING', 'FAILED')
-        AND tracking_code IS NOT NULL
-        AND LTRIM(RTRIM(tracking_code)) <> ''
-      ORDER BY order_id
+      SELECT TOP (100) shipping.tracking_code
+      FROM Orders orders
+      INNER JOIN Order_Shipping_Details shipping ON shipping.order_id = orders.order_id
+      WHERE orders.order_status IN ('PACKED', 'SHIPPING', 'FAILED')
+        AND shipping.tracking_code IS NOT NULL
+        AND LTRIM(RTRIM(shipping.tracking_code)) <> ''
+      ORDER BY orders.order_id
       """, nativeQuery = true)
   List<String> findTrackingCodesForGhnPolling();
 
@@ -234,8 +236,9 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Query(value = """
       SELECT TOP (100) o.order_id
       FROM Orders o
+      INNER JOIN Order_Shipping_Details shipping ON shipping.order_id = o.order_id
       WHERE o.order_status = 'DELIVERED'
-        AND UPPER(COALESCE(o.fulfillment_method, 'DELIVERY')) <> 'STORE_PICKUP'
+        AND UPPER(COALESCE(shipping.fulfillment_method, 'DELIVERY')) <> 'STORE_PICKUP'
         AND EXISTS (
           SELECT 1
           FROM Order_Status_History h

@@ -190,8 +190,10 @@
       <div class="data-grid">
         <article v-for="table in overview.tables || []" :key="`${table.schema}.${table.table}`">
           <span>{{ table.table }}</span>
-          <strong>{{ formatNumber(table.records) }}</strong>
-          <small>bản ghi</small>
+          <strong>{{ formatNumber(table.columnCount) }} cột</strong>
+          <small>
+            <span><i class="bi bi-collection"></i> {{ formatNumber(table.records) }} bản ghi</span>
+          </small>
         </article>
       </div>
     </details>

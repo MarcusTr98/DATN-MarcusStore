@@ -307,27 +307,40 @@ public class BackupService {
     }
 
     private List<BackupOverviewResponse.TableOverview> loadTables() {
-        List<String> tableNames = jdbcTemplate.queryForList("""
-                SELECT TABLE_SCHEMA + '.' + TABLE_NAME
-                FROM INFORMATION_SCHEMA.TABLES
-                WHERE TABLE_TYPE = 'BASE TABLE'
-                ORDER BY TABLE_SCHEMA, TABLE_NAME
-                """, String.class);
+        // Marcus sửa: lấy luôn số cột từ metadata SQL Server để Trung tâm sao lưu
+        // mô tả đúng cả cấu trúc và số bản ghi của từng bảng.
+        List<TableMetadata> tableMetadata = jdbcTemplate.query("""
+                SELECT tables.TABLE_SCHEMA, tables.TABLE_NAME, COUNT(columns.COLUMN_NAME) AS column_count
+                FROM INFORMATION_SCHEMA.TABLES tables
+                INNER JOIN INFORMATION_SCHEMA.COLUMNS columns
+                    ON columns.TABLE_SCHEMA = tables.TABLE_SCHEMA
+                   AND columns.TABLE_NAME = tables.TABLE_NAME
+                WHERE tables.TABLE_TYPE = 'BASE TABLE'
+                GROUP BY tables.TABLE_SCHEMA, tables.TABLE_NAME
+                ORDER BY tables.TABLE_SCHEMA, tables.TABLE_NAME
+                """, (resultSet, rowNumber) -> new TableMetadata(
+                        resultSet.getString("TABLE_SCHEMA"),
+                        resultSet.getString("TABLE_NAME"),
+                        resultSet.getInt("column_count")));
         List<BackupOverviewResponse.TableOverview> tables = new ArrayList<>();
-        for (String qualifiedName : tableNames) {
-            String[] parts = qualifiedName.split("\\.", 2);
-            if (parts.length != 2 || !isSafeIdentifier(parts[0]) || !isSafeIdentifier(parts[1]))
+        for (TableMetadata metadata : tableMetadata) {
+            if (!isSafeIdentifier(metadata.schema()) || !isSafeIdentifier(metadata.table()))
                 continue;
             Long count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT_BIG(*) FROM " + quoteIdentifier(parts[0]) + "." + quoteIdentifier(parts[1]),
+                    "SELECT COUNT_BIG(*) FROM " + quoteIdentifier(metadata.schema()) + "."
+                            + quoteIdentifier(metadata.table()),
                     Long.class);
             tables.add(BackupOverviewResponse.TableOverview.builder()
-                    .schema(parts[0])
-                    .table(parts[1])
+                    .schema(metadata.schema())
+                    .table(metadata.table())
+                    .columnCount(metadata.columnCount())
                     .records(count == null ? 0 : count)
                     .build());
         }
         return tables;
+    }
+
+    private record TableMetadata(String schema, String table, int columnCount) {
     }
 
     private String currentDatabaseName() {

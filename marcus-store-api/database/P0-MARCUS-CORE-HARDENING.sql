@@ -1,24 +1,19 @@
 USE MarcusStoreDB;
 GO
 
-/* Marcus thêm: dữ liệu hủy có cấu trúc. Script an toàn khi chạy lại. */
-IF COL_LENGTH('dbo.Orders', 'cancellation_reason_code') IS NULL
-    ALTER TABLE dbo.Orders ADD cancellation_reason_code VARCHAR(50) NULL;
-GO
-IF COL_LENGTH('dbo.Orders', 'cancellation_actor') IS NULL
-    ALTER TABLE dbo.Orders ADD cancellation_actor VARCHAR(20) NULL;
-GO
-IF COL_LENGTH('dbo.Orders', 'cancelled_at') IS NULL
-    ALTER TABLE dbo.Orders ADD cancelled_at DATETIME2 NULL;
+/* Marcus sửa: dữ liệu hủy đã tách khỏi Orders. Chạy file normalize trước để
+   giữ đúng một nguồn dữ liệu cấu trúc. */
+IF OBJECT_ID(N'dbo.Order_Cancellations', N'U') IS NULL
+    THROW 51010, N'Chưa có Order_Cancellations. Hãy chạy ORDER-NORMALIZE-SHIPPING-CANCELLATION.sql trước.', 1;
 GO
 
-/* Marcus thêm: điền dữ liệu cũ ở mức an toàn, không sửa ghi chú/lịch sử đơn. */
-UPDATE dbo.Orders
-SET cancellation_reason_code = 'SYSTEM_OTHER',
-    cancellation_actor = 'SYSTEM',
-    cancelled_at = COALESCE(updated_at, created_at)
-WHERE order_status = 'CANCELLED'
-  AND cancellation_reason_code IS NULL;
+/* Marcus thêm: bổ sung bản ghi tối thiểu cho đơn hủy cũ chưa có dữ liệu cấu trúc. */
+INSERT INTO dbo.Order_Cancellations (order_id, reason_code, actor_type, detail, cancelled_at)
+SELECT o.order_id, 'SYSTEM_OTHER', 'SYSTEM', NULL, COALESCE(o.updated_at, o.created_at, GETDATE())
+FROM dbo.Orders o
+LEFT JOIN dbo.Order_Cancellations cancellation ON cancellation.order_id = o.order_id
+WHERE o.order_status = 'CANCELLED'
+  AND cancellation.order_id IS NULL;
 GO
 
 /* Marcus thêm: chống trùng giá trị trong cùng một thuộc tính sau khi đã kiểm tra dữ liệu. */
@@ -39,8 +34,9 @@ GO
 
 SELECT
     COUNT(*) AS cancelled_orders,
-    SUM(CASE WHEN cancellation_reason_code IS NULL THEN 1 ELSE 0 END) AS missing_reason_code,
-    SUM(CASE WHEN cancellation_actor IS NULL THEN 1 ELSE 0 END) AS missing_actor
-FROM dbo.Orders
-WHERE order_status = 'CANCELLED';
+    SUM(CASE WHEN cancellation.reason_code IS NULL THEN 1 ELSE 0 END) AS missing_reason_code,
+    SUM(CASE WHEN cancellation.actor_type IS NULL THEN 1 ELSE 0 END) AS missing_actor
+FROM dbo.Orders orders
+LEFT JOIN dbo.Order_Cancellations cancellation ON cancellation.order_id = orders.order_id
+WHERE orders.order_status = 'CANCELLED';
 GO

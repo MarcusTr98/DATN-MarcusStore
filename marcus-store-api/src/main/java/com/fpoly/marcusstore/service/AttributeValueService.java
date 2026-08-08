@@ -6,6 +6,8 @@ import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -54,8 +56,11 @@ public class AttributeValueService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giá trị!"));
         // Marcus thêm: không làm mất liên kết biến thể mà SKU đã sử dụng.
         if (valueRepository.isUsedBySku(id)) {
-            throw new IllegalStateException(
-                    "Giá trị thuộc tính đã được SKU sử dụng nên không thể xóa. Hãy ngừng hoạt động SKU liên quan.");
+            // Marcus sửa: trả mã nghiệp vụ ổn định để giao diện hiển thị modal giải
+            // thích, không làm lộ lỗi khóa ngoại hoặc rơi vào thông báo chung.
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Giá trị thuộc tính đang được SKU sử dụng nên không thể xóa.|ATTRIBUTE_VALUE_IN_USE");
         }
         valueRepository.delete(value);
     }

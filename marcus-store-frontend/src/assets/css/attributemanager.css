@@ -723,6 +723,14 @@
   background: var(--amg-danger);
   box-shadow: 0 0 0 6px #fee2e2;
 }
+
+/* Marcus sửa: cảnh báo nghiệp vụ khác lỗi hệ thống; dùng màu vàng dịu để giải
+   thích rằng dữ liệu được bảo vệ vì đang liên kết với SKU. */
+.amg-alert-icon.is-warning {
+  color: #b45309;
+  background: #fff7df;
+  border-color: #f5d58b;
+}
 .amg-alert-title {
   font-size: 20px;
   font-weight: 800;

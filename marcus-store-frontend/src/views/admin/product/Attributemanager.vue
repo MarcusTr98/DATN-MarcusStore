@@ -232,13 +232,17 @@
           <div class="amg-modal-body amg-text-center">
             <div
               class="amg-alert-icon"
-              :class="alertModal.type === 'success' ? 'is-success' : 'is-error'"
+              :class="{
+                'is-success': alertModal.type === 'success',
+                'is-warning': alertModal.type === 'warning',
+                'is-error': alertModal.type === 'error',
+              }"
             >
-              <span v-if="alertModal.type === 'success'">✓</span><span v-else>✕</span>
+              <span v-if="alertModal.type === 'success'">✓</span>
+              <span v-else-if="alertModal.type === 'warning'">!</span>
+              <span v-else>✕</span>
             </div>
-            <h4 class="amg-alert-title">
-              {{ alertModal.type === 'success' ? 'Thành công' : 'Thông báo lỗi' }}
-            </h4>
+            <h4 class="amg-alert-title">{{ alertModal.title }}</h4>
             <p class="amg-alert-message">{{ alertModal.message }}</p>
           </div>
           <div class="amg-modal-footer amg-justify-center">
@@ -316,7 +320,7 @@ const modalVal = ref({
   unit: '',
   colorHex: '',
 })
-const alertModal = ref({ show: false, message: '', type: 'success' })
+const alertModal = ref({ show: false, message: '', type: 'success', title: 'Thành công' })
 const confirmModal = ref({ show: false, message: '', action: null })
 
 const currentValues = computed(() => {
@@ -484,14 +488,36 @@ const deleteValue = async (val) => {
     show: true,
     message: `Xóa giá trị "${val.valueString}"?`,
     action: async () => {
-      await api.delete(`/admin/attribute-values/${val.valueId}`)
-      await fetchValuesForAttribute(selectedAttribute.value.attributeId)
-      confirmModal.value.show = false
+      try {
+        await api.delete(`/admin/attribute-values/${val.valueId}`)
+        await fetchValuesForAttribute(selectedAttribute.value.attributeId)
+        confirmModal.value.show = false
+        showAlert(`Đã xóa giá trị "${val.valueString}" thành công!`, 'success')
+      } catch (error) {
+        // Marcus sửa: backend chủ động chặn xóa Attribute Value đang được SKU dùng;
+        // đóng modal xác nhận và giải thích bằng modal giao diện thay vì văng lỗi Promise.
+        confirmModal.value.show = false
+        const errorCode = error.response?.data?.data
+        const message =
+          errorCode === 'ATTRIBUTE_VALUE_IN_USE'
+            ? `Không thể xóa "${val.valueString}" vì giá trị này đang được một hoặc nhiều SKU sử dụng. Việc giữ lại giá trị giúp bảo toàn thông tin biến thể, đơn hàng và kho liên quan.`
+            : error.response?.data?.message || 'Không thể xóa giá trị thuộc tính. Vui lòng thử lại.'
+        showAlert(
+          message,
+          errorCode === 'ATTRIBUTE_VALUE_IN_USE' ? 'warning' : 'error',
+          errorCode === 'ATTRIBUTE_VALUE_IN_USE' ? 'Giá trị đang được sử dụng' : 'Không thể xóa',
+        )
+      }
     },
   }
 }
 
-const showAlert = (msg, type = 'success') => {
-  alertModal.value = { show: true, message: msg, type }
+const showAlert = (msg, type = 'success', title = '') => {
+  alertModal.value = {
+    show: true,
+    message: msg,
+    type,
+    title: title || (type === 'success' ? 'Thành công' : 'Thông báo lỗi'),
+  }
 }
 </script>

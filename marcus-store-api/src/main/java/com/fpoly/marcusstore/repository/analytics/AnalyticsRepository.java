@@ -196,7 +196,7 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
             WITH CancelEvents AS (
                 SELECT
                     history.order_id,
-                    orders.cancellation_reason_code,
+                    cancellation.reason_code AS cancellation_reason_code,
                     history.note,
                     history.created_at,
                     ROW_NUMBER() OVER (
@@ -204,7 +204,7 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
                         ORDER BY history.created_at DESC, history.history_id DESC
                     ) AS eventRank
                 FROM Order_Status_History history
-                INNER JOIN Orders orders ON orders.order_id = history.order_id
+                LEFT JOIN Order_Cancellations cancellation ON cancellation.order_id = history.order_id
                 WHERE history.status = 'CANCELLED'
             ),
             NormalizedReasons AS (
