@@ -20,8 +20,13 @@
         </article>
 
         <article class="warranty-stat-card">
-          <span>Chờ xử lý</span>
+          <span>Chờ xác nhận</span>
           <strong class="text-accent">{{ stats.pending }}</strong>
+        </article>
+
+        <article class="warranty-stat-card">
+          <span>Đang xử lý</span>
+          <strong class="text-accent">{{ stats.confirmed }}</strong>
         </article>
 
         <article class="warranty-stat-card">
@@ -30,7 +35,7 @@
         </article>
 
         <article class="warranty-stat-card">
-          <span>Hoàn thành / Từ chối</span>
+          <span>Từ chối</span>
           <strong>{{ stats.rejected }}</strong>
         </article>
       </section>
@@ -246,7 +251,7 @@ const pageSize = ref(10)
 const totalPages = ref(0)
 const totalElements = ref(0)
 
-const warrantyStatusList = ['PENDING', 'APPROVED', 'REJECTED']
+const warrantyStatusList = ['PENDING', 'CONFIRMED', 'APPROVED', 'REJECTED']
 const warrantyReasonList = [
   'DEFECTIVE',
   'DAMAGED',
@@ -257,8 +262,9 @@ const warrantyReasonList = [
 ]
 
 const warrantyStatusMap = {
-  PENDING: { label: 'Chờ xử lý', className: 'warranty-status-pending' },
-  APPROVED: { label: 'Đã duyệt', className: 'warranty-status-approved' },
+  PENDING: { label: 'Chờ xác nhận', className: 'warranty-status-pending' },
+  CONFIRMED: { label: 'Admin đang xử lý', className: 'warranty-status-confirmed' },
+  APPROVED: { label: 'Đồng ý bảo hành', className: 'warranty-status-approved' },
   REJECTED: { label: 'Từ chối', className: 'warranty-status-rejected' },
 }
 
@@ -273,6 +279,7 @@ const warrantyReasonMap = {
 
 const stats = ref({
   pending: 0,
+  confirmed: 0,
   approved: 0,
   rejected: 0,
 })
@@ -309,6 +316,7 @@ async function fetchStats() {
     const data = res.data?.data || res.data || {}
     stats.value = {
       pending: data.pending || 0,
+      confirmed: data.confirmed || 0,
       approved: data.approved || 0,
       rejected: data.rejected || 0,
     }

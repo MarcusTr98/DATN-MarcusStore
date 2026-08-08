@@ -254,6 +254,11 @@
   color: #9a5b00;
 }
 
+.warranty-status-confirmed {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
 .warranty-status-approved {
   background: #ffe4ef;
   color: #d63384;

@@ -316,15 +316,20 @@ const mediaModal = ref({
 })
 
 const warrantyStatusMap = {
-  PENDING: { label: 'Chờ duyệt', className: 'pending' },
-  APPROVED: { label: 'Đồng ý', className: 'approved' },
+  PENDING: { label: 'Chờ xác nhận', className: 'pending' },
+  CONFIRMED: { label: 'Admin đang xử lý', className: 'confirmed' },
+  APPROVED: { label: 'Đồng ý bảo hành', className: 'approved' },
   REJECTED: { label: 'Từ chối', className: 'rejected' },
 }
 
 const allowedTransitions = {
   PENDING: [
-    { value: 'APPROVED', label: 'Đồng ý' },
-    { value: 'REJECTED', label: 'Từ chối' },
+    { value: 'CONFIRMED', label: 'Xác nhận tiếp nhận & xử lý' },
+    { value: 'REJECTED', label: 'Từ chối tiếp nhận' },
+  ],
+  CONFIRMED: [
+    { value: 'APPROVED', label: 'Đồng ý bảo hành' },
+    { value: 'REJECTED', label: 'Từ chối bảo hành' },
   ],
   APPROVED: [],
   REJECTED: [],

@@ -74,8 +74,9 @@ public class WarrantyReturn {
     }
 
     public enum WarrantyStatus {
-        PENDING,     // Chờ duyệt
-        APPROVED,    // Đồng ý
+        PENDING,     // Chờ admin xác nhận tiếp nhận
+        CONFIRMED,   // Admin đã xác nhận - đang xử lý
+        APPROVED,    // Đồng ý bảo hành
         REJECTED     // Từ chối
     }
 }

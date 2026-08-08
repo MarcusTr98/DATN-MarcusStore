@@ -855,7 +855,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import UserOrderApi from '@/api/userOrder.js'
@@ -955,15 +955,20 @@ function canRequestWarranty(item) {
 // Lấy trạng thái bảo hành của sản phẩm (nếu có)
 function getWarrantyStatus(item) {
   if (!item.warrantyStatus) return null
-  
+
   const statusConfig = {
     PENDING: {
-      label: 'Chờ xử lý BH',
+      label: 'Chờ xác nhận',
       className: 'warranty-pending',
       icon: 'fa-solid fa-clock',
     },
+    CONFIRMED: {
+      label: 'Admin đang xử lý',
+      className: 'warranty-confirmed',
+      icon: 'fa-solid fa-gears',
+    },
     APPROVED: {
-      label: 'Đã duyệt BH',
+      label: 'Đồng ý bảo hành',
       className: 'warranty-approved',
       icon: 'fa-solid fa-circle-check',
     },
@@ -973,7 +978,7 @@ function getWarrantyStatus(item) {
       icon: 'fa-solid fa-circle-xmark',
     },
   }
-  
+
   return statusConfig[item.warrantyStatus] || null
 }
 
@@ -981,6 +986,7 @@ function getWarrantyStatus(item) {
 function getWarrantyStatusClass(status) {
   const classMap = {
     PENDING: 'warranty-status-pending',
+    CONFIRMED: 'warranty-status-confirmed',
     APPROVED: 'warranty-status-approved',
     REJECTED: 'warranty-status-rejected',
     COMPLETED: 'warranty-status-completed',
@@ -992,6 +998,7 @@ function getWarrantyStatusClass(status) {
 function getWarrantyStatusIcon(status) {
   const iconMap = {
     PENDING: 'fa-solid fa-clock',
+    CONFIRMED: 'fa-solid fa-gears',
     APPROVED: 'fa-solid fa-circle-check',
     REJECTED: 'fa-solid fa-circle-xmark',
     COMPLETED: 'fa-solid fa-flag-checkered',
@@ -1314,6 +1321,17 @@ onMounted(() => {
   }, 10000)
   window.addEventListener('focus', refreshRefundStatus)
 })
+
+// Marcus thêm: bấm chuông tới cùng URL (cùng orderCode) thì Vue Router không remount
+// component, không gọi lại onMounted → dữ liệu cũ (warrantyStatus cũ) vẫn hiển thị.
+// Theo dõi fullPath (bao gồm cả query) để đảm bảo fetchOrderDetail luôn chạy lại khi URL
+// thay đổi, kể cả khi ClientHeader trick bằng query rác để ép route đổi.
+watch(
+  () => route.fullPath,
+  () => {
+    fetchOrderDetail()
+  }
+)
 
 onBeforeUnmount(() => {
   if (refundPollingTimer) window.clearInterval(refundPollingTimer)
@@ -2068,6 +2086,11 @@ function getVariantText(item) {
   color: #e60012;
 }
 
+.warranty-confirmed {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
 .warranty-approved {
   background: #dcfce7;
   color: #166534;
@@ -2758,6 +2781,11 @@ function getVariantText(item) {
   border: 1.5px solid #fecdd3;
 }
 
+.warranty-status-card.warranty-status-confirmed {
+  background: linear-gradient(135deg, #e0e7ff 0%, #fff 100%);
+  border: 1.5px solid #c7d2fe;
+}
+
 .warranty-status-card.warranty-status-approved {
   background: linear-gradient(135deg, #dcfce7 0%, #fff 100%);
   border: 1.5px solid #bbf7d0;
@@ -2785,6 +2813,7 @@ function getVariantText(item) {
 }
 
 .warranty-status-pending .warranty-status-header i { color: #e60012; }
+.warranty-status-confirmed .warranty-status-header i { color: #4338ca; }
 .warranty-status-approved .warranty-status-header i { color: #16a34a; }
 .warranty-status-rejected .warranty-status-header i { color: #dc2626; }
 .warranty-status-completed .warranty-status-header i { color: #2563eb; }
@@ -2795,6 +2824,7 @@ function getVariantText(item) {
 }
 
 .warranty-status-pending .warranty-status-label { color: #be123c; }
+.warranty-status-confirmed .warranty-status-label { color: #312e81; }
 .warranty-status-approved .warranty-status-label { color: #166534; }
 .warranty-status-rejected .warranty-status-label { color: #991b1b; }
 .warranty-status-completed .warranty-status-label { color: #1e40af; }

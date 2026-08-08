@@ -63,8 +63,9 @@ public class WarrantyResponse {
     
     public static String getStatusLabel(WarrantyStatus status) {
         return switch (status) {
-            case PENDING -> "Chờ duyệt";
-            case APPROVED -> "Đồng ý";
+            case PENDING -> "Chờ xác nhận";
+            case CONFIRMED -> "Admin đang xử lý";
+            case APPROVED -> "Đồng ý bảo hành";
             case REJECTED -> "Từ chối";
         };
     }
