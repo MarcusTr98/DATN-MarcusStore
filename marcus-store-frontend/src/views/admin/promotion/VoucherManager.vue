@@ -1096,10 +1096,9 @@ const errors = computed(() => {
     result.start_date = 'Vui lòng chọn ngày bắt đầu'
   } else {
     const start = new Date(form.start_date)
-    start.setHours(0, 0, 0, 0)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    if (start > today) {
+    const now = new Date()
+    // Ngày bắt đầu không được vượt quá hiện tại quá 1 phút (tránh lệch múi giờ/khách mở modal muộn)
+    if (start.getTime() - now.getTime() > 60_000) {
       result.start_date = 'Ngày bắt đầu không được là ngày trong tương lai'
     }
   }
@@ -1286,6 +1285,17 @@ function openEditModal(voucher) {
     voucherType = 'FREESHIP'
   }
 
+  // Khi sửa: nếu ngày bắt đầu cũ đã ở quá khứ thì tự động đặt lại về thời điểm hiện tại
+  // (định dạng lại thành "YYYY-MM-DDTHH:mm" theo local time cho input datetime-local).
+  // Nếu ngày bắt đầu còn hợp lệ (chưa tới hoặc đang diễn ra) thì giữ nguyên.
+  const now = new Date()
+  const startRaw = voucher.startDate ? new Date(voucher.startDate) : null
+  let startForForm = voucher.startDate
+  if (startRaw && startRaw.getTime() < now.getTime()) {
+    const tzOffset = now.getTimezoneOffset() * 60_000
+    startForForm = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16)
+  }
+
   Object.assign(form, {
     voucher_id: voucher.voucherId,
     voucher_type: voucherType,
@@ -1295,7 +1305,7 @@ function openEditModal(voucher) {
     max_discount_amount: voucher.maxDiscountAmount,
     min_order_value: voucher.minOrderValue,
     quantity: voucher.quantity || 1,
-    start_date: voucher.startDate,
+    start_date: startForForm,
     end_date: voucher.endDate,
     is_active: voucher.isActive,
     freeship_value: voucher.freeshipValue || null,

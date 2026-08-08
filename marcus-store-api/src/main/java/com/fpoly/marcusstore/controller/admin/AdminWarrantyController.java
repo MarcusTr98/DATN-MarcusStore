@@ -72,6 +72,7 @@ public class AdminWarrantyController {
     public ResponseEntity<ApiResponse<Map<String, Long>>> getWarrantyStats() {
         Map<String, Long> stats = new HashMap<>();
         stats.put("pending", warrantyService.countByStatus(WarrantyStatus.PENDING));
+        stats.put("confirmed", warrantyService.countByStatus(WarrantyStatus.CONFIRMED));
         stats.put("approved", warrantyService.countByStatus(WarrantyStatus.APPROVED));
         stats.put("rejected", warrantyService.countByStatus(WarrantyStatus.REJECTED));
         stats.put("total", warrantyService.countAll());

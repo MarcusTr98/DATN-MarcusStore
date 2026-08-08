@@ -162,6 +162,22 @@ public class WarrantyServiceImpl implements WarrantyService {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
+        // Đảm bảo admin đi đúng luồng trạng thái, không nhảy cóc.
+        // PENDING -> CONFIRMED -> (APPROVED | REJECTED); PENDING cũng có thể bị từ chối tiếp nhận ngay.
+        // APPROVED/REJECTED là trạng thái cuối, không thể chuyển tiếp.
+        WarrantyStatus current = warranty.getStatus();
+        WarrantyStatus next = request.getStatus();
+        boolean isValidTransition = switch (current) {
+            case PENDING -> next == WarrantyStatus.CONFIRMED || next == WarrantyStatus.REJECTED;
+            case CONFIRMED -> next == WarrantyStatus.APPROVED || next == WarrantyStatus.REJECTED;
+            case APPROVED, REJECTED -> false;
+        };
+        if (!isValidTransition) {
+            throw new RuntimeException(
+                    "Không thể chuyển trạng thái từ " + current + " sang " + next
+                            + ". Vui lòng đi đúng luồng: Chờ xác nhận -> Đang xử lý -> Đồng ý / Từ chối, hoặc từ chối tiếp nhận ngay từ đầu.");
+        }
+
         warranty.setStatus(request.getStatus());
         warranty.setAdminNote(request.getAdminNote());
         warranty.setProcessedBy(admin);
@@ -191,7 +207,7 @@ public class WarrantyServiceImpl implements WarrantyService {
         if (LocalDateTime.now().isAfter(warrantyEndDate)) return false;
 
         List<WarrantyStatus> activeStatuses = Arrays.asList(
-                WarrantyStatus.PENDING, WarrantyStatus.APPROVED);
+                WarrantyStatus.PENDING, WarrantyStatus.CONFIRMED, WarrantyStatus.APPROVED);
         return !warrantyRepository.existsByOrderItemOrderItemIdAndUserUserIdAndStatusIn(
                 orderItemId, userId, activeStatuses);
     }

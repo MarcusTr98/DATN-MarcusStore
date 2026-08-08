@@ -120,7 +120,18 @@ const scheduleCloseNotifications = () => {
 const openNotification = async (item) => {
   const target = await markRead(item)
   showNotifications.value = false
-  if (target) router.push(target)
+  if (!target) return
+  // Marcus sửa: nếu đang ở chính URL đó (cùng orderCode) thì Vue Router không remount
+  // OrderDetailView → warrantyStatus cũ vẫn hiển thị. Trick bằng query rác để ép route đổi,
+  // watch(route.fullPath) ở OrderDetailView sẽ bắt được và gọi lại fetchOrderDetail.
+  // Sau đó replace về URL gốc để không để lại query trên thanh địa chỉ.
+  const currentPath = router.currentRoute.value.path
+  if (currentPath === target) {
+    await router.replace(target + '?refresh=' + Date.now())
+    await router.replace(target)
+  } else {
+    router.push(target)
+  }
 }
 
 const getUserNotificationIcon = (type) =>

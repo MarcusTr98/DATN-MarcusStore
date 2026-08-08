@@ -35,7 +35,8 @@ public class UserNotificationService {
             Map.entry("CANCELLED", "Đơn hàng đã hủy"),
             Map.entry("FAILED", "Giao hàng chưa thành công"));
     private static final Map<String, String> WARRANTY_STATUS_TITLES = Map.ofEntries(
-            Map.entry("PENDING", "Yêu cầu bảo hành chờ duyệt"),
+            Map.entry("PENDING", "Yêu cầu bảo hành đã được gửi"),
+            Map.entry("CONFIRMED", "Admin đã xác nhận yêu cầu bảo hành"),
             Map.entry("APPROVED", "Yêu cầu bảo hành được duyệt"),
             Map.entry("REJECTED", "Yêu cầu bảo hành bị từ chối"));
     private static final int MAX_PAGE_SIZE = 30;
