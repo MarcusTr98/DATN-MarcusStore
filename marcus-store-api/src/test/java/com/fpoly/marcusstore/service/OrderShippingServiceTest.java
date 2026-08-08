@@ -4,6 +4,7 @@ import com.fpoly.marcusstore.dto.request.GhnCreateOrderRequest;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.repository.core.ShippingConfigRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +31,7 @@ class OrderShippingServiceTest {
     @Mock GhnService ghnService;
     @Mock OrderRepository orderRepository;
     @Mock ShippingConfigRepository shippingConfigRepository;
+    @Mock OrderStatusHistoryRepository historyRepository;
     @Mock TransactionTemplate transactionTemplate;
     @Mock TransactionStatus transactionStatus;
 
@@ -38,7 +40,8 @@ class OrderShippingServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OrderShippingService(ghnService, orderRepository, shippingConfigRepository, transactionTemplate);
+        service = new OrderShippingService(
+                ghnService, orderRepository, shippingConfigRepository, historyRepository, transactionTemplate);
         order = new Order();
         order.setOrderId(10);
         order.setOrderCode("ORD-GHN-RETRY");
@@ -83,7 +86,7 @@ class OrderShippingServiceTest {
         assertThat(order.getGhnLastError()).contains("timeout");
 
         Order retried = service.createOrRetryGhnOrder(10);
-        assertThat(retried.getGhnIntegrationStatus()).isEqualTo("CREATED");
+        assertThat(retried.getGhnIntegrationStatus()).isEqualTo("SUCCESS");
         assertThat(retried.getTrackingCode()).isEqualTo("GHN-TRACK-001");
         assertThat(retried.getGhnRetryCount()).isEqualTo(2);
         verify(ghnService, times(2)).createOrderOnGhn(any(GhnCreateOrderRequest.class));

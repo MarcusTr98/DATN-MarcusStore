@@ -14,7 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class ProductConfigService {
@@ -31,24 +36,60 @@ public class ProductConfigService {
     // 1. LƯU MA TRẬN SKU TỪ FRONTEND
     @Transactional(rollbackFor = Exception.class)
     public void batchCreateSkus(SkuBatchCreateRequest request) {
-        Product product = productRepository.findById(request.getProductId())
+        Product product = productRepository.findByIdForSkuGeneration(request.getProductId())
                 .orElseThrow(() -> new RuntimeException("Sản phẩm không tồn tại!"));
 
-        java.util.Set<String> uniqueCodes = new java.util.HashSet<>();
+        // Marcus sửa: kiểm tra toàn bộ batch trước khi ghi để người dùng nhận lỗi
+        // rõ ràng và không sinh nửa ma trận SKU.
+        Set<String> uniqueCodes = new HashSet<>();
+        Set<String> uniqueCombinations = new HashSet<>();
+        Set<String> existingCombinations = skuRepository.findByProductProductId(request.getProductId()).stream()
+                .map(sku -> combinationKey(sku.getAttributeValues()))
+                .collect(Collectors.toSet());
+        List<ProductSku> candidates = new ArrayList<>();
 
         for (SkuBatchCreateRequest.SkuItem item : request.getSkus()) {
-            if (!uniqueCodes.add(item.getSkuCode())) {
+            String normalizedCode = item.getSkuCode().trim().toUpperCase();
+            if (!uniqueCodes.add(normalizedCode)) {
                 throw new RuntimeException(
-                        "Mã SKU [" + item.getSkuCode() + "] bị trùng lặp trong chính danh sách bạn đang tạo!");
+                        "Mã SKU [" + normalizedCode + "] bị trùng lặp trong chính danh sách bạn đang tạo!");
             }
-            if (skuRepository.existsBySkuCode(item.getSkuCode())) {
+            if (skuRepository.existsBySkuCodeIgnoreCase(normalizedCode)) {
                 throw new RuntimeException(
-                        "Mã SKU [" + item.getSkuCode() + "] đã tồn tại trong hệ thống. Vui lòng đổi mã khác!");
+                        "Mã SKU [" + normalizedCode + "] đã tồn tại trong hệ thống. Vui lòng đổi mã khác!");
+            }
+
+            List<Integer> distinctValueIds = item.getValueIds().stream().distinct().toList();
+            if (distinctValueIds.size() != item.getValueIds().size()) {
+                throw new IllegalArgumentException("SKU [" + normalizedCode + "] có giá trị thuộc tính bị lặp.");
+            }
+            List<AttributeValue> attributeValues = attributeValueRepository.findAllById(distinctValueIds);
+            if (attributeValues.size() != distinctValueIds.size()) {
+                throw new RuntimeException("SKU [" + normalizedCode + "] chứa ID giá trị thuộc tính không tồn tại.");
+            }
+            Map<Integer, Long> valuesPerAttribute = attributeValues.stream().collect(Collectors.groupingBy(
+                    value -> value.getAttribute().getAttributeId(), HashMap::new, Collectors.counting()));
+            if (valuesPerAttribute.values().stream().anyMatch(count -> count > 1)) {
+                throw new IllegalArgumentException(
+                        "SKU [" + normalizedCode + "] chỉ được chọn một giá trị cho mỗi thuộc tính.");
+            }
+            String combination = combinationKey(attributeValues);
+            if (!uniqueCombinations.add(combination)) {
+                throw new IllegalArgumentException("Tổ hợp biến thể của SKU [" + normalizedCode
+                        + "] bị trùng trong danh sách đang tạo.");
+            }
+            if (existingCombinations.contains(combination)) {
+                throw new IllegalArgumentException("Tổ hợp biến thể của SKU [" + normalizedCode
+                        + "] đã tồn tại cho sản phẩm này.");
+            }
+            if (item.getOriginalPrice() != null && item.getOriginalPrice().compareTo(item.getPrice()) < 0) {
+                throw new IllegalArgumentException("Giá gốc của SKU [" + normalizedCode
+                        + "] không được nhỏ hơn giá bán.");
             }
 
             ProductSku sku = new ProductSku();
             sku.setProduct(product);
-            sku.setSkuCode(item.getSkuCode());
+            sku.setSkuCode(normalizedCode);
             sku.setPrice(item.getPrice());
             if (item.getOriginalPrice() == null) {
                 sku.setOriginalPrice(item.getPrice());
@@ -60,14 +101,10 @@ public class ProductConfigService {
             sku.setWeightGram(500);
             sku.setIsActive(true);
 
-            List<AttributeValue> attributeValues = attributeValueRepository.findAllById(item.getValueIds());
-            if (attributeValues.size() != item.getValueIds().size()) {
-                throw new RuntimeException("Có lỗi: Một số ID thuộc tính không tồn tại trong CSDL.");
-            }
             sku.setAttributeValues(attributeValues);
-
-            skuRepository.save(sku);
+            candidates.add(sku);
         }
+        skuRepository.saveAll(candidates);
     }
 
     // 2. CẬP NHẬT HÀNG LOẠT (Giá, Tồn kho)
@@ -103,5 +140,13 @@ public class ProductConfigService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
         sku.setIsActive(false);
         skuRepository.save(sku);
+    }
+
+    private String combinationKey(List<AttributeValue> values) {
+        return values.stream()
+                .map(AttributeValue::getValueId)
+                .sorted()
+                .map(String::valueOf)
+                .collect(Collectors.joining("-"));
     }
 }

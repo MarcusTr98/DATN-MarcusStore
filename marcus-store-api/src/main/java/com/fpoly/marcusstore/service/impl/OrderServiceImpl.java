@@ -37,10 +37,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
+import com.fpoly.marcusstore.utils.CancellationReasonCatalog;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +64,9 @@ public class OrderServiceImpl implements OrderService {
     // Marcus thêm chuông hai chiều cho luồng hủy đơn.
     private final AdminNotificationService adminNotificationService;
     private final UserNotificationService userNotificationService;
+
+    @Value("${vnpay.paymentTimeoutMinutes:20}")
+    private long vnPayPaymentTimeoutMinutes;
     // Marcus sửa: khách được hủy trước khi tạo vận đơn. PACKED đã có tracking GHN
     // nên không thể chỉ hủy nội bộ rồi để vận đơn tiếp tục giao.
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of(
@@ -174,6 +180,11 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
+        return updateStatusOrder(orderCode, request, "ADMIN");
+    }
+
+    private OrderDetailResponse updateStatusOrder(
+            String orderCode, UpdateOrderStatusRequest request, String cancellationActor) {
         Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
@@ -220,7 +231,8 @@ public class OrderServiceImpl implements OrderService {
                         "Đơn đã có vận đơn GHN; cần hủy vận đơn GHN trước khi hủy đơn trên hệ thống");
             }
             // Hoàn kho, voucher, giỏ hàng và số lượng Flash Sale tại một nơi
-            orderCancellationService.cancelAndRestore(order, note);
+            orderCancellationService.cancelAndRestore(
+                    order, request.getCancellationReasonCode(), cancellationActor, note);
         } else {
             order.setOrderStatus(newStatus);
         }
@@ -339,6 +351,11 @@ public class OrderServiceImpl implements OrderService {
         return OrderDetailResponse.builder()
                 .orderCode(order.getOrderCode())
                 .orderStatus(order.getOrderStatus())
+                .cancellationReasonCode(order.getCancellationReasonCode())
+                .cancellationReasonLabel(order.getCancellationReasonCode() == null
+                        ? null : CancellationReasonCatalog.label(order.getCancellationReasonCode()))
+                .cancellationActor(order.getCancellationActor())
+                .cancelledAt(order.getCancelledAt())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .recipientName(order.getRecipientName())
@@ -355,6 +372,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .transactionId(order.getTransactionId())
                 .paymentDate(order.getPaymentDate())
+                .paymentExpiresAt(resolvePaymentExpiresAt(order))
                 .trackingCode(order.getTrackingCode())
                 .ghnIntegrationStatus(order.getGhnIntegrationStatus())
                 .ghnRetryCount(order.getGhnRetryCount())
@@ -438,7 +456,7 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderDetailResponse cancelUserOrder(String orderCode, String reason) {
+    public OrderDetailResponse cancelUserOrder(String orderCode, String reasonCode, String reason) {
         Integer userId = SecurityUtils.getCurrentUserId();
 
         // Marcus sửa: khóa dòng Order trước khi kiểm tra và hoàn tài nguyên. Nhờ đó
@@ -460,8 +478,9 @@ public class OrderServiceImpl implements OrderService {
         UpdateOrderStatusRequest request = UpdateOrderStatusRequest.builder()
                 .status("CANCELLED")
                 .note((reason == null || reason.isBlank()) ? "Khách hàng tự hủy" : reason)
+                .cancellationReasonCode(reasonCode)
                 .build();
-        OrderDetailResponse response = updateStatusOrder(orderCode, request);
+        OrderDetailResponse response = updateStatusOrder(orderCode, request, "CUSTOMER");
         // Marcus thêm: khi khách tự hủy, chủ cửa hàng nhận chuông realtime để nắm
         // lý do và dừng xử lý đơn.
         adminNotificationService.createAndSendNotification(
@@ -470,6 +489,15 @@ public class OrderServiceImpl implements OrderService {
                 "Khách hàng " + getUserDisplayName(order.getUser()) + " hủy đơn. Lý do: " + request.getNote(),
                 order.getOrderCode());
         return response;
+    }
+
+    private LocalDateTime resolvePaymentExpiresAt(Order order) {
+        if (!"VNPAY".equalsIgnoreCase(order.getPaymentMethod())
+                || order.getCreatedAt() == null
+                || !"PENDING".equalsIgnoreCase(order.getPaymentStatus())) {
+            return null;
+        }
+        return order.getCreatedAt().plusMinutes(vnPayPaymentTimeoutMinutes);
     }
 
     @Override

@@ -196,6 +196,7 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
             WITH CancelEvents AS (
                 SELECT
                     history.order_id,
+                    orders.cancellation_reason_code,
                     history.note,
                     history.created_at,
                     ROW_NUMBER() OVER (
@@ -203,11 +204,24 @@ public interface AnalyticsRepository extends Repository<Order, Integer> {
                         ORDER BY history.created_at DESC, history.history_id DESC
                     ) AS eventRank
                 FROM Order_Status_History history
+                INNER JOIN Orders orders ON orders.order_id = history.order_id
                 WHERE history.status = 'CANCELLED'
             ),
             NormalizedReasons AS (
                 SELECT
                     CASE
+                        WHEN cancellation_reason_code = 'CUSTOMER_WRONG_ITEM' THEN N'Đặt nhầm sản phẩm hoặc số lượng'
+                        WHEN cancellation_reason_code = 'CUSTOMER_CHANGE_ADDRESS' THEN N'Muốn thay đổi địa chỉ nhận hàng'
+                        WHEN cancellation_reason_code = 'CUSTOMER_BETTER_OPTION' THEN N'Tìm được sản phẩm hoặc giá phù hợp hơn'
+                        WHEN cancellation_reason_code = 'CUSTOMER_DELIVERY_TIME' THEN N'Thời gian giao hàng không phù hợp'
+                        WHEN cancellation_reason_code = 'CUSTOMER_NO_DEMAND' THEN N'Không còn nhu cầu mua'
+                        WHEN cancellation_reason_code IN ('SYSTEM_VNPAY_EXPIRED', 'SYSTEM_VNPAY_FAILED')
+                            THEN N'Thanh toán gián đoạn hoặc hết hạn'
+                        WHEN cancellation_reason_code = 'ADMIN_CANNOT_CONTACT' THEN N'Không liên hệ được với khách hàng'
+                        WHEN cancellation_reason_code = 'ADMIN_OUT_OF_STOCK' THEN N'Sản phẩm hết hàng hoặc lỗi tồn kho'
+                        WHEN cancellation_reason_code = 'ADMIN_INVALID_ADDRESS' THEN N'Thông tin nhận hàng không hợp lệ'
+                        WHEN cancellation_reason_code = 'ADMIN_SUSPICIOUS_ORDER' THEN N'Phát hiện đơn hàng bất thường'
+                        WHEN cancellation_reason_code = 'GHN_CANCELLED' THEN N'Đơn vị vận chuyển hủy vận đơn'
                         WHEN note LIKE N'%Đặt nhầm sản phẩm hoặc số lượng%'
                             THEN N'Đặt nhầm sản phẩm hoặc số lượng'
                         WHEN note LIKE N'%thay đổi địa chỉ nhận hàng%'

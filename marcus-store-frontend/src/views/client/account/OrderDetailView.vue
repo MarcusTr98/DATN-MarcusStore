@@ -75,6 +75,19 @@
                 </div>
               </div>
 
+              <!-- Marcus thêm: đơn VNPAY chờ thanh toán được gọi đúng là đang giữ
+                   hàng, không khiến khách hiểu nhầm Admin đang chuẩn bị đơn. -->
+              <div v-if="isAwaitingVnPayPayment" class="payment-hold-notice">
+                <i class="fa-solid fa-hourglass-half"></i>
+                <div>
+                  <strong>Đơn đang giữ hàng và chờ thanh toán VNPAY</strong>
+                  <p>
+                    Hoàn tất trước {{ formatDateTime(selectedOrder.paymentExpiresAt) }}. Quá thời
+                    hạn, hệ thống tự hủy đơn và hoàn tài nguyên.
+                  </p>
+                </div>
+              </div>
+
               <div class="timeline-body">
                 <div
                   class="timeline"
@@ -446,14 +459,14 @@
             <div class="cancel-reason-grid">
               <button
                 v-for="reason in CUSTOMER_CANCEL_REASONS"
-                :key="reason"
+                :key="reason.code"
                 type="button"
                 class="cancel-reason-option"
-                :class="{ active: cancelModal.selectedReason === reason }"
+                :class="{ active: cancelModal.selectedReason === reason.code }"
                 :disabled="cancelling"
                 @click="selectCancelReason(reason)"
               >
-                {{ reason }}
+                {{ reason.label }}
               </button>
             </div>
             <textarea
@@ -1341,6 +1354,13 @@ onBeforeUnmount(() => {
 // Marcus sửa: đơn tại quầy vẫn có thể hủy trước khi nhân viên xác nhận đã giao.
 const USER_CANCELLABLE_STATUSES = ['PENDING', 'PROCESSING', 'PACKED', 'READY_FOR_PICKUP']
 
+const isAwaitingVnPayPayment = computed(
+  () =>
+    String(selectedOrder.value?.paymentMethod || '').toUpperCase() === 'VNPAY' &&
+    String(selectedOrder.value?.paymentStatus || '').toUpperCase() === 'PENDING' &&
+    Boolean(selectedOrder.value?.paymentExpiresAt),
+)
+
 // Marcus thêm nội dung thân thiện với khách thay cho response code kỹ thuật của VNPAY.
 const refundStatusConfig = {
   PENDING_APPROVAL: {
@@ -1467,14 +1487,14 @@ async function confirmReceivedOrder() {
 }
 
 const cancelling = ref(false)
-const OTHER_CANCEL_REASON = 'Lý do khác'
+const OTHER_CANCEL_REASON = 'CUSTOMER_OTHER'
 const CUSTOMER_CANCEL_REASONS = [
-  'Đặt nhầm sản phẩm hoặc số lượng',
-  'Muốn thay đổi địa chỉ nhận hàng',
-  'Tìm được sản phẩm hoặc giá phù hợp hơn',
-  'Thời gian giao hàng không phù hợp',
-  'Không còn nhu cầu mua',
-  OTHER_CANCEL_REASON,
+  { code: 'CUSTOMER_WRONG_ITEM', label: 'Đặt nhầm sản phẩm hoặc số lượng' },
+  { code: 'CUSTOMER_CHANGE_ADDRESS', label: 'Muốn thay đổi địa chỉ nhận hàng' },
+  { code: 'CUSTOMER_BETTER_OPTION', label: 'Tìm được sản phẩm hoặc giá phù hợp hơn' },
+  { code: 'CUSTOMER_DELIVERY_TIME', label: 'Thời gian giao hàng không phù hợp' },
+  { code: 'CUSTOMER_NO_DEMAND', label: 'Không còn nhu cầu mua' },
+  { code: OTHER_CANCEL_REASON, label: 'Lý do khác' },
 ]
 
 const cancelModal = ref({
@@ -1514,8 +1534,8 @@ async function handleCancelOrder() {
 }
 
 function selectCancelReason(reason) {
-  cancelModal.value.selectedReason = reason
-  cancelModal.value.reason = reason === OTHER_CANCEL_REASON ? '' : reason
+  cancelModal.value.selectedReason = reason.code
+  cancelModal.value.reason = reason.code === OTHER_CANCEL_REASON ? '' : reason.label
   cancelModal.value.feedback = { type: '', message: '' }
 }
 
@@ -1529,7 +1549,10 @@ async function confirmCancelOrder() {
   cancelling.value = true
   modal.feedback = { type: '', message: '' }
   try {
-    const response = await UserOrderApi.cancelOrder(modal.orderCode, { note: reason })
+    const response = await UserOrderApi.cancelOrder(modal.orderCode, {
+      note: reason,
+      cancellationReasonCode: modal.selectedReason,
+    })
     if (response?.data) {
       selectedOrder.value = response.data
     } else {
@@ -1740,6 +1763,20 @@ function getVariantText(item) {
 </script>
 
 <style scoped>
+.payment-hold-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 16px 0 2px;
+  padding: 14px 16px;
+  border: 1px solid #f6cf75;
+  border-radius: 14px;
+  color: #7a4b00;
+  background: #fff8e7;
+}
+.payment-hold-notice > i { margin-top: 3px; color: #e69a00; }
+.payment-hold-notice strong { display: block; }
+.payment-hold-notice p { margin: 3px 0 0; font-size: 13px; line-height: 1.5; }
 .cancel-reason-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

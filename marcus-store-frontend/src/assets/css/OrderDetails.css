@@ -1192,3 +1192,18 @@ tbody tr:hover {
   padding: 9px 14px;
   font-size: 13px;
 }
+.payment-hold-admin {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #f1cf7a;
+  border-radius: 12px;
+  color: #754900;
+  background: #fff8e5;
+}
+.payment-hold-admin i { margin-top: 2px; color: #df9200; }
+.payment-hold-admin strong,
+.payment-hold-admin span { display: block; }
+.payment-hold-admin span { margin-top: 3px; font-size: 12px; }

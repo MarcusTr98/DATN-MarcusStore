@@ -51,7 +51,8 @@ public class UserOrderController {
             @PathVariable("orderCode") @Size(min = 1, max = 50) String orderCode,
             @Valid @RequestBody(required = false) UpdateOrderStatusRequest request) {
         String reason = request == null ? null : request.getNote();
-        return orderService.cancelUserOrder(orderCode, reason);
+        String reasonCode = request == null ? null : request.getCancellationReasonCode();
+        return orderService.cancelUserOrder(orderCode, reasonCode, reason);
     }
 
     // Marcus thêm: khách chỉ xác nhận đã nhận trên chính đơn của mình; backend

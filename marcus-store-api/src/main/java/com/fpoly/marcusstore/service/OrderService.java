@@ -35,7 +35,7 @@ public interface OrderService {
 
     OrderDetailResponse getUserOrderDetail(String orderCode);
 
-    OrderDetailResponse cancelUserOrder(String orderCode, String reason);
+    OrderDetailResponse cancelUserOrder(String orderCode, String reasonCode, String reason);
 
     OrderDetailResponse confirmUserReceivedOrder(String orderCode);
 

@@ -5,6 +5,8 @@ import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.core.ShippingConfig;
 import com.fpoly.marcusstore.repository.core.ShippingConfigRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
+import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
+import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ public class OrderShippingService {
         private final GhnService ghnService;
         private final OrderRepository orderRepository;
         private final ShippingConfigRepository shippingConfigRepository;
+        private final OrderStatusHistoryRepository historyRepository;
         private final TransactionTemplate transactionTemplate;
 
         // Marcus làm: transaction 1 chỉ khóa/đánh dấu attempt và dựng payload;
@@ -47,7 +50,7 @@ public class OrderShippingService {
                                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
 
                 if (order.getTrackingCode() != null && !order.getTrackingCode().isBlank()) {
-                        order.setGhnIntegrationStatus("CREATED");
+                        order.setGhnIntegrationStatus("SUCCESS");
                         order.setGhnLastError(null);
                         orderRepository.save(order);
                         return null;
@@ -63,7 +66,8 @@ public class OrderShippingService {
 
                 // Marcus thêm: chặn hai worker cùng tạo vận đơn; attempt CREATING bị
                 // treo quá hai phút mới được phép thử lại.
-                if ("CREATING".equalsIgnoreCase(order.getGhnIntegrationStatus())
+                if (("PROCESSING".equalsIgnoreCase(order.getGhnIntegrationStatus())
+                                || "CREATING".equalsIgnoreCase(order.getGhnIntegrationStatus()))
                                 && order.getGhnLastAttemptAt() != null
                                 && order.getGhnLastAttemptAt().isAfter(LocalDateTime.now().minusMinutes(2))) {
                         return null;
@@ -97,7 +101,7 @@ public class OrderShippingService {
                                 })
                                 .sum();
 
-                order.setGhnIntegrationStatus("CREATING");
+                order.setGhnIntegrationStatus("PROCESSING");
                 order.setGhnRetryCount((order.getGhnRetryCount() == null ? 0 : order.getGhnRetryCount()) + 1);
                 order.setGhnLastAttemptAt(LocalDateTime.now());
                 order.setGhnLastError(null);
@@ -132,17 +136,37 @@ public class OrderShippingService {
                 Order order = orderRepository.findByIdForUpdate(orderId)
                                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
                 order.setTrackingCode(trackingCode);
-                order.setGhnIntegrationStatus("CREATED");
+                order.setGhnIntegrationStatus("SUCCESS");
                 order.setGhnLastError(null);
-                return orderRepository.save(order);
+                Order saved = orderRepository.save(order);
+                saveIntegrationHistory(saved, "Đã tạo vận đơn GHN",
+                                "GHN trả mã vận đơn " + trackingCode + " sau lần thử " + saved.getGhnRetryCount());
+                return saved;
         }
 
         private void markFailed(Integer orderId, RuntimeException exception) {
                 orderRepository.findByIdForUpdate(orderId).ifPresent(order -> {
-                        order.setGhnIntegrationStatus("FAILED");
+                        int retryCount = order.getGhnRetryCount() == null ? 0 : order.getGhnRetryCount();
+                        // Marcus thêm: sau ba lần lỗi không tiếp tục retry mù; đưa
+                        // đơn sang hàng đợi để Admin kiểm tra dashboard GHN.
+                        order.setGhnIntegrationStatus(retryCount >= 3 ? "NEEDS_REVIEW" : "FAILED");
                         order.setGhnLastError(safeError(exception));
                         orderRepository.save(order);
+                        saveIntegrationHistory(order,
+                                        "NEEDS_REVIEW".equals(order.getGhnIntegrationStatus())
+                                                        ? "Cần kiểm tra tích hợp GHN"
+                                                        : "Tạo vận đơn GHN thất bại",
+                                        "Lần thử " + retryCount + ": " + order.getGhnLastError());
                 });
+        }
+
+        private void saveIntegrationHistory(Order order, String title, String note) {
+                OrderStatusHistory history = new OrderStatusHistory();
+                history.setOrder(order);
+                history.setStatus(order.getOrderStatus());
+                history.setTitle(title);
+                history.setNote(note);
+                historyRepository.save(history);
         }
 
         private String safeError(RuntimeException exception) {

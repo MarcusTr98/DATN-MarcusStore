@@ -43,12 +43,14 @@ class VnPayPaymentExpiryServiceTest {
                 .findFirstByOrder_OrderIdAndTypeAndStatusOrderByCreatedAtDesc(
                         10, "VNPAY_PAYMENT", "PENDING"))
                 .thenReturn(Optional.of(new OrderTransaction()));
-        when(cancellationService.cancelAndRestore(eq(order), anyString())).thenReturn(true);
+        when(cancellationService.cancelAndRestore(
+                eq(order), eq("SYSTEM_VNPAY_EXPIRED"), eq("SYSTEM"), anyString())).thenReturn(true);
 
         service.cancelOneExpiredPayment(10);
 
         assertThat(order.getPaymentStatus()).isEqualTo("FAILED");
-        verify(cancellationService).cancelAndRestore(eq(order), contains("không hoàn tất"));
+        verify(cancellationService).cancelAndRestore(
+                eq(order), eq("SYSTEM_VNPAY_EXPIRED"), eq("SYSTEM"), contains("không hoàn tất"));
         ArgumentCaptor<OrderStatusHistory> history = ArgumentCaptor.forClass(OrderStatusHistory.class);
         verify(historyRepository).save(history.capture());
         assertThat(history.getValue().getStatus()).isEqualTo("CANCELLED");

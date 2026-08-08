@@ -72,6 +72,17 @@ public class Order {
     @Column(name = "order_status", length = 50)
     private String orderStatus = "PENDING";
 
+    // Marcus thêm: dữ liệu hủy có cấu trúc phục vụ vận hành và AI Analytics;
+    // note chi tiết vẫn nằm trong timeline đơn hàng.
+    @Column(name = "cancellation_reason_code", length = 50)
+    private String cancellationReasonCode;
+
+    @Column(name = "cancellation_actor", length = 20)
+    private String cancellationActor;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
     @Column(name = "is_hidden", nullable = false)
     private Boolean isHidden = false;
 

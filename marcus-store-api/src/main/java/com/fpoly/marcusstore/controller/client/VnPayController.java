@@ -175,7 +175,8 @@ public class VnPayController {
             order.setTransactionId(transactionId);
             orderTransactionService.markVnPayPaymentFailed(
                     order, transactionId, responseCode, failureNote);
-            orderCancellationService.cancelAndRestore(order, failureNote);
+            orderCancellationService.cancelAndRestore(
+                    order, "SYSTEM_VNPAY_FAILED", "SYSTEM", failureNote);
             userNotificationService.createOrderStatusNotification(
                     order, "CANCELLED",
                     "Đơn " + orderCode + " đã tự hủy vì thanh toán VNPAY không thành công.");

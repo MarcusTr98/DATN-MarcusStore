@@ -31,7 +31,8 @@ public class VnPayPaymentExpiryService {
         // Marcus sửa: gắn FAILED trước khi hủy để màn hình khách/admin không còn hiện
         // treo.
         order.setPaymentStatus("FAILED");
-        if (!cancellationService.cancelAndRestore(order, EXPIRED_REASON)) {
+        if (!cancellationService.cancelAndRestore(
+                order, "SYSTEM_VNPAY_EXPIRED", "SYSTEM", EXPIRED_REASON)) {
             return;
         }
 

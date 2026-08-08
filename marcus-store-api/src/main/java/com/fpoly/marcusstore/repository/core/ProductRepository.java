@@ -6,6 +6,8 @@ import com.fpoly.marcusstore.entity.core.ProductSku;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
@@ -16,6 +18,12 @@ import java.util.Optional;
 
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Integer> {
+
+        // Marcus thêm: khóa Product khi sinh ma trận để hai Admin không tạo cùng
+        // một tổ hợp SKU trong hai request đồng thời.
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("SELECT p FROM Product p WHERE p.productId = :productId")
+        Optional<Product> findByIdForSkuGeneration(@Param("productId") Integer productId);
 
         // Marcus sửa
         @EntityGraph(attributePaths = { "category" })
@@ -30,7 +38,8 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
         // Tìm kiếm cơ bản cho thanh Search
         List<Product> findByProductNameContainingIgnoreCaseAndStatusTrue(String keyword);
 
-        // Overload có Pageable + load kèm category, dùng cho search box (gợi ý + trang kết quả)
+        // Overload có Pageable + load kèm category, dùng cho search box (gợi ý + trang
+        // kết quả)
         @EntityGraph(attributePaths = { "category" })
         @Query("SELECT p FROM Product p "
                         + "WHERE LOWER(p.productName) LIKE LOWER(CONCAT('%', :keyword, '%')) "
@@ -39,7 +48,6 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
         List<Product> findByProductNameContainingIgnoreCaseAndStatusTrue(
                         @Param("keyword") String keyword,
                         Pageable pageable);
-
 
         @EntityGraph(attributePaths = { "category", "category.parent" })
         @Query("SELECT DISTINCT p FROM Product p " +
@@ -77,8 +85,9 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
         // list tên brand
         @Query("SELECT DISTINCT p.brand FROM Product p WHERE p.brand IS NOT NULL AND p.brand <> ''")
         List<String> findAllDistinctBrands();
+
         // Lấy products theo brand, có category, status = true
-        @EntityGraph(attributePaths = { "category" }) // tránh N + 1 query  load category và product cùng lúc
+        @EntityGraph(attributePaths = { "category" }) // tránh N + 1 query load category và product cùng lúc
         @Query("SELECT p FROM Product p WHERE p.brand = :brand AND p.status = true AND p.category IS NOT NULL")
         List<Product> findByBrandAndStatusTrue(@Param("brand") String brand);
 
@@ -94,31 +103,31 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
                         "            AND s.stockQuantity > 0)")
         List<Product> findActiveByCategoryIds(@Param("categoryIds") Collection<Integer> categoryIds);
 
-// Gợi ý phụ kiện cho trang Cart theo brand
+        // Gợi ý phụ kiện cho trang Cart theo brand
 
-    @EntityGraph(attributePaths = { "category", "category.parent" })
-    @Query("SELECT DISTINCT p FROM Product p " +
-                    "WHERE p.category.parent.categoryId = :accessoryRootId " +
-                    "AND p.brand IN :brands " +
-                    "AND p.status = true " +
-                    "AND EXISTS (SELECT 1 FROM ProductSku s " +
-                    "            WHERE s.product = p " +
-                    "            AND s.isActive = true " +
-                    "            AND s.stockQuantity > 0)")
-    List<Product> findActiveAccessoriesByBrands(
-                    @Param("accessoryRootId") Integer accessoryRootId,
-                    @Param("brands") Collection<String> brands);
+        @EntityGraph(attributePaths = { "category", "category.parent" })
+        @Query("SELECT DISTINCT p FROM Product p " +
+                        "WHERE p.category.parent.categoryId = :accessoryRootId " +
+                        "AND p.brand IN :brands " +
+                        "AND p.status = true " +
+                        "AND EXISTS (SELECT 1 FROM ProductSku s " +
+                        "            WHERE s.product = p " +
+                        "            AND s.isActive = true " +
+                        "            AND s.stockQuantity > 0)")
+        List<Product> findActiveAccessoriesByBrands(
+                        @Param("accessoryRootId") Integer accessoryRootId,
+                        @Param("brands") Collection<String> brands);
 
-    // Lấy DISTINCT brand của các SP phụ kiện active còn hàng
-    // - dùng cho nhánh "Phụ kiện" trên trang Search (lấy hết, không filter brand)
-    @Query("SELECT DISTINCT p.brand FROM Product p " +
-                    "WHERE p.category.parent.categoryId = :accessoryRootId " +
-                    "AND p.status = true " +
-                    "AND p.brand IS NOT NULL AND p.brand <> '' " +
-                    "AND EXISTS (SELECT 1 FROM ProductSku s " +
-                    "            WHERE s.product = p " +
-                    "            AND s.isActive = true " +
-                    "            AND s.stockQuantity > 0)")
-    List<String> findDistinctBrandsOfActiveAccessories(
-                    @Param("accessoryRootId") Integer accessoryRootId);
+        // Lấy DISTINCT brand của các SP phụ kiện active còn hàng
+        // - dùng cho nhánh "Phụ kiện" trên trang Search (lấy hết, không filter brand)
+        @Query("SELECT DISTINCT p.brand FROM Product p " +
+                        "WHERE p.category.parent.categoryId = :accessoryRootId " +
+                        "AND p.status = true " +
+                        "AND p.brand IS NOT NULL AND p.brand <> '' " +
+                        "AND EXISTS (SELECT 1 FROM ProductSku s " +
+                        "            WHERE s.product = p " +
+                        "            AND s.isActive = true " +
+                        "            AND s.stockQuantity > 0)")
+        List<String> findDistinctBrandsOfActiveAccessories(
+                        @Param("accessoryRootId") Integer accessoryRootId);
 }

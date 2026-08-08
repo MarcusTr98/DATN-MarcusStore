@@ -91,7 +91,8 @@ public class GhnStatusService {
 
         if ("CANCELLED".equals(newStatus)) {
             orderCancellationService.cancelAndRestore(
-                    order, "GHN " + source + " báo hủy vận đơn. Tracking: " + trackingCode);
+                    order, "GHN_CANCELLED", "GHN",
+                    "GHN " + source + " báo hủy vận đơn. Tracking: " + trackingCode);
         } else {
             order.setOrderStatus(newStatus);
         }

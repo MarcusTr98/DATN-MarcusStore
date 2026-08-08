@@ -289,8 +289,12 @@
                   <label class="status-note-label">Lý do hủy đơn</label>
                   <select v-model="selectedAdminCancelReason" class="status-note-input">
                     <option value="" disabled>Chọn lý do hủy</option>
-                    <option v-for="reason in ADMIN_CANCEL_REASONS" :key="reason" :value="reason">
-                      {{ reason }}
+                    <option
+                      v-for="reason in ADMIN_CANCEL_REASONS"
+                      :key="reason.code"
+                      :value="reason.code"
+                    >
+                      {{ reason.label }}
                     </option>
                   </select>
                 </template>
@@ -339,14 +343,17 @@
                 <div class="mini-row" v-if="orderDetail.fulfillmentMethod !== 'STORE_PICKUP'">
                   <span class="mini-label">Kết nối GHN</span>
                   <span class="mini-value">
-                    <span class="badge" :class="getGhnStatusClass(orderDetail.ghnIntegrationStatus)">
+                    <span
+                      class="badge"
+                      :class="getGhnStatusClass(orderDetail.ghnIntegrationStatus)"
+                    >
                       {{ getGhnStatusLabel(orderDetail.ghnIntegrationStatus) }}
                     </span>
                   </span>
                 </div>
                 <div
                   class="mini-row align-items-start"
-                  v-if="orderDetail.ghnIntegrationStatus === 'FAILED'"
+                  v-if="['FAILED', 'NEEDS_REVIEW'].includes(orderDetail.ghnIntegrationStatus)"
                 >
                   <span class="mini-label mt-1">Lỗi gần nhất</span>
                   <span class="mini-value text-danger">
@@ -411,6 +418,13 @@
                 <div class="mini-row">
                   <span class="mini-label">Thời gian TT</span
                   ><span class="mini-value">{{ orderDetail.paymentDate || '---' }}</span>
+                </div>
+                <div v-if="isAwaitingVnPayPayment" class="payment-hold-admin">
+                  <i class="bi bi-hourglass-split"></i>
+                  <div>
+                    <strong>Đang giữ hàng – chưa được xử lý đơn</strong>
+                    <span>Hết hạn thanh toán: {{ orderDetail.paymentExpiresAt }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -700,14 +714,14 @@ const retryingGhn = ref(false)
 
 const selectedStatus = ref('')
 const statusNote = ref('')
-const OTHER_CANCEL_REASON = 'Lý do khác'
+const OTHER_CANCEL_REASON = 'ADMIN_OTHER'
 const ADMIN_CANCEL_REASONS = [
-  'Khách hàng yêu cầu hủy',
-  'Không liên hệ được với khách hàng',
-  'Sản phẩm hết hàng hoặc lỗi tồn kho',
-  'Thông tin nhận hàng không hợp lệ',
-  'Phát hiện đơn hàng bất thường',
-  OTHER_CANCEL_REASON,
+  { code: 'ADMIN_CUSTOMER_REQUEST', label: 'Khách hàng yêu cầu hủy' },
+  { code: 'ADMIN_CANNOT_CONTACT', label: 'Không liên hệ được với khách hàng' },
+  { code: 'ADMIN_OUT_OF_STOCK', label: 'Sản phẩm hết hàng hoặc lỗi tồn kho' },
+  { code: 'ADMIN_INVALID_ADDRESS', label: 'Thông tin nhận hàng không hợp lệ' },
+  { code: 'ADMIN_SUSPICIOUS_ORDER', label: 'Phát hiện đơn hàng bất thường' },
+  { code: OTHER_CANCEL_REASON, label: 'Lý do khác' },
 ]
 const selectedAdminCancelReason = ref('')
 const updatingStatus = ref(false)
@@ -780,6 +794,10 @@ const paymentMethodMap = {
 const ghnStatusMap = {
   NOT_REQUIRED: { label: 'Không sử dụng GHN', className: 'completed' },
   PENDING: { label: 'Chờ tạo vận đơn', className: 'pending' },
+  PROCESSING: { label: 'Đang kết nối GHN', className: 'processing' },
+  SUCCESS: { label: 'Đã tạo vận đơn', className: 'completed' },
+  NEEDS_REVIEW: { label: 'Cần kiểm tra GHN', className: 'failed' },
+  // Marcus giữ nhãn tương thích với dữ liệu cũ trước P0.
   CREATING: { label: 'Đang kết nối GHN', className: 'processing' },
   CREATED: { label: 'Đã tạo vận đơn', className: 'completed' },
   FAILED: { label: 'Tạo vận đơn thất bại', className: 'failed' },
@@ -878,6 +896,14 @@ const canManageRefund = computed(() => {
     ['PAID', 'REFUND_PENDING', 'REFUND_FAILED'].includes(order.paymentStatus)
   )
 })
+
+// Marcus thêm: Admin nhìn rõ đơn VNPAY treo và không hiểu nhầm là đơn đã thu tiền.
+const isAwaitingVnPayPayment = computed(
+  () =>
+    String(orderDetail.value?.paymentMethod || '').toUpperCase() === 'VNPAY' &&
+    String(orderDetail.value?.paymentStatus || '').toUpperCase() === 'PENDING' &&
+    Boolean(orderDetail.value?.paymentExpiresAt),
+)
 
 const subTotal = computed(
   () => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0,
@@ -1164,10 +1190,13 @@ const saveStatusUpdate = async () => {
       return
     }
 
+    const selectedReason = ADMIN_CANCEL_REASONS.find(
+      (reason) => reason.code === selectedAdminCancelReason.value,
+    )
     const resolvedNote =
       selectedStatus.value === 'CANCELLED' &&
       selectedAdminCancelReason.value !== OTHER_CANCEL_REASON
-        ? selectedAdminCancelReason.value
+        ? selectedReason?.label || ''
         : statusNote.value.trim()
 
     if (isStatusNoteRequired.value && !resolvedNote) {
@@ -1187,6 +1216,8 @@ const saveStatusUpdate = async () => {
     const response = await OrderDetailApi.updateStatusOrder(orderCode, {
       status: selectedStatus.value,
       note: resolvedNote || null,
+      cancellationReasonCode:
+        selectedStatus.value === 'CANCELLED' ? selectedAdminCancelReason.value : null,
     })
 
     orderDetail.value = response.data

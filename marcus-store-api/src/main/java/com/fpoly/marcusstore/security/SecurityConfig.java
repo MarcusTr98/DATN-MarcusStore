@@ -18,6 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import com.fpoly.marcusstore.security.OAuth2SuccessHandler;
 import org.springframework.http.HttpMethod;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -27,6 +28,9 @@ public class SecurityConfig {
 
     @Autowired
     private AuthTokenFilter authTokenFilter;
+
+    @Autowired
+    private RequestRateLimitFilter requestRateLimitFilter;
 
     @Autowired
     private OAuth2SuccessHandler oAuth2SuccessHandler;
@@ -47,6 +51,16 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(); // Dùng BCrypt
+    }
+
+    @Bean
+    public FilterRegistrationBean<RequestRateLimitFilter> disableStandaloneRateLimitRegistration(
+            RequestRateLimitFilter filter) {
+        // Marcus sửa: filter chỉ chạy trong Spring Security sau JWT, không bị
+        // Servlet container gọi thêm một lần theo IP trước khi xác thực.
+        FilterRegistrationBean<RequestRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
@@ -119,6 +133,9 @@ public class SecurityConfig {
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        // Marcus thêm: chạy sau JWT để API quản trị giới hạn theo tài khoản,
+        // còn API public giới hạn theo địa chỉ kết nối.
+        http.addFilterAfter(requestRateLimitFilter, AuthTokenFilter.class);
 
         return http.build();
     }

@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.fpoly.marcusstore.utils.CancellationReasonCatalog;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +50,13 @@ public class OrderCancellationService {
     // được hủy trước đó.
     @Transactional
     public boolean cancelAndRestore(Order order, String reason) {
+        return cancelAndRestore(order, null, "SYSTEM", reason);
+    }
+
+    // Marcus thêm: lưu nguồn và mã lý do hủy một lần cùng transaction hoàn tài
+    // nguyên. Giữ overload cũ để không phá các điểm tích hợp hiện tại.
+    @Transactional
+    public boolean cancelAndRestore(Order order, String reasonCode, String actor, String reason) {
         if ("CANCELLED".equalsIgnoreCase(order.getOrderStatus())) {
             return false;
         }
@@ -63,11 +71,24 @@ public class OrderCancellationService {
         markPendingVnPayTransactionFailed(order, reason);
 
         order.setOrderStatus("CANCELLED");
+        order.setCancellationActor(normalizeActor(actor));
+        order.setCancellationReasonCode(CancellationReasonCatalog.normalizeCode(reasonCode, actor));
+        order.setCancelledAt(LocalDateTime.now());
         orderRepository.save(order);
         if (paidByVnPay) {
             refundService.requestSystemRefundIfEligible(order, reason);
         }
         return true;
+    }
+
+    private String normalizeActor(String actor) {
+        if (actor == null) {
+            return "SYSTEM";
+        }
+        return switch (actor.trim().toUpperCase()) {
+            case "CUSTOMER", "ADMIN", "SYSTEM", "GHN" -> actor.trim().toUpperCase();
+            default -> "SYSTEM";
+        };
     }
 
     // Marcus thêm: IPN thành công đến sau scheduler không được hoàn kho/voucher lần

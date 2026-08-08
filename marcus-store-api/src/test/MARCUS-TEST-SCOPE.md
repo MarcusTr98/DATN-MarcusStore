@@ -38,6 +38,8 @@
 
 ## 4. Module nền và module Marcus khác
 
+- `RequestRateLimitFilterTest`: giới hạn spam đăng nhập/API công khai thuộc phạm vi Marcus.
+- `ProductConfigServiceTest`: chặn batch sinh trùng tổ hợp biến thể trước khi ghi SKU.
 - `AdminNotificationServiceTest`: lưu lịch sử, badge và realtime notification.
 - `ChatSessionServiceTest`: vòng đời phiên Live Chat.
 - `AdminBackupControllerSecurityTest`: quyền tải bản sao lưu dữ liệu.
