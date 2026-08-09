@@ -13,6 +13,9 @@ public class BackupOverviewResponse {
     private long totalRecords;
     private long successfulBackups;
     private long storageBytes;
+    private long availableStorageBytes;
+    private boolean storageWarning;
+    private int retentionLimit;
     private List<TableOverview> tables;
 
     @Getter

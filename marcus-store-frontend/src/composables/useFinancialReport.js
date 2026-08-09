@@ -15,7 +15,7 @@ export function useFinancialReport() {
   // Bộ lọc
   const keywordInput = ref('')
   let searchTimeout = null
-  const filters = reactive({ keyword: '', type: '', status: '', fromDate: '', toDate: '' })
+  const filters = reactive({ keyword: '', type: '', status: '', attention: '', fromDate: '', toDate: '' })
   // Marcus thêm: mặc định trang đối soát mở ở 7 ngày gần nhất.
   const activeDatePreset = ref('7days')
 
@@ -125,6 +125,7 @@ export function useFinancialReport() {
     filters.keyword = ''
     filters.type = ''
     filters.status = ''
+    filters.attention = ''
     currentPage.value = 1
     applyDatePreset('7days')
   }
@@ -140,6 +141,8 @@ export function useFinancialReport() {
       }
       if (filters.type && item.type !== filters.type) return false
       if (filters.status && item.status !== filters.status) return false
+      if (filters.attention === 'UNRECONCILED' && !(item.status === 'SUCCESS' && !item.isReconciled)) return false
+      if (filters.attention === 'ATTENTION' && !item.needsAttention) return false
       if (filters.fromDate) {
         // Marcus sửa: parse ngày bắt đầu theo local để không bỏ sót giao dịch 00:00–06:59.
         if (new Date(item.createdAt) < parseLocalDate(filters.fromDate)) return false
@@ -484,9 +487,21 @@ export function useFinancialReport() {
       successfulRefund,
       recognizedRevenue,
       unsettledCancellationAmount,
+      vnpayCollected: sumCashCategory(dataset, 'VNPAY_COLLECTED'),
+      codExpected: sumCashCategory(dataset, 'COD_EXPECTED'),
+      codReconciled: sumCashCategory(dataset, 'COD_RECONCILED'),
+      storeCollected: sumCashCategory(dataset, 'STORE_COLLECTED'),
+      refundExpected: sumCashCategory(dataset, 'REFUND_EXPECTED'),
+      refundSuccessful: sumCashCategory(dataset, 'REFUND_SUCCESSFUL'),
+      attentionCount: dataset.filter((t) => t.needsAttention).length,
       totalAmount: successfulInflow - successfulRefund,
     }
   })
+
+  const sumCashCategory = (dataset, category) =>
+    dataset
+      .filter((item) => item.cashCategory === category)
+      .reduce((sum, item) => sum + (Number(item.amount) || 0), 0)
 
   // UTILS FORMATTING
   const formatCurrency = (value) => new Intl.NumberFormat('vi-VN').format(value || 0)

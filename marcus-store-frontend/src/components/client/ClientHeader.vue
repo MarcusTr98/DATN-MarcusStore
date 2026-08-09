@@ -381,7 +381,7 @@ function handleClickOutside(e) {
                     @click="openNotification(item)"
                   >
                     <span class="notification-item-icon" :class="item.type">
-                      <i :class="getUserNotificationIcon(item.type)"></i>
+                      <i :class="item.icon || getUserNotificationIcon(item.type)"></i>
                     </span>
                     <span
                       ><strong>{{ item.title }}</strong

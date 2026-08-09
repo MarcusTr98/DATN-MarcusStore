@@ -53,6 +53,14 @@ public class OrderTransaction {
     @Builder.Default
     private Boolean isReconciled = false; // mặc định là chưa đối soát
 
+    // Marcus thêm: boolean là chưa đủ cho audit; lưu snapshot người và thời điểm
+    // xác nhận đối soát.
+    @Column(name = "reconciled_by", length = 100)
+    private String reconciledBy;
+
+    @Column(name = "reconciled_at")
+    private LocalDateTime reconciledAt;
+
     @Column(name = "idempotency_key", length = 150)
     private String idempotencyKey;
 

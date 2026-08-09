@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 
 import java.util.Map;
 import java.util.Set;
+import com.fpoly.marcusstore.dto.response.SystemSettingsAdminResponse;
 
 @RestController
 @RequestMapping("/api")
@@ -31,8 +32,15 @@ public class SystemSettingController {
     @GetMapping("/admin/settings")
     // Marcus thêm: tách quyền xem và cập nhật cấu hình hệ thống.
     @PreAuthorize("hasAuthority('SYSTEM_VIEW')")
-    public Map<String, String> getAdminSettings() {
-        return service.getAllSettingsAsMap();
+    public SystemSettingsAdminResponse getAdminSettings() {
+        return service.getAdminSettings();
+    }
+
+    @PostMapping("/admin/settings/restore-defaults")
+    @PreAuthorize("hasAuthority('SYSTEM_UPDATE')")
+    public ApiResponse<Void> restoreDefaults() {
+        service.restoreDefaults();
+        return ApiResponse.success("Đã khôi phục cấu hình mặc định.");
     }
 
     @PutMapping("/admin/settings/bulk-update")

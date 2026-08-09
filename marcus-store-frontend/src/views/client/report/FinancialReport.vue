@@ -99,6 +99,16 @@
         </div>
       </div>
 
+      <!-- Marcus thêm: sáu nhóm tiền vận hành, không trộn tiền dự kiến với tiền đã thu. -->
+      <div class="cash-breakdown-grid">
+        <article><span>VNPAY đã thu</span><strong>{{ formatCurrencyVnd(stats.vnpayCollected) }}</strong></article>
+        <article><span>COD dự kiến thu</span><strong>{{ formatCurrencyVnd(stats.codExpected) }}</strong></article>
+        <article><span>COD đã đối soát</span><strong>{{ formatCurrencyVnd(stats.codReconciled) }}</strong></article>
+        <article><span>Tiền nhận tại cửa hàng</span><strong>{{ formatCurrencyVnd(stats.storeCollected) }}</strong></article>
+        <article class="cash-pending"><span>Refund dự kiến</span><strong>{{ formatCurrencyVnd(stats.refundExpected) }}</strong></article>
+        <article class="cash-refund"><span>Refund thành công</span><strong>-{{ formatCurrencyVnd(stats.refundSuccessful) }}</strong></article>
+      </div>
+
       <!-- Mini Chart (Stacked Bar) -->
       <div class="chart-panel" v-if="filteredTransactions.length > 0">
         <div class="chart-header">
@@ -141,6 +151,15 @@
               <option value="STORE_PAYMENT">Thanh toán tại cửa hàng</option>
               <option value="VNPAY_PAYMENT">Thanh toán (VNPAY)</option>
               <option value="REFUND">Hoàn tiền</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label class="form-label">Kiểm tra đối soát</label>
+            <select v-model="filters.attention" class="form-select" @change="onFilterChange">
+              <option value="">Tất cả</option>
+              <option value="UNRECONCILED">Chưa đối soát</option>
+              <option value="ATTENTION">Chưa khớp / Cần xử lý</option>
             </select>
           </div>
 
@@ -454,6 +473,17 @@
           <div class="note-box">
             <span class="detail-label"><i class="bi bi-info-circle"></i> Ghi chú (Log)</span>
             <p class="note-text">{{ selectedTransaction?.note || 'Không có ghi chú' }}</p>
+          </div>
+
+          <div v-if="selectedTransaction?.reconciliationIssue" class="note-box reconciliation-warning">
+            <span class="detail-label"><i class="bi bi-exclamation-triangle"></i> Cần xử lý</span>
+            <p class="note-text">{{ selectedTransaction.reconciliationIssue }}</p>
+          </div>
+
+          <div v-if="selectedTransaction?.isReconciled" class="reconcile-audit">
+            <i class="bi bi-person-check"></i>
+            Đối soát bởi <strong>{{ selectedTransaction.reconciledBy || 'Không rõ' }}</strong>
+            lúc {{ formatDate(selectedTransaction.reconciledAt) }}
           </div>
 
           <!-- Thông tin mở rộng Order -->

@@ -531,3 +531,10 @@
     min-height: auto;
   }
 }
+.storage-warning { display: flex; gap: 10px; margin: 14px 0; padding: 13px 16px; border: 1px solid #fdba74; border-radius: 12px; background: #fff7ed; color: #9a3412; }
+.restore-guide { margin-top: 18px; padding: 16px 20px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+.restore-guide summary { cursor: pointer; font-weight: 750; color: var(--ink); }
+.restore-guide ol { margin: 14px 0 8px; color: #475569; line-height: 1.8; }
+.restore-result.success { color: #15803d !important; }
+.restore-result.failed { color: #dc2626 !important; }
+.icon-btn.restore { color: #2563eb; background: #eff6ff; }

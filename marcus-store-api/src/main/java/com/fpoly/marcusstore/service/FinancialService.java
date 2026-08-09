@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import com.fpoly.marcusstore.security.SecurityUtils;
 
 @Service
 @RequiredArgsConstructor
@@ -67,6 +68,11 @@ public class FinancialService {
                                                                 : note + " | Cảnh báo đối soát: lệch tiền đơn (Gốc: "
                                                                                 + orderFinalAmount + ")";
                                         }
+                                        boolean amountMismatch = !isRefund(t)
+                                                        && orderFinalAmount != null && t.getAmount() != null
+                                                        && t.getAmount().compareTo(orderFinalAmount) != 0;
+                                        String cashCategory = resolveCashCategory(t);
+                                        String issue = resolveReconciliationIssue(t, amountMismatch);
                                         return TransactionResponse.builder()
                                                         .transactionId(t.getTransactionId())
                                                         .providerTransactionId(
@@ -90,6 +96,11 @@ public class FinancialService {
                                                         .recipientPhone(t.getOrder().getRecipientPhone())
                                                         .shippingAddress(t.getOrder().getShippingAddress())
                                                         .isReconciled(t.getIsReconciled())
+                                                        .reconciledBy(t.getReconciledBy())
+                                                        .reconciledAt(t.getReconciledAt())
+                                                        .cashCategory(cashCategory)
+                                                        .needsAttention(issue != null)
+                                                        .reconciliationIssue(issue)
                                                         .build();
                                 })
                                 .collect(Collectors.toList());
@@ -157,6 +168,14 @@ public class FinancialService {
                                 .filter(java.util.Objects::nonNull)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+                BigDecimal vnpayCollected = sumByCashCategory(dtoList, "VNPAY_COLLECTED");
+                BigDecimal codExpected = sumByCashCategory(dtoList, "COD_EXPECTED");
+                BigDecimal codReconciled = sumByCashCategory(dtoList, "COD_RECONCILED");
+                BigDecimal storeCollected = sumByCashCategory(dtoList, "STORE_COLLECTED");
+                BigDecimal refundExpected = sumByCashCategory(dtoList, "REFUND_EXPECTED");
+                BigDecimal refundSuccessful = sumByCashCategory(dtoList, "REFUND_SUCCESSFUL");
+                long attentionCount = dtoList.stream().filter(t -> Boolean.TRUE.equals(t.getNeedsAttention())).count();
+
                 // Marcus thêm: doanh thu chỉ được ghi nhận khi tiền đã thu thành công
                 // và đơn đã hoàn tất. Đây là cùng quy tắc mà Analytics/AI sử dụng.
                 BigDecimal recognizedRevenue = dtoList.stream()
@@ -197,6 +216,13 @@ public class FinancialService {
                                 unsettledCancellationAmount,
                                 pending,
                                 failed,
+                                vnpayCollected,
+                                codExpected,
+                                codReconciled,
+                                storeCollected,
+                                refundExpected,
+                                refundSuccessful,
+                                attentionCount,
                                 rate);
         }
 
@@ -214,6 +240,46 @@ public class FinancialService {
                 return transaction.getType();
         }
 
+        private static String resolveCashCategory(OrderTransaction transaction) {
+                String type = resolveReportTransactionType(transaction);
+                String status = transaction.getStatus() == null ? "" : transaction.getStatus().toUpperCase();
+                if (REFUND.equalsIgnoreCase(type)) {
+                        return SUCCESS.equals(status) ? "REFUND_SUCCESSFUL" : "REFUND_EXPECTED";
+                }
+                if ("VNPAY_PAYMENT".equalsIgnoreCase(type) && SUCCESS.equals(status))
+                        return "VNPAY_COLLECTED";
+                if ("STORE_PAYMENT".equalsIgnoreCase(type) && SUCCESS.equals(status))
+                        return "STORE_COLLECTED";
+                if ("COD_COLLECTION".equalsIgnoreCase(type)) {
+                        if (!SUCCESS.equals(status))
+                                return "COD_EXPECTED";
+                        return Boolean.TRUE.equals(transaction.getIsReconciled())
+                                        ? "COD_RECONCILED"
+                                        : "COD_AWAITING_RECONCILIATION";
+                }
+                return "OTHER";
+        }
+
+        private static String resolveReconciliationIssue(OrderTransaction transaction, boolean amountMismatch) {
+                if (amountMismatch)
+                        return "Số tiền giao dịch lệch với giá trị đơn hàng";
+                if (SUCCESS.equalsIgnoreCase(transaction.getStatus())
+                                && !Boolean.TRUE.equals(transaction.getIsReconciled())) {
+                        return "Giao dịch thành công nhưng chưa được đối soát";
+                }
+                if (REFUND.equalsIgnoreCase(transaction.getType())
+                                && !SUCCESS.equalsIgnoreCase(transaction.getStatus())) {
+                        return "Refund chưa hoàn tất, cần tiếp tục theo dõi";
+                }
+                return null;
+        }
+
+        private static BigDecimal sumByCashCategory(List<TransactionResponse> transactions, String category) {
+                return transactions.stream().filter(item -> category.equals(item.getCashCategory()))
+                                .map(TransactionResponse::getAmount).filter(java.util.Objects::nonNull)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
         public void updateReconciliationStatus(Integer transactionId, boolean status) {
                 OrderTransaction tx = transactionRepository.findById(transactionId)
                                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch"));
@@ -223,6 +289,8 @@ public class FinancialService {
                         throw new IllegalStateException("Chỉ giao dịch thành công mới được đối soát");
                 }
                 tx.setIsReconciled(status);
+                tx.setReconciledBy(status ? SecurityUtils.getCurrentUsername() : null);
+                tx.setReconciledAt(status ? LocalDateTime.now() : null);
                 transactionRepository.save(tx);
         }
 }

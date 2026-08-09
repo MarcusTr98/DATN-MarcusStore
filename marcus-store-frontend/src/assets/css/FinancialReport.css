@@ -863,3 +863,23 @@
   cursor: not-allowed;
   background-color: #e9ecef;
 }
+.cash-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 20px;
+}
+.cash-breakdown-grid article {
+  padding: 13px 14px;
+  border: 1px solid #cfe0f5;
+  border-radius: 13px;
+  background: #fff;
+}
+.cash-breakdown-grid span { display: block; color: #64748b; font-size: 12px; }
+.cash-breakdown-grid strong { display: block; margin-top: 5px; color: #087443; font-size: 14px; }
+.cash-breakdown-grid .cash-pending strong { color: #b7791f; }
+.cash-breakdown-grid .cash-refund strong { color: #dc2626; }
+.reconciliation-warning { border-color: #fed7aa !important; background: #fff7ed !important; }
+.reconcile-audit { margin-top: 12px; color: #475569; font-size: 13px; }
+@media (max-width: 1200px) { .cash-breakdown-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px) { .cash-breakdown-grid { grid-template-columns: 1fr; } }

@@ -42,6 +42,7 @@ CREATE TABLE Users (
     is_active     BIT            DEFAULT 1,
     created_at    DATETIME2      DEFAULT GETDATE(),
     updated_at    DATETIME2      DEFAULT GETDATE(),
+    updated_by    VARCHAR(100)   NULL,
     CONSTRAINT PK_Users       PRIMARY KEY (user_id),
     CONSTRAINT FK_Users_Roles FOREIGN KEY (role_id) REFERENCES Roles(role_id)
 );
@@ -611,7 +612,10 @@ CREATE TABLE Contact_Requests (
     phone_number VARCHAR(15) NOT NULL,
     email VARCHAR(100),
     message NVARCHAR(1000) NOT NULL,
-    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING (Mới), IN_PROGRESS (Đang xử lý), RESOLVED (Đã giải quyết)
+    status VARCHAR(50) DEFAULT 'NEW',
+    handled_by VARCHAR(100) NULL,
+    processing_started_at DATETIME2 NULL,
+    resolved_at DATETIME2 NULL,
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2
 );
@@ -625,9 +629,15 @@ CREATE TABLE Admin_Notifications (
     title NVARCHAR(255) NOT NULL,
     message NVARCHAR(1000) NOT NULL,
     reference_id VARCHAR(50) NULL, -- Lưu orderCode hoặc contact_id để click vào chuyển trang
+    event_key VARCHAR(180) NULL,
+    category VARCHAR(20) NOT NULL DEFAULT 'INFO',
+    icon VARCHAR(80) NULL,
+    deep_link VARCHAR(300) NULL,
+    expires_at DATETIME2 NULL,
     is_read BIT DEFAULT 0,
     created_at DATETIME2 DEFAULT GETDATE()
 );
+CREATE UNIQUE INDEX UX_AdminNotifications_EventKey ON Admin_Notifications(event_key) WHERE event_key IS NOT NULL;
 
 -- Marcus thêm: chuông của khách hàng được lưu riêng, hỗ trợ đọc/chưa đọc và realtime.
 CREATE TABLE User_Notifications (
@@ -637,6 +647,11 @@ CREATE TABLE User_Notifications (
     title NVARCHAR(255) NOT NULL,
     message NVARCHAR(1000) NOT NULL,
     reference_id VARCHAR(50) NULL,
+    event_key VARCHAR(180) NULL,
+    category VARCHAR(20) NOT NULL DEFAULT 'INFO',
+    icon VARCHAR(80) NULL,
+    deep_link VARCHAR(300) NULL,
+    expires_at DATETIME2 NULL,
     is_read BIT NOT NULL CONSTRAINT DF_UserNotifications_IsRead DEFAULT 0,
     created_at DATETIME2 NOT NULL CONSTRAINT DF_UserNotifications_CreatedAt DEFAULT SYSDATETIME(),
     CONSTRAINT FK_UserNotifications_User
@@ -644,6 +659,20 @@ CREATE TABLE User_Notifications (
 );
 CREATE INDEX IX_UserNotifications_User_Created
     ON User_Notifications(user_id, created_at DESC);
+CREATE UNIQUE INDEX UX_UserNotifications_EventKey ON User_Notifications(event_key) WHERE event_key IS NOT NULL;
+
+-- Marcus thêm: chỉ lưu metadata Live Chat, không lưu nội dung hội thoại.
+CREATE TABLE Chat_Session_Metrics (
+    session_id VARCHAR(36) PRIMARY KEY,
+    customer_hash VARCHAR(64) NOT NULL,
+    started_at DATETIME2 NOT NULL,
+    claimed_at DATETIME2 NULL,
+    first_response_at DATETIME2 NULL,
+    ended_at DATETIME2 NULL,
+    status VARCHAR(20) NOT NULL,
+    answered BIT NOT NULL DEFAULT 0,
+    closed_by VARCHAR(20) NULL
+);
 
 -- Marcus thêm để tính phí ship riêng
 USE MarcusStoreDB;
@@ -694,6 +723,8 @@ CREATE TABLE Order_Transactions (
     CONSTRAINT FK_OrderTrans_Orders FOREIGN KEY (order_id) REFERENCES Orders(order_id) ON DELETE CASCADE
 );
 ALTER TABLE Order_Transactions ADD is_reconciled BIT DEFAULT 0 NOT NULL;
+ALTER TABLE Order_Transactions ADD reconciled_by VARCHAR(100) NULL;
+ALTER TABLE Order_Transactions ADD reconciled_at DATETIME2 NULL;
 ALTER TABLE Order_Transactions ADD idempotency_key VARCHAR(150) NULL;
 ALTER TABLE Order_Transactions ADD provider_transaction_id VARCHAR(100) NULL;
 ALTER TABLE Order_Transactions ADD provider_response_code VARCHAR(20) NULL;

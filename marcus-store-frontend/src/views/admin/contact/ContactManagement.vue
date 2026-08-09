@@ -19,8 +19,8 @@
           <strong>{{ stats.total }}</strong>
         </article>
         <article class="cm-stat-card">
-          <span>Chờ xử lý</span>
-          <strong class="cm-text-accent">{{ stats.pending }}</strong>
+          <span>Mới / đang xử lý</span>
+          <strong class="cm-text-accent">{{ stats.new + stats.inProgress }}</strong>
         </article>
         <article class="cm-stat-card">
           <span>Đã giải quyết</span>
@@ -50,8 +50,10 @@
             <label class="form-label">Trạng thái xử lý</label>
             <select v-model="filters.status" class="form-select">
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="PENDING">Chờ xử lý</option>
+              <option value="NEW">Mới</option>
+              <option value="IN_PROGRESS">Đang xử lý</option>
               <option value="RESOLVED">Đã giải quyết</option>
+              <option value="SPAM">Spam</option>
             </select>
           </div>
           <div class="col-12 col-md-3">
@@ -122,8 +124,8 @@
                   <div class="cm-date-line">{{ formatDateTime(item.createdAt) }}</div>
                 </td>
                 <td>
-                  <span class="cm-status-badge" :class="{ pending: item.status === 'PENDING' }">
-                    {{ item.status === 'PENDING' ? 'Chờ xử lý' : 'Đã giải quyết' }}
+                  <span class="cm-status-badge" :class="{ pending: ['NEW', 'IN_PROGRESS'].includes(item.status) }">
+                    {{ statusLabel(item.status) }}
                   </span>
                 </td>
                 <td>
@@ -132,12 +134,18 @@
                       <i class="fa-regular fa-eye"></i>
                     </button>
                     <button
-                      v-if="item.status === 'PENDING'"
+                      v-if="item.status === 'NEW'"
                       class="cm-icon-btn success"
-                      title="Đánh dấu đã xử lý"
-                      @click="confirmResolve(item.contactId)"
+                      title="Tiếp nhận xử lý"
+                      @click="confirmStatus(item, 'IN_PROGRESS')"
                     >
+                      <i class="fa-solid fa-user-check"></i>
+                    </button>
+                    <button v-if="!['RESOLVED', 'SPAM'].includes(item.status)" class="cm-icon-btn success" title="Đã giải quyết" @click="confirmStatus(item, 'RESOLVED')">
                       <i class="fa-solid fa-check"></i>
+                    </button>
+                    <button v-if="item.status !== 'SPAM'" class="cm-icon-btn" title="Đánh dấu Spam" @click="confirmStatus(item, 'SPAM')">
+                      <i class="fa-solid fa-ban"></i>
                     </button>
                   </div>
                 </td>
@@ -230,6 +238,18 @@
           <div class="msg-title">Nội dung khiếu nại/tư vấn:</div>
           <p class="msg-content">"{{ detailModal.data.message }}"</p>
         </div>
+        <div class="detail-row" v-if="detailModal.data.handledBy">
+          <i class="fa-solid fa-user-check text-primary"></i>
+          <span>Xử lý bởi <strong>{{ detailModal.data.handledBy }}</strong></span>
+        </div>
+        <div class="detail-row" v-if="detailModal.data.processingStartedAt">
+          <i class="fa-regular fa-clock"></i>
+          <span>Tiếp nhận lúc {{ formatDateTime(detailModal.data.processingStartedAt) }}</span>
+        </div>
+        <div class="detail-row" v-if="detailModal.data.resolvedAt">
+          <i class="fa-solid fa-circle-check text-success"></i>
+          <span>Kết thúc lúc {{ formatDateTime(detailModal.data.resolvedAt) }}</span>
+        </div>
       </div>
     </BaseModal>
 
@@ -259,7 +279,7 @@ const pageSize = ref(10)
 const totalElements = ref(0)
 const totalPages = ref(0)
 const filters = reactive({ keyword: '', status: 'ALL' })
-const stats = reactive({ total: 0, pending: 0, resolved: 0, guest: 0 })
+const stats = reactive({ total: 0, new: 0, inProgress: 0, resolved: 0, guest: 0 })
 
 // Trạng thái "vừa sao chép User ID" (dùng chung cho bảng + modal chi tiết)
 const copiedId = ref(null)
@@ -273,6 +293,7 @@ const actionModal = reactive({
   title: '',
   message: '',
   targetId: null,
+  targetStatus: null,
 })
 
 // Logic Modal
@@ -298,7 +319,8 @@ const filteredContacts = computed(() => {
 
 const calculateStats = (dataList) => {
   stats.total = dataList.length
-  stats.pending = dataList.filter((i) => i.status === 'PENDING').length
+  stats.new = dataList.filter((i) => i.status === 'NEW').length
+  stats.inProgress = dataList.filter((i) => i.status === 'IN_PROGRESS').length
   stats.resolved = dataList.filter((i) => i.status === 'RESOLVED').length
   stats.guest = dataList.filter((i) => !i.userId).length
 }
@@ -330,12 +352,13 @@ const viewDetail = (item) => {
   detailModal.visible = true
 }
 
-const confirmResolve = (id) => {
+const confirmStatus = (item, status) => {
+  actionModal.targetStatus = status
   showActionModal(
     'confirm',
-    'Xác nhận xử lý',
-    'Bạn có chắc chắn đã giải quyết xong yêu cầu này?',
-    id,
+    status === 'SPAM' ? 'Đánh dấu Spam?' : 'Cập nhật trạng thái?',
+    `Yêu cầu #${item.contactId} sẽ chuyển sang “${statusLabel(status)}”.`,
+    item.contactId,
   )
 }
 
@@ -344,7 +367,9 @@ const executeAction = async () => {
   if (actionModal.type === 'confirm' && actionModal.targetId) {
     actionModal.visible = false
     try {
-      await api.put(`/admin/contacts/${actionModal.targetId}/resolve`)
+      await api.put(`/admin/contacts/${actionModal.targetId}/status`, {
+        status: actionModal.targetStatus,
+      })
       fetchContacts()
       setTimeout(
         () => showActionModal('success', 'Thành công', 'Đã cập nhật trạng thái yêu cầu.'),
@@ -391,6 +416,9 @@ const goToPage = (page) => {
 
 const formatDateTime = (val) =>
   new Date(val).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
+
+const statusLabel = (status) =>
+  ({ NEW: 'Mới', IN_PROGRESS: 'Đang xử lý', RESOLVED: 'Đã giải quyết', SPAM: 'Spam', PENDING: 'Mới' })[status] || status
 
 onMounted(fetchContacts)
 </script>

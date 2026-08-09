@@ -17,6 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.time.LocalDateTime;
+import org.springframework.scheduling.annotation.Scheduled;
+import com.fpoly.marcusstore.utils.NotificationRegistry;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -30,17 +33,27 @@ public class AdminNotificationService {
     private final AdminNotificationRepository notificationRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
-    @Transactional(readOnly = true)
     public Map<String, Object> getNotificationsForAdmin(int page, int size, boolean unreadOnly) {
+        return getNotificationsForAdmin(page, size, unreadOnly, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getNotificationsForAdmin(int page, int size, boolean unreadOnly, String category) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), MAX_PAGE_SIZE);
         // Marcus sửa: repository đã khai báo OrderByCreatedAtDesc, không chồng thêm
         // ORDER BY từ Pageable.
         PageRequest pageable = PageRequest.of(safePage, safeSize);
 
-        Page<AdminNotification> result = unreadOnly
-                ? notificationRepository.findByIsReadFalseOrderByCreatedAtDesc(pageable)
-                : notificationRepository.findAllByOrderByCreatedAtDesc(pageable);
+        String normalizedCategory = category == null ? "" : category.trim().toUpperCase();
+        Page<AdminNotification> result;
+        if (unreadOnly) {
+            result = notificationRepository.findByIsReadFalseOrderByCreatedAtDesc(pageable);
+        } else if (java.util.Set.of("INFO", "WARNING", "ACTION_REQUIRED").contains(normalizedCategory)) {
+            result = notificationRepository.findByCategoryOrderByCreatedAtDesc(normalizedCategory, pageable);
+        } else {
+            result = notificationRepository.findAllByOrderByCreatedAtDesc(pageable);
+        }
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("list", result.getContent().stream().map(this::toResponse).toList());
@@ -76,11 +89,23 @@ public class AdminNotificationService {
 
     @Transactional
     public void createAndSendNotification(String type, String title, String message, String referenceId) {
+        String eventKey = NotificationRegistry.eventKey("ADMIN", type, referenceId, title);
+        java.util.Optional<AdminNotification> existing = notificationRepository.findByEventKey(eventKey);
+        if (existing != null && existing.isPresent()) {
+            return;
+        }
+        NotificationRegistry.Metadata metadata = NotificationRegistry.forAdmin(type, referenceId);
         AdminNotification notification = new AdminNotification();
         notification.setType(type);
         notification.setTitle(title);
         notification.setMessage(message);
         notification.setReferenceId(referenceId);
+        notification.setEventKey(eventKey);
+        notification.setCategory(metadata.category());
+        notification.setIcon(metadata.icon());
+        notification.setDeepLink(metadata.deepLink());
+        notification.setExpiresAt(LocalDateTime.now().plusDays(
+                NotificationRegistry.ACTION_REQUIRED.equals(metadata.category()) ? 180 : 90));
         notification.setIsRead(false);
 
         AdminNotification saved = notificationRepository.saveAndFlush(notification);
@@ -109,9 +134,21 @@ public class AdminNotificationService {
                 .title(notification.getTitle())
                 .message(notification.getMessage())
                 .referenceId(notification.getReferenceId())
+                .category(notification.getCategory())
+                .icon(notification.getIcon())
+                .deepLink(notification.getDeepLink())
                 .isRead(Boolean.TRUE.equals(notification.getIsRead()))
                 .createdAt(notification.getCreatedAt())
+                .expiresAt(notification.getExpiresAt())
                 .build();
+    }
+
+    // Marcus thêm: dọn chuông đã quá hạn mỗi đêm; sự kiện cần xử lý được giữ lâu
+    // hơn nhờ expiresAt đã tính lúc tạo.
+    @Scheduled(cron = "0 20 3 * * *")
+    @Transactional
+    public void cleanupExpiredNotifications() {
+        notificationRepository.deleteByExpiresAtBefore(LocalDateTime.now());
     }
 
     private void sendAfterCommit(Object payload) {

@@ -142,7 +142,7 @@
                 <textarea
                   v-model="form.message"
                   rows="4"
-                  maxlength="2000"
+                  maxlength="1000"
                   placeholder="Vui lòng mô tả chi tiết vấn đề của bạn..."
                   required
                 ></textarea>

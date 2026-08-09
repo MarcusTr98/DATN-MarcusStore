@@ -31,6 +31,22 @@ public class AdminNotification {
     @Column(name = "reference_id", length = 50)
     private String referenceId; // Lưu mã đơn hoặc ID liên hệ để FE làm chức năng Click chuyển trang
 
+    // Marcus thêm: eventKey chống ghi trùng khi webhook/scheduler retry cùng sự kiện.
+    @Column(name = "event_key", length = 180, unique = true)
+    private String eventKey;
+
+    @Column(name = "category", nullable = false, length = 20)
+    private String category = "INFO";
+
+    @Column(name = "icon", length = 80)
+    private String icon;
+
+    @Column(name = "deep_link", length = 300)
+    private String deepLink;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @Column(name = "is_read")
     private Boolean isRead = false;
 

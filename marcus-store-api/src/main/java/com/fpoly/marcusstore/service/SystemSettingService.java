@@ -14,9 +14,30 @@ import java.util.Set;
 import java.net.URI;
 import java.util.regex.Pattern;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.dto.response.SystemSettingsAdminResponse;
+import java.time.LocalDateTime;
 
 @Service
 public class SystemSettingService {
+
+    private static final Map<String, String> DEFAULT_SETTINGS = Map.ofEntries(
+            Map.entry("SITE_NAME", "Marcus Store"), Map.entry("SITE_LOGO_URL", ""),
+            Map.entry("HOTLINE", "0907640098"), Map.entry("EMAIL", "support@marcusstore.com"),
+            Map.entry("ADDRESS", "118 Cát Bi, Hải An, Hải Phòng"),
+            Map.entry("WORKING_HOURS", "8:00 - 21:00 (Thứ 2 - Chủ nhật)"),
+            Map.entry("PROMO_TEXT", "Sản phẩm chính hãng - Hỗ trợ tận tâm"),
+            Map.entry("FACEBOOK_URL", ""), Map.entry("TIKTOK_URL", ""),
+            Map.entry("INSTAGRAM_URL", ""), Map.entry("YOUTUBE_URL", ""),
+            Map.entry("STORE_LOCATION",
+                    "{\"lat\":20.82716,\"lng\":106.70466,\"name\":\"Marcus Store\",\"address\":\"118 Cát Bi, Hải An, Hải Phòng\"}"),
+            Map.entry("HOME_HERO_BADGE", "Sản phẩm công nghệ chính hãng"),
+            Map.entry("HOME_HERO_TITLE", "Công nghệ mới."),
+            Map.entry("HOME_HERO_TITLE_ACCENT", "Trải nghiệm tốt hơn."),
+            Map.entry("HOME_HERO_LEAD", "Khám phá điện thoại và phụ kiện phù hợp tại Marcus Store."),
+            Map.entry("HOME_HERO_SLIDES", "[]"), Map.entry("AI_ADVISOR_POLICY", ""));
 
     private static final Set<String> PUBLIC_SETTING_KEYS = Set.of(
             "SITE_NAME", "SITE_LOGO_URL",
@@ -47,9 +68,22 @@ public class SystemSettingService {
                 .collect(Collectors.toMap(SystemSetting::getSettingKey, SystemSetting::getSettingValue));
     }
 
+    @Transactional(readOnly = true)
+    public SystemSettingsAdminResponse getAdminSettings() {
+        List<SystemSetting> all = repository.findAll();
+        SystemSetting latest = all.stream()
+                .filter(item -> item.getUpdatedAt() != null)
+                .max(java.util.Comparator.comparing(SystemSetting::getUpdatedAt)).orElse(null);
+        return new SystemSettingsAdminResponse(
+                all.stream().collect(Collectors.toMap(SystemSetting::getSettingKey, SystemSetting::getSettingValue)),
+                latest == null ? null : latest.getUpdatedBy(),
+                latest == null ? null : latest.getUpdatedAt());
+    }
+
     // Marcus sửa: client công khai chỉ nhận các cấu hình hiển thị đã allowlist,
     // không lộ prompt/chính sách nội bộ trong System_Settings.
     @Transactional(readOnly = true)
+    @Cacheable("public-settings")
     public Map<String, String> getPublicSettingsAsMap() {
         return repository.findAllById(PUBLIC_SETTING_KEYS).stream()
                 .collect(Collectors.toMap(SystemSetting::getSettingKey, SystemSetting::getSettingValue));
@@ -64,6 +98,7 @@ public class SystemSettingService {
     }
 
     @Transactional
+    @CacheEvict(value = "public-settings", allEntries = true)
     public void updateSettings(Map<String, String> payload) {
         List<SystemSetting> existingSettings = repository.findAllById(payload.keySet());
 
@@ -95,10 +130,19 @@ public class SystemSettingService {
                 setting.setSettingGroup(determineSettingGroup(key));
                 setting.setDescription("Cấu hình tự động khởi tạo từ hệ thống quản trị");
             }
+            setting.setUpdatedBy(SecurityUtils.getCurrentUsername());
+            setting.setUpdatedAt(LocalDateTime.now());
             toSave.add(setting);
         }
 
         repository.saveAll(toSave);
+    }
+
+    // Marcus thêm: khôi phục bộ mặc định có kiểm soát, vẫn đi qua cùng validation.
+    @Transactional
+    @CacheEvict(value = "public-settings", allEntries = true)
+    public void restoreDefaults() {
+        updateSettings(DEFAULT_SETTINGS);
     }
 
     // Marcus thêm: System Settings chỉ nhận key do hệ thống định nghĩa và validate

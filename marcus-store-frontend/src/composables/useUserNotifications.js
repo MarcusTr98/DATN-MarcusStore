@@ -66,6 +66,7 @@ export function useUserNotifications() {
       item.isRead = true
       unreadCount.value = Math.max(0, unreadCount.value - 1)
     }
+    if (item.deepLink) return item.deepLink
     if (item.referenceId) return `/profile/orders/${item.referenceId}`
     return null
   }

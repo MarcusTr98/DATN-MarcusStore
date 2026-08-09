@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.service.chat;
 
 import com.fpoly.marcusstore.dto.chat.ChatMessageDTO;
 import com.fpoly.marcusstore.dto.chat.ChatSessionDTO;
+import com.fpoly.marcusstore.repository.contact.ChatSessionMetricRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -17,7 +18,11 @@ class ChatSessionServiceTest {
 
         @BeforeEach
         void setUp() {
-                chatSessionService = new ChatSessionService(mock(SimpMessagingTemplate.class));
+                // Marcus sửa: Live Chat chỉ lưu metadata vận hành, tuyệt đối không lưu nội
+                // dung.
+                chatSessionService = new ChatSessionService(
+                                mock(SimpMessagingTemplate.class),
+                                mock(ChatSessionMetricRepository.class));
         }
 
         @Test

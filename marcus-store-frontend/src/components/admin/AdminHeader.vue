@@ -57,6 +57,15 @@
             >
               Chưa đọc <span v-if="unreadCount">{{ displayUnreadCount }}</span>
             </button>
+            <button type="button" :class="{ active: activeFilter === 'INFO' }" @click="setFilter('INFO')">
+              Thông tin
+            </button>
+            <button type="button" :class="{ active: activeFilter === 'WARNING' }" @click="setFilter('WARNING')">
+              Cảnh báo
+            </button>
+            <button type="button" :class="{ active: activeFilter === 'ACTION_REQUIRED' }" @click="setFilter('ACTION_REQUIRED')">
+              Cần xử lý
+            </button>
           </div>
           <div class="notif-body">
             <div v-if="isLoading" class="notif-skeleton-list">
@@ -83,12 +92,12 @@
                 :key="item.id"
                 type="button"
                 class="notif-item"
-                :class="{ unread: !item.isRead }"
+                :class="['notif-' + (item.category || 'INFO').toLowerCase(), { unread: !item.isRead }]"
                 @click="handleNotifClick(item)"
               >
                 <div class="notif-icon-wrapper">
                   <div class="notif-icon" :class="item.type">
-                    <i :class="getNotificationIcon(item.type)"></i>
+                    <i :class="item.icon || getNotificationIcon(item.type)"></i>
                   </div>
                   <span v-if="!item.isRead" class="unread-dot"></span>
                 </div>
@@ -191,6 +200,13 @@ const handleNotifClick = async (item) => {
   await markAsRead(item)
 
   showNotifDropdown.value = false
+
+  // Marcus sửa: deep link do registry backend quyết định, Header không tự đoán
+  // đường dẫn của đơn/refund/liên hệ/bảo hành nữa.
+  if (item.deepLink) {
+    router.push(item.deepLink)
+    return
+  }
 
   if (
     ['ORDER', 'ORDER_COMPLETED', 'ORDER_CANCELLED', 'ORDER_FAILED', 'REFUND'].includes(item.type) &&

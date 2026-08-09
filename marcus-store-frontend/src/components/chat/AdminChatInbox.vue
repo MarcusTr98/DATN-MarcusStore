@@ -74,6 +74,7 @@
                   <span class="room-time">{{ formatTime(room.lastTimestamp) }}</span>
                 </div>
                 <p class="room-preview">{{ room.lastMessage }}</p>
+                <small class="room-status">{{ roomStatusLabel(room.status) }} · chờ {{ formatWaiting(room.waitingSeconds) }}</small>
               </div>
             </button>
           </aside>
@@ -169,6 +170,9 @@
                   <i class="fas fa-paper-plane"></i>
                 </button>
               </div>
+              <div class="chat-metadata-note">
+                Chỉ lưu thời gian chờ/thời lượng/trạng thái trả lời; không lưu nội dung chat vào database.
+              </div>
             </template>
 
             <div v-else class="no-room-selected">
@@ -252,6 +256,8 @@ const formatTime = (ts) => {
   const d = new Date(ts)
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
 }
+const roomStatusLabel = (status) => ({ WAITING_ADMIN: 'Đang chờ Admin', CLAIMED: 'Đã tiếp nhận', ACTIVE: 'Đang trả lời', ENDED: 'Đã kết thúc' })[status] || 'Đang hoạt động'
+const formatWaiting = (seconds) => seconds >= 60 ? `${Math.floor(seconds / 60)} phút` : `${seconds || 0} giây`
 
 onMounted(async () => {
   const token = localStorage.getItem('ACCESS_TOKEN')
@@ -273,6 +279,8 @@ onBeforeUnmount(() => {
   font-family: 'Be Vietnam Pro', sans-serif;
   z-index: 1050;
 }
+.room-status { color: #64748b; font-size: 9px; }
+.chat-metadata-note { padding: 5px 12px 8px; color: #64748b; background: #fff; font-size: 9px; text-align: center; }
 
 /* NÚT THẢ NỔI DÍNH MÉP (SIDE TAB) */
 .chat-side-tab {

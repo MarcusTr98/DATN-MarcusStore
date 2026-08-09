@@ -14,6 +14,10 @@ public class AdminNotificationResponse {
     private String title;
     private String message;
     private String referenceId;
+    private String category;
+    private String icon;
+    private String deepLink;
     private Boolean isRead;
     private LocalDateTime createdAt;
+    private LocalDateTime expiresAt;
 }

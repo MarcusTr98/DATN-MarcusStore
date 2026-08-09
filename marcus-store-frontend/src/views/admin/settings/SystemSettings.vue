@@ -8,6 +8,9 @@
       icon="bi bi-gear-wide-connected"
     >
       <template #actions>
+        <button type="button" class="settings-restore-btn" :disabled="isLoading || isSaving" @click="confirmRestoreDefaults">
+          <i class="fas fa-arrow-rotate-left"></i> Khôi phục mặc định
+        </button>
         <button type="submit" form="system-settings-form" :disabled="isLoading || isSaving">
           <i class="fas" :class="isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'"></i>
           {{ isSaving ? 'Đang lưu...' : 'Lưu thay đổi' }}
@@ -84,8 +87,8 @@
               <span class="preview-label">Xem trước</span>
               <div class="preview-logo-box">
                 <img
-                  v-if="settings.SITE_LOGO_URL && !logoPreviewError"
-                  :src="settings.SITE_LOGO_URL"
+                  v-if="logoDisplayUrl && !logoPreviewError"
+                  :src="logoDisplayUrl"
                   :alt="settings.SITE_NAME"
                   class="site-logo-preview"
                   @error="logoPreviewError = true"
@@ -96,6 +99,15 @@
               <small v-if="logoPreviewError" class="text-danger">Không tải được ảnh từ URL này.</small>
               <small v-else class="text-muted">Logo thực tế sẽ tự co vừa từng vị trí.</small>
             </div>
+          </div>
+
+          <div class="settings-audit">
+            <i class="fas fa-clock-rotate-left"></i>
+            <span v-if="settingsMeta.updatedAt">
+              Cập nhật gần nhất bởi <strong>{{ settingsMeta.updatedBy || 'Không rõ' }}</strong>
+              lúc {{ formatDateTime(settingsMeta.updatedAt) }}
+            </span>
+            <span v-else>Chưa có lịch sử cập nhật cấu hình.</span>
           </div>
 
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
@@ -374,12 +386,13 @@
       :title="localModal.title"
       :message="localModal.message"
       @close="localModal.visible = false"
+      @confirm="executeModalAction"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
@@ -390,6 +403,8 @@ const { fetchSettings: refreshPublicSettings } = useSettings()
 const isLoading = ref(true)
 const isSaving = ref(false)
 const aiClickStats = ref([])
+const settingsMeta = reactive({ updatedBy: '', updatedAt: null })
+const pendingAction = ref('')
 
 // State Modal
 const localModal = reactive({
@@ -411,6 +426,8 @@ const logoFileInput = ref(null)
 const isLogoUploading = ref(false)
 const logoUploadProgress = ref(0)
 const logoPreviewError = ref(false)
+const localLogoPreview = ref('')
+const logoDisplayUrl = computed(() => localLogoPreview.value || settings.value.SITE_LOGO_URL)
 
 const settings = ref({
   SITE_NAME: 'Marcus Store',
@@ -471,6 +488,11 @@ const uploadLogoFile = async (file) => {
     return
   }
 
+  // Marcus thêm: xem ảnh local ngay khi chọn, không phải chờ upload/lưu cấu hình.
+  releaseLocalLogoPreview()
+  localLogoPreview.value = URL.createObjectURL(file)
+  logoPreviewError.value = false
+
   const formData = new FormData()
   formData.append('file', file)
   isLogoUploading.value = true
@@ -487,6 +509,7 @@ const uploadLogoFile = async (file) => {
     const imageUrl = response.data?.data?.imageUrl
     if (!imageUrl) throw new Error('Server không trả về URL Logo.')
     settings.value.SITE_LOGO_URL = imageUrl
+    releaseLocalLogoPreview()
     logoPreviewError.value = false
     showAlert('success', 'Đã tải Logo', 'Logo đã tải thành công. Nhấn “Lưu thay đổi” để áp dụng toàn hệ thống.')
   } catch (error) {
@@ -509,8 +532,14 @@ const handleLogoDrop = (event) => {
 }
 
 const removeLogo = () => {
+  releaseLocalLogoPreview()
   settings.value.SITE_LOGO_URL = ''
   logoPreviewError.value = false
+}
+
+const releaseLocalLogoPreview = () => {
+  if (localLogoPreview.value) URL.revokeObjectURL(localLogoPreview.value)
+  localLogoPreview.value = ''
 }
 
 const loadSettings = async () => {
@@ -520,9 +549,13 @@ const loadSettings = async () => {
     // API cấu hình công khai.
     const res = await api.get('/admin/settings')
 
+    const payload = res.data?.data ?? res.data ?? {}
+    const loadedSettings = payload.settings ?? payload
+    settingsMeta.updatedBy = payload.updatedBy || ''
+    settingsMeta.updatedAt = payload.updatedAt || null
     Object.keys(settings.value).forEach((key) => {
-      if (res.data[key] !== undefined) {
-        settings.value[key] = res.data[key]
+      if (loadedSettings[key] !== undefined) {
+        settings.value[key] = loadedSettings[key]
       }
     })
 
@@ -562,6 +595,33 @@ const loadSettings = async () => {
   }
 }
 
+const confirmRestoreDefaults = () => {
+  pendingAction.value = 'RESTORE_DEFAULTS'
+  localModal.type = 'confirm'
+  localModal.title = 'Khôi phục cấu hình mặc định?'
+  localModal.message = 'Tên Website, Logo, liên hệ, mạng xã hội, bản đồ và Hero sẽ trở về bộ mặc định của Marcus Store.'
+  localModal.visible = true
+}
+
+const executeModalAction = async () => {
+  if (pendingAction.value !== 'RESTORE_DEFAULTS') return
+  localModal.visible = false
+  pendingAction.value = ''
+  try {
+    isSaving.value = true
+    await api.post('/admin/settings/restore-defaults')
+    await loadSettings()
+    await refreshPublicSettings(true)
+    showAlert('success', 'Đã khôi phục', 'Cấu hình mặc định đã được áp dụng.')
+  } catch (error) {
+    showAlert('error', 'Không thể khôi phục', error.response?.data?.message || 'Vui lòng thử lại.')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const formatDateTime = (value) => value ? new Date(value).toLocaleString('vi-VN') : '—'
+
 const saveSettings = async () => {
   try {
     isSaving.value = true
@@ -587,6 +647,7 @@ const saveSettings = async () => {
 onMounted(() => {
   loadSettings()
 })
+onBeforeUnmount(releaseLocalLogoPreview)
 </script>
 
 <style scoped>
@@ -652,6 +713,8 @@ onMounted(() => {
   border: 1px solid #e1e9f5;
   text-align: center;
 }
+.settings-audit { display: flex; gap: 8px; margin: -6px 0 18px; color: #64748b; font-size: 13px; }
+.settings-restore-btn { border-color: #b9d2f3 !important; background: #fff !important; color: #175ca8 !important; }
 .preview-label { align-self: flex-start; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; }
 .preview-logo-box { width: 96px; height: 96px; padding: 10px; border-radius: 22px; background: #eff6ff; }
 .preview-fallback { font-size: 52px; color: #2563eb; line-height: 76px; }

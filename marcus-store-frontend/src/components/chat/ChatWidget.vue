@@ -32,7 +32,7 @@
             <div>
               <h6 class="mb-0 fw-bold text-white">CSKH {{ siteName }}</h6>
               <span class="status-text">
-                {{ chatStore.isAdminOnline ? 'Đang trực tuyến' : 'Tạm ngoại tuyến' }}
+                {{ liveChatStatusLabel }}
               </span>
             </div>
           </div>
@@ -120,6 +120,9 @@
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
+        <div class="chat-privacy-note">
+          <i class="fas fa-shield-halved"></i> Nội dung chat chỉ lưu tạm trong phiên và bị xóa khi kết thúc.
+        </div>
       </div>
     </transition>
 
@@ -185,7 +188,7 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import BaseModal from '@/components/BaseModal.vue'
 import { useSettings } from '@/composables/useSettings'
@@ -211,6 +214,12 @@ const chatBody = ref(null)
 const chatInput = ref(null)
 const showLoginPrompt = ref(false)
 const showEndConfirm = ref(false)
+const liveChatStatusLabel = computed(() => ({
+  WAITING_ADMIN: 'Đang chờ Admin',
+  CLAIMED: 'Admin đã nhận',
+  ACTIVE: 'Admin đang trả lời',
+  ENDED: 'Phiên đã kết thúc',
+})[chatStore.sessionStatus] || (chatStore.isAdminOnline ? 'Đang trực tuyến' : 'Tạm ngoại tuyến'))
 
 // Marcus sửa: giữ gợi ý đặc trưng của cửa hàng trong suốt cuộc trò chuyện.
 const suggestedQuestions = [
@@ -611,6 +620,7 @@ onBeforeUnmount(() => clearFloatingContactPanel('live'))
   align-items: center;
   gap: 10px;
 }
+.chat-privacy-note { padding: 6px 12px 9px; background: #fff; color: #64748b; font-size: 10px; text-align: center; }
 
 .chat-input {
   flex: 1;

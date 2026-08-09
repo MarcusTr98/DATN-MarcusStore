@@ -18,4 +18,6 @@ public class ChatRoomSummaryDTO {
     private LocalDateTime lastTimestamp; // Thời gian tin nhắn gần nhất
     private String claimedBy; // Username Admin đang phụ trách (null nếu chưa ai nhận)
     private boolean unclaimed; // true nếu phòng đang chờ Admin nhận
+    private String status;
+    private long waitingSeconds;
 }
