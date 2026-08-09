@@ -5,6 +5,7 @@ import userApi from '@/api/userApi'
 import cartApi from '@/api/cartApi'
 import ghnApi from '@/api/ghnApi'
 import api from '@/utils/api'
+import { getBehaviorSessionId, trackBehavior } from '@/api/behaviorApi'
 import { useCartStore } from '@/stores/cartStore'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
 
@@ -1052,6 +1053,7 @@ export function useCheckoutPage() {
       // Marcus thêm: cùng tập cart item trong cùng phiên luôn dùng lại một UUID,
       // kể cả F5 hoặc retry sau timeout.
       checkoutRequestId: getOrCreateCheckoutRequestId(cartData.value.items),
+      behaviorSessionId: getBehaviorSessionId(),
       cartItemIds: cartData.value.items.map((i) => i.cartItemId),
       recipientName: orderForm.value.recipientName,
       recipientPhone: orderForm.value.recipientPhone,
@@ -1158,6 +1160,8 @@ export function useCheckoutPage() {
   }
 
   onMounted(async () => {
+    // Marcus thêm: mốc funnel thuộc Checkout; lỗi telemetry không chặn thanh toán.
+    trackBehavior('CHECKOUT_STARTED').catch(() => {})
     // Marcus thêm: lấy thông tin cửa hàng từ cấu hình chung, không hard-code trên giao diện.
     api
       .get('/public/settings')

@@ -3,10 +3,12 @@ package com.fpoly.marcusstore.controller.publicapi;
 import com.fpoly.marcusstore.dto.ai.AiAdvisorRequest;
 import com.fpoly.marcusstore.dto.ai.AiAdvisorResponse;
 import com.fpoly.marcusstore.dto.ai.AiProductClickRequest;
+import com.fpoly.marcusstore.dto.ai.AiAdvisorFeedbackRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.service.ai.AiAdvisorService;
 import com.fpoly.marcusstore.service.ai.AiProductClickService;
 import com.fpoly.marcusstore.service.ai.AiUsageEventService;
+import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.UUID;
 
 import static org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE;
 
@@ -39,19 +42,22 @@ public class AiAdvisorController {
     private final AiAdvisorService aiAdvisorService;
     private final AiProductClickService aiProductClickService;
     private final AiUsageEventService usageEventService;
+    private final BehaviorEventService behaviorEventService;
     private final Map<String, Deque<Instant>> requestWindows = new ConcurrentHashMap<>();
 
     @PostMapping("/chat")
     public ResponseEntity<ApiResponse<AiAdvisorResponse>> chat(
             @Valid @RequestBody AiAdvisorRequest request, HttpServletRequest servletRequest) {
         enforceRateLimit(clientKey(servletRequest));
+        recordBehavior("AI_QUESTION", request.getSessionId(), null);
         long startedAt = System.nanoTime();
         try {
             AiAdvisorResponse response = aiAdvisorService.advise(request);
-            recordChatUsage(request.getSessionId(), true, startedAt);
+            prepareResponse(response);
+            recordChatUsage(request.getSessionId(), response.getAdviceId(), !response.isFallbackUsed(), startedAt);
             return ResponseEntity.ok(ApiResponse.success(response));
         } catch (RuntimeException exception) {
-            recordChatUsage(request.getSessionId(), false, startedAt);
+            recordChatUsage(request.getSessionId(), null, false, startedAt);
             throw exception;
         }
     }
@@ -60,6 +66,7 @@ public class AiAdvisorController {
     public SseEmitter streamChat(
             @Valid @RequestBody AiAdvisorRequest request, HttpServletRequest servletRequest) {
         enforceRateLimit(clientKey(servletRequest));
+        recordBehavior("AI_QUESTION", request.getSessionId(), null);
         // Marcus sửa: emitter phải sống lâu hơn timeout gọi Gemini để không đóng
         // kết nối khi nhà cung cấp vẫn đang tạo câu trả lời.
         SseEmitter emitter = new SseEmitter(75_000L);
@@ -68,14 +75,15 @@ public class AiAdvisorController {
         CompletableFuture.runAsync(() -> {
             try {
                 AiAdvisorResponse response = aiAdvisorService.advise(request);
+                prepareResponse(response);
                 for (String token : response.getAnswer().split("(?<=\\s)")) {
                     emitter.send(SseEmitter.event().name("token").data(Map.of("token", token)));
                 }
                 emitter.send(SseEmitter.event().name("done").data(response));
                 emitter.complete();
-                recordChatUsage(request.getSessionId(), true, startedAt);
+                recordChatUsage(request.getSessionId(), response.getAdviceId(), !response.isFallbackUsed(), startedAt);
             } catch (Exception exception) {
-                recordChatUsage(request.getSessionId(), false, startedAt);
+                recordChatUsage(request.getSessionId(), null, false, startedAt);
                 sendSafeStreamError(emitter, exception);
             }
         });
@@ -101,16 +109,39 @@ public class AiAdvisorController {
             @Valid @RequestBody AiProductClickRequest request) {
         aiProductClickService.track(request);
         recordProductClickUsage(request);
+        recordBehavior("AI_PRODUCT_CLICK", request.getSessionId(), request.getProductId());
         return ResponseEntity.ok(ApiResponse.success("Đã ghi nhận."));
     }
 
-    private void recordChatUsage(String sessionId, boolean successful, long startedAt) {
+    private void recordBehavior(String type, String sessionId, Integer productId) {
+        try {
+            behaviorEventService.recordAi(type, sessionId, productId);
+        } catch (RuntimeException ignored) {
+        }
+    }
+
+    @PostMapping("/feedback")
+    public ResponseEntity<ApiResponse<String>> feedback(
+            @Valid @RequestBody AiAdvisorFeedbackRequest request) {
+        usageEventService.recordFeedback(
+                request.getSessionId(), request.getAdviceId(), request.getHelpful());
+        return ResponseEntity.ok(ApiResponse.success("Cảm ơn bạn đã đánh giá."));
+    }
+
+    private void recordChatUsage(String sessionId, String adviceId, boolean providerSuccessful, long startedAt) {
         try {
             long elapsedMs = (System.nanoTime() - startedAt) / 1_000_000;
-            usageEventService.recordChatResult(sessionId, successful, elapsedMs);
+            usageEventService.recordChatResult(sessionId, adviceId, providerSuccessful, elapsedMs);
         } catch (RuntimeException ignored) {
             // Marcus sửa: lỗi telemetry không được làm gián đoạn câu trả lời AI.
         }
+    }
+
+    private void prepareResponse(AiAdvisorResponse response) {
+        if (response.getAdviceId() == null)
+            response.setAdviceId(UUID.randomUUID().toString());
+        if (response.getSource() == null)
+            response.setSource("RULE");
     }
 
     private void recordProductClickUsage(AiProductClickRequest request) {

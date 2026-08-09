@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderTransactionService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
 import com.fpoly.marcusstore.service.UserNotificationService;
+import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 
@@ -30,6 +31,8 @@ class VnPayControllerTest {
         private final OrderStatusHistoryRepository historyRepository = mock(OrderStatusHistoryRepository.class);
         private final OrderCancellationService cancellationService = mock(OrderCancellationService.class);
         private final OrderTransactionService transactionService = mock(OrderTransactionService.class);
+        // Marcus thêm: VNPAY IPN ghi mốc PAYMENT_SUCCESS cho funnel Analytics P2.
+        private final BehaviorEventService behaviorEventService = mock(BehaviorEventService.class);
         private final VnPayController controller = new VnPayController(
                         vnPayConfig,
                         orderRepository,
@@ -37,7 +40,8 @@ class VnPayControllerTest {
                         cancellationService,
                         transactionService,
                         mock(AdminNotificationService.class),
-                        mock(UserNotificationService.class));
+                        mock(UserNotificationService.class),
+                        behaviorEventService);
 
         @Test
         void parsesVnPayAmountWithoutLongOverflowOrTruncation() {

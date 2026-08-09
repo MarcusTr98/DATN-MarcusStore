@@ -9,8 +9,13 @@ import java.util.List;
 @Data
 @Builder
 public class AiAdvisorResponse {
+    // Marcus thêm: mã ẩn danh cho từng câu trả lời để mỗi lượt chỉ feedback một
+    // lần.
+    private String adviceId;
     private String answer;
     private List<ProductSuggestion> products;
+    private boolean fallbackUsed;
+    private String source;
 
     @Data
     @Builder

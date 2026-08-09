@@ -23,6 +23,7 @@ import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -65,6 +66,7 @@ public class CheckoutService {
         private final FlashSaleItemRepository flashSaleItemRepository;
         private final FlashSaleSlotRepository flashSaleSlotRepository;
         private final SystemSettingRepository systemSettingRepository;
+        private final BehaviorEventService behaviorEventService;
 
         @Transactional(readOnly = true)
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -414,6 +416,11 @@ public class CheckoutService {
                 order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
                 Order savedOrder = orderRepository.save(order);
+                // Marcus thêm: chỉ lưu mốc funnel và order_id, không lưu thông tin khách.
+                try {
+                        behaviorEventService.recordOrderCreated(savedOrder.getOrderId(), req.getBehaviorSessionId());
+                } catch (RuntimeException ignored) {
+                }
                 // Marcus thêm: khách nhận xác nhận ngay khi backend tạo đơn thành
                 // công; VNPAY vẫn có notification thanh toán riêng sau IPN.
                 userNotificationService.createOrderStatusNotification(

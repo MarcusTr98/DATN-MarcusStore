@@ -97,6 +97,7 @@ backup.storage-path=D:/MarcusStoreBackups
 backup.sqlserver-directory=D:/MarcusStoreBackups
 backup.retention.max-successful=10
 backup.storage-warning-free-mb=1024
+analytics.behavior.retention-days=365
 
 # Marcus AI - Gemini Free Tier
 gemini.api-key=

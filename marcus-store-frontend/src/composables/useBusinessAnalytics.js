@@ -30,6 +30,7 @@ export function useBusinessAnalytics() {
   const products = ref([])
   const cancellationReasons = ref([])
   const warrantyQuality = ref(null)
+  const behaviorFunnel = ref(null)
   const loading = ref(false)
   const errorMessage = ref('')
   const aiReport = ref(null)
@@ -273,6 +274,7 @@ export function useBusinessAnalytics() {
         cancellationResponse,
         warrantyResponse,
         aiUsageResponse,
+        behaviorFunnelResponse,
       ] = await Promise.all([
         analyticsApi.getOverview(params),
         analyticsApi.getSalesTrend(params),
@@ -282,6 +284,7 @@ export function useBusinessAnalytics() {
         // Marcus sửa: telemetry là phần bổ sung; chưa chạy migration không được
         // làm hỏng toàn bộ trang phân tích kinh doanh.
         analyticsApi.getAiUsageSummary(params).catch(() => null),
+        analyticsApi.getBehaviorFunnel(params).catch(() => null),
       ])
       if (currentRequest !== requestVersion) return
 
@@ -291,6 +294,7 @@ export function useBusinessAnalytics() {
       cancellationReasons.value = unwrap(cancellationResponse) || []
       warrantyQuality.value = unwrap(warrantyResponse) || null
       aiUsage.value = unwrap(aiUsageResponse) || null
+      behaviorFunnel.value = unwrap(behaviorFunnelResponse) || null
       await loadSavedAiReport(currentRequest)
     } catch (error) {
       if (currentRequest !== requestVersion) return
@@ -345,6 +349,7 @@ export function useBusinessAnalytics() {
     today,
     trend,
     warrantyQuality,
+    behaviorFunnel,
     applyCustomRange,
     applyPreset,
     generateAiReport,

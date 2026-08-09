@@ -1,7 +1,7 @@
 <template>
   <section class="ai-briefing analysis-source-host" :class="{ 'ai-briefing--ready': report }">
     <!-- Marcus thêm: nhãn nguồn giúp người dùng không nhầm nội dung Gemini với thuật toán. -->
-    <AnalysisSourceBadge source="ai" />
+    <AnalysisSourceBadge :source="report?.source === 'ALGORITHM' ? 'algorithm' : 'ai'" />
     <div class="ai-briefing__hero">
       <div class="ai-briefing__identity">
         <span class="ai-briefing__robot"><i class="bi bi-robot"></i></span>
@@ -94,6 +94,10 @@
               <strong>{{ signal.title }}</strong>
               <small>{{ signal.evidence }}</small>
               <p>{{ signal.interpretation }}</p>
+              <p v-if="signal.action"><strong>Hành động:</strong> {{ signal.action }}</p>
+              <small v-if="signal.verification"
+                ><strong>Kiểm chứng:</strong> {{ signal.verification }}</small
+              >
             </div>
           </article>
         </div>
@@ -128,7 +132,9 @@
         <span><i class="bi bi-chat-dots"></i></span>
         <div>
           <strong>{{ formatNumber(usage.successfulChats) }}</strong
-          ><small>Phản hồi AI thành công</small>
+          ><small title="Phiên có ít nhất một đánh giá Hữu ích hoặc click từ AI sang sản phẩm"
+            >Lượt tư vấn thành công</small
+          >
         </div>
       </article>
       <article>

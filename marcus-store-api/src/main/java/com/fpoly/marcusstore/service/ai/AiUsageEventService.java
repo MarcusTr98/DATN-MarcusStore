@@ -20,16 +20,21 @@ public class AiUsageEventService {
     // Marcus thêm: chỉ lưu telemetry tối thiểu; tuyệt đối không nhận câu hỏi,
     // câu trả lời, IP, userId hoặc dữ liệu nhận dạng khách hàng.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordChatResult(String sessionId, boolean successful, long responseTimeMs) {
-        save(sessionId, successful ? "CHAT_SUCCESS" : "CHAT_FAILED", null, responseTimeMs);
+    public void recordChatResult(String sessionId, String adviceId, boolean providerSuccessful, long responseTimeMs) {
+        save(sessionId, adviceId, providerSuccessful ? "CHAT_RESPONSE" : "CHAT_FAILED", null, responseTimeMs);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordProductClick(String sessionId, Integer productId) {
-        save(sessionId, "PRODUCT_CLICK", productId, null);
+        save(sessionId, null, "PRODUCT_CLICK", productId, null);
     }
 
-    private void save(String sessionId, String eventType, Integer productId, Long responseTimeMs) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordFeedback(String sessionId, String adviceId, boolean helpful) {
+        save(sessionId, adviceId, helpful ? "FEEDBACK_HELPFUL" : "FEEDBACK_NOT_HELPFUL", null, null);
+    }
+
+    private void save(String sessionId, String adviceId, String eventType, Integer productId, Long responseTimeMs) {
         if (sessionId == null || !sessionId.matches(
                 "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")) {
             return;
@@ -38,7 +43,7 @@ public class AiUsageEventService {
         if (responseTimeMs != null) {
             safeResponseTime = (int) Math.min(Math.max(responseTimeMs, 0), MAX_RESPONSE_TIME_MS);
         }
-        repository.insert(sessionId, eventType, productId, safeResponseTime);
+        repository.insert(sessionId, adviceId, eventType, productId, safeResponseTime);
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +58,9 @@ public class AiUsageEventService {
         long success = row.successfulChats();
         long failed = row.failedChats();
         long clicks = row.productClicks();
-        long chats = success + failed;
+        // Marcus sửa: lượt tư vấn thành công = phiên có feedback Hữu ích hoặc click
+        // sản phẩm; mẫu số là toàn bộ phiên đã nhận phản hồi/fallback.
+        long chats = row.totalAdvisorSessions();
         double successRate = chats == 0 ? 0 : round(success * 100.0 / chats);
         double clickRate = success == 0 ? 0 : round(clicks * 100.0 / success);
         return new AiUsageSummaryResponse(

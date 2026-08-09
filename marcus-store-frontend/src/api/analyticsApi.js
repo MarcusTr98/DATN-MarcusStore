@@ -37,6 +37,9 @@ const analyticsApi = {
   getWarrantyQuality(params) {
     return get('/admin/analytics/warranty-quality', params)
   },
+  getBehaviorFunnel(params) {
+    return get('/admin/analytics/behavior-funnel', params)
+  },
 
   getSavedAiReport(params) {
     return get('/admin/analytics/ai-report', params)

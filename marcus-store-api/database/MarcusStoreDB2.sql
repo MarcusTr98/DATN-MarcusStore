@@ -857,13 +857,15 @@ CREATE TABLE AI_Usage_Events (
     event_id BIGINT IDENTITY(1,1) NOT NULL
         CONSTRAINT PK_AI_Usage_Events PRIMARY KEY,
     session_id VARCHAR(36) NOT NULL,
+    advice_id VARCHAR(36) NULL,
     event_type VARCHAR(30) NOT NULL,
     product_id INT NULL,
     response_time_ms INT NULL,
     created_at DATETIME2 NOT NULL
         CONSTRAINT DF_AIUsageEvents_CreatedAt DEFAULT SYSDATETIME(),
     CONSTRAINT CK_AIUsageEvents_Type CHECK (
-        event_type IN ('CHAT_SUCCESS', 'CHAT_FAILED', 'PRODUCT_CLICK')
+        event_type IN ('CHAT_SUCCESS', 'CHAT_RESPONSE', 'CHAT_FAILED', 'PRODUCT_CLICK',
+                       'FEEDBACK_HELPFUL', 'FEEDBACK_NOT_HELPFUL')
     ),
     CONSTRAINT CK_AIUsageEvents_ResponseTime CHECK (
         response_time_ms IS NULL OR response_time_ms BETWEEN 0 AND 120000
@@ -875,6 +877,24 @@ CREATE INDEX IX_AIUsageEvents_CreatedType
     ON AI_Usage_Events(created_at DESC, event_type);
 CREATE INDEX IX_AIUsageEvents_Session
     ON AI_Usage_Events(session_id, created_at DESC);
+CREATE INDEX IX_AIUsageEvents_Advice ON AI_Usage_Events(advice_id, created_at DESC)
+    WHERE advice_id IS NOT NULL;
+
+-- Marcus thêm P2: funnel hành vi tối thiểu trên SQL Server, không lưu dữ liệu nhạy cảm.
+CREATE TABLE Customer_Behavior_Events (
+    event_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    event_type VARCHAR(30) NOT NULL,
+    session_id VARCHAR(36) NULL,
+    product_id INT NULL,
+    order_id INT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT CK_CustomerBehaviorEvents_Type CHECK (
+        event_type IN ('PRODUCT_VIEW','CHECKOUT_STARTED','ORDER_CREATED','PAYMENT_SUCCESS','AI_QUESTION','AI_PRODUCT_CLICK')
+    )
+);
+CREATE INDEX IX_CustomerBehaviorEvents_CreatedType ON Customer_Behavior_Events(created_at DESC, event_type);
+CREATE INDEX IX_CustomerBehaviorEvents_Session ON Customer_Behavior_Events(session_id, created_at DESC) WHERE session_id IS NOT NULL;
+CREATE INDEX IX_CustomerBehaviorEvents_Order ON Customer_Behavior_Events(order_id, created_at DESC) WHERE order_id IS NOT NULL;
 
 
 CREATE INDEX IX_OrderTrans_OrderId ON Order_Transactions(order_id);	

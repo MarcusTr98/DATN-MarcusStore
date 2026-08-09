@@ -49,3 +49,11 @@ export const trackAiProductClick = (productId, sessionId) =>
     { productId, sessionId },
     { skipGlobalLoading: true },
   )
+
+// Marcus thêm: feedback tối thiểu theo adviceId, không gửi nội dung hội thoại.
+export const sendAiAdvisorFeedback = (adviceId, sessionId, helpful) =>
+  api.post(
+    '/public/ai-advisor/feedback',
+    { adviceId, sessionId, helpful },
+    { skipGlobalLoading: true },
+  )

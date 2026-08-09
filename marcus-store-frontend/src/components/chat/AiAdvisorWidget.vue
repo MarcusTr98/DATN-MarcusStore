@@ -55,7 +55,22 @@
           >
             <div class="ai-message">
               <span v-if="message.role === 'assistant'" class="message-author">Marcus AI</span>
-              <p>{{ message.content }}</p>
+              <!-- Marcus thêm: render Markdown giới hạn bằng Vue, không dùng v-html để tránh XSS. -->
+              <div v-if="message.role === 'assistant'" class="message-content">
+                <p
+                  v-for="(line, lineIndex) in formatAssistantMessage(message.content)"
+                  :key="`${message.id}-${lineIndex}`"
+                  :class="{ 'is-bullet': line.bullet }"
+                >
+                  <span v-if="line.bullet" aria-hidden="true" class="message-bullet">•</span>
+                  <template v-for="(token, tokenIndex) in line.tokens" :key="tokenIndex">
+                    <strong v-if="token.type === 'bold'">{{ token.text }}</strong>
+                    <em v-else-if="token.type === 'italic'">{{ token.text }}</em>
+                    <span v-else>{{ token.text }}</span>
+                  </template>
+                </p>
+              </div>
+              <p v-else>{{ message.content }}</p>
 
               <div v-if="message.products?.length" class="product-suggestions">
                 <router-link
@@ -78,6 +93,11 @@
                   </div>
                   <i class="fas fa-chevron-right"></i>
                 </router-link>
+              </div>
+              <div v-if="message.role === 'assistant' && message.adviceId && !message.isError" class="ai-feedback">
+                <span>Câu trả lời này có hữu ích?</span>
+                <button type="button" :class="{ active: message.feedback === true }" :disabled="message.feedback !== undefined" @click="submitFeedback(message, true)"><i class="far fa-thumbs-up"></i> Hữu ích</button>
+                <button type="button" :class="{ active: message.feedback === false }" :disabled="message.feedback !== undefined" @click="submitFeedback(message, false)"><i class="far fa-thumbs-down"></i> Chưa hữu ích</button>
               </div>
             </div>
           </article>
@@ -116,8 +136,8 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { streamAiAdvisor, trackAiProductClick } from '@/api/aiAdvisorApi'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { sendAiAdvisorFeedback, streamAiAdvisor, trackAiProductClick } from '@/api/aiAdvisorApi'
 import {
   clearFloatingContactPanel,
   setFloatingContactPanelOpen,
@@ -131,6 +151,46 @@ const messageBody = ref(null)
 const messageInput = ref(null)
 const messages = ref([])
 let messageId = 0
+const AI_HISTORY_STORAGE_KEY = 'MARCUS_AI_CONVERSATION'
+const AI_HISTORY_TTL_MS = 4 * 60 * 60 * 1000
+const AI_HISTORY_LIMIT = 16
+
+// Marcus thêm: giữ hội thoại trong đúng tab trình duyệt để khách mua xong vẫn
+// có thể quay lại cảm ơn AI. Không gửi lịch sử này vào database/localStorage.
+const restoreConversation = () => {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(AI_HISTORY_STORAGE_KEY) || 'null')
+    if (!stored || Date.now() - Number(stored.savedAt) > AI_HISTORY_TTL_MS) {
+      sessionStorage.removeItem(AI_HISTORY_STORAGE_KEY)
+      return []
+    }
+    return Array.isArray(stored.messages) ? stored.messages.slice(-AI_HISTORY_LIMIT) : []
+  } catch {
+    sessionStorage.removeItem(AI_HISTORY_STORAGE_KEY)
+    return []
+  }
+}
+
+const persistConversation = () => {
+  try {
+    const safeMessages = messages.value.slice(-AI_HISTORY_LIMIT).map((message) => ({
+      id: message.id,
+      role: message.role,
+      content: String(message.content || '').slice(0, 1500),
+      products: Array.isArray(message.products) ? message.products.slice(0, 3) : [],
+      adviceId: message.adviceId,
+      fallbackUsed: Boolean(message.fallbackUsed),
+      isError: Boolean(message.isError),
+      feedback: message.feedback,
+    }))
+    sessionStorage.setItem(
+      AI_HISTORY_STORAGE_KEY,
+      JSON.stringify({ savedAt: Date.now(), messages: safeMessages }),
+    )
+  } catch {
+    // sessionStorage đầy/bị chặn không được làm gián đoạn thao tác chat.
+  }
+}
 
 const getTrackingSessionId = () => {
   const storageKey = 'MARCUS_AI_TRACKING_SESSION'
@@ -177,6 +237,39 @@ const buildHistory = () =>
     .slice(-6)
     .map(({ role, content }) => ({ role, content: content.slice(0, 500) }))
 
+// Marcus thêm: chỉ hỗ trợ in đậm, in nghiêng và gạch đầu dòng; mọi nội dung
+// vẫn được Vue escape như text nên câu trả lời AI không thể chèn HTML/script.
+const parseInlineFormatting = (text) => {
+  const tokens = []
+  const pattern = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g
+  let cursor = 0
+  let match
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > cursor) tokens.push({ type: 'text', text: text.slice(cursor, match.index) })
+    const value = match[0]
+    tokens.push({
+      type: value.startsWith('**') ? 'bold' : 'italic',
+      text: value.startsWith('**') ? value.slice(2, -2) : value.slice(1, -1),
+    })
+    cursor = match.index + value.length
+  }
+
+  if (cursor < text.length) tokens.push({ type: 'text', text: text.slice(cursor) })
+  return tokens.length ? tokens : [{ type: 'text', text }]
+}
+
+const formatAssistantMessage = (content = '') =>
+  content
+    .split(/\r?\n/)
+    .map((rawLine) => {
+      const trimmed = rawLine.trim()
+      const bullet = /^[-•]\s+/.test(trimmed)
+      const text = bullet ? trimmed.replace(/^[-•]\s+/, '') : trimmed
+      return { bullet, tokens: parseInlineFormatting(text) }
+    })
+    .filter((line) => line.tokens.some((token) => token.text.trim()))
+
 const sendMessage = async () => {
   const content = inputMessage.value.trim()
   if (!content || isLoading.value) return
@@ -205,6 +298,8 @@ const sendMessage = async () => {
         assistantMessage.content =
           data?.answer || assistantMessage.content || 'Mình chưa tìm được câu trả lời phù hợp.'
         assistantMessage.products = data?.products ?? []
+        assistantMessage.adviceId = data?.adviceId
+        assistantMessage.fallbackUsed = Boolean(data?.fallbackUsed)
       },
     })
   } catch (error) {
@@ -224,6 +319,16 @@ const sendMessage = async () => {
   }
 }
 
+const submitFeedback = async (message, helpful) => {
+  if (!message.adviceId || message.feedback !== undefined) return
+  message.feedback = helpful
+  try {
+    await sendAiAdvisorFeedback(message.adviceId, getTrackingSessionId(), helpful)
+  } catch {
+    delete message.feedback
+  }
+}
+
 const scrollToBottom = async () => {
   await nextTick()
   if (messageBody.value) messageBody.value.scrollTop = messageBody.value.scrollHeight
@@ -233,6 +338,14 @@ const formatPrice = (price) =>
   price == null ? 'Liên hệ' : `${Number(price).toLocaleString('vi-VN')} ₫`
 
 watch(isOpen, (opened) => setFloatingContactPanelOpen('ai', opened))
+watch(messages, persistConversation, { deep: true })
+onMounted(() => {
+  messages.value = restoreConversation()
+  messageId = messages.value.reduce(
+    (highestId, message) => Math.max(highestId, Number(message.id) || 0),
+    0,
+  )
+})
 onBeforeUnmount(() => clearFloatingContactPanel('ai'))
 </script>
 
@@ -471,6 +584,36 @@ onBeforeUnmount(() => clearFloatingContactPanel('ai'))
   white-space: pre-line;
 }
 
+.message-content {
+  display: grid;
+  gap: 5px;
+}
+
+.message-content p {
+  position: relative;
+  white-space: normal;
+}
+
+.message-content p.is-bullet {
+  padding-left: 13px;
+}
+
+.message-bullet {
+  position: absolute;
+  left: 1px;
+  color: #7c3aed;
+  font-weight: 800;
+}
+
+.message-content strong {
+  color: #312e81;
+  font-weight: 750;
+}
+
+.message-content em {
+  color: #64748b;
+}
+
 .message-author {
   display: block;
   margin-bottom: 3px;
@@ -484,6 +627,12 @@ onBeforeUnmount(() => clearFloatingContactPanel('ai'))
   gap: 6px;
   margin-top: 9px;
 }
+
+.ai-feedback { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:8px; padding-top:7px; border-top:1px solid #eef2f7; font-size:9px; color:#64748b }
+.ai-feedback span { width:100% }
+.ai-feedback button { border:1px solid #ddd6fe; border-radius:999px; padding:4px 7px; background:#fff; color:#5b21b6; font-size:9px; cursor:pointer }
+.ai-feedback button.active { border-color:#7c3aed; background:#ede9fe; font-weight:700 }
+.ai-feedback button:disabled { cursor:default; opacity:.75 }
 
 .ai-product {
   display: grid;

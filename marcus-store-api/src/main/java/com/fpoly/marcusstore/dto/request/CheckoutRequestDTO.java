@@ -13,6 +13,10 @@ public class CheckoutRequestDTO {
     @Pattern(regexp = "^[A-Za-z0-9_-]{16,64}$", message = "Mã yêu cầu Checkout sai định dạng")
     private String checkoutRequestId;
 
+    // Marcus thêm: UUID ẩn danh nối funnel, không phải userId/token.
+    @Pattern(regexp = "^[0-9a-fA-F-]{36}$", message = "Mã phiên hành vi không hợp lệ")
+    private String behaviorSessionId;
+
     @NotEmpty(message = "Giỏ hàng không được để trống")
     @Size(max = 100, message = "Mỗi đơn hàng chỉ được có tối đa 100 dòng sản phẩm")
     private List<@NotNull(message = "ID sản phẩm trong giỏ không được để trống") @Positive(message = "ID sản phẩm trong giỏ không hợp lệ") Integer> cartItemIds;
