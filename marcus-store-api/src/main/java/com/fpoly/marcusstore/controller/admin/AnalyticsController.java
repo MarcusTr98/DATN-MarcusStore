@@ -4,6 +4,9 @@ import com.fpoly.marcusstore.dto.analytics.AnalyticsOverviewResponse;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsTrendPoint;
 import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
 import com.fpoly.marcusstore.dto.analytics.CancellationReasonResponse;
+import com.fpoly.marcusstore.dto.analytics.WarrantyAnalyticsResponse;
+import com.fpoly.marcusstore.dto.analytics.BehaviorFunnelResponse;
+import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.service.analytics.AnalyticsService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +27,7 @@ import java.util.List;
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;
+    private final BehaviorEventService behaviorEventService;
 
     @GetMapping("/overview")
     public ApiResponse<AnalyticsOverviewResponse> getOverview(
@@ -52,5 +56,22 @@ public class AnalyticsController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
         return ApiResponse.success(analyticsService.getCancellationReasons(fromDate, toDate));
+    }
+
+    // Marcus thêm: API chỉ trả thống kê bảo hành tổng hợp, không lộ mô tả hoặc
+    // khách hàng.
+    @GetMapping("/warranty-quality")
+    public ApiResponse<WarrantyAnalyticsResponse> getWarrantyQuality(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(defaultValue = "10") int limit) {
+        return ApiResponse.success(analyticsService.getWarrantyAnalytics(fromDate, toDate, limit));
+    }
+
+    @GetMapping("/behavior-funnel")
+    public ApiResponse<BehaviorFunnelResponse> getBehaviorFunnel(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate) {
+        return ApiResponse.success(behaviorEventService.funnel(fromDate, toDate));
     }
 }

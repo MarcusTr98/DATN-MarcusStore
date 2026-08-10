@@ -10,6 +10,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import com.fpoly.marcusstore.dto.request.UpdateContactStatusRequest;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/admin/contacts")
@@ -33,5 +35,14 @@ public class AdminContactController {
     public ApiResponse<String> resolveContact(@PathVariable("id") Integer id) {
         contactService.resolveContact(id);
         return ApiResponse.success("Đã xử lý xong yêu cầu liên hệ");
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('CONTACT_PROCESS')")
+    public ApiResponse<String> updateStatus(
+            @PathVariable("id") Integer id,
+            @Valid @RequestBody UpdateContactStatusRequest request) {
+        contactService.updateStatus(id, request.getStatus());
+        return ApiResponse.success("Đã cập nhật trạng thái yêu cầu liên hệ.");
     }
 }

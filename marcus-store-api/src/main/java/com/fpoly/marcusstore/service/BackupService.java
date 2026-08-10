@@ -73,6 +73,12 @@ public class BackupService {
     @Value("${backup.sqlserver-directory:D:/MarcusStoreBackups}")
     private String sqlServerDirectory;
 
+    @Value("${backup.retention.max-successful:10}")
+    private int maxSuccessfulBackups;
+
+    @Value("${backup.storage-warning-free-mb:1024}")
+    private long storageWarningFreeMb;
+
     @PostConstruct
     void recoverInterruptedJobs() {
         // Marcus thêm: nếu backend tắt giữa chừng, job cũ không được treo PROCESSING
@@ -100,6 +106,13 @@ public class BackupService {
                 .filter(item -> item.getFileSize() != null)
                 .mapToLong(BackupRecordResponse::getFileSize)
                 .sum();
+        Path storageRoot = ensureStorageDirectory();
+        long availableStorageBytes;
+        try {
+            availableStorageBytes = Files.getFileStore(storageRoot).getUsableSpace();
+        } catch (IOException exception) {
+            availableStorageBytes = 0;
+        }
 
         return BackupOverviewResponse.builder()
                 .databaseName(currentDatabaseName())
@@ -107,6 +120,10 @@ public class BackupService {
                 .totalRecords(tables.stream().mapToLong(BackupOverviewResponse.TableOverview::getRecords).sum())
                 .successfulBackups(records.stream().filter(item -> STATUS_SUCCESS.equals(item.getStatus())).count())
                 .storageBytes(storageBytes)
+                .availableStorageBytes(availableStorageBytes)
+                .storageWarning(availableStorageBytes > 0
+                        && availableStorageBytes < storageWarningFreeMb * 1024L * 1024L)
+                .retentionLimit(Math.max(1, maxSuccessfulBackups))
                 .tables(tables)
                 .build();
     }
@@ -169,10 +186,13 @@ public class BackupService {
             record.setStatus(STATUS_SUCCESS);
             record.setFileSize(Files.size(output));
             record.setChecksum(sha256(output));
+            record.setSourceDatabase(currentDatabaseName());
+            record.setIntegrityVerified(TYPE_BAK.equals(record.getType()));
             record.setCompletedAt(LocalDateTime.now());
             record.setErrorMessage(null);
             writeMetadata(record);
             writeAudit("BACKUP_COMPLETED", record, username, ipAddress);
+            enforceRetention(record.getId());
         } catch (Exception exception) {
             log.error("Tạo backup {} thất bại", id, exception);
             record.setStatus(STATUS_FAILED);
@@ -307,31 +327,119 @@ public class BackupService {
     }
 
     private List<BackupOverviewResponse.TableOverview> loadTables() {
-        List<String> tableNames = jdbcTemplate.queryForList("""
-                SELECT TABLE_SCHEMA + '.' + TABLE_NAME
-                FROM INFORMATION_SCHEMA.TABLES
-                WHERE TABLE_TYPE = 'BASE TABLE'
-                ORDER BY TABLE_SCHEMA, TABLE_NAME
-                """, String.class);
+        // Marcus sửa: lấy luôn số cột từ metadata SQL Server để Trung tâm sao lưu
+        // mô tả đúng cả cấu trúc và số bản ghi của từng bảng.
+        List<TableMetadata> tableMetadata = jdbcTemplate.query("""
+                SELECT tables.TABLE_SCHEMA, tables.TABLE_NAME, COUNT(columns.COLUMN_NAME) AS column_count
+                FROM INFORMATION_SCHEMA.TABLES tables
+                INNER JOIN INFORMATION_SCHEMA.COLUMNS columns
+                    ON columns.TABLE_SCHEMA = tables.TABLE_SCHEMA
+                   AND columns.TABLE_NAME = tables.TABLE_NAME
+                WHERE tables.TABLE_TYPE = 'BASE TABLE'
+                GROUP BY tables.TABLE_SCHEMA, tables.TABLE_NAME
+                ORDER BY tables.TABLE_SCHEMA, tables.TABLE_NAME
+                """, (resultSet, rowNumber) -> new TableMetadata(
+                        resultSet.getString("TABLE_SCHEMA"),
+                        resultSet.getString("TABLE_NAME"),
+                        resultSet.getInt("column_count")));
         List<BackupOverviewResponse.TableOverview> tables = new ArrayList<>();
-        for (String qualifiedName : tableNames) {
-            String[] parts = qualifiedName.split("\\.", 2);
-            if (parts.length != 2 || !isSafeIdentifier(parts[0]) || !isSafeIdentifier(parts[1]))
+        for (TableMetadata metadata : tableMetadata) {
+            if (!isSafeIdentifier(metadata.schema()) || !isSafeIdentifier(metadata.table()))
                 continue;
             Long count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT_BIG(*) FROM " + quoteIdentifier(parts[0]) + "." + quoteIdentifier(parts[1]),
+                    "SELECT COUNT_BIG(*) FROM " + quoteIdentifier(metadata.schema()) + "."
+                            + quoteIdentifier(metadata.table()),
                     Long.class);
             tables.add(BackupOverviewResponse.TableOverview.builder()
-                    .schema(parts[0])
-                    .table(parts[1])
+                    .schema(metadata.schema())
+                    .table(metadata.table())
+                    .columnCount(metadata.columnCount())
                     .records(count == null ? 0 : count)
                     .build());
         }
         return tables;
     }
 
+    /**
+     * Marcus thêm: phục hồi thật vào database test tên ngẫu nhiên, đếm bảng rồi
+     * xóa ngay. Không bao giờ ghi đè MarcusStoreDB đang chạy.
+     */
+    public synchronized BackupRecordResponse testRestore(String id, String username, String ipAddress) {
+        BackupRecordResponse record = getRecord(id);
+        if (!TYPE_BAK.equals(record.getType()) || !STATUS_SUCCESS.equals(record.getStatus())) {
+            throw new IllegalStateException("Chỉ bản BAK sẵn sàng mới có thể kiểm tra phục hồi.");
+        }
+        Path backup = safeResolve(record.getFileName());
+        if (!Files.isRegularFile(backup) || !sha256(backup).equalsIgnoreCase(record.getChecksum())) {
+            throw new IllegalStateException("File BAK không vượt qua kiểm tra checksum.");
+        }
+        String testDatabase = "MarcusRestoreTest_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        String escapedBackup = backup.toAbsolutePath().toString().replace("'", "''");
+        Path restoreDirectory = Path.of(sqlServerDirectory).toAbsolutePath().normalize();
+        try {
+            List<java.util.Map<String, Object>> files = jdbcTemplate.queryForList(
+                    "RESTORE FILELISTONLY FROM DISK = N'" + escapedBackup + "'");
+            if (files.isEmpty()) throw new IllegalStateException("BAK không chứa file dữ liệu SQL Server.");
+            StringBuilder moves = new StringBuilder();
+            int dataIndex = 0;
+            int logIndex = 0;
+            for (java.util.Map<String, Object> file : files) {
+                String logical = String.valueOf(file.get("LogicalName")).replace("'", "''");
+                boolean logFile = "L".equalsIgnoreCase(String.valueOf(file.get("Type")));
+                String suffix = logFile ? "_log_" + (++logIndex) + ".ldf" : "_data_" + (++dataIndex) + ".mdf";
+                String physical = restoreDirectory.resolve(testDatabase + suffix).toString().replace("'", "''");
+                moves.append(", MOVE N'").append(logical).append("' TO N'").append(physical).append("'");
+            }
+            jdbcTemplate.execute("RESTORE DATABASE " + quoteIdentifier(testDatabase)
+                    + " FROM DISK = N'" + escapedBackup + "' WITH RECOVERY, REPLACE" + moves);
+            Integer tableCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM " + quoteIdentifier(testDatabase) + ".sys.tables", Integer.class);
+            record.setRestoreTestStatus("SUCCESS");
+            record.setRestoreTestMessage("Phục hồi thử thành công " + (tableCount == null ? 0 : tableCount) + " bảng.");
+            record.setRestoreTestedAt(LocalDateTime.now());
+            writeMetadata(record);
+            writeAudit("BACKUP_RESTORE_TESTED", record, username, ipAddress);
+            return record;
+        } catch (Exception exception) {
+            record.setRestoreTestStatus("FAILED");
+            record.setRestoreTestMessage("Không thể phục hồi thử. Kiểm tra quyền RESTORE và thư mục SQL Server.");
+            record.setRestoreTestedAt(LocalDateTime.now());
+            writeMetadata(record);
+            throw new IllegalStateException(record.getRestoreTestMessage(), exception);
+        } finally {
+            try {
+                jdbcTemplate.execute("IF DB_ID(N'" + testDatabase + "') IS NOT NULL BEGIN "
+                        + "ALTER DATABASE " + quoteIdentifier(testDatabase)
+                        + " SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE "
+                        + quoteIdentifier(testDatabase) + "; END");
+            } catch (Exception cleanupException) {
+                log.error("Không thể xóa database restore test {}", testDatabase, cleanupException);
+            }
+        }
+    }
+
+    private record TableMetadata(String schema, String table, int columnCount) {
+    }
+
     private String currentDatabaseName() {
         return jdbcTemplate.execute((ConnectionCallback<String>) connection -> connection.getCatalog());
+    }
+
+    private void enforceRetention(String currentId) {
+        int keep = Math.max(1, maxSuccessfulBackups);
+        List<BackupRecordResponse> successful = listBackups().stream()
+                .filter(item -> STATUS_SUCCESS.equals(item.getStatus()))
+                .sorted(Comparator.comparing(BackupRecordResponse::getCreatedAt,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+        successful.stream().skip(keep).filter(item -> !currentId.equals(item.getId())).forEach(item -> {
+            try {
+                Files.deleteIfExists(safeResolve(item.getFileName()));
+                Files.deleteIfExists(metadataPath(item.getId()));
+            } catch (IOException exception) {
+                log.warn("Không thể dọn backup cũ {}", item.getFileName());
+            }
+        });
     }
 
     private CellStyle createHeaderStyle(SXSSFWorkbook workbook) {

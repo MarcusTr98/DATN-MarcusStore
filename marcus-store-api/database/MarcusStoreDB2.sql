@@ -42,6 +42,7 @@ CREATE TABLE Users (
     is_active     BIT            DEFAULT 1,
     created_at    DATETIME2      DEFAULT GETDATE(),
     updated_at    DATETIME2      DEFAULT GETDATE(),
+    updated_by    VARCHAR(100)   NULL,
     CONSTRAINT PK_Users       PRIMARY KEY (user_id),
     CONSTRAINT FK_Users_Roles FOREIGN KEY (role_id) REFERENCES Roles(role_id)
 );
@@ -304,25 +305,65 @@ CREATE TABLE Orders (
     payment_status   NVARCHAR(50)   DEFAULT N'UNPAID',
     transaction_id   VARCHAR(100)   NULL,
     order_status     NVARCHAR(50)   DEFAULT N'PENDING',
-    fulfillment_method VARCHAR(30)  NOT NULL
-        CONSTRAINT DF_Orders_FulfillmentMethod DEFAULT 'DELIVERY',
+    -- Marcus thêm: khóa idempotency Checkout; thông tin giao nhận/GHN nằm ở
+    -- Order_Shipping_Details để Orders chỉ giữ dữ liệu lõi.
+    checkout_request_id VARCHAR(64) NULL,
     created_at       DATETIME2      DEFAULT GETDATE(),
     updated_at       DATETIME2      DEFAULT GETDATE(),
     CONSTRAINT PK_Orders          PRIMARY KEY (order_id),
     CONSTRAINT FK_Orders_Users    FOREIGN KEY (user_id)    REFERENCES Users(user_id),
-    CONSTRAINT FK_Orders_Vouchers FOREIGN KEY (voucher_id) REFERENCES Vouchers(voucher_id) ON DELETE SET NULL,
-    CONSTRAINT CK_Orders_FulfillmentMethod
-        CHECK (fulfillment_method IN ('DELIVERY', 'STORE_PICKUP'))
+    CONSTRAINT FK_Orders_Vouchers FOREIGN KEY (voucher_id) REFERENCES Vouchers(voucher_id) ON DELETE SET NULL
 );
-ALTER TABLE Orders ADD shipping_fee DECIMAL(18,2) DEFAULT 0 CHECK (shipping_fee >= 0);
-ALTER TABLE Orders ADD tracking_code VARCHAR(100) NULL;
+CREATE UNIQUE INDEX UX_Orders_CheckoutRequestId
+    ON Orders(checkout_request_id)
+    WHERE checkout_request_id IS NOT NULL;
 ALTER TABLE Orders ADD payment_date DATETIME2;
--- transaction GHN Marcus
-ALTER TABLE Orders ADD to_district_id INT NULL;
-ALTER TABLE Orders ADD to_ward_code VARCHAR(20) NULL;
-ALTER TABLE Orders ADD shipping_subsidy DECIMAL(18,2) DEFAULT 0 CHECK (shipping_subsidy >= 0);
-ALTER TABLE Orders ADD customer_shipping_fee DECIMAL(18,2) NULL;
-ALTER TABLE Orders ADD delivery_note NVARCHAR(500) NULL;
+
+-- Marcus thêm: snapshot giao nhận và trạng thái tích hợp GHN tách khỏi Orders.
+CREATE TABLE Order_Shipping_Details (
+    order_id                 INT NOT NULL,
+    fulfillment_method       VARCHAR(30) NOT NULL DEFAULT 'DELIVERY',
+    shipping_fee             DECIMAL(18,2) NULL,
+    shipping_subsidy         DECIMAL(18,2) NOT NULL DEFAULT 0,
+    customer_shipping_fee    DECIMAL(18,2) NULL,
+    tracking_code            VARCHAR(100) NULL,
+    to_district_id           INT NULL,
+    to_ward_code             VARCHAR(20) NULL,
+    delivery_note            NVARCHAR(500) NULL,
+    ghn_integration_status   VARCHAR(30) NOT NULL DEFAULT 'NOT_REQUIRED',
+    ghn_retry_count          INT NOT NULL DEFAULT 0,
+    ghn_last_error           NVARCHAR(500) NULL,
+    ghn_last_attempt_at      DATETIME2 NULL,
+    CONSTRAINT PK_Order_Shipping_Details PRIMARY KEY (order_id),
+    CONSTRAINT FK_OrderShipping_Orders FOREIGN KEY (order_id)
+        REFERENCES Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT CK_OrderShipping_Fulfillment
+        CHECK (fulfillment_method IN ('DELIVERY', 'STORE_PICKUP')),
+    CONSTRAINT CK_OrderShipping_Fees CHECK (
+        (shipping_fee IS NULL OR shipping_fee >= 0)
+        AND shipping_subsidy >= 0
+        AND (customer_shipping_fee IS NULL OR customer_shipping_fee >= 0)
+    ),
+    CONSTRAINT CK_OrderShipping_GhnRetry CHECK (ghn_retry_count >= 0)
+);
+CREATE UNIQUE INDEX UX_OrderShipping_TrackingCode
+    ON Order_Shipping_Details(tracking_code)
+    WHERE tracking_code IS NOT NULL;
+
+-- Marcus thêm: một quyết định hủy có cấu trúc cho mỗi đơn; timeline trình bày
+-- vẫn nằm ở Order_Status_History.
+CREATE TABLE Order_Cancellations (
+    order_id       INT NOT NULL,
+    reason_code    VARCHAR(50) NOT NULL,
+    actor_type     VARCHAR(20) NOT NULL,
+    detail         NVARCHAR(500) NULL,
+    cancelled_at   DATETIME2 NOT NULL DEFAULT GETDATE(),
+    CONSTRAINT PK_Order_Cancellations PRIMARY KEY (order_id),
+    CONSTRAINT FK_OrderCancellations_Orders FOREIGN KEY (order_id)
+        REFERENCES Orders(order_id) ON DELETE CASCADE,
+    CONSTRAINT CK_OrderCancellations_Actor
+        CHECK (actor_type IN ('CUSTOMER', 'ADMIN', 'SYSTEM', 'GHN'))
+);
 
 
 CREATE TABLE Order_Items (
@@ -373,6 +414,12 @@ CREATE TABLE System_Settings (
     updated_at    DATETIME2      DEFAULT GETDATE(),
     CONSTRAINT PK_System_Settings PRIMARY KEY (setting_key)
 );
+
+-- Marcus thêm: nhận diện Website dùng chung cho Header, Footer, Admin và loading.
+INSERT INTO System_Settings (setting_key, setting_value, setting_group, description)
+VALUES
+    ('SITE_NAME', N'Marcus Store', 'GENERAL', N'Tên Website hiển thị trên toàn hệ thống'),
+    ('SITE_LOGO_URL', N'', 'GENERAL', N'URL Logo Website; để trống dùng icon mặc định');
 
 CREATE TABLE Post_Categories (
     post_category_id INT IDENTITY(1,1),
@@ -565,7 +612,10 @@ CREATE TABLE Contact_Requests (
     phone_number VARCHAR(15) NOT NULL,
     email VARCHAR(100),
     message NVARCHAR(1000) NOT NULL,
-    status VARCHAR(50) DEFAULT 'PENDING', -- PENDING (Mới), IN_PROGRESS (Đang xử lý), RESOLVED (Đã giải quyết)
+    status VARCHAR(50) DEFAULT 'NEW',
+    handled_by VARCHAR(100) NULL,
+    processing_started_at DATETIME2 NULL,
+    resolved_at DATETIME2 NULL,
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2
 );
@@ -579,9 +629,15 @@ CREATE TABLE Admin_Notifications (
     title NVARCHAR(255) NOT NULL,
     message NVARCHAR(1000) NOT NULL,
     reference_id VARCHAR(50) NULL, -- Lưu orderCode hoặc contact_id để click vào chuyển trang
+    event_key VARCHAR(180) NULL,
+    category VARCHAR(20) NOT NULL DEFAULT 'INFO',
+    icon VARCHAR(80) NULL,
+    deep_link VARCHAR(300) NULL,
+    expires_at DATETIME2 NULL,
     is_read BIT DEFAULT 0,
     created_at DATETIME2 DEFAULT GETDATE()
 );
+CREATE UNIQUE INDEX UX_AdminNotifications_EventKey ON Admin_Notifications(event_key) WHERE event_key IS NOT NULL;
 
 -- Marcus thêm: chuông của khách hàng được lưu riêng, hỗ trợ đọc/chưa đọc và realtime.
 CREATE TABLE User_Notifications (
@@ -591,6 +647,11 @@ CREATE TABLE User_Notifications (
     title NVARCHAR(255) NOT NULL,
     message NVARCHAR(1000) NOT NULL,
     reference_id VARCHAR(50) NULL,
+    event_key VARCHAR(180) NULL,
+    category VARCHAR(20) NOT NULL DEFAULT 'INFO',
+    icon VARCHAR(80) NULL,
+    deep_link VARCHAR(300) NULL,
+    expires_at DATETIME2 NULL,
     is_read BIT NOT NULL CONSTRAINT DF_UserNotifications_IsRead DEFAULT 0,
     created_at DATETIME2 NOT NULL CONSTRAINT DF_UserNotifications_CreatedAt DEFAULT SYSDATETIME(),
     CONSTRAINT FK_UserNotifications_User
@@ -598,6 +659,20 @@ CREATE TABLE User_Notifications (
 );
 CREATE INDEX IX_UserNotifications_User_Created
     ON User_Notifications(user_id, created_at DESC);
+CREATE UNIQUE INDEX UX_UserNotifications_EventKey ON User_Notifications(event_key) WHERE event_key IS NOT NULL;
+
+-- Marcus thêm: chỉ lưu metadata Live Chat, không lưu nội dung hội thoại.
+CREATE TABLE Chat_Session_Metrics (
+    session_id VARCHAR(36) PRIMARY KEY,
+    customer_hash VARCHAR(64) NOT NULL,
+    started_at DATETIME2 NOT NULL,
+    claimed_at DATETIME2 NULL,
+    first_response_at DATETIME2 NULL,
+    ended_at DATETIME2 NULL,
+    status VARCHAR(20) NOT NULL,
+    answered BIT NOT NULL DEFAULT 0,
+    closed_by VARCHAR(20) NULL
+);
 
 -- Marcus thêm để tính phí ship riêng
 USE MarcusStoreDB;
@@ -648,6 +723,8 @@ CREATE TABLE Order_Transactions (
     CONSTRAINT FK_OrderTrans_Orders FOREIGN KEY (order_id) REFERENCES Orders(order_id) ON DELETE CASCADE
 );
 ALTER TABLE Order_Transactions ADD is_reconciled BIT DEFAULT 0 NOT NULL;
+ALTER TABLE Order_Transactions ADD reconciled_by VARCHAR(100) NULL;
+ALTER TABLE Order_Transactions ADD reconciled_at DATETIME2 NULL;
 ALTER TABLE Order_Transactions ADD idempotency_key VARCHAR(150) NULL;
 ALTER TABLE Order_Transactions ADD provider_transaction_id VARCHAR(100) NULL;
 ALTER TABLE Order_Transactions ADD provider_response_code VARCHAR(20) NULL;
@@ -767,6 +844,8 @@ CREATE TABLE AI_Analytics_Reports (
     to_date DATE NOT NULL,
     report_json NVARCHAR(MAX) NOT NULL,
     model_name VARCHAR(100) NOT NULL,
+    -- Marcus thêm: cache chỉ hợp lệ khi dữ liệu tổng hợp vẫn cùng fingerprint.
+    data_fingerprint VARCHAR(64) NULL,
     generated_at DATETIME2 NOT NULL
         CONSTRAINT DF_AIAnalyticsReports_GeneratedAt DEFAULT SYSDATETIME(),
     CONSTRAINT CK_AIAnalyticsReports_Period CHECK (from_date <= to_date),
@@ -774,19 +853,23 @@ CREATE TABLE AI_Analytics_Reports (
 );
 CREATE INDEX IX_AIAnalyticsReports_PeriodGenerated
     ON AI_Analytics_Reports(from_date, to_date, generated_at DESC);
+CREATE INDEX IX_AIAnalyticsReports_Fingerprint
+    ON AI_Analytics_Reports(from_date, to_date, model_name, data_fingerprint, generated_at DESC);
 
 -- Marcus thêm: telemetry AI ẩn danh; không lưu nội dung chat, IP, email hay user_id.
 CREATE TABLE AI_Usage_Events (
     event_id BIGINT IDENTITY(1,1) NOT NULL
         CONSTRAINT PK_AI_Usage_Events PRIMARY KEY,
     session_id VARCHAR(36) NOT NULL,
+    advice_id VARCHAR(36) NULL,
     event_type VARCHAR(30) NOT NULL,
     product_id INT NULL,
     response_time_ms INT NULL,
     created_at DATETIME2 NOT NULL
         CONSTRAINT DF_AIUsageEvents_CreatedAt DEFAULT SYSDATETIME(),
     CONSTRAINT CK_AIUsageEvents_Type CHECK (
-        event_type IN ('CHAT_SUCCESS', 'CHAT_FAILED', 'PRODUCT_CLICK')
+        event_type IN ('CHAT_SUCCESS', 'CHAT_RESPONSE', 'CHAT_FAILED', 'PRODUCT_CLICK',
+                       'FEEDBACK_HELPFUL', 'FEEDBACK_NOT_HELPFUL')
     ),
     CONSTRAINT CK_AIUsageEvents_ResponseTime CHECK (
         response_time_ms IS NULL OR response_time_ms BETWEEN 0 AND 120000
@@ -798,6 +881,38 @@ CREATE INDEX IX_AIUsageEvents_CreatedType
     ON AI_Usage_Events(created_at DESC, event_type);
 CREATE INDEX IX_AIUsageEvents_Session
     ON AI_Usage_Events(session_id, created_at DESC);
+CREATE INDEX IX_AIUsageEvents_Advice ON AI_Usage_Events(advice_id, created_at DESC)
+    WHERE advice_id IS NOT NULL;
+GO
+CREATE OR ALTER TRIGGER dbo.TR_AIUsageEvents_OneFeedback
+ON dbo.AI_Usage_Events AFTER INSERT, UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (
+        SELECT usage_event.advice_id FROM dbo.AI_Usage_Events usage_event
+        WHERE usage_event.advice_id IS NOT NULL
+          AND usage_event.event_type IN ('FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')
+          AND usage_event.advice_id IN (SELECT advice_id FROM inserted WHERE advice_id IS NOT NULL)
+        GROUP BY usage_event.advice_id HAVING COUNT_BIG(*) > 1
+    ) THROW 51202, N'Mỗi câu tư vấn chỉ được ghi nhận một feedback.', 1;
+END;
+GO
+
+-- Marcus thêm P2: funnel hành vi tối thiểu trên SQL Server, không lưu dữ liệu nhạy cảm.
+CREATE TABLE Customer_Behavior_Events (
+    event_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    event_type VARCHAR(30) NOT NULL,
+    session_id VARCHAR(36) NULL,
+    product_id INT NULL,
+    order_id INT NULL,
+    created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
+    CONSTRAINT CK_CustomerBehaviorEvents_Type CHECK (
+        event_type IN ('PRODUCT_VIEW','CHECKOUT_STARTED','ORDER_CREATED','PAYMENT_SUCCESS','AI_QUESTION','AI_PRODUCT_CLICK')
+    )
+);
+CREATE INDEX IX_CustomerBehaviorEvents_CreatedType ON Customer_Behavior_Events(created_at DESC, event_type);
+CREATE INDEX IX_CustomerBehaviorEvents_Session ON Customer_Behavior_Events(session_id, created_at DESC) WHERE session_id IS NOT NULL;
+CREATE INDEX IX_CustomerBehaviorEvents_Order ON Customer_Behavior_Events(order_id, created_at DESC) WHERE order_id IS NOT NULL;
 
 
 CREATE INDEX IX_OrderTrans_OrderId ON Order_Transactions(order_id);	

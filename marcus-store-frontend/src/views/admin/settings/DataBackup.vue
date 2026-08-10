@@ -21,6 +21,11 @@
       <button type="button" @click="loadPage">Thử lại</button>
     </section>
 
+    <section v-if="overview.storageWarning" class="storage-warning">
+      <i class="bi bi-device-hdd-fill"></i>
+      Ổ lưu backup chỉ còn {{ formatBytes(overview.availableStorageBytes) }}. Hãy tải file về ổ cứng và dọn bản cũ.
+    </section>
+
     <section class="stats-grid">
       <article class="stat-card">
         <span class="stat-icon blue"><i class="bi bi-database"></i></span>
@@ -55,8 +60,8 @@
           <span class="option-icon"><i class="bi bi-file-earmark-spreadsheet-fill"></i></span>
           <span class="option-tag">Dễ đọc</span>
         </div>
-        <h2>Xuất toàn bộ Excel</h2>
-        <p>Mỗi bảng SQL là một sheet. Password, OTP, token và secret được tự động che.</p>
+        <h2>Xuất dữ liệu đọc (Excel)</h2>
+        <p>Mỗi bảng SQL là một sheet để đọc/tra cứu. Đây không phải bản phục hồi toàn bộ hệ thống.</p>
         <ul>
           <li><i class="bi bi-check-circle-fill"></i> Mở bằng Excel để tra cứu và in</li>
           <li><i class="bi bi-check-circle-fill"></i> Có tiêu đề, bộ lọc và cố định hàng đầu</li>
@@ -135,6 +140,10 @@
                   <div>
                     <strong>{{ item.fileName }}</strong>
                     <small :title="item.checksum">{{ shortChecksum(item.checksum) }}</small>
+                    <small>Nguồn: {{ item.sourceDatabase || overview.databaseName || '—' }}</small>
+                    <small v-if="item.restoreTestStatus" :class="['restore-result', item.restoreTestStatus.toLowerCase()]">
+                      {{ item.restoreTestMessage }} · {{ formatDateTime(item.restoreTestedAt) }}
+                    </small>
                     <small v-if="item.note">{{ item.note }}</small>
                   </div>
                 </div>
@@ -153,6 +162,16 @@
                 <small v-if="item.errorMessage" class="row-error">{{ item.errorMessage }}</small>
               </td>
               <td class="actions">
+                <button
+                  v-if="item.type === 'BAK' && item.status === 'SUCCESS'"
+                  class="icon-btn restore"
+                  type="button"
+                  title="Phục hồi thử vào database tạm"
+                  :disabled="restoreTestingId === item.id"
+                  @click="testRestore(item)"
+                >
+                  <i :class="restoreTestingId === item.id ? 'bi bi-arrow-repeat spin' : 'bi bi-database-check'"></i>
+                </button>
                 <button
                   class="icon-btn download"
                   type="button"
@@ -182,6 +201,17 @@
       </div>
     </section>
 
+    <details class="restore-guide">
+      <summary><i class="bi bi-life-preserver"></i> Hướng dẫn phục hồi file BAK</summary>
+      <ol>
+        <li>Tải file BAK và kiểm tra SHA-256 hiển thị trong lịch sử.</li>
+        <li>Trong SSMS chọn <strong>Databases → Restore Database → Device</strong>.</li>
+        <li>Chọn file BAK, phục hồi sang tên database mới; không ghi đè database đang chạy.</li>
+        <li>Đổi cấu hình <code>spring.datasource.url</code> sang database vừa phục hồi và chạy kiểm tra.</li>
+      </ol>
+      <p>Nút hình database ở lịch sử sẽ tự phục hồi vào database test tên ngẫu nhiên, đếm bảng rồi xóa database test.</p>
+    </details>
+
     <details class="data-detail">
       <summary>
         <span><i class="bi bi-table"></i> Dữ liệu sẽ được đưa vào Excel</span>
@@ -190,8 +220,10 @@
       <div class="data-grid">
         <article v-for="table in overview.tables || []" :key="`${table.schema}.${table.table}`">
           <span>{{ table.table }}</span>
-          <strong>{{ formatNumber(table.records) }}</strong>
-          <small>bản ghi</small>
+          <strong>{{ formatNumber(table.columnCount) }} cột</strong>
+          <small>
+            <span><i class="bi bi-collection"></i> {{ formatNumber(table.records) }} bản ghi</span>
+          </small>
         </article>
       </div>
     </details>
@@ -250,6 +282,7 @@ const loading = ref(false)
 const creating = ref(false)
 const downloadingId = ref('')
 const deletingId = ref('')
+const restoreTestingId = ref('')
 const errorMessage = ref('')
 const createModal = reactive({ open: false, type: 'EXCEL', note: '' })
 let pollTimer = null
@@ -359,6 +392,20 @@ const deleteBackup = async (item) => {
     errorMessage.value = error.response?.data?.message || 'Không thể xóa bản sao lưu.'
   } finally {
     deletingId.value = ''
+  }
+}
+
+const testRestore = async (item) => {
+  restoreTestingId.value = item.id
+  errorMessage.value = ''
+  try {
+    const response = await backupApi.testRestore(item.id)
+    Object.assign(item, response.data?.data || {})
+  } catch (error) {
+    errorMessage.value = error.response?.data?.message || 'Không thể phục hồi thử file BAK.'
+    await refreshHistory()
+  } finally {
+    restoreTestingId.value = ''
   }
 }
 

@@ -33,6 +33,14 @@ const analyticsApi = {
     return get('/admin/analytics/cancellation-reasons', params)
   },
 
+  // Marcus thêm: đọc dữ liệu bảo hành đã tổng hợp cho Analytics.
+  getWarrantyQuality(params) {
+    return get('/admin/analytics/warranty-quality', params)
+  },
+  getBehaviorFunnel(params) {
+    return get('/admin/analytics/behavior-funnel', params)
+  },
+
   getSavedAiReport(params) {
     return get('/admin/analytics/ai-report', params)
   },
@@ -40,6 +48,10 @@ const analyticsApi = {
   // Marcus thêm: đọc telemetry AI đã ẩn danh, không chứa nội dung hội thoại.
   getAiUsageSummary(params) {
     return get('/admin/ai-advisor/usage-summary', params)
+  },
+
+  getAiSalesFunnel(params) {
+    return get('/admin/ai-advisor/sales-funnel', params)
   },
 
   generateAiReport(params) {

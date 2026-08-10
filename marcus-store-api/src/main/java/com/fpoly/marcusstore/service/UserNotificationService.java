@@ -18,6 +18,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.*;
 
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import java.time.LocalDateTime;
+import org.springframework.scheduling.annotation.Scheduled;
+import com.fpoly.marcusstore.utils.NotificationRegistry;
 
 @Service
 @RequiredArgsConstructor
@@ -58,12 +61,23 @@ public class UserNotificationService {
     public void create(User user, String type, String title, String message, String referenceId) {
         if (user == null || user.getUserId() == null)
             return;
+        String eventKey = NotificationRegistry.eventKey(
+                "USER_" + user.getUserId(), type, referenceId, title);
+        java.util.Optional<UserNotification> existing = repository.findByEventKey(eventKey);
+        if (existing != null && existing.isPresent())
+            return;
+        NotificationRegistry.Metadata metadata = NotificationRegistry.forUser(type, referenceId);
         UserNotification notification = new UserNotification();
         notification.setUser(user);
         notification.setType(type);
         notification.setTitle(title);
         notification.setMessage(message);
         notification.setReferenceId(referenceId);
+        notification.setEventKey(eventKey);
+        notification.setCategory(metadata.category());
+        notification.setIcon(metadata.icon());
+        notification.setDeepLink(metadata.deepLink());
+        notification.setExpiresAt(LocalDateTime.now().plusDays(120));
         UserNotificationResponse data = toResponse(repository.saveAndFlush(notification));
         sendAfterCommit(user.getUsername(), Map.of("event", "NEW", "data", data));
     }
@@ -72,10 +86,12 @@ public class UserNotificationService {
     // tránh mỗi service tự viết title/type khác nhau.
     @Transactional
     public void createOrderStatusNotification(Order order, String status, String detail) {
-        if (order == null || status == null) return;
+        if (order == null || status == null)
+            return;
         String normalized = status.trim().toUpperCase(Locale.ROOT);
         String title = ORDER_STATUS_TITLES.get(normalized);
-        if (title == null) return;
+        if (title == null)
+            return;
         String message = detail == null || detail.isBlank()
                 ? "Đơn " + order.getOrderCode() + " vừa được cập nhật: " + title + "."
                 : detail;
@@ -85,7 +101,8 @@ public class UserNotificationService {
     // Marcus thêm: phát chuông cho khách khi admin cập nhật trạng thái bảo hành.
     @Transactional
     public void notifyWarrantyStatusChanged(WarrantyReturn warranty, WarrantyStatus newStatus, String adminNote) {
-        if (warranty == null || warranty.getUser() == null || newStatus == null) return;
+        if (warranty == null || warranty.getUser() == null || newStatus == null)
+            return;
         String type = "WARRANTY_" + newStatus.name();
         String title = WARRANTY_STATUS_TITLES.getOrDefault(newStatus.name(), "Cập nhật bảo hành");
         String message = adminNote != null && !adminNote.isBlank()
@@ -114,7 +131,17 @@ public class UserNotificationService {
         return UserNotificationResponse.builder()
                 .id(item.getId()).type(item.getType()).title(item.getTitle())
                 .message(item.getMessage()).referenceId(item.getReferenceId())
-                .isRead(Boolean.TRUE.equals(item.getIsRead())).createdAt(item.getCreatedAt()).build();
+                .category(item.getCategory()).icon(item.getIcon()).deepLink(item.getDeepLink())
+                .isRead(Boolean.TRUE.equals(item.getIsRead())).createdAt(item.getCreatedAt())
+                .expiresAt(item.getExpiresAt()).build();
+    }
+
+    // Marcus thêm: chuông khách quá hạn được dọn định kỳ, không để bảng tăng vô
+    // hạn.
+    @Scheduled(cron = "0 35 3 * * *")
+    @Transactional
+    public void cleanupExpiredNotifications() {
+        repository.deleteByExpiresAtBefore(LocalDateTime.now());
     }
 
     private void sendAfterCommit(String username, Object payload) {

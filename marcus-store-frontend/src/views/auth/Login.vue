@@ -5,12 +5,13 @@
       <div class="deco-circle circle-2" ref="circle2"></div>
       <div class="content">
         <router-link to="/" class="brand brand-logo-link">
-          <div class="logo-icon-box">
-            <i class="fas fa-mobile-alt"></i>
+          <div class="logo-icon-box" :class="{ 'has-site-logo': siteLogoUrl }">
+            <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+            <i v-else class="fas fa-mobile-alt"></i>
           </div>
           <div>
-            <h1>MarcusStore</h1>
-            <p>Chào mừng bạn đến với MarcusStore!</p>
+            <h1>{{ siteName }}</h1>
+            <p>Chào mừng bạn đến với {{ siteName }}!</p>
           </div>
         </router-link>
         <div class="features">
@@ -154,7 +155,10 @@ import { ref, reactive, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { loginApi } from '@/api/authApi'
 import BaseModal from '@/components/BaseModal.vue'
+import { useSettings } from '@/composables/useSettings'
 import '@/assets/css/Login.css'
+
+const { siteName, siteLogoUrl, fetchSettings } = useSettings()
 const router = useRouter()
 
 const showLoginPassword = ref(false)
@@ -261,6 +265,7 @@ const triggerShake = () => {
 }
 
 onMounted(() => {
+  fetchSettings()
   nextTick(() => setIndicatorToActive())
 
   const params = new URLSearchParams(window.location.search)
@@ -368,6 +373,15 @@ const handleLogin = async () => {
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s ease;
+}
+
+.logo-icon-box.has-site-logo {
+  padding: 7px;
+  border: 1px solid #fee2e2;
+}
+
+.logo-icon-box.has-site-logo .site-logo-image {
+  border-radius: 7px;
 }
 
 .logo-icon-box i {

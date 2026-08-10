@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,19 +29,19 @@ public class GhnWebhookController {
     @Transactional
     public ResponseEntity<String> handleWebhook(
             @RequestHeader(value = "X-Verification-Token", required = false) String verifyToken,
-            Authentication authentication,
             @Valid @RequestBody GhnWebhookRequest payload) {
 
         boolean configuredWebhookToken = ghnWebhookToken != null && !ghnWebhookToken.isBlank();
         boolean validWebhookToken = configuredWebhookToken && isValidToken(verifyToken);
-        boolean authorizedAdmin = hasOrderUpdatePermission(authentication);
 
-        if (!configuredWebhookToken && !authorizedAdmin) {
+        if (!configuredWebhookToken) {
             log.error("[GHN Webhook] Chưa cấu hình ghn.webhook.token, từ chối webhook để bảo vệ dữ liệu đơn hàng.");
             return ResponseEntity.status(503).body("Webhook verification is not configured");
         }
 
-        if (!validWebhookToken && !authorizedAdmin) {
+        // Marcus sửa: webhook là kênh máy-máy nên chỉ chấp nhận token nhà vận
+        // chuyển. JWT/quyền Admin không được dùng để giả lập callback GHN.
+        if (!validWebhookToken) {
             log.warn("[GHN Webhook] Token xác thực không hợp lệ.");
             return ResponseEntity.status(401).body("Unauthorized");
         }
@@ -72,13 +71,4 @@ public class GhnWebhookController {
                 receivedToken.getBytes(StandardCharsets.UTF_8));
     }
 
-    private boolean hasOrderUpdatePermission(Authentication authentication) {
-        return authentication != null
-                && authentication.isAuthenticated()
-                && authentication.getAuthorities().stream()
-                        .map(authority -> authority.getAuthority())
-                        .anyMatch(authority -> "SUPER_ADMIN".equals(authority)
-                                || "ROLE_ADMIN".equals(authority)
-                                || "ORDER_UPDATE".equals(authority));
-    }
 }

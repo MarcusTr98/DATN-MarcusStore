@@ -10,6 +10,7 @@ import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderStatusHistory;
+import com.fpoly.marcusstore.event.OrderConfirmedEvent;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
@@ -30,15 +31,21 @@ import com.fpoly.marcusstore.service.UserNotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
+import com.fpoly.marcusstore.utils.CancellationReasonCatalog;
 
 @Service
 @RequiredArgsConstructor
@@ -49,6 +56,8 @@ public class OrderServiceImpl implements OrderService {
     private final OrderStatusHistoryRepository orderStatusHistoryRepository;
     private final UserRepository userRepository;
     private final ProductSkuRepository productSkuRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    // Marcus thêm: Admin có thể retry GHN sau khi lần tạo vận đơn tự động thất bại.
     private final OrderShippingService orderShippingService;
     private final OrderPaymentService orderPaymentService;
     private final OrderCancellationService orderCancellationService;
@@ -57,6 +66,9 @@ public class OrderServiceImpl implements OrderService {
     // Marcus thêm chuông hai chiều cho luồng hủy đơn.
     private final AdminNotificationService adminNotificationService;
     private final UserNotificationService userNotificationService;
+
+    @Value("${vnpay.paymentTimeoutMinutes:20}")
+    private long vnPayPaymentTimeoutMinutes;
     // Marcus sửa: khách được hủy trước khi tạo vận đơn. PACKED đã có tracking GHN
     // nên không thể chỉ hủy nội bộ rồi để vận đơn tiếp tục giao.
     private static final Set<String> USER_CANCELLABLE_STATUSES = Set.of(
@@ -65,6 +77,16 @@ public class OrderServiceImpl implements OrderService {
     // Marcus thêm: IMEI chỉ gồm chữ số, độ dài 8-20. Validate chặt để FE gõ nhầm
     // IMEI ngắn/dài/ký tự đặc biệt sẽ bị BE chặn ngay tại đầu vào.
     private static final java.util.regex.Pattern IMEI_PATTERN = java.util.regex.Pattern.compile("^[0-9]{8,20}$");
+
+    // Marcus thêm: retry GHN độc lập, không làm mất bước kiểm soát IMEI của module
+    // kho.
+    @Override
+    public OrderDetailResponse retryGhnShipment(String orderCode) {
+        Order order = orderRepository.findByOrderCode(orderCode)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+        orderShippingService.createOrRetryGhnOrder(order.getOrderId());
+        return getOrderDetailResponse(orderCode);
+    }
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -161,6 +183,11 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderDetailResponse updateStatusOrder(String orderCode, UpdateOrderStatusRequest request) {
+        return updateStatusOrder(orderCode, request, "ADMIN");
+    }
+
+    private OrderDetailResponse updateStatusOrder(
+            String orderCode, UpdateOrderStatusRequest request, String cancellationActor) {
         Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
@@ -186,11 +213,10 @@ public class OrderServiceImpl implements OrderService {
                 && !"STORE_PICKUP".equalsIgnoreCase(order.getFulfillmentMethod());
 
         if (isPackingNow) {
-            try {
-                orderShippingService.processCreateGhnOrder(order);
-            } catch (Exception e) {
-                throw new RuntimeException("Lỗi tạo mã vận đơn GHN: " + e.getMessage());
-            }
+            // Marcus sửa: PACKED là nghiệp vụ của đơn và phải commit độc lập với
+            // HTTP GHN. Listener sau-commit sẽ tạo vận đơn và lưu FAILED nếu lỗi.
+            order.setGhnIntegrationStatus("PENDING");
+            order.setGhnLastError(null);
         }
 
         String note = request.getNote();
@@ -208,7 +234,8 @@ public class OrderServiceImpl implements OrderService {
                         "Đơn đã có vận đơn GHN; cần hủy vận đơn GHN trước khi hủy đơn trên hệ thống");
             }
             // Hoàn kho, voucher, giỏ hàng và số lượng Flash Sale tại một nơi
-            orderCancellationService.cancelAndRestore(order, note);
+            orderCancellationService.cancelAndRestore(
+                    order, request.getCancellationReasonCode(), cancellationActor, note);
         } else {
             order.setOrderStatus(newStatus);
         }
@@ -224,18 +251,10 @@ public class OrderServiceImpl implements OrderService {
         }
         orderRepository.save(order);
 
-        // Gửi email thông báo trạng thái đơn hàng cho khách
-        try {
-            emailService.sendOrderStatusUpdate(
-                    order.getUser().getEmail(),
-                    getUserDisplayName(order.getUser()),
-                    order,
-                    newStatus);
-        } catch (Exception e) {
-            // log lỗi, không rollback transaction cập nhật đơn hàng
-            // log.error("Gửi mail cập nhật đơn hàng thất bại cho order {}: {}", orderCode,
-            // e.getMessage());
-        }
+        // Marcus sửa luồng thành viên: chỉ gửi email sau khi toàn bộ transaction
+        // trạng thái + IMEI commit. IMEI lỗi/rollback sẽ không gửi email PROCESSING
+        // sai.
+        sendOrderStatusEmailAfterCommit(order);
 
         OrderStatusHistory history = createStatusHistory(order, newStatus, note);
         orderStatusHistoryRepository.save(history);
@@ -249,12 +268,41 @@ public class OrderServiceImpl implements OrderService {
                         ? "Đơn " + order.getOrderCode() + " đã hủy. Lý do: " + note
                         : null);
 
+        if (isPackingNow) {
+            eventPublisher.publishEvent(new OrderConfirmedEvent(this, order.getOrderId()));
+        }
+
         return getOrderDetailResponse(orderCode);
     }
 
     private boolean isAwaitingVnPayPayment(Order order) {
         return "VNPAY".equalsIgnoreCase(order.getPaymentMethod())
                 && !"PAID".equalsIgnoreCase(order.getPaymentStatus());
+    }
+
+    private void sendOrderStatusEmailAfterCommit(Order order) {
+        String email = order.getUser().getEmail();
+        String customerName = getUserDisplayName(order.getUser());
+        Runnable sender = () -> {
+            try {
+                // Marcus sửa: lấy trạng thái cuối của entity tại AFTER_COMMIT. Luồng
+                // gộp có thể đi PROCESSING -> PACKED trong cùng một transaction.
+                emailService.sendOrderStatusUpdate(
+                        email, customerName, order, normalizeStatusValue(order.getOrderStatus()));
+            } catch (Exception ignored) {
+                // Email là tác vụ phụ, không được làm sai trạng thái đơn đã commit.
+            }
+        };
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            sender.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                sender.run();
+            }
+        });
     }
 
     @Override
@@ -323,6 +371,12 @@ public class OrderServiceImpl implements OrderService {
         return OrderDetailResponse.builder()
                 .orderCode(order.getOrderCode())
                 .orderStatus(order.getOrderStatus())
+                .cancellationReasonCode(order.getCancellationReasonCode())
+                .cancellationReasonLabel(order.getCancellationReasonCode() == null
+                        ? null
+                        : CancellationReasonCatalog.label(order.getCancellationReasonCode()))
+                .cancellationActor(order.getCancellationActor())
+                .cancelledAt(order.getCancelledAt())
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .recipientName(order.getRecipientName())
@@ -339,7 +393,12 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .transactionId(order.getTransactionId())
                 .paymentDate(order.getPaymentDate())
+                .paymentExpiresAt(resolvePaymentExpiresAt(order))
                 .trackingCode(order.getTrackingCode())
+                .ghnIntegrationStatus(order.getGhnIntegrationStatus())
+                .ghnRetryCount(order.getGhnRetryCount())
+                .ghnLastError(order.getGhnLastError())
+                .ghnLastAttemptAt(order.getGhnLastAttemptAt())
                 .userId(order.getUser().getUserId())
                 .fullName(order.getUser().getFullName())
                 .email(order.getUser().getEmail())
@@ -418,10 +477,12 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderDetailResponse cancelUserOrder(String orderCode, String reason) {
+    public OrderDetailResponse cancelUserOrder(String orderCode, String reasonCode, String reason) {
         Integer userId = SecurityUtils.getCurrentUserId();
 
-        Order order = orderRepository.findByOrderCodeAndUserUserId(orderCode, userId)
+        // Marcus sửa: khóa dòng Order trước khi kiểm tra và hoàn tài nguyên. Nhờ đó
+        // retry của khách không thể đua với IPN VNPAY, scheduler hoặc Admin hủy đơn.
+        Order order = orderRepository.findByOrderCodeAndUserIdForUpdate(orderCode, userId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
         // Marcus sửa: cho phép khách hủy cả COD và VNPAY trong các trạng thái an toàn.
@@ -438,8 +499,9 @@ public class OrderServiceImpl implements OrderService {
         UpdateOrderStatusRequest request = UpdateOrderStatusRequest.builder()
                 .status("CANCELLED")
                 .note((reason == null || reason.isBlank()) ? "Khách hàng tự hủy" : reason)
+                .cancellationReasonCode(reasonCode)
                 .build();
-        OrderDetailResponse response = updateStatusOrder(orderCode, request);
+        OrderDetailResponse response = updateStatusOrder(orderCode, request, "CUSTOMER");
         // Marcus thêm: khi khách tự hủy, chủ cửa hàng nhận chuông realtime để nắm
         // lý do và dừng xử lý đơn.
         adminNotificationService.createAndSendNotification(
@@ -448,6 +510,15 @@ public class OrderServiceImpl implements OrderService {
                 "Khách hàng " + getUserDisplayName(order.getUser()) + " hủy đơn. Lý do: " + request.getNote(),
                 order.getOrderCode());
         return response;
+    }
+
+    private LocalDateTime resolvePaymentExpiresAt(Order order) {
+        if (!"VNPAY".equalsIgnoreCase(order.getPaymentMethod())
+                || order.getCreatedAt() == null
+                || !"PENDING".equalsIgnoreCase(order.getPaymentStatus())) {
+            return null;
+        }
+        return order.getCreatedAt().plusMinutes(vnPayPaymentTimeoutMinutes);
     }
 
     @Override
@@ -508,26 +579,27 @@ public class OrderServiceImpl implements OrderService {
 
         List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
 
-        return orderItems.stream().map(item -> {
+        // Marcus sửa luồng kho thành viên: preview chỉ chứa dòng thực sự quản lý
+        // IMEI. SKU thường trong đơn trộn không được buộc FE chọn IMEI giả.
+        return orderItems.stream().filter(item -> {
             ProductSku sku = item.getSku();
-            boolean hasImei = sku.getProduct() != null && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
-
-            List<OrderImeiAssignmentResponse.ImeiDetailItem> available = java.util.Collections.emptyList();
+            return sku.getProduct() != null
+                    && Boolean.TRUE.equals(sku.getProduct().getStatusImei());
+        }).map(item -> {
+            ProductSku sku = item.getSku();
             List<String> assignedImeis = item.getProductItems().stream()
                     .map(ProductItem::getImeiCode)
                     .toList();
-            if (hasImei) {
-                List<ProductItem> availableItems = productItemRepository.findAvailableBySkuId(sku.getSkuId());
-                available = availableItems.stream()
-                        .map(pi -> OrderImeiAssignmentResponse.ImeiDetailItem.builder()
-                                .itemId(pi.getItemId())
-                                .imeiCode(pi.getImeiCode())
-                                .status(pi.getStatus())
-                                .statusLabel(ProductItemService.toStatusLabel(pi.getStatus()))
-                                .createdAt(pi.getCreatedAt())
-                                .build())
-                        .toList();
-            }
+            List<OrderImeiAssignmentResponse.ImeiDetailItem> available = productItemRepository
+                    .findAvailableBySkuId(sku.getSkuId()).stream()
+                    .map(pi -> OrderImeiAssignmentResponse.ImeiDetailItem.builder()
+                            .itemId(pi.getItemId())
+                            .imeiCode(pi.getImeiCode())
+                            .status(pi.getStatus())
+                            .statusLabel(ProductItemService.toStatusLabel(pi.getStatus()))
+                            .createdAt(pi.getCreatedAt())
+                            .build())
+                    .toList();
 
             return OrderImeiAssignmentResponse.builder()
                     .orderItemId(item.getOrderItemId())
@@ -544,7 +616,9 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OrderDetailResponse assignOrderImeis(String orderCode, List<UpdateOrderImeiRequest> requests) {
-        Order order = orderRepository.findByOrderCode(orderCode)
+        // Marcus sửa luồng kho thành viên: endpoint gán độc lập cũng khóa Order,
+        // tránh hai Admin đồng thời lấy cùng IMEI hoặc chuyển trạng thái hai lần.
+        Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
         // Marcus sửa: chỉ cho phép gán IMEI khi đơn đang ở PROCESSING hoặc
@@ -564,15 +638,16 @@ public class OrderServiceImpl implements OrderService {
                     "Chỉ có thể gán IMEI khi đơn đang ở trạng thái Đang chuẩn bị hoặc Sẵn sàng nhận tại cửa hàng");
         }
 
-        if (requests == null || requests.isEmpty()) {
-            // Không có dòng nào cần gán → bỏ qua, đơn vẫn ở trạng thái hiện tại.
-            return getOrderDetailResponse(orderCode);
-        }
+        // Marcus sửa: đơn thuần không có IMEI vẫn phải đi tiếp xuống bước kiểm tra
+        // allItemsFullyAssigned để tự chuyển PACKED/READY_FOR_PICKUP.
+        List<UpdateOrderImeiRequest> safeRequests = requests == null
+                ? java.util.Collections.emptyList()
+                : requests;
 
         // Marcus gom tất cả IMEI của toàn bộ request để check trùng giữa các dòng đơn
         // (Bug 3: admin nhập nhầm cùng IMEI cho 2 dòng khác nhau).
         Map<Integer, List<String>> imeisByOrderItem = new java.util.LinkedHashMap<>();
-        for (UpdateOrderImeiRequest req : requests) {
+        for (UpdateOrderImeiRequest req : safeRequests) {
             OrderItem orderItem = orderItemRepository.findById(req.getOrderItemId())
                     .orElseThrow(() -> new RuntimeException(
                             "Không tìm thấy dòng đơn hàng: " + req.getOrderItemId()));
@@ -634,7 +709,7 @@ public class OrderServiceImpl implements OrderService {
                     "IMEI bị trùng giữa các dòng đơn: " + String.join(", ", duplicates));
         }
 
-        Set<Integer> skuIds = requests.stream()
+        Set<Integer> skuIds = safeRequests.stream()
                 .map(req -> orderItemRepository.findById(req.getOrderItemId())
                         .orElseThrow(() -> new RuntimeException(
                                 "Không tìm thấy dòng đơn hàng: " + req.getOrderItemId()))
@@ -646,8 +721,9 @@ public class OrderServiceImpl implements OrderService {
                 : productSkuRepository.findByIdsForUpdate(new java.util.ArrayList<>(skuIds)).stream()
                         .collect(Collectors.toMap(ProductSku::getSkuId, s -> s));
 
-        List<ProductItem> lockedImeis = productItemRepository
-                .findAvailableByImeiCodesForUpdate(allImeis);
+        List<ProductItem> lockedImeis = allImeis.isEmpty()
+                ? java.util.Collections.emptyList()
+                : productItemRepository.findAvailableByImeiCodesForUpdate(allImeis);
         Map<String, ProductItem> imeiMap = lockedImeis.stream()
                 .collect(Collectors.toMap(ProductItem::getImeiCode, pi -> pi));
 
@@ -675,7 +751,7 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        for (UpdateOrderImeiRequest req : requests) {
+        for (UpdateOrderImeiRequest req : safeRequests) {
             OrderItem orderItem = orderItemRepository.findById(req.getOrderItemId())
                     .orElseThrow(() -> new RuntimeException(
                             "Không tìm thấy dòng đơn hàng: " + req.getOrderItemId()));
@@ -689,8 +765,8 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        order = orderRepository.findByOrderCode(orderCode)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        // Order đã được khóa từ đầu transaction; không truy vấn lại bằng API không
+        // khóa.
         List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
 
         boolean allItemsFullyAssigned = orderItems.stream().allMatch(orderItem -> {
@@ -723,12 +799,12 @@ public class OrderServiceImpl implements OrderService {
                 orderStatusHistoryRepository.save(history);
 
                 if ("PACKED".equals(nextStatus) && !storePickup) {
-                    try {
-                        orderShippingService.processCreateGhnOrder(order);
-                    } catch (Exception e) {
-                        System.err.println("Auto-create GHN order failed for "
-                                + order.getOrderCode() + ": " + e.getMessage());
-                    }
+                    order.setGhnIntegrationStatus("PENDING");
+                    order.setGhnLastError(null);
+                    orderRepository.save(order);
+                    // Marcus sửa: phát event để HTTP GHN chạy AFTER_COMMIT, không giữ
+                    // transaction khóa kho/IMEI trong lúc chờ bên thứ ba.
+                    eventPublisher.publishEvent(new OrderConfirmedEvent(this, order.getOrderId()));
                 }
             }
         }

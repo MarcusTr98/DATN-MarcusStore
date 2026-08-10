@@ -17,4 +17,10 @@ public interface AiAnalyticsReportRepository extends JpaRepository<AiAnalyticsRe
                         LocalDate fromDate,
                         LocalDate toDate,
                         String modelName);
+
+        Optional<AiAnalyticsReport> findFirstByFromDateAndToDateAndModelNameAndDataFingerprintOrderByGeneratedAtDesc(
+                        LocalDate fromDate,
+                        LocalDate toDate,
+                        String modelName,
+                        String dataFingerprint);
 }

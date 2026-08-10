@@ -18,6 +18,8 @@ export const useChatStore = defineStore('chat', {
     isConnecting: false,
     roomId: null,
     claimedBy: null,
+    sessionStatus: 'WAITING_ADMIN',
+    expiresAt: null,
     isOpen: false,
     unreadCount: 0,
     errorMessage: '',
@@ -45,6 +47,8 @@ export const useChatStore = defineStore('chat', {
         if (!session?.active) return
         this.roomId = session.roomId
         this.claimedBy = session.claimedBy
+        this.sessionStatus = session.status || (session.claimedBy ? 'CLAIMED' : 'WAITING_ADMIN')
+        this.expiresAt = session.expiresAt || null
         await this.loadHistory()
       } catch {
         this.resetSession()
@@ -59,6 +63,8 @@ export const useChatStore = defineStore('chat', {
         const session = response.data?.data
         this.roomId = session?.roomId ?? null
         this.claimedBy = session?.claimedBy ?? null
+        this.sessionStatus = session?.status || 'WAITING_ADMIN'
+        this.expiresAt = session?.expiresAt || null
         await this.loadHistory()
         return Boolean(this.roomId)
       } catch (error) {
@@ -109,7 +115,9 @@ export const useChatStore = defineStore('chat', {
             const message = JSON.parse(frame.body)
             if (message.senderRole === 'SYSTEM' && message.sender) {
               this.claimedBy = message.sender
+              this.sessionStatus = 'CLAIMED'
             }
+            if (message.senderRole === 'ADMIN') this.sessionStatus = 'ACTIVE'
             if (!this.messages.some((item) => item.id === message.id)) {
               this.messages.push(message)
             }
@@ -159,6 +167,8 @@ export const useChatStore = defineStore('chat', {
     resetSession() {
       this.roomId = null
       this.claimedBy = null
+      this.sessionStatus = 'WAITING_ADMIN'
+      this.expiresAt = null
       this.messages = []
       this.isOpen = false
       this.unreadCount = 0

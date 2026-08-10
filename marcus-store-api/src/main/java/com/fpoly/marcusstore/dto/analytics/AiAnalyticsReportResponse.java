@@ -7,6 +7,7 @@ public record AiAnalyticsReportResponse(
                 LocalDateTime generatedAt,
                 LocalDateTime cachedUntil,
                 boolean cached,
+                String source,
                 String headline,
                 String executiveSummary,
                 String outlook,
@@ -21,6 +22,7 @@ public record AiAnalyticsReportResponse(
                                 generatedAt,
                                 cachedUntil,
                                 true,
+                                source,
                                 headline,
                                 executiveSummary,
                                 outlook,
@@ -32,9 +34,13 @@ public record AiAnalyticsReportResponse(
         }
 
         public record Signal(
+                        String evidenceId,
                         String title,
                         String evidence,
                         String interpretation,
+                        String confidence,
+                        String action,
+                        String verification,
                         String severity) {
         }
 

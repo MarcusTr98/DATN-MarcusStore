@@ -30,9 +30,9 @@
               <span class="status-dot" :class="{ 'is-offline': !chatStore.isAdminOnline }"></span>
             </div>
             <div>
-              <h6 class="mb-0 fw-bold text-white">CSKH Marcus Store</h6>
+              <h6 class="mb-0 fw-bold text-white">CSKH {{ siteName }}</h6>
               <span class="status-text">
-                {{ chatStore.isAdminOnline ? 'Đang trực tuyến' : 'Tạm ngoại tuyến' }}
+                {{ liveChatStatusLabel }}
               </span>
             </div>
           </div>
@@ -120,6 +120,9 @@
             <i class="fas fa-paper-plane"></i>
           </button>
         </div>
+        <div class="chat-privacy-note">
+          <i class="fas fa-shield-halved"></i> Nội dung chat chỉ lưu tạm trong phiên và bị xóa khi kết thúc.
+        </div>
       </div>
     </transition>
 
@@ -146,12 +149,13 @@
           <div class="modal-body text-center pt-0">
             <!-- Khối Logo Marcus Store mô phỏng chính xác ảnh của bạn -->
             <div class="brand-logo-wrapper mb-4">
-              <div class="logo-icon-box shadow-sm">
-                <i class="fas fa-mobile-alt"></i>
+              <div class="logo-icon-box shadow-sm" :class="{ 'has-site-logo': siteLogoUrl }">
+                <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+                <i v-else class="fas fa-mobile-alt"></i>
               </div>
               <div class="logo-text-box">
-                <span class="text-marcus">Marcus</span>
-                <span class="text-store">STORE</span>
+                <span class="text-marcus">{{ siteNameParts.primary }}</span>
+                <span v-if="siteNameParts.secondary" class="text-store">{{ siteNameParts.secondary }}</span>
               </div>
             </div>
 
@@ -184,13 +188,17 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chatStore'
 import BaseModal from '@/components/BaseModal.vue'
+import { useSettings } from '@/composables/useSettings'
 import {
   clearFloatingContactPanel,
   setFloatingContactPanelOpen,
 } from '@/utils/floatingContactVisibility'
+
+const { siteName, siteLogoUrl, siteNameParts, fetchSettings } = useSettings()
+onMounted(fetchSettings)
 
 const props = defineProps({
   isLoggedIn: {
@@ -206,6 +214,12 @@ const chatBody = ref(null)
 const chatInput = ref(null)
 const showLoginPrompt = ref(false)
 const showEndConfirm = ref(false)
+const liveChatStatusLabel = computed(() => ({
+  WAITING_ADMIN: 'Đang chờ Admin',
+  CLAIMED: 'Admin đã nhận',
+  ACTIVE: 'Admin đang trả lời',
+  ENDED: 'Phiên đã kết thúc',
+})[chatStore.sessionStatus] || (chatStore.isAdminOnline ? 'Đang trực tuyến' : 'Tạm ngoại tuyến'))
 
 // Marcus sửa: giữ gợi ý đặc trưng của cửa hàng trong suốt cuộc trò chuyện.
 const suggestedQuestions = [
@@ -606,6 +620,7 @@ onBeforeUnmount(() => clearFloatingContactPanel('live'))
   align-items: center;
   gap: 10px;
 }
+.chat-privacy-note { padding: 6px 12px 9px; background: #fff; color: #64748b; font-size: 10px; text-align: center; }
 
 .chat-input {
   flex: 1;
@@ -718,6 +733,18 @@ onBeforeUnmount(() => clearFloatingContactPanel('live'))
   justify-content: center;
   color: #fff;
   font-size: 24px;
+}
+
+/* Marcus sửa: logo cấu hình không đặt trực tiếp trên nền đỏ của fallback icon. */
+.logo-icon-box.has-site-logo {
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 5px 14px rgba(215, 0, 24, 0.12);
+}
+
+.logo-icon-box.has-site-logo .site-logo-image {
+  border-radius: 6px;
 }
 
 .logo-text-box {

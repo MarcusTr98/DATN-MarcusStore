@@ -1,11 +1,12 @@
 <template>
   <aside class="sidebar">
     <div class="logo">
-      <div class="logo-icon">
-        <i class="fa-solid fa-mobile-screen-button"></i>
+      <div class="logo-icon" :class="{ 'has-site-logo': siteLogoUrl }">
+        <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+        <i v-else class="fa-solid fa-mobile-screen-button"></i>
       </div>
       <div class="logo-text">
-        <h2>Marcus Store</h2>
+        <h2>{{ siteName }}</h2>
         <span>Admin Panel</span>
       </div>
     </div>
@@ -181,6 +182,7 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { useSettings } from "@/composables/useSettings";
 
 import pieChartIcon from "/src/assets/icons/pie-chart.svg";
 import layersIcon from "/src/assets/icons/layers.svg";
@@ -195,6 +197,9 @@ import gearIcon from "/src/assets/icons/gear.svg";
 
 const route = useRoute();
 const router = useRouter();
+const { siteName, siteLogoUrl, fetchSettings } = useSettings();
+
+onMounted(fetchSettings);
 
 /* ===========================
    USER INFO
@@ -400,14 +405,15 @@ onMounted(() => {
 .logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 13px;
   margin-bottom: 32px;
-  padding-left: 8px;
+  padding: 4px 6px;
+  min-width: 0;
 }
 
 .logo-icon {
-  width: 44px;
-  height: 44px;
+  width: 58px;
+  height: 58px;
   border-radius: 12px;
   background: #ff4d94;
   color: white;
@@ -415,13 +421,39 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   font-size: 20px;
+  flex: 0 0 58px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Marcus sửa: logo tải lên dùng nền trung tính để không bị chìm trên nền hồng/đỏ. */
+.logo-icon.has-site-logo {
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.09);
+}
+
+.logo-icon .site-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 7px;
+}
+
+.logo-text {
+  min-width: 0;
+  flex: 1;
 }
 
 .logo-text h2 {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 900;
   color: #111827;
   margin: 0;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .logo-text span {
@@ -429,6 +461,7 @@ onMounted(() => {
   color: #111827;
   font-weight: 700;
   text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 /* Menu Group Title: Đổi sang đen, đậm rõ để dễ phân biệt */

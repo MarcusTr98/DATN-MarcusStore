@@ -7,3 +7,10 @@ body {
   font-family: 'Be Vietnam Pro', sans-serif;
   background-color: #f8f9fa;
 }
+/* Marcus thêm: logo Website lấy từ System Settings phải vừa mọi khung nhận diện. */
+.site-logo-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

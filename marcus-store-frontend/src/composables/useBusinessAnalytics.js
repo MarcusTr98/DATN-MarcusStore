@@ -29,10 +29,13 @@ export function useBusinessAnalytics() {
   const dailyTrend = ref([])
   const products = ref([])
   const cancellationReasons = ref([])
+  const warrantyQuality = ref(null)
+  const behaviorFunnel = ref(null)
   const loading = ref(false)
   const errorMessage = ref('')
   const aiReport = ref(null)
   const aiUsage = ref(null)
+  const aiSalesFunnel = ref(null)
   const aiLoading = ref(false)
   const aiError = ref('')
   let requestVersion = 0
@@ -98,6 +101,8 @@ export function useBusinessAnalytics() {
 
     const values = sample.map((point) => Number(point.completedSales || 0))
     const regression = linearRegression(values)
+    const backtest = backtestRegression(values)
+    const anomalies = detectAnomalies(sample, regression)
     const future = Array.from({ length: horizon }, (_, index) => {
       const position = values.length + index
       const predicted = Math.max(0, regression.intercept + regression.slope * position)
@@ -120,6 +125,8 @@ export function useBusinessAnalytics() {
         recentAverage > 0 ? ((forecastAverage - recentAverage) / recentAverage) * 100 : null,
       forecastTotal: future.reduce((sum, point) => sum + point.predictedSales, 0),
       unit: numberOfDays.value > 120 ? 'tháng' : 'ngày',
+      backtest,
+      anomalies,
     }
   })
 
@@ -265,23 +272,37 @@ export function useBusinessAnalytics() {
     const params = { fromDate: fromDate.value, toDate: toDate.value }
 
     try {
-      const [overviewResponse, trendResponse, productsResponse, cancellationResponse, aiUsageResponse] =
-        await Promise.all([
-          analyticsApi.getOverview(params),
-          analyticsApi.getSalesTrend(params),
-          analyticsApi.getProductTrends({ ...params, limit: 12 }),
-          analyticsApi.getCancellationReasons(params),
-          // Marcus sửa: telemetry là phần bổ sung; chưa chạy migration không được
-          // làm hỏng toàn bộ trang phân tích kinh doanh.
-          analyticsApi.getAiUsageSummary(params).catch(() => null),
-        ])
+      const [
+        overviewResponse,
+        trendResponse,
+        productsResponse,
+        cancellationResponse,
+        warrantyResponse,
+        aiUsageResponse,
+        behaviorFunnelResponse,
+        aiSalesFunnelResponse,
+      ] = await Promise.all([
+        analyticsApi.getOverview(params),
+        analyticsApi.getSalesTrend(params),
+        analyticsApi.getProductTrends({ ...params, limit: 12 }),
+        analyticsApi.getCancellationReasons(params),
+        analyticsApi.getWarrantyQuality({ ...params, limit: 10 }),
+        // Marcus sửa: telemetry là phần bổ sung; chưa chạy migration không được
+        // làm hỏng toàn bộ trang phân tích kinh doanh.
+        analyticsApi.getAiUsageSummary(params).catch(() => null),
+        analyticsApi.getBehaviorFunnel(params).catch(() => null),
+        analyticsApi.getAiSalesFunnel(params).catch(() => null),
+      ])
       if (currentRequest !== requestVersion) return
 
       overview.value = unwrap(overviewResponse)
       dailyTrend.value = unwrap(trendResponse) || []
       products.value = unwrap(productsResponse) || []
       cancellationReasons.value = unwrap(cancellationResponse) || []
+      warrantyQuality.value = unwrap(warrantyResponse) || null
       aiUsage.value = unwrap(aiUsageResponse) || null
+      behaviorFunnel.value = unwrap(behaviorFunnelResponse) || null
+      aiSalesFunnel.value = unwrap(aiSalesFunnelResponse) || null
       await loadSavedAiReport(currentRequest)
     } catch (error) {
       if (currentRequest !== requestVersion) return
@@ -322,6 +343,7 @@ export function useBusinessAnalytics() {
     aiLoading,
     aiReport,
     aiUsage,
+    aiSalesFunnel,
     cancellationReasons,
     errorMessage,
     fromDate,
@@ -335,6 +357,8 @@ export function useBusinessAnalytics() {
     toDate,
     today,
     trend,
+    warrantyQuality,
+    behaviorFunnel,
     applyCustomRange,
     applyPreset,
     generateAiReport,
@@ -363,6 +387,47 @@ function linearRegression(values) {
     rmse: Math.sqrt(residualSum / count),
     rSquared: totalSum ? Math.max(0, 1 - residualSum / totalSum) : 0,
   }
+}
+
+/*
+ * Marcus thêm: giữ lại các điểm cuối làm dữ liệu kiểm tra, không dùng chính
+ * dữ liệu đã huấn luyện để tự chấm độ chính xác của dự báo.
+ */
+function backtestRegression(values) {
+  if (values.length < 6) return { available: false, reason: 'Cần ít nhất 6 kỳ dữ liệu.' }
+  const holdoutSize = Math.min(3, Math.max(1, Math.floor(values.length * 0.2)))
+  const training = values.slice(0, -holdoutSize)
+  const actual = values.slice(-holdoutSize)
+  const model = linearRegression(training)
+  const errors = actual.map((value, index) => {
+    const predicted = Math.max(0, model.intercept + model.slope * (training.length + index))
+    return { actual: value, predicted, absoluteError: Math.abs(value - predicted) }
+  })
+  const mae = average(errors.map((item) => item.absoluteError))
+  const percentageErrors = errors
+    .filter((item) => item.actual > 0)
+    .map((item) => (item.absoluteError / item.actual) * 100)
+  return {
+    available: true,
+    testedPeriods: holdoutSize,
+    mae: Math.round(mae),
+    mape: percentageErrors.length ? average(percentageErrors) : null,
+  }
+}
+
+/* Marcus thêm: đánh dấu ngày/tháng lệch khỏi đường xu hướng quá 2 độ lệch chuẩn. */
+function detectAnomalies(points, regression) {
+  if (points.length < 5 || regression.rmse <= 0) return []
+  return points
+    .map((point, index) => {
+      const actual = Number(point.completedSales || 0)
+      const expected = Math.max(0, regression.intercept + regression.slope * index)
+      const score = Math.abs(actual - expected) / regression.rmse
+      return { label: point.label || point.date, actual, expected: Math.round(expected), score }
+    })
+    .filter((point) => point.score >= 2)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
 }
 
 function nextPeriodLabel(lastDate, offset, monthly) {

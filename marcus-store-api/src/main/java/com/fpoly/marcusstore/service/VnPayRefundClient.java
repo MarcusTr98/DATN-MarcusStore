@@ -56,9 +56,11 @@ public class VnPayRefundClient {
             if (!verifyResponseChecksum(body)) {
                 // Marcus sửa: request có thể đã tới VNPAY dù response không xác thực
                 // được. Giữ PROCESSING để QueryDR, không retry mù gây hoàn hai lần.
-                log.warn("VNPAY refund checksum invalid. responseCode={}, transactionStatus={}, keys={}, received={}",
+                // Marcus sửa: không lưu checksum gateway; log chỉ giữ dữ liệu đủ để
+                // đối soát trạng thái nghiệp vụ.
+                log.warn("VNPAY refund checksum invalid. responseCode={}, transactionStatus={}, keys={}",
                         body.get("vnp_ResponseCode"), body.get("vnp_TransactionStatus"),
-                        body.keySet(), hashPrefix(body.get("vnp_SecureHash")));
+                        body.keySet());
                 return RefundGatewayResult.processing(
                         "CHECKSUM_INVALID", null,
                         // Marcus sửa thông báo nghiệp vụ: chi tiết checksum chỉ ghi log,
@@ -271,8 +273,7 @@ public class VnPayRefundClient {
 
         // Marcus sửa: Refund chỉ chấp nhận đúng công thức chính thức; hai trường
         // promotion chỉ thuộc checksum QueryDR, không dùng làm fallback Refund.
-        log.warn("VNPAY refund hash mismatch. expected={}, received={}",
-                hashPrefix(standardHash), hashPrefix(receivedHash));
+        log.warn("VNPAY refund hash mismatch.");
         return false;
     }
 
@@ -283,10 +284,6 @@ public class VnPayRefundClient {
         return MessageDigest.isEqual(
                 expected.toLowerCase().getBytes(java.nio.charset.StandardCharsets.US_ASCII),
                 received.toLowerCase().getBytes(java.nio.charset.StandardCharsets.US_ASCII));
-    }
-
-    private String hashPrefix(String hash) {
-        return hash == null ? "null" : hash.substring(0, Math.min(12, hash.length()));
     }
 
     private boolean isDefinitelyNotSent(RestClientException exception) {

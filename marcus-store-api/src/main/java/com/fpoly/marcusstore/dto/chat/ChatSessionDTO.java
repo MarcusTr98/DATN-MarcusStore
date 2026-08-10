@@ -13,4 +13,6 @@ public class ChatSessionDTO {
     private String roomId;
     private String claimedBy;
     private boolean active;
+    private String status;
+    private java.time.LocalDateTime expiresAt;
 }

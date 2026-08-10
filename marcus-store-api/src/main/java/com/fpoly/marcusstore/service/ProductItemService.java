@@ -22,9 +22,10 @@ public class ProductItemService {
     public static final int STATUS_SOLD = 2;
     public static final int STATUS_WARRANTY = 3;
     public static final int STATUS_ERROR = 4;
+    private static final java.util.Set<Integer> ADMIN_EDITABLE_STATUSES = java.util.Set.of(STATUS_IN_STOCK,
+            STATUS_WARRANTY, STATUS_ERROR);
 
-    private static final java.util.regex.Pattern IMEI_PATTERN =
-            java.util.regex.Pattern.compile("^[0-9]{8,20}$");
+    private static final java.util.regex.Pattern IMEI_PATTERN = java.util.regex.Pattern.compile("^[0-9]{8,20}$");
 
     @Autowired
     private ProductItemRepository productItemRepo;
@@ -33,7 +34,8 @@ public class ProductItemService {
     private ProductSkuRepository skuRepository;
 
     private String normalizeImei(String raw) {
-        if (raw == null) return null;
+        if (raw == null)
+            return null;
         String v = raw.trim();
         return v.isEmpty() ? null : v;
     }
@@ -46,7 +48,7 @@ public class ProductItemService {
                 || !Boolean.TRUE.equals(sku.getProduct().getStatusImei())) {
             throw new RuntimeException(
                     "Sản phẩm này không quản lý IMEI; tuyệt đối không được tạo IMEI cho SKU "
-                    + sku.getSkuCode());
+                            + sku.getSkuCode());
         }
     }
 
@@ -76,7 +78,8 @@ public class ProductItemService {
     }
 
     public void resyncStockFromImeis(ProductSku sku) {
-        if (sku == null) return;
+        if (sku == null)
+            return;
         long inStockCount = productItemRepo.countInStockBySkuId(sku.getSkuId());
         ProductSku managed = skuRepository.findById(sku.getSkuId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU: " + sku.getSkuId()));
@@ -89,7 +92,8 @@ public class ProductItemService {
     }
 
     public static String toStatusLabel(Integer status) {
-        if (status == null) return "";
+        if (status == null)
+            return "";
         return switch (status) {
             case STATUS_IN_STOCK -> "Trong kho";
             case STATUS_SOLD -> "Đã bán";
@@ -117,11 +121,12 @@ public class ProductItemService {
         if (productItemRepo.existsByImeiCode(imei)) {
             throw new RuntimeException("IMEI đã tồn tại trong hệ thống: " + imei);
         }
-        Integer status = request.getStatus() == null ? STATUS_IN_STOCK : request.getStatus();
         ProductItem item = new ProductItem();
         item.setProductSku(sku);
         item.setImeiCode(imei);
-        item.setStatus(status);
+        // Marcus sửa luồng kho thành viên: IMEI mới nhập kho luôn IN_STOCK.
+        // SOLD chỉ được thiết lập qua nghiệp vụ gán IMEI vào đơn hàng.
+        item.setStatus(STATUS_IN_STOCK);
         ProductItem saved = productItemRepo.save(item);
         resyncStockFromImeis(sku);
         return toResponse(saved);
@@ -148,6 +153,18 @@ public class ProductItemService {
             if (oldStatus == null || !oldStatus.equals(newStatus)) {
                 statusChanged = true;
             }
+            // Marcus sửa: API quản trị kho không được tự đánh dấu đã bán hoặc sửa
+            // IMEI đang gắn với đơn. Các trạng thái này phải qua Order/Warranty flow.
+            if (!ADMIN_EDITABLE_STATUSES.contains(newStatus)) {
+                throw new RuntimeException("Không thể đặt thủ công trạng thái IMEI này");
+            }
+            if (statusChanged && (item.getOrderItem() != null || Integer.valueOf(STATUS_SOLD).equals(oldStatus))) {
+                throw new RuntimeException("IMEI đã thuộc đơn hàng; hãy xử lý qua nghiệp vụ đơn hàng hoặc bảo hành");
+            }
+            String note = request.getNote() == null ? null : request.getNote().trim();
+            if (statusChanged && (note == null || note.isEmpty())) {
+                throw new RuntimeException("Vui lòng nhập ghi chú khi thay đổi trạng thái IMEI.");
+            }
             item.setStatus(newStatus);
             productItemRepo.save(item);
             if (statusChanged) {
@@ -155,9 +172,6 @@ public class ProductItemService {
             }
         }
         String note = request.getNote() == null ? null : request.getNote().trim();
-        if (statusChanged && (note == null || note.isEmpty())) {
-            throw new RuntimeException("Vui lòng nhập ghi chú khi thay đổi trạng thái IMEI.");
-        }
         if (note != null && !note.isEmpty()) {
             if (note.length() > 500) {
                 throw new RuntimeException("Ghi chú tối đa 500 ký tự.");
@@ -183,7 +197,8 @@ public class ProductItemService {
 
     @Transactional(rollbackFor = Exception.class)
     public void createBatchForSku(Integer skuId, List<String> imeiCodes) {
-        if (imeiCodes == null || imeiCodes.isEmpty()) return;
+        if (imeiCodes == null || imeiCodes.isEmpty())
+            return;
         ProductSku sku = skuRepository.findById(skuId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
         requireImeiSku(sku);
@@ -191,12 +206,14 @@ public class ProductItemService {
         Map<String, Boolean> seen = new LinkedHashMap<>();
         for (String raw : imeiCodes) {
             String imei = normalizeImei(raw);
-            if (imei == null) continue;
+            if (imei == null)
+                continue;
             validateImeiFormat(imei);
             seen.putIfAbsent(imei, true);
         }
         List<String> uniqueImeis = new ArrayList<>(seen.keySet());
-        if (uniqueImeis.isEmpty()) return;
+        if (uniqueImeis.isEmpty())
+            return;
 
         List<String> existed = productItemRepo.findExistingImeiCodes(uniqueImeis);
         if (!existed.isEmpty()) {

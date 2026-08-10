@@ -5,12 +5,13 @@
       <div class="deco-circle circle-2" ref="circle2"></div>
       <div class="content">
         <router-link to="/" class="brand brand-logo-link">
-          <div class="logo-icon-box">
-            <i class="fas fa-mobile-alt"></i>
+          <div class="logo-icon-box" :class="{ 'has-site-logo': siteLogoUrl }">
+            <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+            <i v-else class="fas fa-mobile-alt"></i>
           </div>
           <div>
-            <h1>MarcusStore</h1>
-            <p>Chào mừng bạn đến với MarcusStore!</p>
+            <h1>{{ siteName }}</h1>
+            <p>Chào mừng bạn đến với {{ siteName }}!</p>
           </div>
         </router-link>
         <div class="features">
@@ -82,7 +83,7 @@
 
         <div class="title">
           <h2>Tạo tài khoản mới</h2>
-          <p>Tham gia MarcusStore - Mua sắm thả ga!</p>
+          <p>Tham gia {{ siteName }} - Mua sắm thả ga!</p>
         </div>
 
         <div v-if="isNewsletterSignup" class="newsletter-banner">
@@ -196,7 +197,10 @@ import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 import PrivacyPolicyModal from '@/components/PrivacyPolicyModal.vue'
 import TermsOfServiceModal from '@/components/TermsOfServiceModal.vue'
+import { useSettings } from '@/composables/useSettings'
 import '@/assets/css/Register.css'
+
+const { siteName, siteLogoUrl, fetchSettings } = useSettings()
 const showTermsModal = ref(false)
 const showPrivacyModal = ref(false)
 const router = useRouter()
@@ -305,6 +309,7 @@ const triggerShake = () => {
 }
 
 onMounted(() => {
+  fetchSettings()
   nextTick(() => setIndicatorToActive())
 
   // Đến từ footer "Nhận ưu đãi độc quyền": tự điền email + đánh dấu newsletter
@@ -445,6 +450,15 @@ const handleRegister = async () => {
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s ease;
+}
+
+.logo-icon-box.has-site-logo {
+  padding: 7px;
+  border: 1px solid #fee2e2;
+}
+
+.logo-icon-box.has-site-logo .site-logo-image {
+  border-radius: 7px;
 }
 
 .logo-icon-box i {

@@ -6,6 +6,10 @@ const OrderDetailApi = {
   updateStatusOrder(orderCode, data) {
     return api.put(`/admin/order/${orderCode}`, data)
   },
+  // Marcus thêm: Admin thử tạo lại vận đơn khi GHN trả lỗi hoặc mất kết nối.
+  retryGhnShipment(orderCode) {
+    return api.post(`/admin/orders/${orderCode}/ghn/retry`)
+  },
 
   // marcus them refund
   getRefund(orderCode) {

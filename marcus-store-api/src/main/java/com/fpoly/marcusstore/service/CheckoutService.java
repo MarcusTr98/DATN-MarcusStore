@@ -23,13 +23,14 @@ import com.fpoly.marcusstore.repository.shopping.CartItemRepository;
 import com.fpoly.marcusstore.repository.shopping.CartRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
+import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import com.fpoly.marcusstore.security.SecurityUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
@@ -43,40 +44,29 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class CheckoutService {
 
-        @Autowired
-        private CartItemRepository cartItemRepository;
-        @Autowired
-        private CartRepository cartRepository;
-        @Autowired
-        private ProductSkuRepository productSkuRepository;
-        @Autowired
-        private OrderRepository orderRepository;
-        @Autowired
-        private OrderStatusHistoryRepository orderStatusHistoryRepository;
-        @Autowired
-        private UserRepository userRepository;
-        @Autowired
-        private VoucherRepository voucherRepository;
-        @Autowired
-        private VoucherService voucherService;
-        @Autowired
-        private GhnService ghnService;
-        @Autowired
-        private AdminNotificationService notificationService;
-        @Autowired
-        private UserNotificationService userNotificationService;
-        @Autowired
-        private ShippingService shippingService; // NÂNG CẤP: Thêm ShippingService để tính trợ giá
-        @Autowired
-        private OrderTransactionService orderTransactionService;
-        @Autowired
-        private FlashSaleItemRepository flashSaleItemRepository;
-        @Autowired
-        private FlashSaleSlotRepository flashSaleSlotRepository;
-        @Autowired
-        private SystemSettingRepository systemSettingRepository;
+        // Marcus sửa: dùng constructor injection để dependency bắt buộc, bất biến và dễ
+        // kiểm thử hơn; không thay đổi nghiệp vụ Cart/Voucher/Flash Sale của thành
+        // viên.
+        private final CartItemRepository cartItemRepository;
+        private final CartRepository cartRepository;
+        private final ProductSkuRepository productSkuRepository;
+        private final OrderRepository orderRepository;
+        private final OrderStatusHistoryRepository orderStatusHistoryRepository;
+        private final UserRepository userRepository;
+        private final VoucherRepository voucherRepository;
+        private final VoucherService voucherService;
+        private final GhnService ghnService;
+        private final AdminNotificationService notificationService;
+        private final UserNotificationService userNotificationService;
+        private final ShippingService shippingService;
+        private final OrderTransactionService orderTransactionService;
+        private final FlashSaleItemRepository flashSaleItemRepository;
+        private final FlashSaleSlotRepository flashSaleSlotRepository;
+        private final SystemSettingRepository systemSettingRepository;
+        private final BehaviorEventService behaviorEventService;
 
         @Transactional(readOnly = true)
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -104,6 +94,26 @@ public class CheckoutService {
 
         @Transactional
         public Order processCheckout(CheckoutRequestDTO req) {
+                Integer currentUserId = SecurityUtils.getCurrentUserId();
+                String checkoutRequestId = req.getCheckoutRequestId().trim();
+
+                // Marcus thêm: đường tắt cho retry đã hoàn tất. Không đọc Cart và
+                // tuyệt đối không đụng lại kho/voucher/Flash Sale.
+                Order existingOrder = findExistingCheckout(checkoutRequestId, currentUserId);
+                if (existingOrder != null) {
+                        return existingOrder;
+                }
+
+                // Marcus thêm: khóa giỏ theo user rồi kiểm tra idempotency lần hai.
+                // Request đồng thời sẽ chờ request đầu commit và nhận lại cùng đơn.
+                cartRepository.findByUserIdForCheckout(currentUserId)
+                                .orElseThrow(() -> new ResponseStatusException(
+                                                HttpStatus.BAD_REQUEST, "Giỏ hàng rỗng."));
+                existingOrder = findExistingCheckout(checkoutRequestId, currentUserId);
+                if (existingOrder != null) {
+                        return existingOrder;
+                }
+
                 // Marcus thêm: client cũ không gửi fulfillmentMethod vẫn được xem là giao tận
                 // nơi.
                 String fulfillmentMethod = req.getFulfillmentMethod() == null
@@ -115,9 +125,8 @@ public class CheckoutService {
                 }
                 boolean isStorePickup = "STORE_PICKUP".equals(fulfillmentMethod);
 
-                log.info("📥 [CHECKOUT API] Dữ liệu Frontend gửi lên: Name={}, Phone={}, District={}, Ward={}",
-                                req.getRecipientName(), req.getRecipientPhone(), req.getToDistrictId(),
-                                req.getToWardCode());
+                // Marcus sửa: không ghi tên, số điện thoại và địa chỉ khách vào log hệ
+                // thống. Khi cần truy vết chỉ dùng userId/orderCode ở các bước phía sau.
 
                 if (!isStorePickup
                                 && (req.getShippingAddress() == null || req.getShippingAddress().isBlank()
@@ -127,7 +136,6 @@ public class CheckoutService {
                                         "Lỗi hệ thống: Dữ liệu Quận/Huyện hoặc Phường/Xã bị trống từ Frontend gửi lên!");
                 }
 
-                Integer currentUserId = SecurityUtils.getCurrentUserId();
                 User user = userRepository.findById(currentUserId)
                                 .orElseThrow(() -> new RuntimeException("Không tìm thấy User"));
 
@@ -152,6 +160,7 @@ public class CheckoutService {
 
                 Order order = new Order();
                 order.setOrderCode("ORD-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                order.setCheckoutRequestId(checkoutRequestId);
                 order.setUser(user);
                 order.setRecipientName(req.getRecipientName());
                 order.setRecipientPhone(req.getRecipientPhone());
@@ -175,6 +184,8 @@ public class CheckoutService {
                 order.setPaymentMethod(paymentMethod);
                 order.setPaymentStatus("COD".equals(paymentMethod) ? "UNPAID" : "PENDING");
                 order.setOrderStatus("PENDING");
+                order.setGhnIntegrationStatus(isStorePickup ? "NOT_REQUIRED" : "PENDING");
+                order.setGhnRetryCount(0);
                 order.setDeliveryNote(req.getNote());
 
                 BigDecimal totalAmount = BigDecimal.ZERO;
@@ -405,6 +416,11 @@ public class CheckoutService {
                 order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
                 Order savedOrder = orderRepository.save(order);
+                // Marcus thêm: chỉ lưu mốc funnel và order_id, không lưu thông tin khách.
+                try {
+                        behaviorEventService.recordOrderCreated(savedOrder.getOrderId(), req.getBehaviorSessionId());
+                } catch (RuntimeException ignored) {
+                }
                 // Marcus thêm: khách nhận xác nhận ngay khi backend tạo đơn thành
                 // công; VNPAY vẫn có notification thanh toán riêng sau IPN.
                 userNotificationService.createOrderStatusNotification(
@@ -466,5 +482,11 @@ public class CheckoutService {
                 }
 
                 return savedOrder;
+        }
+
+        private Order findExistingCheckout(String checkoutRequestId, Integer userId) {
+                return orderRepository
+                                .findByCheckoutRequestIdAndUserUserId(checkoutRequestId, userId)
+                                .orElse(null);
         }
 }

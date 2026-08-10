@@ -45,6 +45,9 @@ export function useAdminNotifications() {
           page: append ? page.value + 1 : 0,
           size: PAGE_SIZE,
           unreadOnly: isUnreadOnly.value,
+          category: ['INFO', 'WARNING', 'ACTION_REQUIRED'].includes(activeFilter.value)
+            ? activeFilter.value
+            : undefined,
         },
         // Marcus thêm: chuông có skeleton riêng nên không bật loading toàn trang cho request nền.
         skipGlobalLoading: true,

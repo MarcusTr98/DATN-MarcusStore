@@ -23,4 +23,10 @@ export const backupApi = {
   remove(id) {
     return api.delete(`${BASE_URL}/${id}`, { skipGlobalLoading: true })
   },
+  testRestore(id) {
+    return api.post(`${BASE_URL}/${id}/test-restore`, null, {
+      timeout: 300000,
+      skipGlobalLoading: true,
+    })
+  },
 }

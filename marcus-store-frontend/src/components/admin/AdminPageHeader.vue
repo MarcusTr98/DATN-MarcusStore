@@ -43,9 +43,9 @@ defineProps({
   border: 1px solid #c7dcef;
   border-radius: 20px;
   background:
-    linear-gradient(100deg, rgba(232, 242, 255, 0.82), rgba(255, 255, 255, 0) 46%),
-    #fff;
-  box-shadow: 0 8px 26px rgba(15, 35, 64, 0.06);
+    radial-gradient(circle at 88% 10%, rgba(96, 165, 250, 0.16), transparent 24%),
+    linear-gradient(110deg, #eaf4ff 0%, #f4f9ff 52%, #ffffff 100%);
+  box-shadow: 0 10px 28px rgba(30, 91, 156, 0.09);
 }
 
 .admin-page-header::after {
@@ -123,19 +123,19 @@ defineProps({
   gap: 8px;
   min-height: 42px;
   padding: 0 17px;
-  border: 1px solid #c5d9f1;
+  border: 1px solid #1769ca;
   border-radius: 12px;
-  color: #1559a5;
-  background: #fff;
-  box-shadow: 0 4px 12px rgba(21, 89, 165, 0.08);
+  color: #ffffff;
+  background: linear-gradient(135deg, #2478d4, #1769ca);
+  box-shadow: 0 7px 16px rgba(23, 105, 202, 0.2);
   font-size: 13px;
   font-weight: 800;
   transition: 0.2s ease;
 }
 
 .admin-page-header__actions :deep(button:hover:not(:disabled)) {
-  border-color: #1769ca;
-  background: #f4f9ff;
+  border-color: #1259ad;
+  background: linear-gradient(135deg, #1d6ec7, #1259ad);
   transform: translateY(-1px);
 }
 

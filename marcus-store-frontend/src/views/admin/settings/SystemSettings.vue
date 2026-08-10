@@ -8,6 +8,9 @@
       icon="bi bi-gear-wide-connected"
     >
       <template #actions>
+        <button type="button" class="settings-restore-btn" :disabled="isLoading || isSaving" @click="confirmRestoreDefaults">
+          <i class="fas fa-arrow-rotate-left"></i> Khôi phục mặc định
+        </button>
         <button type="submit" form="system-settings-form" :disabled="isLoading || isSaving">
           <i class="fas" :class="isSaving ? 'fa-spinner fa-spin' : 'fa-floppy-disk'"></i>
           {{ isSaving ? 'Đang lưu...' : 'Lưu thay đổi' }}
@@ -24,7 +27,91 @@
 
         <form v-else id="system-settings-form" @submit.prevent="saveSettings">
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            1. Thông tin liên hệ (Header & Footer)
+            1. Nhận diện Website
+          </h5>
+          <div class="branding-settings mb-4">
+            <div class="branding-fields">
+              <label class="form-label fw-semibold">Tên Website</label>
+              <input type="text" class="form-control" v-model="settings.SITE_NAME" required maxlength="255" />
+              <small class="setting-help">Tên này được dùng đồng bộ ở Header, Footer, Admin, Checkout và màn loading.</small>
+
+              <label class="form-label fw-semibold mt-3">Dán đường dẫn ảnh</label>
+              <input
+                type="url"
+                class="form-control"
+                v-model="settings.SITE_LOGO_URL"
+                @input="logoPreviewError = false"
+                placeholder="https://res.cloudinary.com/.../logo.png"
+              />
+              <small class="setting-help">
+                Link phải mở trực tiếp ra ảnh và bắt đầu bằng <code>https://</code>. Không dùng link trang Google Drive/Facebook.
+              </small>
+
+              <input
+                ref="logoFileInput"
+                type="file"
+                class="d-none"
+                accept="image/png,image/jpeg,image/webp"
+                @change="handleLogoFile"
+              />
+              <button
+                type="button"
+                class="logo-upload-zone"
+                :class="{ 'is-uploading': isLogoUploading }"
+                :disabled="isLogoUploading"
+                @click="logoFileInput?.click()"
+                @dragover.prevent
+                @drop.prevent="handleLogoDrop"
+              >
+                <i class="fas upload-zone-icon" :class="isLogoUploading ? 'fa-spinner fa-spin' : 'fa-cloud-arrow-up'"></i>
+                <span>{{ isLogoUploading ? `Đang tải Logo... ${logoUploadProgress}%` : 'Kéo thả Logo vào đây hoặc nhấn để chọn ảnh' }}</span>
+                <small>PNG, JPG, WEBP · tối đa 2 MB</small>
+                <span v-if="isLogoUploading" class="upload-progress"><i :style="{ width: `${logoUploadProgress}%` }"></i></span>
+              </button>
+
+              <div class="branding-actions">
+                <button
+                  v-if="settings.SITE_LOGO_URL"
+                  type="button"
+                  class="brand-remove-btn"
+                  :disabled="isLogoUploading"
+                  @click="removeLogo"
+                >
+                  <i class="fas fa-trash"></i> Xóa Logo
+                </button>
+              </div>
+              <small class="setting-help">Khuyên dùng PNG/WEBP nền trong suốt, ảnh vuông; tối đa 2 MB.</small>
+            </div>
+
+            <div class="branding-preview">
+              <span class="preview-label">Xem trước</span>
+              <div class="preview-logo-box">
+                <img
+                  v-if="logoDisplayUrl && !logoPreviewError"
+                  :src="logoDisplayUrl"
+                  :alt="settings.SITE_NAME"
+                  class="site-logo-preview"
+                  @error="logoPreviewError = true"
+                />
+                <i v-else class="fas fa-mobile-screen-button preview-fallback"></i>
+              </div>
+              <strong>{{ settings.SITE_NAME || 'Tên Website' }}</strong>
+              <small v-if="logoPreviewError" class="text-danger">Không tải được ảnh từ URL này.</small>
+              <small v-else class="text-muted">Logo thực tế sẽ tự co vừa từng vị trí.</small>
+            </div>
+          </div>
+
+          <div class="settings-audit">
+            <i class="fas fa-clock-rotate-left"></i>
+            <span v-if="settingsMeta.updatedAt">
+              Cập nhật gần nhất bởi <strong>{{ settingsMeta.updatedBy || 'Không rõ' }}</strong>
+              lúc {{ formatDateTime(settingsMeta.updatedAt) }}
+            </span>
+            <span v-else>Chưa có lịch sử cập nhật cấu hình.</span>
+          </div>
+
+          <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
+            2. Thông tin liên hệ (Header & Footer)
           </h5>
           <div class="row g-3 mb-4">
             <div class="col-md-4">
@@ -46,7 +133,7 @@
           </div>
 
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            2. Nội dung thông báo hiển thị
+            3. Nội dung thông báo hiển thị
           </h5>
           <div class="mb-4">
             <label class="form-label fw-semibold">Chữ chạy trên thanh Topbar thông báo</label>
@@ -54,7 +141,7 @@
           </div>
 
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            3. Đường dẫn Mạng xã hội (Footer Icons)
+            4. Đường dẫn Mạng xã hội (Footer Icons)
           </h5>
           <div class="row g-3 mb-4">
             <div class="col-md-6">
@@ -76,7 +163,7 @@
           </div>
 
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            4. Cấu hình Bản đồ & Cửa hàng (Store Location)
+            5. Cấu hình Bản đồ & Cửa hàng (Store Location)
           </h5>
           <div class="row g-3 mb-4 bg-light p-3 rounded-3 border">
             <div class="col-md-6">
@@ -129,7 +216,7 @@
           </div>
 
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            5. Nội dung Hero Trang chủ (Home.vue)
+            6. Nội dung Hero Trang chủ (Home.vue)
           </h5>
           <div class="row g-3 mb-4">
             <div class="col-12">
@@ -173,7 +260,7 @@
           <h5
             class="fw-bold text-primary mb-3 border-bottom pb-2 d-flex align-items-center justify-content-between"
           >
-            <span>6. Slide sản phẩm nổi bật (màn hình điện thoại Hero)</span>
+            <span>7. Slide sản phẩm nổi bật (màn hình điện thoại Hero)</span>
             <button
               type="button"
               class="btn btn-sm btn-outline-primary rounded-pill"
@@ -242,7 +329,7 @@
           </div>
 
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            7. Chính sách tư vấn Marcus AI
+            8. Chính sách tư vấn Marcus AI
           </h5>
           <div class="mb-4 rounded-3 border bg-light p-3">
             <label class="form-label fw-semibold">Hướng dẫn bổ sung cho AI</label>
@@ -299,19 +386,25 @@
       :title="localModal.title"
       :message="localModal.message"
       @close="localModal.visible = false"
+      @confirm="executeModalAction"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import api from '@/utils/api'
 import BaseModal from '@/components/BaseModal.vue'
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
+import { useSettings } from '@/composables/useSettings'
+
+const { fetchSettings: refreshPublicSettings } = useSettings()
 
 const isLoading = ref(true)
 const isSaving = ref(false)
 const aiClickStats = ref([])
+const settingsMeta = reactive({ updatedBy: '', updatedAt: null })
+const pendingAction = ref('')
 
 // State Modal
 const localModal = reactive({
@@ -329,8 +422,16 @@ const showAlert = (type, title, msg) => {
 }
 
 const mapData = ref({ lat: '', lng: '', name: '', address: '' })
+const logoFileInput = ref(null)
+const isLogoUploading = ref(false)
+const logoUploadProgress = ref(0)
+const logoPreviewError = ref(false)
+const localLogoPreview = ref('')
+const logoDisplayUrl = computed(() => localLogoPreview.value || settings.value.SITE_LOGO_URL)
 
 const settings = ref({
+  SITE_NAME: 'Marcus Store',
+  SITE_LOGO_URL: '',
   HOTLINE: '',
   EMAIL: '',
   ADDRESS: '',
@@ -376,6 +477,71 @@ const removeSlide = (idx) => {
   slidesData.value.splice(idx, 1)
 }
 
+const uploadLogoFile = async (file) => {
+  if (!file) return
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+    showAlert('error', 'Ảnh không hợp lệ', 'Logo chỉ hỗ trợ JPG, PNG hoặc WEBP.')
+    return
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    showAlert('error', 'Ảnh quá lớn', 'Ảnh Logo không được vượt quá 2 MB.')
+    return
+  }
+
+  // Marcus thêm: xem ảnh local ngay khi chọn, không phải chờ upload/lưu cấu hình.
+  releaseLocalLogoPreview()
+  localLogoPreview.value = URL.createObjectURL(file)
+  logoPreviewError.value = false
+
+  const formData = new FormData()
+  formData.append('file', file)
+  isLogoUploading.value = true
+  logoUploadProgress.value = 0
+  try {
+    const response = await api.post('/admin/settings/upload-logo', formData, {
+      skipGlobalLoading: true,
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          logoUploadProgress.value = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        }
+      },
+    })
+    const imageUrl = response.data?.data?.imageUrl
+    if (!imageUrl) throw new Error('Server không trả về URL Logo.')
+    settings.value.SITE_LOGO_URL = imageUrl
+    releaseLocalLogoPreview()
+    logoPreviewError.value = false
+    showAlert('success', 'Đã tải Logo', 'Logo đã tải thành công. Nhấn “Lưu thay đổi” để áp dụng toàn hệ thống.')
+  } catch (error) {
+    showAlert('error', 'Không thể tải Logo', error.response?.data?.message || error.message || 'Vui lòng thử lại.')
+  } finally {
+    isLogoUploading.value = false
+    logoUploadProgress.value = 0
+  }
+}
+
+const handleLogoFile = (event) => {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  uploadLogoFile(file)
+}
+
+const handleLogoDrop = (event) => {
+  if (isLogoUploading.value) return
+  uploadLogoFile(event.dataTransfer?.files?.[0])
+}
+
+const removeLogo = () => {
+  releaseLocalLogoPreview()
+  settings.value.SITE_LOGO_URL = ''
+  logoPreviewError.value = false
+}
+
+const releaseLocalLogoPreview = () => {
+  if (localLogoPreview.value) URL.revokeObjectURL(localLogoPreview.value)
+  localLogoPreview.value = ''
+}
+
 const loadSettings = async () => {
   try {
     isLoading.value = true
@@ -383,9 +549,13 @@ const loadSettings = async () => {
     // API cấu hình công khai.
     const res = await api.get('/admin/settings')
 
+    const payload = res.data?.data ?? res.data ?? {}
+    const loadedSettings = payload.settings ?? payload
+    settingsMeta.updatedBy = payload.updatedBy || ''
+    settingsMeta.updatedAt = payload.updatedAt || null
     Object.keys(settings.value).forEach((key) => {
-      if (res.data[key] !== undefined) {
-        settings.value[key] = res.data[key]
+      if (loadedSettings[key] !== undefined) {
+        settings.value[key] = loadedSettings[key]
       }
     })
 
@@ -425,6 +595,33 @@ const loadSettings = async () => {
   }
 }
 
+const confirmRestoreDefaults = () => {
+  pendingAction.value = 'RESTORE_DEFAULTS'
+  localModal.type = 'confirm'
+  localModal.title = 'Khôi phục cấu hình mặc định?'
+  localModal.message = 'Tên Website, Logo, liên hệ, mạng xã hội, bản đồ và Hero sẽ trở về bộ mặc định của Marcus Store.'
+  localModal.visible = true
+}
+
+const executeModalAction = async () => {
+  if (pendingAction.value !== 'RESTORE_DEFAULTS') return
+  localModal.visible = false
+  pendingAction.value = ''
+  try {
+    isSaving.value = true
+    await api.post('/admin/settings/restore-defaults')
+    await loadSettings()
+    await refreshPublicSettings(true)
+    showAlert('success', 'Đã khôi phục', 'Cấu hình mặc định đã được áp dụng.')
+  } catch (error) {
+    showAlert('error', 'Không thể khôi phục', error.response?.data?.message || 'Vui lòng thử lại.')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+const formatDateTime = (value) => value ? new Date(value).toLocaleString('vi-VN') : '—'
+
 const saveSettings = async () => {
   try {
     isSaving.value = true
@@ -434,6 +631,8 @@ const saveSettings = async () => {
     // ĐÃ FIX: Bỏ "const res =" đi
     // Marcus sửa đồng bộ DTO backend: payload cấu hình nằm trong field settings.
     await api.put('/admin/settings/bulk-update', { settings: settings.value })
+    // Marcus thêm: cập nhật cache nhận diện dùng chung ngay, không bắt Admin F5.
+    await refreshPublicSettings(true)
 
     // ĐÃ FIX: Dùng Modal thay cho alert()
     showAlert('success', 'Thành công', 'Đã cập nhật cấu hình hệ thống thành công!')
@@ -448,6 +647,7 @@ const saveSettings = async () => {
 onMounted(() => {
   loadSettings()
 })
+onBeforeUnmount(releaseLocalLogoPreview)
 </script>
 
 <style scoped>
@@ -455,6 +655,76 @@ onMounted(() => {
   min-height: 100%;
   padding: 28px;
   background: #f4f7fb;
+}
+
+.branding-settings {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 24px;
+  padding: 20px;
+  border: 1px solid #dbe6f5;
+  border-radius: 16px;
+  background: #f8fbff;
+}
+
+.branding-fields { min-width: 0; }
+.setting-help { display: block; margin-top: 6px; color: #64748b; line-height: 1.45; }
+.logo-upload-zone {
+  width: 100%;
+  min-height: 132px;
+  margin-top: 18px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 2px dashed #a9c8f5;
+  border-radius: 14px;
+  color: #174b91;
+  background: #fff;
+  transition: border-color .2s ease, background .2s ease, transform .2s ease;
+}
+.logo-upload-zone:hover:not(:disabled) { border-color: #2563eb; background: #f1f7ff; transform: translateY(-1px); }
+.logo-upload-zone.is-uploading { cursor: wait; background: #f6f9fe; }
+.upload-zone-icon { font-size: 28px; color: #2563eb; }
+.logo-upload-zone > span:not(.upload-progress) { font-weight: 750; }
+.logo-upload-zone small { color: #64748b; }
+.upload-progress { width: min(320px, 90%); height: 5px; overflow: hidden; border-radius: 99px; background: #dbeafe; }
+.upload-progress i { display: block; height: 100%; border-radius: inherit; background: #2563eb; transition: width .15s ease; }
+.branding-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.brand-remove-btn {
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-weight: 700;
+  border: 1px solid #bfd5f4;
+}
+.brand-remove-btn { color: #dc2626; background: #fff; border-color: #fecaca; }
+.branding-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 210px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid #e1e9f5;
+  text-align: center;
+}
+.settings-audit { display: flex; gap: 8px; margin: -6px 0 18px; color: #64748b; font-size: 13px; }
+.settings-restore-btn { border-color: #b9d2f3 !important; background: #fff !important; color: #175ca8 !important; }
+.preview-label { align-self: flex-start; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+.preview-logo-box { width: 96px; height: 96px; padding: 10px; border-radius: 22px; background: #eff6ff; }
+.preview-fallback { font-size: 52px; color: #2563eb; line-height: 76px; }
+.site-logo-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+@media (max-width: 768px) {
+  .branding-settings { grid-template-columns: 1fr; }
 }
 
 .settings-card {

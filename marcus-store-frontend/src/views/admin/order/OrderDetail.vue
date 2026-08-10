@@ -22,7 +22,8 @@
 
     <!-- PRINT-ONLY HEADER -->
     <div class="print-only-header">
-      <h1>Marcus Store</h1>
+      <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="print-site-logo" />
+      <h1>{{ siteName }}</h1>
       <p>Hóa đơn bán hàng</p>
       <p v-if="orderDetail">
         Mã đơn: <strong>{{ orderDetail.orderCode }}</strong>
@@ -288,8 +289,12 @@
                   <label class="status-note-label">Lý do hủy đơn</label>
                   <select v-model="selectedAdminCancelReason" class="status-note-input">
                     <option value="" disabled>Chọn lý do hủy</option>
-                    <option v-for="reason in ADMIN_CANCEL_REASONS" :key="reason" :value="reason">
-                      {{ reason }}
+                    <option
+                      v-for="reason in ADMIN_CANCEL_REASONS"
+                      :key="reason.code"
+                      :value="reason.code"
+                    >
+                      {{ reason.label }}
                     </option>
                   </select>
                 </template>
@@ -333,6 +338,35 @@
                 <div class="mini-row">
                   <span class="mini-label">Mã vận đơn</span
                   ><span class="mini-value">{{ orderDetail.trackingCode || '---' }}</span>
+                </div>
+                <!-- Marcus thêm: hiển thị rõ trạng thái tích hợp, lỗi và thao tác retry GHN. -->
+                <div class="mini-row" v-if="orderDetail.fulfillmentMethod !== 'STORE_PICKUP'">
+                  <span class="mini-label">Kết nối GHN</span>
+                  <span class="mini-value">
+                    <span
+                      class="badge"
+                      :class="getGhnStatusClass(orderDetail.ghnIntegrationStatus)"
+                    >
+                      {{ getGhnStatusLabel(orderDetail.ghnIntegrationStatus) }}
+                    </span>
+                  </span>
+                </div>
+                <div
+                  class="mini-row align-items-start"
+                  v-if="['FAILED', 'NEEDS_REVIEW'].includes(orderDetail.ghnIntegrationStatus)"
+                >
+                  <span class="mini-label mt-1">Lỗi gần nhất</span>
+                  <span class="mini-value text-danger">
+                    {{ orderDetail.ghnLastError || 'GHN chưa tạo được vận đơn' }}
+                    <button
+                      type="button"
+                      class="primary-btn ghn-retry-btn"
+                      :disabled="retryingGhn"
+                      @click="retryGhnShipment"
+                    >
+                      {{ retryingGhn ? 'Đang thử lại...' : 'Thử tạo lại vận đơn' }}
+                    </button>
+                  </span>
                 </div>
                 <div class="mini-row">
                   <span class="mini-label">Phí ship gốc</span>
@@ -384,6 +418,13 @@
                 <div class="mini-row">
                   <span class="mini-label">Thời gian TT</span
                   ><span class="mini-value">{{ orderDetail.paymentDate || '---' }}</span>
+                </div>
+                <div v-if="isAwaitingVnPayPayment" class="payment-hold-admin">
+                  <i class="bi bi-hourglass-split"></i>
+                  <div>
+                    <strong>Đang giữ hàng – chưa được xử lý đơn</strong>
+                    <span>Hết hạn thanh toán: {{ orderDetail.paymentExpiresAt }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -488,7 +529,10 @@
       <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title"><i class="bi bi-upc-scan me-2"></i>Nhập IMEI cho đơn hàng</h5>
+            <h5 class="modal-title">
+              <i class="bi bi-upc-scan me-2"></i>
+              {{ imeiPreviewItems.length ? 'Nhập IMEI cho đơn hàng' : 'Bắt đầu chuẩn bị đơn hàng' }}
+            </h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
@@ -629,7 +673,9 @@
               @click="submitImeiAndProcess"
             >
               <span v-if="submittingImei" class="spinner-border spinner-border-sm me-1"></span>
-              Xác nhận IMEI &amp; Bắt đầu chuẩn bị
+              {{
+                imeiPreviewItems.length ? 'Xác nhận IMEI & Bắt đầu chuẩn bị' : 'Bắt đầu chuẩn bị'
+              }}
             </button>
           </div>
         </div>
@@ -653,7 +699,11 @@ import '@/assets/css/OrderDetails.css'
 import OrderDetailApi from '@/api/orderDetailApi.js'
 import BaseModal from '@/components/BaseModal.vue'
 import * as bootstrap from 'bootstrap'
+import { useSettings } from '@/composables/useSettings'
+
+// Marcus giữ Bootstrap cho modal IMEI của luồng kho và Settings cho logo in động.
 window.bootstrap = bootstrap
+const { siteName, siteLogoUrl, fetchSettings } = useSettings()
 
 const route = useRoute()
 const toastMessage = ref('')
@@ -665,17 +715,18 @@ const error = ref(null)
 const refund = ref(null)
 const refundReason = ref('')
 const refundBusy = ref(false)
+const retryingGhn = ref(false)
 
 const selectedStatus = ref('')
 const statusNote = ref('')
-const OTHER_CANCEL_REASON = 'Lý do khác'
+const OTHER_CANCEL_REASON = 'ADMIN_OTHER'
 const ADMIN_CANCEL_REASONS = [
-  'Khách hàng yêu cầu hủy',
-  'Không liên hệ được với khách hàng',
-  'Sản phẩm hết hàng hoặc lỗi tồn kho',
-  'Thông tin nhận hàng không hợp lệ',
-  'Phát hiện đơn hàng bất thường',
-  OTHER_CANCEL_REASON,
+  { code: 'ADMIN_CUSTOMER_REQUEST', label: 'Khách hàng yêu cầu hủy' },
+  { code: 'ADMIN_CANNOT_CONTACT', label: 'Không liên hệ được với khách hàng' },
+  { code: 'ADMIN_OUT_OF_STOCK', label: 'Sản phẩm hết hàng hoặc lỗi tồn kho' },
+  { code: 'ADMIN_INVALID_ADDRESS', label: 'Thông tin nhận hàng không hợp lệ' },
+  { code: 'ADMIN_SUSPICIOUS_ORDER', label: 'Phát hiện đơn hàng bất thường' },
+  { code: OTHER_CANCEL_REASON, label: 'Lý do khác' },
 ]
 const selectedAdminCancelReason = ref('')
 const updatingStatus = ref(false)
@@ -743,6 +794,40 @@ const paymentMethodMap = {
   COD: 'COD',
   MoMo: 'MoMo',
   BankTransfer: 'Chuyển khoản',
+}
+
+const ghnStatusMap = {
+  NOT_REQUIRED: { label: 'Không sử dụng GHN', className: 'completed' },
+  PENDING: { label: 'Chờ tạo vận đơn', className: 'pending' },
+  PROCESSING: { label: 'Đang kết nối GHN', className: 'processing' },
+  SUCCESS: { label: 'Đã tạo vận đơn', className: 'completed' },
+  NEEDS_REVIEW: { label: 'Cần kiểm tra GHN', className: 'failed' },
+  // Marcus giữ nhãn tương thích với dữ liệu cũ trước P0.
+  CREATING: { label: 'Đang kết nối GHN', className: 'processing' },
+  CREATED: { label: 'Đã tạo vận đơn', className: 'completed' },
+  FAILED: { label: 'Tạo vận đơn thất bại', className: 'failed' },
+}
+
+const getGhnStatusLabel = (status) =>
+  ghnStatusMap[String(status || '').toUpperCase()]?.label || 'Chưa xác định'
+const getGhnStatusClass = (status) =>
+  ghnStatusMap[String(status || '').toUpperCase()]?.className || 'pending'
+
+// Marcus thêm: retry tại đúng màn chi tiết và tải lại trạng thái mới sau thao tác.
+const retryGhnShipment = async () => {
+  if (!orderDetail.value || retryingGhn.value) return
+  try {
+    retryingGhn.value = true
+    const response = await OrderDetailApi.retryGhnShipment(orderDetail.value.orderCode)
+    orderDetail.value = response.data
+    statusSuccessMessage.value = `Đã tạo vận đơn GHN ${response.data.trackingCode}.`
+    statusSuccessModal.value = true
+  } catch (e) {
+    const message = e.response?.data?.message || e.response?.data || 'GHN vẫn chưa tạo được vận đơn'
+    showToast(message)
+  } finally {
+    retryingGhn.value = false
+  }
 }
 
 const allowedTransitions = {
@@ -817,6 +902,14 @@ const canManageRefund = computed(() => {
   )
 })
 
+// Marcus thêm: Admin nhìn rõ đơn VNPAY treo và không hiểu nhầm là đơn đã thu tiền.
+const isAwaitingVnPayPayment = computed(
+  () =>
+    String(orderDetail.value?.paymentMethod || '').toUpperCase() === 'VNPAY' &&
+    String(orderDetail.value?.paymentStatus || '').toUpperCase() === 'PENDING' &&
+    Boolean(orderDetail.value?.paymentExpiresAt),
+)
+
 const subTotal = computed(
   () => orderDetail.value?.items?.reduce((sum, item) => sum + Number(item.lineTotal || 0), 0) || 0,
 )
@@ -839,8 +932,8 @@ const finalAmount = computed(() => {
 const isStatusNoteRequired = computed(() => statusesRequiringNote.includes(selectedStatus.value))
 
 const canSubmitImei = computed(() => {
-  if (!imeiPreviewItems.value.length) return true 
-  return imeiPreviewItems.value.every(item => {
+  if (!imeiPreviewItems.value.length) return true
+  return imeiPreviewItems.value.every((item) => {
     const needed = item.quantityOrdered - item.quantityAssigned
     const picked = (imeiInputByOrderItem.value[item.orderItemId] || []).length
     return picked >= needed
@@ -1002,7 +1095,7 @@ function addManualImei(orderItemId, event) {
   if (!imei) return
 
   const list = imeiInputByOrderItem.value[orderItemId] || []
-  const item = imeiPreviewItems.value.find(i => i.orderItemId === orderItemId)
+  const item = imeiPreviewItems.value.find((i) => i.orderItemId === orderItemId)
   if (!item) return
   const needed = item.quantityOrdered - item.quantityAssigned
   // Khoá cứng theo số lượng tối đa để tránh nhập dư quá nhiều → payload nặng.
@@ -1016,16 +1109,16 @@ function addManualImei(orderItemId, event) {
 
 function removeManualImei(orderItemId, imei) {
   const list = imeiInputByOrderItem.value[orderItemId] || []
-  imeiInputByOrderItem.value[orderItemId] = list.filter(code => code !== imei)
+  imeiInputByOrderItem.value[orderItemId] = list.filter((code) => code !== imei)
 }
 
 function toggleImei(orderItemId, availItem) {
   const list = imeiInputByOrderItem.value[orderItemId] || []
   if (list.includes(availItem.imeiCode)) {
-    imeiInputByOrderItem.value[orderItemId] = list.filter(code => code !== availItem.imeiCode)
+    imeiInputByOrderItem.value[orderItemId] = list.filter((code) => code !== availItem.imeiCode)
     return
   }
-  const item = imeiPreviewItems.value.find(i => i.orderItemId === orderItemId)
+  const item = imeiPreviewItems.value.find((i) => i.orderItemId === orderItemId)
   if (!item) return
   const needed = item.quantityOrdered - item.quantityAssigned
   if (list.length >= needed) {
@@ -1041,7 +1134,7 @@ async function openImeiPrepareModal() {
   try {
     const res = await OrderDetailApi.getImeiPreview(orderDetail.value.orderCode)
     imeiPreviewItems.value = res.data || []
-  } catch (e) {
+  } catch {
     showToast('Không tải được danh sách IMEI')
   } finally {
     loadingImeiPreview.value = false
@@ -1061,11 +1154,11 @@ async function submitImeiAndProcess() {
   submittingImei.value = true
   try {
     const requests = imeiPreviewItems.value
-      .map(item => ({
+      .map((item) => ({
         orderItemId: item.orderItemId,
         imeiCodes: imeiInputByOrderItem.value[item.orderItemId] || [],
       }))
-      .filter(req => req.imeiCodes.length > 0)
+      .filter((req) => req.imeiCodes.length > 0)
 
     const response = await OrderDetailApi.startProcessingWithImei(
       orderDetail.value.orderCode,
@@ -1081,7 +1174,9 @@ async function submitImeiAndProcess() {
 
     // Lấy đúng trạng thái thật sau khi gán IMEI (có thể auto-transition tiếp
     // sang PACKED/READY_FOR_PICKUP nếu đã gán đủ toàn bộ dòng), không hardcode.
-    statusSuccessMessage.value = `Gán IMEI thành công! Đơn ${orderDetail.value.orderCode} đã chuyển sang trạng thái "${getOrderStatusLabel(orderDetail.value.orderStatus)}".`
+    statusSuccessMessage.value = imeiPreviewItems.value.length
+      ? `Gán IMEI thành công! Đơn ${orderDetail.value.orderCode} đã chuyển sang trạng thái "${getOrderStatusLabel(orderDetail.value.orderStatus)}".`
+      : `Đơn ${orderDetail.value.orderCode} đã bắt đầu được chuẩn bị và chuyển sang trạng thái "${getOrderStatusLabel(orderDetail.value.orderStatus)}".`
     statusSuccessModal.value = true
   } catch (e) {
     showToast(e?.response?.data?.message || 'Gán IMEI thất bại')
@@ -1102,10 +1197,13 @@ const saveStatusUpdate = async () => {
       return
     }
 
+    const selectedReason = ADMIN_CANCEL_REASONS.find(
+      (reason) => reason.code === selectedAdminCancelReason.value,
+    )
     const resolvedNote =
       selectedStatus.value === 'CANCELLED' &&
       selectedAdminCancelReason.value !== OTHER_CANCEL_REASON
-        ? selectedAdminCancelReason.value
+        ? selectedReason?.label || ''
         : statusNote.value.trim()
 
     if (isStatusNoteRequired.value && !resolvedNote) {
@@ -1125,6 +1223,8 @@ const saveStatusUpdate = async () => {
     const response = await OrderDetailApi.updateStatusOrder(orderCode, {
       status: selectedStatus.value,
       note: resolvedNote || null,
+      cancellationReasonCode:
+        selectedStatus.value === 'CANCELLED' ? selectedAdminCancelReason.value : null,
     })
 
     orderDetail.value = response.data
@@ -1232,6 +1332,7 @@ const onAfterPrint = () => {
 }
 
 onMounted(() => {
+  fetchSettings()
   window.addEventListener('beforeprint', onBeforePrint)
   window.addEventListener('afterprint', onAfterPrint)
 })

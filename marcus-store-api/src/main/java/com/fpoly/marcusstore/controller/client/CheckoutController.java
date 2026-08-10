@@ -38,8 +38,10 @@ public class CheckoutController {
         Map<String, Object> responseData = new HashMap<>();
         responseData.put("orderCode", savedOrder.getOrderCode());
 
-        // 2. Nếu khách chọn VNPAY => Sinh URL và trả về cho Frontend Redirect
-        if ("VNPAY".equalsIgnoreCase(request.getPaymentMethod())) {
+        // Marcus sửa: response retry phải theo đơn đã lưu, không tin paymentMethod
+        // client gửi lại. Chỉ phát URL khi giao dịch vẫn đang chờ thanh toán.
+        if ("VNPAY".equalsIgnoreCase(savedOrder.getPaymentMethod())
+                && "PENDING".equalsIgnoreCase(savedOrder.getPaymentStatus())) {
             String paymentUrl = vnPayService.createPaymentUrl(savedOrder, httpRequest);
             responseData.put("paymentUrl", paymentUrl);
             return ResponseEntity.ok(new ApiResponse<>(200, "Tạo URL VNPAY thành công", responseData));

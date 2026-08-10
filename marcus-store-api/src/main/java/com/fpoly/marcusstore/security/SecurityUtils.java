@@ -22,4 +22,13 @@ public class SecurityUtils {
         }
         throw new RuntimeException("Lỗi bảo mật: Người dùng chưa đăng nhập hoặc Token không hợp lệ!");
     }
+
+    // Marcus thêm: lưu snapshot người thực hiện cho audit các module vận hành.
+    public static String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.isAuthenticated()) {
+            return authentication.getName();
+        }
+        return "SYSTEM";
+    }
 }

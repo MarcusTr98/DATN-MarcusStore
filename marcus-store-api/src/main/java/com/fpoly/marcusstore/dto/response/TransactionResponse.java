@@ -31,4 +31,10 @@ public class TransactionResponse {
 
     // bổ sung tích đối soát
     private Boolean isReconciled;
+    private String reconciledBy;
+    private LocalDateTime reconciledAt;
+    // Marcus thêm: định nghĩa tiền chuẩn để FE/Excel/Analytics cùng một cách hiểu.
+    private String cashCategory;
+    private Boolean needsAttention;
+    private String reconciliationIssue;
 }

@@ -23,6 +23,6 @@ public class CreateContactRequest {
     private String email;
 
     @NotBlank(message = "Nội dung không được để trống")
-    @Size(max = 2000, message = "Nội dung không được vượt quá 2000 ký tự")
+    @Size(max = 1000, message = "Nội dung không được vượt quá 1000 ký tự")
     private String message;
 }

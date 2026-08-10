@@ -12,7 +12,7 @@
         <span class="payment-option__desc">
           {{
             isStorePickup
-              ? 'Thanh toán khi đến nhận sản phẩm tại Marcus Store'
+              ? `Thanh toán khi đến nhận sản phẩm tại ${siteName}`
               : 'Thanh toán cho nhân viên giao hàng sau khi nhận kiện hàng'
           }}
         </span>
@@ -47,7 +47,7 @@
 
     <div class="payment-security-note">
       <i class="fas fa-lock"></i>
-      <span>Marcus Store không lưu thông tin thẻ hoặc tài khoản ngân hàng của bạn.</span>
+      <span>{{ siteName }} không lưu thông tin thẻ hoặc tài khoản ngân hàng của bạn.</span>
     </div>
   </div>
 </template>
@@ -58,6 +58,10 @@ defineProps({
   isStorePickup: {
     type: Boolean,
     default: false,
+  },
+  siteName: {
+    type: String,
+    default: 'Marcus Store',
   },
 })
 

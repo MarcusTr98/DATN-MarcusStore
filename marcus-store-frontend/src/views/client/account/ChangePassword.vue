@@ -3,14 +3,15 @@
     <div class="cp-card">
 
       <div class="cp-logo">
-        <div class="cp-logo-box">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"
+        <div class="cp-logo-box" :class="{ 'has-site-logo': siteLogoUrl }">
+          <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round"
             stroke-linejoin="round" style="width:22px;height:22px;">
             <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
             <line x1="12" y1="18" x2="12.01" y2="18" />
           </svg>
         </div>
-        <span class="cp-logo-name">MarcusStore</span>
+        <span class="cp-logo-name">{{ siteName }}</span>
       </div>
 
       <p class="cp-title">Đổi mật khẩu</p>
@@ -113,6 +114,9 @@ import { changePassword } from "@/api/authApi";
 import BaseModal from "@/components/BaseModal.vue";
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
+import { useSettings } from "@/composables/useSettings";
+
+const { siteName, siteLogoUrl, fetchSettings } = useSettings();
 
 const router = useRouter();
 const loading = ref(false);
@@ -158,6 +162,7 @@ const closeModal = () => {
 };
 
 onMounted(() => {
+  fetchSettings();
   if (!localStorage.getItem("ACCESS_TOKEN")) router.replace("/auth/login");
 });
 
@@ -332,6 +337,17 @@ const submit = async () => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+}
+
+.cp-logo-box.has-site-logo {
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 4px 12px rgba(215, 0, 24, 0.1);
+}
+
+.cp-logo-box.has-site-logo .site-logo-image {
+  border-radius: 6px;
 }
 
 .cp-logo-name {

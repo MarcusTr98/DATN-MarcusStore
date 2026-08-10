@@ -6,6 +6,8 @@ import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -21,14 +23,15 @@ public class AttributeValueService {
 
     @Transactional
     public AttributeValue createValue(Integer attributeId, String valueString, String valueMeta) {
-        if (valueRepository.existsByValueStringAndAttribute_AttributeId(valueString, attributeId)) {
+        String normalizedValue = normalize(valueString);
+        if (valueRepository.existsByValueStringIgnoreCaseAndAttribute_AttributeId(normalizedValue, attributeId)) {
             throw new RuntimeException("Giá trị này đã tồn tại trong thuộc tính!");
         }
         AttributeValue value = new AttributeValue();
         Attribute attribute = new Attribute();
         attribute.setAttributeId(attributeId);
         value.setAttribute(attribute);
-        value.setValueString(valueString);
+        value.setValueString(normalizedValue);
         value.setValueMeta(valueMeta);
         return valueRepository.save(value);
     }
@@ -37,13 +40,35 @@ public class AttributeValueService {
     public AttributeValue updateValue(Integer id, String newValue, String valueMeta) {
         AttributeValue value = valueRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giá trị!"));
-        value.setValueString(newValue);
+        String normalizedValue = normalize(newValue);
+        if (valueRepository.existsByValueStringIgnoreCaseAndAttribute_AttributeIdAndValueIdNot(
+                normalizedValue, value.getAttribute().getAttributeId(), id)) {
+            throw new RuntimeException("Giá trị này đã tồn tại trong thuộc tính!");
+        }
+        value.setValueString(normalizedValue);
         value.setValueMeta(valueMeta);
         return valueRepository.save(value);
     }
 
     @Transactional
     public void deleteValue(Integer id) {
-        valueRepository.deleteById(id);
+        AttributeValue value = valueRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy giá trị!"));
+        // Marcus thêm: không làm mất liên kết biến thể mà SKU đã sử dụng.
+        if (valueRepository.isUsedBySku(id)) {
+            // Marcus sửa: trả mã nghiệp vụ ổn định để giao diện hiển thị modal giải
+            // thích, không làm lộ lỗi khóa ngoại hoặc rơi vào thông báo chung.
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Giá trị thuộc tính đang được SKU sử dụng nên không thể xóa.|ATTRIBUTE_VALUE_IN_USE");
+        }
+        valueRepository.delete(value);
+    }
+
+    private String normalize(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new IllegalArgumentException("Giá trị thuộc tính không được để trống!");
+        }
+        return value.trim().replaceAll("\\s+", " ");
     }
 }

@@ -7,6 +7,9 @@ import com.fpoly.marcusstore.dto.analytics.AnalyticsRateMetric;
 import com.fpoly.marcusstore.dto.analytics.AnalyticsTrendPoint;
 import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
 import com.fpoly.marcusstore.dto.analytics.CancellationReasonResponse;
+import com.fpoly.marcusstore.dto.analytics.ProductWarrantyQualityResponse;
+import com.fpoly.marcusstore.dto.analytics.WarrantyAnalyticsResponse;
+import com.fpoly.marcusstore.dto.analytics.WarrantyReasonMetric;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.CancellationReasonProjection;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.SalesSummaryProjection;
@@ -121,6 +124,62 @@ public class AnalyticsService {
     }
 
     /**
+     * Marcus thêm: chỉ số bảo hành dùng ngày khách tạo yêu cầu. Đây là tín hiệu
+     * hậu mãi/chất lượng cần theo dõi, không tự gọi là tỷ lệ lỗi sản phẩm vì yêu
+     * cầu có thể phát sinh sau kỳ bán hàng.
+     */
+    public WarrantyAnalyticsResponse getWarrantyAnalytics(
+            LocalDate fromDate,
+            LocalDate toDate,
+            int productLimit) {
+        AnalyticsPeriod period = resolvePeriod(fromDate, toDate);
+        WarrantySummary current = loadWarrantySummary(period.fromDate(), period.toDate());
+        WarrantySummary previous = loadWarrantySummary(
+                period.previousFromDate(), period.previousToDate());
+        int safeLimit = Math.max(1, Math.min(productLimit, MAX_PRODUCT_LIMIT));
+
+        List<WarrantyReasonMetric> reasons = loadWarrantyReasons(
+                period.fromDate(), period.toDate(), current.totalRequests());
+        List<ProductWarrantyQualityResponse> products = analyticsRepository
+                .findProductWarrantyQuality(
+                        period.fromDate().atStartOfDay(),
+                        period.toDate().plusDays(1).atStartOfDay(),
+                        period.previousFromDate().atStartOfDay(),
+                        period.previousToDate().plusDays(1).atStartOfDay())
+                .stream()
+                .limit(safeLimit)
+                .map(product -> {
+                    long approved = value(product.getApprovedRequests());
+                    long rejected = value(product.getRejectedRequests());
+                    return new ProductWarrantyQualityResponse(
+                            product.getProductId(),
+                            product.getProductName(),
+                            product.getBrand(),
+                            value(product.getCurrentRequests()),
+                            value(product.getPreviousRequests()),
+                            calculateChange(
+                                    value(product.getCurrentRequests()),
+                                    value(product.getPreviousRequests())),
+                            approved,
+                            rejected,
+                            percentage(approved, approved + rejected));
+                })
+                .toList();
+
+        return new WarrantyAnalyticsResponse(
+                period,
+                metric(current.totalRequests(), previous.totalRequests()),
+                rateMetric(current.resolutionRate(), previous.resolutionRate()),
+                rateMetric(current.approvalRate(), previous.approvalRate()),
+                current.pendingRequests(),
+                current.processingRequests(),
+                current.approvedRequests(),
+                current.rejectedRequests(),
+                reasons,
+                products);
+    }
+
+    /**
      * Marcus thêm: kỳ mặc định là 30 ngày tính cả hôm nay; kỳ so sánh nằm ngay
      * trước đó và luôn có cùng số ngày.
      */
@@ -178,6 +237,43 @@ public class AnalyticsService {
                         java.util.LinkedHashMap::new));
     }
 
+    private WarrantySummary loadWarrantySummary(LocalDate fromDate, LocalDate toDate) {
+        var summary = analyticsRepository.summarizeWarranties(
+                fromDate.atStartOfDay(), toDate.plusDays(1).atStartOfDay());
+        return new WarrantySummary(
+                value(summary.getTotalRequests()),
+                value(summary.getPendingRequests()),
+                value(summary.getProcessingRequests()),
+                value(summary.getApprovedRequests()),
+                value(summary.getRejectedRequests()));
+    }
+
+    private List<WarrantyReasonMetric> loadWarrantyReasons(
+            LocalDate fromDate,
+            LocalDate toDate,
+            long totalRequests) {
+        return analyticsRepository.findWarrantyReasons(
+                fromDate.atStartOfDay(), toDate.plusDays(1).atStartOfDay())
+                .stream()
+                .map(reason -> new WarrantyReasonMetric(
+                        reason.getReason(),
+                        warrantyReasonLabel(reason.getReason()),
+                        value(reason.getReasonCount()),
+                        percentage(value(reason.getReasonCount()), totalRequests)))
+                .toList();
+    }
+
+    private static String warrantyReasonLabel(String reason) {
+        return switch (reason == null ? "" : reason.toUpperCase()) {
+            case "DEFECTIVE" -> "Sản phẩm bị lỗi";
+            case "DAMAGED" -> "Sản phẩm bị hư hỏng";
+            case "WRONG_ITEM" -> "Giao sai sản phẩm";
+            case "NOT_AS_DESCRIBED" -> "Không đúng mô tả";
+            case "ACCESSORY_MISSING" -> "Thiếu phụ kiện";
+            default -> "Lý do khác";
+        };
+    }
+
     private static AnalyticsMetric metric(BigDecimal current, BigDecimal previous) {
         return new AnalyticsMetric(current, previous, calculateChange(current, previous));
     }
@@ -221,6 +317,13 @@ public class AnalyticsService {
                 .doubleValue();
     }
 
+    private static double percentage(long part, long total) {
+        if (total == 0) {
+            return 0D;
+        }
+        return round(part * 100D / total);
+    }
+
     private record SalesSummary(
             long totalOrders,
             long completedOrders,
@@ -255,6 +358,22 @@ public class AnalyticsService {
                     .multiply(BigDecimal.valueOf(100))
                     .divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP)
                     .doubleValue();
+        }
+    }
+
+    private record WarrantySummary(
+            long totalRequests,
+            long pendingRequests,
+            long processingRequests,
+            long approvedRequests,
+            long rejectedRequests) {
+
+        double resolutionRate() {
+            return percentage(approvedRequests + rejectedRequests, totalRequests);
+        }
+
+        double approvalRate() {
+            return percentage(approvedRequests, approvedRequests + rejectedRequests);
         }
     }
 }

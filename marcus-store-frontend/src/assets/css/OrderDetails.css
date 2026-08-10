@@ -705,6 +705,17 @@ tbody tr:hover {
   display: none;
 }
 
+.print-site-logo {
+  width: 58px;
+  height: 58px;
+  padding: 4px;
+  margin: 0 auto 5px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+}
+
 @media print {
   /* Reset nền và màu chữ cho bản in */
   html,
@@ -1174,3 +1185,25 @@ tbody tr:hover {
   color: #fff;
 }
 }
+.ghn-retry-btn {
+  display: block;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 9px 14px;
+  font-size: 13px;
+}
+.payment-hold-admin {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #f1cf7a;
+  border-radius: 12px;
+  color: #754900;
+  background: #fff8e5;
+}
+.payment-hold-admin i { margin-top: 2px; color: #df9200; }
+.payment-hold-admin strong,
+.payment-hold-admin span { display: block; }
+.payment-hold-admin span { margin-top: 3px; font-size: 12px; }

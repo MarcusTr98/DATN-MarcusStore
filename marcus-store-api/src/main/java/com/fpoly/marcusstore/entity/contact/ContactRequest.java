@@ -38,7 +38,17 @@ public class ContactRequest {
     private String message;
 
     @Column(name = "status", length = 50)
-    private String status = "PENDING";
+    private String status = "NEW";
+
+    // Marcus thêm: dấu vết vận hành của module liên hệ.
+    @Column(name = "handled_by", length = 100)
+    private String handledBy;
+
+    @Column(name = "processing_started_at")
+    private LocalDateTime processingStartedAt;
+
+    @Column(name = "resolved_at")
+    private LocalDateTime resolvedAt;
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)

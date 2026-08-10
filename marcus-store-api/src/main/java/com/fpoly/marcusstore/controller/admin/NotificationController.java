@@ -22,8 +22,9 @@ public class NotificationController {
     public ApiResponse<Map<String, Object>> getNotifications(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "false") boolean unreadOnly) {
-        return ApiResponse.success(notificationService.getNotificationsForAdmin(page, size, unreadOnly));
+            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(required = false) String category) {
+        return ApiResponse.success(notificationService.getNotificationsForAdmin(page, size, unreadOnly, category));
     }
 
     // Đánh dấu đọc 1 thông báo

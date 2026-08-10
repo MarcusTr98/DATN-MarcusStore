@@ -25,6 +25,9 @@ public class AiAdvisorRequest {
     @Size(max = 6, message = "Chỉ gửi tối đa 6 tin nhắn gần nhất.")
     private List<ConversationTurn> history = new ArrayList<>();
 
+    @Valid
+    private AiAdvisorContext context;
+
     @Data
     public static class ConversationTurn {
         @NotBlank

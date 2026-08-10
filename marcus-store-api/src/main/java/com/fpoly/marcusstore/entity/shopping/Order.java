@@ -31,6 +31,13 @@ public class Order {
     @Column(name = "order_code", nullable = false, unique = true, length = 50)
     private String orderCode;
 
+    // Marcus thêm: khóa idempotency do Checkout client sinh. Một request được
+    // gửi lại do double click, F5 hoặc retry mạng chỉ được ánh xạ tới một đơn.
+    // Marcus sửa: SQL Server dùng filtered unique index để vẫn cho phép nhiều đơn
+    // cũ có NULL.
+    @Column(name = "checkout_request_id", length = 64)
+    private String checkoutRequestId;
+
     @Column(name = "recipient_name", nullable = false, length = 100)
     private String recipientName;
 
@@ -39,10 +46,6 @@ public class Order {
 
     @Column(name = "shipping_address", nullable = false, length = 500)
     private String shippingAddress;
-
-    // Marcus thêm: phân biệt giao tận nơi và khách nhận trực tiếp tại cửa hàng.
-    @Column(name = "fulfillment_method", nullable = false, length = 30)
-    private String fulfillmentMethod = "DELIVERY";
 
     @Column(name = "total_amount", nullable = false, precision = 18, scale = 2)
     private BigDecimal totalAmount;
@@ -76,32 +79,8 @@ public class Order {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(name = "shipping_fee", precision = 18, scale = 2)
-    private BigDecimal shippingFee;
-
-    @Column(name = "shipping_subsidy", precision = 18, scale = 2)
-    private BigDecimal shippingSubsidy = BigDecimal.ZERO;
-
-    // Marcus lam refund
-    @Column(name = "customer_shipping_fee", precision = 18, scale = 2)
-    private BigDecimal customerShippingFee;
-
-    @Column(name = "tracking_code", length = 100)
-    private String trackingCode;
-
     @Column(name = "payment_date")
     private LocalDateTime paymentDate;
-
-    // Marcus bổ sung: để GhnOrderListener map được to_district_id và to_ward_code
-    // Lưu khi user checkout, lấy từ địa chỉ GHN đã chọn
-    @Column(name = "to_district_id")
-    private Integer toDistrictId;
-
-    @Column(name = "to_ward_code", length = 20)
-    private String toWardCode;
-
-    @Column(name = "delivery_note", length = 500)
-    private String deliveryNote;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -116,4 +95,159 @@ public class Order {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<OrderItem> orderItems = new ArrayList<>();
+
+    // Marcus thêm: các trường giao nhận/GHN và hủy đơn được tách khỏi Orders
+    // nhưng giữ method miền nghiệp vụ trên Order để không làm rò cấu trúc lưu trữ
+    // sang Checkout, email và response mapper.
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private OrderShippingDetail shippingDetail;
+
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private OrderCancellation cancellation;
+
+    private OrderShippingDetail ensureShippingDetail() {
+        if (shippingDetail == null) {
+            shippingDetail = new OrderShippingDetail();
+            shippingDetail.setOrder(this);
+        }
+        return shippingDetail;
+    }
+
+    private OrderCancellation ensureCancellation() {
+        if (cancellation == null) {
+            cancellation = new OrderCancellation();
+            cancellation.setOrder(this);
+        }
+        return cancellation;
+    }
+
+    public String getFulfillmentMethod() {
+        return shippingDetail == null ? "DELIVERY" : shippingDetail.getFulfillmentMethod();
+    }
+
+    public void setFulfillmentMethod(String value) {
+        ensureShippingDetail().setFulfillmentMethod(value);
+    }
+
+    public BigDecimal getShippingFee() {
+        return shippingDetail == null ? null : shippingDetail.getShippingFee();
+    }
+
+    public void setShippingFee(BigDecimal value) {
+        ensureShippingDetail().setShippingFee(value);
+    }
+
+    public BigDecimal getShippingSubsidy() {
+        return shippingDetail == null ? BigDecimal.ZERO : shippingDetail.getShippingSubsidy();
+    }
+
+    public void setShippingSubsidy(BigDecimal value) {
+        ensureShippingDetail().setShippingSubsidy(value);
+    }
+
+    public BigDecimal getCustomerShippingFee() {
+        return shippingDetail == null ? null : shippingDetail.getCustomerShippingFee();
+    }
+
+    public void setCustomerShippingFee(BigDecimal value) {
+        ensureShippingDetail().setCustomerShippingFee(value);
+    }
+
+    public String getTrackingCode() {
+        return shippingDetail == null ? null : shippingDetail.getTrackingCode();
+    }
+
+    public void setTrackingCode(String value) {
+        ensureShippingDetail().setTrackingCode(value);
+    }
+
+    public Integer getToDistrictId() {
+        return shippingDetail == null ? null : shippingDetail.getToDistrictId();
+    }
+
+    public void setToDistrictId(Integer value) {
+        ensureShippingDetail().setToDistrictId(value);
+    }
+
+    public String getToWardCode() {
+        return shippingDetail == null ? null : shippingDetail.getToWardCode();
+    }
+
+    public void setToWardCode(String value) {
+        ensureShippingDetail().setToWardCode(value);
+    }
+
+    public String getDeliveryNote() {
+        return shippingDetail == null ? null : shippingDetail.getDeliveryNote();
+    }
+
+    public void setDeliveryNote(String value) {
+        ensureShippingDetail().setDeliveryNote(value);
+    }
+
+    public String getGhnIntegrationStatus() {
+        return shippingDetail == null ? "NOT_REQUIRED" : shippingDetail.getGhnIntegrationStatus();
+    }
+
+    public void setGhnIntegrationStatus(String value) {
+        ensureShippingDetail().setGhnIntegrationStatus(value);
+    }
+
+    public Integer getGhnRetryCount() {
+        return shippingDetail == null ? 0 : shippingDetail.getGhnRetryCount();
+    }
+
+    public void setGhnRetryCount(Integer value) {
+        ensureShippingDetail().setGhnRetryCount(value);
+    }
+
+    public String getGhnLastError() {
+        return shippingDetail == null ? null : shippingDetail.getGhnLastError();
+    }
+
+    public void setGhnLastError(String value) {
+        ensureShippingDetail().setGhnLastError(value);
+    }
+
+    public LocalDateTime getGhnLastAttemptAt() {
+        return shippingDetail == null ? null : shippingDetail.getGhnLastAttemptAt();
+    }
+
+    public void setGhnLastAttemptAt(LocalDateTime value) {
+        ensureShippingDetail().setGhnLastAttemptAt(value);
+    }
+
+    public String getCancellationReasonCode() {
+        return cancellation == null ? null : cancellation.getReasonCode();
+    }
+
+    public void setCancellationReasonCode(String value) {
+        ensureCancellation().setReasonCode(value);
+    }
+
+    public String getCancellationActor() {
+        return cancellation == null ? null : cancellation.getActorType();
+    }
+
+    public void setCancellationActor(String value) {
+        ensureCancellation().setActorType(value);
+    }
+
+    public LocalDateTime getCancelledAt() {
+        return cancellation == null ? null : cancellation.getCancelledAt();
+    }
+
+    public void setCancelledAt(LocalDateTime value) {
+        ensureCancellation().setCancelledAt(value);
+    }
+
+    public String getCancellationDetail() {
+        return cancellation == null ? null : cancellation.getDetail();
+    }
+
+    public void setCancellationDetail(String value) {
+        ensureCancellation().setDetail(value);
+    }
 }

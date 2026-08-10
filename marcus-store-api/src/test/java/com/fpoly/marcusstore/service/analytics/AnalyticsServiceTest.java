@@ -5,6 +5,9 @@ import com.fpoly.marcusstore.dto.analytics.AnalyticsPeriod;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.SalesSummaryProjection;
 import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.CancellationReasonProjection;
+import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.ProductWarrantyProjection;
+import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.WarrantyReasonProjection;
+import com.fpoly.marcusstore.repository.analytics.AnalyticsRepository.WarrantySummaryProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -169,6 +172,49 @@ class AnalyticsServiceTest {
                 assertThat(reasons.getFirst().changePercent()).isEqualTo(100);
         }
 
+        @Test
+        void summarizesWarrantyQualityWithoutReadingCustomerFreeText() {
+                LocalDate from = LocalDate.of(2026, 7, 1);
+                LocalDate to = LocalDate.of(2026, 7, 30);
+                WarrantySummaryProjection current = warrantySummary(10, 2, 3, 4, 1);
+                WarrantySummaryProjection previous = warrantySummary(5, 1, 1, 2, 1);
+                WarrantyReasonProjection reason = mock(WarrantyReasonProjection.class);
+                when(reason.getReason()).thenReturn("DEFECTIVE");
+                when(reason.getReasonCount()).thenReturn(6L);
+                ProductWarrantyProjection product = mock(ProductWarrantyProjection.class);
+                when(product.getProductId()).thenReturn(15);
+                when(product.getProductName()).thenReturn("iPhone Test");
+                when(product.getBrand()).thenReturn("Apple");
+                when(product.getCurrentRequests()).thenReturn(6L);
+                when(product.getPreviousRequests()).thenReturn(3L);
+                when(product.getApprovedRequests()).thenReturn(3L);
+                when(product.getRejectedRequests()).thenReturn(1L);
+
+                when(analyticsRepository.summarizeWarranties(
+                                from.atStartOfDay(), to.plusDays(1).atStartOfDay())).thenReturn(current);
+                when(analyticsRepository.summarizeWarranties(
+                                LocalDate.of(2026, 6, 1).atStartOfDay(), from.atStartOfDay())).thenReturn(previous);
+                when(analyticsRepository.findWarrantyReasons(
+                                from.atStartOfDay(), to.plusDays(1).atStartOfDay()))
+                                .thenReturn(java.util.List.of(reason));
+                when(analyticsRepository.findProductWarrantyQuality(
+                                from.atStartOfDay(), to.plusDays(1).atStartOfDay(),
+                                LocalDate.of(2026, 6, 1).atStartOfDay(), from.atStartOfDay()))
+                                .thenReturn(java.util.List.of(product));
+
+                var result = analyticsService.getWarrantyAnalytics(from, to, 10);
+
+                // Marcus kiểm tra: tỷ lệ xử lý = APPROVED + REJECTED; tỷ lệ đồng ý
+                // chỉ dùng các yêu cầu đã có kết luận, không tính PENDING/CONFIRMED.
+                assertThat(result.totalRequests().currentValue()).isEqualByComparingTo("10");
+                assertThat(result.resolutionRate().currentPercent()).isEqualTo(50);
+                assertThat(result.approvalRate().currentPercent()).isEqualTo(80);
+                assertThat(result.reasons().getFirst().label()).isEqualTo("Sản phẩm bị lỗi");
+                assertThat(result.reasons().getFirst().sharePercent()).isEqualTo(60);
+                assertThat(result.productQuality().getFirst().requestsChangePercent()).isEqualTo(100);
+                assertThat(result.productQuality().getFirst().approvalRate()).isEqualTo(75);
+        }
+
         private static SalesSummaryProjection summary(
                         long totalOrders,
                         long completedOrders,
@@ -193,6 +239,17 @@ class AnalyticsServiceTest {
                 CancellationReasonProjection projection = mock(CancellationReasonProjection.class);
                 when(projection.getReason()).thenReturn(reason);
                 when(projection.getReasonCount()).thenReturn(count);
+                return projection;
+        }
+
+        private static WarrantySummaryProjection warrantySummary(
+                        long total, long pending, long processing, long approved, long rejected) {
+                WarrantySummaryProjection projection = mock(WarrantySummaryProjection.class);
+                when(projection.getTotalRequests()).thenReturn(total);
+                when(projection.getPendingRequests()).thenReturn(pending);
+                when(projection.getProcessingRequests()).thenReturn(processing);
+                when(projection.getApprovedRequests()).thenReturn(approved);
+                when(projection.getRejectedRequests()).thenReturn(rejected);
                 return projection;
         }
 }

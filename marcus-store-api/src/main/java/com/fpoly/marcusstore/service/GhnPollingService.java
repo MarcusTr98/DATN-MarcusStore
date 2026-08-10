@@ -1,13 +1,10 @@
 package com.fpoly.marcusstore.service;
 
-import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 
 @Service
@@ -18,38 +15,32 @@ public class GhnPollingService {
     private final GhnService ghnService;
     private final GhnStatusService ghnStatusService;
 
-    @Scheduled(fixedRate = 60000) // Chạy mỗi 60 giây
-    @Transactional
+    // Marcus sửa: fixedDelay tránh chồng lượt quét; không giữ transaction/Entity trong lúc gọi GHN.
+    @Scheduled(initialDelayString = "${ghn.polling.initial-delay-ms:60000}",
+            fixedDelayString = "${ghn.polling.delay-ms:60000}")
     public void syncShippingStatus() {
-        // Theo dõi cả đơn vừa đóng gói, đang giao và giao lỗi để hỗ trợ giao lại.
-        List<Order> shippingOrders = orderRepository.findByOrderStatusIn(
-                List.of("PACKED", "SHIPPING", "FAILED"));
+        // Marcus sửa: query projection chỉ lấy mã vận đơn cần thiết, không mở transaction dài.
+        List<String> trackingCodes = orderRepository.findTrackingCodesForGhnPolling();
 
-        if (shippingOrders.isEmpty())
+        if (trackingCodes.isEmpty())
             return;
 
-        log.info("⏳ [Polling] Đang kiểm tra trạng thái cho {} đơn hàng...", shippingOrders.size());
+        log.info("[GHN Polling] Đang kiểm tra {} vận đơn", trackingCodes.size());
 
-        for (Order order : shippingOrders) {
+        for (String trackingCode : trackingCodes) {
             try {
-                // xử lý thêm chốt để qua đc VNPAY
-                if (order.getTrackingCode() == null || order.getTrackingCode().trim().isEmpty()) {
-                    log.warn("⚠️ [Polling] Đơn {} đang SHIPPING nhưng chưa có mã vận đơn GHN. Bỏ qua.",
-                            order.getOrderCode());
-                    continue;
-                }
-                String ghnStatus = ghnService.getTrackingStatus(order.getTrackingCode());
+                String ghnStatus = ghnService.getTrackingStatus(trackingCode);
                 if (ghnStatus == null)
                     continue;
 
                 GhnStatusService.SyncResult result = ghnStatusService.applyStatus(
-                        order.getTrackingCode(), ghnStatus, "POLLING");
+                        trackingCode, ghnStatus, "POLLING");
                 if (result == GhnStatusService.SyncResult.UPDATED) {
-                    log.info("[Polling] Đã đồng bộ đơn {} theo trạng thái GHN {}",
-                            order.getOrderCode(), ghnStatus);
+                    log.info("[GHN Polling] Đã đồng bộ vận đơn {} theo trạng thái {}", trackingCode, ghnStatus);
                 }
             } catch (Exception e) {
-                log.error("❌ Lỗi sync đơn {}: {}", order.getOrderCode(), e.getMessage());
+                // Marcus sửa: một vận đơn lỗi không làm dừng các vận đơn còn lại.
+                log.warn("[GHN Polling] Không đồng bộ được vận đơn {}: {}", trackingCode, e.getMessage());
             }
         }
     }

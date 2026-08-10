@@ -14,23 +14,46 @@ import java.util.Set;
 import java.net.URI;
 import java.util.regex.Pattern;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.dto.response.SystemSettingsAdminResponse;
+import java.time.LocalDateTime;
 
 @Service
 public class SystemSettingService {
 
+    private static final Map<String, String> DEFAULT_SETTINGS = Map.ofEntries(
+            Map.entry("SITE_NAME", "Marcus Store"), Map.entry("SITE_LOGO_URL", ""),
+            Map.entry("HOTLINE", "0907640098"), Map.entry("EMAIL", "support@marcusstore.com"),
+            Map.entry("ADDRESS", "118 Cát Bi, Hải An, Hải Phòng"),
+            Map.entry("WORKING_HOURS", "8:00 - 21:00 (Thứ 2 - Chủ nhật)"),
+            Map.entry("PROMO_TEXT", "Sản phẩm chính hãng - Hỗ trợ tận tâm"),
+            Map.entry("FACEBOOK_URL", ""), Map.entry("TIKTOK_URL", ""),
+            Map.entry("INSTAGRAM_URL", ""), Map.entry("YOUTUBE_URL", ""),
+            Map.entry("STORE_LOCATION",
+                    "{\"lat\":20.82716,\"lng\":106.70466,\"name\":\"Marcus Store\",\"address\":\"118 Cát Bi, Hải An, Hải Phòng\"}"),
+            Map.entry("HOME_HERO_BADGE", "Sản phẩm công nghệ chính hãng"),
+            Map.entry("HOME_HERO_TITLE", "Công nghệ mới."),
+            Map.entry("HOME_HERO_TITLE_ACCENT", "Trải nghiệm tốt hơn."),
+            Map.entry("HOME_HERO_LEAD", "Khám phá điện thoại và phụ kiện phù hợp tại Marcus Store."),
+            Map.entry("HOME_HERO_SLIDES", "[]"), Map.entry("AI_ADVISOR_POLICY", ""));
+
     private static final Set<String> PUBLIC_SETTING_KEYS = Set.of(
+            "SITE_NAME", "SITE_LOGO_URL",
             "HOTLINE", "EMAIL", "ADDRESS", "WORKING_HOURS", "PROMO_TEXT",
             "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL",
             "STORE_LOCATION", "HOME_HERO_BADGE", "HOME_HERO_TITLE",
             "HOME_HERO_TITLE_ACCENT", "HOME_HERO_LEAD", "HOME_HERO_SLIDES");
     private static final Set<String> ADMIN_EDITABLE_KEYS = Set.of(
+            "SITE_NAME", "SITE_LOGO_URL",
             "HOTLINE", "EMAIL", "ADDRESS", "WORKING_HOURS", "PROMO_TEXT",
             "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL",
             "STORE_LOCATION", "HOME_HERO_BADGE", "HOME_HERO_TITLE",
             "HOME_HERO_TITLE_ACCENT", "HOME_HERO_LEAD", "HOME_HERO_SLIDES",
             "AI_ADVISOR_POLICY");
     private static final Set<String> URL_KEYS = Set.of(
-            "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL");
+            "SITE_LOGO_URL", "FACEBOOK_URL", "TIKTOK_URL", "INSTAGRAM_URL", "YOUTUBE_URL");
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
             "^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$", Pattern.CASE_INSENSITIVE);
 
@@ -45,9 +68,22 @@ public class SystemSettingService {
                 .collect(Collectors.toMap(SystemSetting::getSettingKey, SystemSetting::getSettingValue));
     }
 
+    @Transactional(readOnly = true)
+    public SystemSettingsAdminResponse getAdminSettings() {
+        List<SystemSetting> all = repository.findAll();
+        SystemSetting latest = all.stream()
+                .filter(item -> item.getUpdatedAt() != null)
+                .max(java.util.Comparator.comparing(SystemSetting::getUpdatedAt)).orElse(null);
+        return new SystemSettingsAdminResponse(
+                all.stream().collect(Collectors.toMap(SystemSetting::getSettingKey, SystemSetting::getSettingValue)),
+                latest == null ? null : latest.getUpdatedBy(),
+                latest == null ? null : latest.getUpdatedAt());
+    }
+
     // Marcus sửa: client công khai chỉ nhận các cấu hình hiển thị đã allowlist,
     // không lộ prompt/chính sách nội bộ trong System_Settings.
     @Transactional(readOnly = true)
+    @Cacheable("public-settings")
     public Map<String, String> getPublicSettingsAsMap() {
         return repository.findAllById(PUBLIC_SETTING_KEYS).stream()
                 .collect(Collectors.toMap(SystemSetting::getSettingKey, SystemSetting::getSettingValue));
@@ -62,16 +98,25 @@ public class SystemSettingService {
     }
 
     @Transactional
+    @CacheEvict(value = "public-settings", allEntries = true)
     public void updateSettings(Map<String, String> payload) {
-        List<SystemSetting> existingSettings = repository.findAllById(payload.keySet());
+        // Marcus sửa: chuẩn hóa key trước khi query và save để service luôn xử lý
+        // nhất quán, kể cả khi được gọi nội bộ không đi qua validation controller.
+        Map<String, String> normalizedPayload = payload.entrySet().stream()
+                .collect(Collectors.toMap(
+                        entry -> entry.getKey() == null ? "" : entry.getKey().trim().toUpperCase(),
+                        Map.Entry::getValue,
+                        (first, duplicate) -> duplicate,
+                        java.util.LinkedHashMap::new));
+        List<SystemSetting> existingSettings = repository.findAllById(normalizedPayload.keySet());
 
         Map<String, SystemSetting> existingMap = existingSettings.stream()
                 .collect(Collectors.toMap(SystemSetting::getSettingKey, s -> s));
 
         List<SystemSetting> toSave = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : payload.entrySet()) {
-            String key = entry.getKey() == null ? "" : entry.getKey().trim().toUpperCase();
+        for (Map.Entry<String, String> entry : normalizedPayload.entrySet()) {
+            String key = entry.getKey();
             String value = validateSettingValue(key, entry.getValue());
 
             // Bỏ qua nếu giá trị null
@@ -93,10 +138,19 @@ public class SystemSettingService {
                 setting.setSettingGroup(determineSettingGroup(key));
                 setting.setDescription("Cấu hình tự động khởi tạo từ hệ thống quản trị");
             }
+            setting.setUpdatedBy(SecurityUtils.getCurrentUsername());
+            setting.setUpdatedAt(LocalDateTime.now());
             toSave.add(setting);
         }
 
         repository.saveAll(toSave);
+    }
+
+    // Marcus thêm: khôi phục bộ mặc định có kiểm soát, vẫn đi qua cùng validation.
+    @Transactional
+    @CacheEvict(value = "public-settings", allEntries = true)
+    public void restoreDefaults() {
+        updateSettings(DEFAULT_SETTINGS);
     }
 
     // Marcus thêm: System Settings chỉ nhận key do hệ thống định nghĩa và validate
@@ -109,7 +163,7 @@ public class SystemSettingService {
             throw new IllegalArgumentException("Giá trị cấu hình " + key + " không được để trống.");
         }
         String value = rawValue.trim();
-        if (Set.of("HOTLINE", "EMAIL", "ADDRESS").contains(key) && value.isBlank()) {
+        if (Set.of("SITE_NAME", "HOTLINE", "EMAIL", "ADDRESS").contains(key) && value.isBlank()) {
             throw new IllegalArgumentException(key + " không được để trống.");
         }
         if ("EMAIL".equals(key) && !EMAIL_PATTERN.matcher(value).matches()) {

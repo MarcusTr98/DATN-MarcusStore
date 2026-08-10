@@ -5,8 +5,11 @@ import userApi from '@/api/userApi'
 import cartApi from '@/api/cartApi'
 import ghnApi from '@/api/ghnApi'
 import api from '@/utils/api'
+import { getBehaviorSessionId, trackBehavior } from '@/api/behaviorApi'
 import { useCartStore } from '@/stores/cartStore'
 import { useFlashSaleStore } from '@/stores/FlashSaleStore'
+
+const CHECKOUT_REQUEST_STORAGE_KEY = 'MARCUS_CHECKOUT_REQUEST'
 
 // Marcus refactor: gom luồng địa chỉ, vận chuyển, voucher và đặt hàng khỏi Checkout.vue.
 export function useCheckoutPage() {
@@ -178,16 +181,18 @@ export function useCheckoutPage() {
   // server revert giá về gốc nhưng localStorage vẫn còn isFlashSale=true. Logic cũ
   // dựa vào localStorage để chặn ngay → user kẹt vĩnh viễn không mua được.
   async function findCancelledFlashSaleItem() {
-    let serverItems = []
+    let response
     try {
-      const res = await cartApi.getCart()
-      const freshData = res.data?.data ?? res.data
-      serverItems = Array.isArray(freshData?.items) ? freshData.items : []
+      response = await cartApi.getCart()
     } catch (e) {
       console.warn('Không thể refetch cart để kiểm tra Flash Sale:', e)
       // Lỗi mạng → fallback dùng localStorage (giữ hành vi cũ an toàn)
       return findCancelledFromLocal()
     }
+    // Marcus sửa: chỉ khởi tạo dữ liệu sau khi request thành công, tránh state
+    // trung gian thừa và giữ rõ nhánh fallback khi Cart API gián đoạn.
+    const freshData = response.data?.data ?? response.data
+    const serverItems = Array.isArray(freshData?.items) ? freshData.items : []
 
     // Sync cartData cục bộ với server (đảm bảo UI đúng giá)
     const revertedItems = [] // Lưu các cartItemId vừa bị revert giá (để hiện cảnh báo)
@@ -1045,6 +1050,10 @@ export function useCheckoutPage() {
     }
 
     const payload = {
+      // Marcus thêm: cùng tập cart item trong cùng phiên luôn dùng lại một UUID,
+      // kể cả F5 hoặc retry sau timeout.
+      checkoutRequestId: getOrCreateCheckoutRequestId(cartData.value.items),
+      behaviorSessionId: getBehaviorSessionId(),
       cartItemIds: cartData.value.items.map((i) => i.cartItemId),
       recipientName: orderForm.value.recipientName,
       recipientPhone: orderForm.value.recipientPhone,
@@ -1062,6 +1071,8 @@ export function useCheckoutPage() {
     isProcessing.value = true
     try {
       const { data } = await api.post('/checkout', payload)
+
+      sessionStorage.removeItem(CHECKOUT_REQUEST_STORAGE_KEY)
 
       const paidSkuIds = cartData.value.items
         .map((item) => Number(item.skuId))
@@ -1128,7 +1139,29 @@ export function useCheckoutPage() {
     }
   }
 
+  function getOrCreateCheckoutRequestId(items) {
+    const fingerprint = items
+      .map((item) => Number(item.cartItemId))
+      .filter(Number.isInteger)
+      .sort((left, right) => left - right)
+      .join('-')
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(CHECKOUT_REQUEST_STORAGE_KEY) || 'null')
+      if (stored?.fingerprint === fingerprint && stored?.requestId) return stored.requestId
+    } catch {
+      sessionStorage.removeItem(CHECKOUT_REQUEST_STORAGE_KEY)
+    }
+    const requestId = crypto.randomUUID()
+    sessionStorage.setItem(
+      CHECKOUT_REQUEST_STORAGE_KEY,
+      JSON.stringify({ fingerprint, requestId }),
+    )
+    return requestId
+  }
+
   onMounted(async () => {
+    // Marcus thêm: mốc funnel thuộc Checkout; lỗi telemetry không chặn thanh toán.
+    trackBehavior('CHECKOUT_STARTED').catch(() => {})
     // Marcus thêm: lấy thông tin cửa hàng từ cấu hình chung, không hard-code trên giao diện.
     api
       .get('/public/settings')

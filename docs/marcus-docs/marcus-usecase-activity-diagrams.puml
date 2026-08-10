@@ -1,0 +1,1208 @@
+' MarcusStore - PlantUML diagrams owned by Trần Thu Huyền
+' Mỗi khối @startuml ... @enduml có thể xuất thành một hình riêng.
+' Phạm vi: UC-04, UC-07, UC-10, UC-12, UC-13, UC-14, UC-15,
+' UC-17, UC-24, UC-25, UC-26, UC-27, UC-28, UC-29, UC-30 và UC-32.
+' Có thể tìm nhanh theo tên khối, ví dụ: @startuml UC24_ACTIVITY.
+
+' ============================================================
+' UC-04 - USE CASE
+' ============================================================
+@startuml UC04_USECASE
+title UC-04: Quản lý sổ địa chỉ và bản đồ động
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase { BackgroundColor White; BorderColor #1F4E79; ArrowColor #1F4E79 }
+actor "Khách hàng" as Customer
+rectangle "Hệ thống MarcusStore" {
+  usecase "Xem danh sách\nđịa chỉ" as U04_View
+  usecase "Thêm địa chỉ" as U04_Add
+  usecase "Cập nhật địa chỉ" as U04_Update
+  usecase "Xóa địa chỉ" as U04_Delete
+  usecase "Đặt địa chỉ\nmặc định" as U04_Default
+  usecase "Chọn địa giới\nGHN" as U04_GHN
+  usecase "Chọn vị trí\ntrên bản đồ" as U04_Map
+}
+Customer --> U04_View
+Customer --> U04_Add
+Customer --> U04_Update
+Customer --> U04_Delete
+Customer --> U04_Default
+Customer --> U04_Map
+U04_Add ..> U04_GHN : <<include>>
+U04_Update ..> U04_GHN : <<include>>
+U04_Map ..> U04_Add : <<extend>>
+U04_Map ..> U04_Update : <<extend>>
+note bottom of U04_Map: Tọa độ bản đồ là tùy chọn
+note bottom of U04_Delete: Không được xóa địa chỉ mặc định
+@enduml
+
+' UC-14 - NHẬN HÀNG TẠI CỬA HÀNG
+@startuml UC14_USECASE
+title UC-14: Nhận hàng tại cửa hàng
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+actor "Nhân viên/Admin" as Staff
+rectangle MarcusStore {
+  usecase "Chọn nhận tại cửa hàng" as Pick
+  usecase "Xem địa chỉ cửa hàng" as Address
+  usecase "Tạo đơn không tính phí giao hàng" as Create
+  usecase "Xác nhận đơn sẵn sàng" as Ready
+  usecase "Hoàn tất nhận hàng" as Complete
+}
+Customer --> Pick
+Customer --> Address
+Customer --> Create
+Staff --> Ready
+Staff --> Complete
+Pick ..> Address : <<include>>
+Create ..> Pick : <<include>>
+@enduml
+
+@startuml UC14_ACTIVITY
+title Activity UC-14: Nhận hàng tại cửa hàng
+skinparam shadowing false
+|Khách hàng|
+start
+:Chọn nhận hàng tại cửa hàng;
+|Hệ thống|
+:Đọc địa chỉ cửa hàng từ System Settings;
+:Đặt phí giao hàng bằng 0;
+:Kiểm tra giỏ hàng, tồn và khuyến mãi;
+|Dữ liệu|
+:Khóa dữ liệu cần thiết và tạo đơn STORE_PICKUP;
+|Hệ thống|
+:Gửi xác nhận đơn;
+|Nhân viên/Admin|
+:Chuẩn bị hàng và cập nhật sẵn sàng;
+|Khách hàng|
+:Đến cửa hàng nhận hàng;
+|Nhân viên/Admin|
+:Xác nhận giao hàng thành công;
+stop
+@enduml
+
+' UC-15 - THANH TOÁN VNPAY
+@startuml UC15_USECASE
+title UC-15: Thanh toán VNPay
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+actor VNPay
+rectangle MarcusStore {
+  usecase "Tạo yêu cầu thanh toán" as Create
+  usecase "Chuyển sang cổng VNPay" as Redirect
+  usecase "Xử lý Return URL" as Return
+  usecase "Xử lý IPN" as IPN
+  usecase "Cập nhật giao dịch và đơn hàng" as Update
+}
+Customer --> Create
+Customer --> Return
+VNPay --> Return
+VNPay --> IPN
+Create ..> Redirect : <<include>>
+Return ..> Update : <<include>>
+IPN ..> Update : <<include>>
+@enduml
+
+@startuml UC15_ACTIVITY
+title Activity UC-15: Thanh toán đơn hàng qua VNPay
+skinparam shadowing false
+|Khách hàng|
+start
+:Chọn VNPay và xác nhận đặt hàng;
+|Hệ thống|
+:Tạo đơn chờ thanh toán và mã giao dịch;
+:Ký tham số, tạo URL thanh toán;
+|VNPay|
+:Nhận yêu cầu và xử lý thanh toán;
+:Chuyển khách hàng về Return URL;
+|Hệ thống|
+:Kiểm tra chữ ký và thông tin giao dịch;
+if (Thanh toán hợp lệ và thành công?) then (Có)
+  |Dữ liệu|
+  :Cập nhật giao dịch và đơn đã thanh toán;
+  |Hệ thống|
+  :Thông báo thanh toán thành công;
+else (Không)
+  |Dữ liệu|
+  :Ghi nhận thất bại hoặc giữ trạng thái chờ IPN;
+  |Hệ thống|
+  :Thông báo kết quả phù hợp;
+endif
+|Khách hàng|
+:Xem kết quả thanh toán;
+stop
+@enduml
+
+@startuml UC15_ACTIVITY_IPN
+title Activity UC-15: Tiếp nhận IPN từ VNPay
+skinparam shadowing false
+|VNPay|
+start
+:Gửi IPN;
+|Hệ thống|
+:Xác minh chữ ký, mã đơn và số tiền;
+if (Yêu cầu hợp lệ?) then (Có)
+  |Dữ liệu|
+  :Khóa và kiểm tra giao dịch đã xử lý;
+  if (Chưa xử lý?) then (Có)
+    :Cập nhật giao dịch và trạng thái đơn;
+  else (Không)
+    :Giữ nguyên dữ liệu;
+  endif
+  |Hệ thống|
+  :Trả mã xác nhận thành công;
+else (Không)
+  :Trả mã lỗi cho VNPay;
+endif
+stop
+@enduml
+
+' UC-17 - HỦY ĐƠN, HOÀN TÀI NGUYÊN VÀ REFUND
+@startuml UC17_USECASE
+title UC-17: Hủy đơn, hoàn tài nguyên và refund VNPay
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+actor "Admin" as Admin
+actor VNPay
+rectangle MarcusStore {
+  usecase "Yêu cầu hủy đơn" as Cancel
+  usecase "Kiểm tra điều kiện hủy" as Validate
+  usecase "Hoàn tồn và tài nguyên" as Restore
+  usecase "Hoàn tiền VNPay" as Refund
+  usecase "Ghi lịch sử và thông báo" as Notify
+}
+Customer --> Cancel
+Admin --> Cancel
+VNPay --> Refund
+Cancel ..> Validate : <<include>>
+Cancel ..> Restore : <<include>>
+Cancel ..> Notify : <<include>>
+Refund ..> Cancel : <<extend>>
+@enduml
+
+@startuml UC17_ACTIVITY
+title Activity UC-17: Hủy đơn và hoàn tài nguyên
+skinparam shadowing false
+|Khách hàng/Admin|
+start
+:Gửi yêu cầu hủy và lý do;
+|Hệ thống|
+:Kiểm tra quyền và trạng thái đơn;
+if (Được phép hủy?) then (Có)
+  |Dữ liệu|
+  :Khóa đơn và các tài nguyên liên quan;
+  :Hoàn tồn kho và quyền sử dụng voucher nếu có;
+  :Cập nhật trạng thái hủy và lịch sử;
+  |Hệ thống|
+  if (Đã thanh toán VNPay?) then (Có)
+    |VNPay|
+    :Tiếp nhận yêu cầu hoàn tiền;
+    |Hệ thống|
+    :Ghi nhận kết quả refund;
+  endif
+  :Gửi thông báo hủy đơn;
+else (Không)
+  :Từ chối và nêu lý do;
+endif
+|Khách hàng/Admin|
+:Nhận kết quả;
+stop
+@enduml
+
+' UC-24 - LIVE CHAT
+@startuml UC24_USECASE
+title UC-24: Live Chat giữa khách hàng và Admin
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+actor Admin
+rectangle MarcusStore {
+  usecase "Mở hoặc tiếp tục phiên chat" as Start
+  usecase "Gửi và nhận tin nhắn" as Message
+  usecase "Tiếp nhận phòng chat" as Claim
+  usecase "Kết thúc phiên chat" as End
+}
+Customer --> Start
+Customer --> Message
+Customer --> End
+Admin --> Claim
+Admin --> Message
+Admin --> End
+note bottom of Start: Phiên lưu trong bộ nhớ và hết hạn sau 30 phút không hoạt động
+@enduml
+
+@startuml UC24_ACTIVITY
+title Activity UC-24: Trao đổi Live Chat
+skinparam shadowing false
+|Khách hàng|
+start
+:Mở Live Chat và gửi tin nhắn;
+|Hệ thống|
+:Tạo hoặc tiếp tục phòng chat trong bộ nhớ;
+:Phát phòng chat tới danh sách Admin;
+|Admin|
+:Tiếp nhận phòng chat;
+:Gửi phản hồi;
+|Hệ thống|
+:Chuyển tin nhắn qua WebSocket;
+|Khách hàng|
+:Nhận phản hồi;
+if (Tiếp tục trao đổi?) then (Có)
+  :Gửi tin nhắn tiếp theo;
+  |Hệ thống|
+  :Chuyển tin nhắn tới Admin;
+else (Không)
+  |Khách hàng/Admin|
+  :Kết thúc phiên chat;
+  |Hệ thống|
+  :Xóa phiên hoặc tự hủy sau thời gian không hoạt động;
+endif
+stop
+@enduml
+
+' UC-25 - THÔNG BÁO
+@startuml UC25_USECASE
+title UC-25: Quản lý thông báo hệ thống
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+actor Admin
+rectangle MarcusStore {
+  usecase "Nhận thông báo" as Receive
+  usecase "Xem danh sách thông báo" as List
+  usecase "Đánh dấu đã đọc" as Read
+  usecase "Đánh dấu tất cả đã đọc" as ReadAll
+}
+Customer --> Receive
+Customer --> List
+Customer --> Read
+Admin --> Receive
+Admin --> List
+Admin --> Read
+Admin --> ReadAll
+@enduml
+
+@startuml UC25_ACTIVITY
+title Activity UC-25: Nhận và đọc thông báo
+skinparam shadowing false
+|Hệ thống|
+start
+:Phát sinh sự kiện nghiệp vụ;
+:Tạo thông báo cho đúng người nhận;
+|Dữ liệu|
+:Lưu nội dung và trạng thái chưa đọc;
+|Hệ thống|
+:Đẩy thông báo thời gian thực nếu đang kết nối;
+|Khách hàng/Admin|
+:Mở chuông thông báo;
+|Hệ thống|
+:Tải danh sách và số lượng chưa đọc;
+|Khách hàng/Admin|
+:Chọn một thông báo;
+|Dữ liệu|
+:Đánh dấu đã đọc;
+|Hệ thống|
+:Cập nhật số lượng trên chuông;
+stop
+@enduml
+
+' UC-26 - SYSTEM SETTINGS
+@startuml UC26_USECASE
+title UC-26: Quản lý System Settings
+left to right direction
+skinparam shadowing false
+actor Admin
+actor "Khách truy cập" as Guest
+rectangle MarcusStore {
+  usecase "Xem toàn bộ cấu hình" as List
+  usecase "Cập nhật cấu hình" as Update
+  usecase "Kiểm tra khóa và giá trị" as Validate
+  usecase "Đọc cấu hình công khai" as Public
+}
+Admin --> List
+Admin --> Update
+Guest --> Public
+Update ..> Validate : <<include>>
+@enduml
+
+@startuml UC26_ACTIVITY
+title Activity UC-26: Cập nhật System Settings
+skinparam shadowing false
+|Admin|
+start
+:Mở trang cấu hình và chỉnh sửa giá trị;
+:Gửi yêu cầu lưu;
+|Hệ thống|
+:Kiểm tra quyền, khóa được phép và định dạng;
+if (Dữ liệu hợp lệ?) then (Có)
+  |Dữ liệu|
+  :Cập nhật từng cấu hình;
+  |Hệ thống|
+  :Trả cấu hình mới;
+else (Không)
+  :Trả lỗi tại trường không hợp lệ;
+endif
+|Admin|
+:Xem kết quả;
+stop
+@enduml
+
+' UC-27 - LIÊN HỆ
+@startuml UC27_USECASE
+title UC-27: Quản lý liên hệ
+left to right direction
+skinparam shadowing false
+actor "Khách truy cập/Khách hàng" as Customer
+actor Admin
+rectangle MarcusStore {
+  usecase "Gửi yêu cầu liên hệ" as Submit
+  usecase "Xem danh sách liên hệ" as List
+  usecase "Đánh dấu đã xử lý" as Resolve
+  usecase "Nhận thông báo liên hệ mới" as Notify
+}
+Customer --> Submit
+Admin --> List
+Admin --> Resolve
+Submit ..> Notify : <<include>>
+@enduml
+
+@startuml UC27_ACTIVITY
+title Activity UC-27: Tiếp nhận và xử lý liên hệ
+skinparam shadowing false
+|Khách truy cập/Khách hàng|
+start
+:Nhập và gửi thông tin liên hệ;
+|Hệ thống|
+:Kiểm tra dữ liệu đầu vào;
+if (Hợp lệ?) then (Có)
+  |Dữ liệu|
+  :Lưu yêu cầu liên hệ;
+  :Tạo thông báo cho Admin;
+  |Hệ thống|
+  :Xác nhận gửi thành công;
+  |Admin|
+  :Xem yêu cầu và liên hệ lại khách hàng;
+  :Đánh dấu đã xử lý;
+  |Dữ liệu|
+  :Cập nhật trạng thái yêu cầu;
+else (Không)
+  |Hệ thống|
+  :Thông báo nội dung cần sửa;
+endif
+stop
+@enduml
+
+' UC-28 - ĐỐI SOÁT TÀI CHÍNH
+@startuml UC28_USECASE
+title UC-28: Đối soát tài chính
+left to right direction
+skinparam shadowing false
+actor Admin
+rectangle MarcusStore {
+  usecase "Xem báo cáo tài chính" as Report
+  usecase "Lọc theo thời gian" as Filter
+  usecase "Xem danh sách giao dịch" as Transactions
+  usecase "Cập nhật trạng thái đối soát" as Reconcile
+  usecase "Xuất Excel" as Export
+}
+Admin --> Report
+Admin --> Transactions
+Admin --> Reconcile
+Admin --> Export
+Report ..> Filter : <<include>>
+@enduml
+
+@startuml UC28_ACTIVITY
+title Activity UC-28: Đối soát giao dịch
+skinparam shadowing false
+|Admin|
+start
+:Chọn khoảng thời gian cần đối soát;
+|Hệ thống|
+:Tổng hợp đơn hàng và giao dịch;
+|Dữ liệu|
+:Truy vấn doanh thu, phí, hoàn tiền và trạng thái đối soát;
+|Hệ thống|
+:Hiển thị báo cáo và danh sách giao dịch;
+|Admin|
+:Kiểm tra một giao dịch;
+if (Thông tin khớp?) then (Có)
+  :Xác nhận đã đối soát;
+  |Dữ liệu|
+  :Cập nhật trạng thái đối soát;
+else (Không)
+  |Admin|
+  :Giữ trạng thái chưa đối soát để kiểm tra tiếp;
+endif
+stop
+@enduml
+
+' UC-29 - HÀNH VI KHÁCH HÀNG
+@startuml UC29_USECASE
+title UC-29: Thu thập và phân tích hành vi khách hàng
+left to right direction
+skinparam shadowing false
+actor "Khách truy cập/Khách hàng" as Customer
+actor Admin
+rectangle MarcusStore {
+  usecase "Ghi nhận sự kiện hành vi" as Track
+  usecase "Tổng hợp chỉ số" as Aggregate
+  usecase "Xem xu hướng bán hàng" as Trend
+  usecase "Xem xu hướng sản phẩm" as Product
+  usecase "Xem lý do hủy" as Cancel
+}
+Customer --> Track
+Admin --> Aggregate
+Admin --> Trend
+Admin --> Product
+Admin --> Cancel
+@enduml
+
+@startuml UC29_ACTIVITY
+title Activity UC-29: Thu thập và phân tích dữ liệu hành vi
+skinparam shadowing false
+|Khách truy cập/Khách hàng|
+start
+:Thực hiện thao tác trên hệ thống;
+|Hệ thống|
+:Ghi nhận sự kiện được hỗ trợ và ngữ cảnh;
+|SQL Server|
+:Lưu dữ liệu hành vi hoặc giao dịch;
+|Admin|
+:Chọn khoảng thời gian phân tích;
+|Hệ thống|
+:Chuẩn hóa khoảng thời gian và yêu cầu truy vấn;
+|SQL Server|
+:Tổng hợp KPI, xu hướng, sản phẩm và lý do hủy;
+|Hệ thống|
+:Trả dữ liệu biểu đồ và bảng;
+|Admin|
+:Xem kết quả phân tích;
+stop
+@enduml
+
+' UC-30 - AI TƯ VẤN BÁN HÀNG
+@startuml UC30_USECASE
+title UC-30: AI tư vấn bán hàng
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+actor "Dịch vụ AI" as AI
+rectangle MarcusStore {
+  usecase "Nhập nhu cầu tư vấn" as Ask
+  usecase "Tìm sản phẩm phù hợp" as Search
+  usecase "Sinh câu trả lời tư vấn" as Answer
+  usecase "Mở sản phẩm được gợi ý" as Open
+}
+Customer --> Ask
+Customer --> Open
+AI --> Answer
+Ask ..> Search : <<include>>
+Search ..> Answer : <<include>>
+@enduml
+
+@startuml UC30_ACTIVITY
+title Activity UC-30: AI tư vấn bán hàng
+skinparam shadowing false
+|Khách hàng|
+start
+:Nhập nhu cầu hoặc câu hỏi;
+|Hệ thống|
+:Kiểm tra nội dung và giới hạn yêu cầu;
+:Tìm dữ liệu sản phẩm phù hợp;
+:Tạo ngữ cảnh tư vấn từ dữ liệu thực;
+|Dịch vụ AI|
+:Sinh câu trả lời và đề xuất;
+|Hệ thống|
+:Kiểm tra, chuẩn hóa phản hồi và ghi nhận sử dụng;
+|Khách hàng|
+:Xem tư vấn và chọn sản phẩm;
+|Dữ liệu|
+:Ghi nhận lượt nhấp sản phẩm được AI gợi ý;
+stop
+@enduml
+
+' UC-32 - AI PHÂN TÍCH KINH DOANH
+@startuml UC32_USECASE
+title UC-32: AI phân tích kinh doanh
+left to right direction
+skinparam shadowing false
+actor Admin
+actor "Dịch vụ AI" as AI
+rectangle MarcusStore {
+  usecase "Chọn kỳ phân tích" as Period
+  usecase "Xem báo cáo AI gần nhất" as Latest
+  usecase "Tạo báo cáo AI" as Generate
+  usecase "Lưu báo cáo phân tích" as Save
+}
+Admin --> Period
+Admin --> Latest
+Admin --> Generate
+AI --> Generate
+Generate ..> Save : <<include>>
+@enduml
+
+@startuml UC32_ACTIVITY
+title Activity UC-32: AI phân tích kinh doanh
+skinparam shadowing false
+|Admin|
+start
+:Chọn khoảng thời gian và yêu cầu phân tích;
+|Hệ thống|
+:Kiểm tra kỳ phân tích và tần suất tạo báo cáo;
+:Tổng hợp KPI, xu hướng, sản phẩm và hủy đơn;
+|Dịch vụ AI|
+:Phân tích dữ liệu và sinh nhận định;
+|Hệ thống|
+:Kiểm tra cấu trúc phản hồi;
+|Dữ liệu|
+:Lưu báo cáo AI theo kỳ;
+|Hệ thống|
+:Trả báo cáo gồm tóm tắt, cảnh báo và khuyến nghị;
+|Admin|
+:Xem báo cáo hỗ trợ ra quyết định;
+stop
+@enduml
+
+' UC-04 - ACTIVITY THÊM/CẬP NHẬT
+@startuml UC04_ACTIVITY_SAVE
+title Activity UC-04: Thêm hoặc cập nhật địa chỉ
+skinparam shadowing false
+skinparam activity { BackgroundColor White; BorderColor #1F4E79; DiamondBackgroundColor #D9EAF7; DiamondBorderColor #1F4E79; ArrowColor #1F4E79 }
+|Khách hàng|
+start
+:Mở sổ địa chỉ;
+:Chọn thêm mới hoặc chỉnh sửa;
+|Hệ thống|
+:Hiển thị biểu mẫu địa chỉ;
+|Dữ liệu và dịch vụ ngoài|
+:Tải tỉnh hoặc thành phố từ GHN;
+|Khách hàng|
+:Nhập thông tin người nhận;
+:Chọn tỉnh, huyện và xã;
+|Dữ liệu và dịch vụ ngoài|
+:Tải địa giới GHN tương ứng;
+|Hệ thống|
+:Đồng bộ tên và mã địa giới;
+:Di chuyển bản đồ đến khu vực đã chọn;
+|Khách hàng|
+if (Có chọn vị trí bản đồ?) then (Có)
+  :Kéo ghim hoặc chọn vị trí hiện tại;
+  |Dữ liệu và dịch vụ ngoài|
+  :Xác định tọa độ và địa chỉ;
+  |Hệ thống|
+  :Cập nhật latitude và longitude;
+else (Không)
+endif
+|Khách hàng|
+:Chọn trạng thái mặc định nếu cần;
+:Nhấn Hoàn thành;
+|Hệ thống|
+:Kiểm tra dữ liệu bắt buộc;
+if (Dữ liệu hợp lệ?) then (Có)
+  :Xác thực tài khoản và quyền sở hữu;
+  |Dữ liệu và dịch vụ ngoài|
+  if (Là địa chỉ đầu tiên\nhoặc chọn mặc định?) then (Có)
+    :Bỏ mặc định của địa chỉ cũ;
+  else (Không)
+  endif
+  :Lưu địa chỉ;
+  |Hệ thống|
+  :Tải lại danh sách địa chỉ;
+  :Thông báo lưu thành công;
+  |Khách hàng|
+  :Xem danh sách đã cập nhật;
+else (Không)
+  :Trả thông báo lỗi;
+  |Khách hàng|
+  :Bổ sung hoặc sửa thông tin;
+endif
+stop
+@enduml
+
+' UC-04 - ACTIVITY XÓA
+@startuml UC04_ACTIVITY_DELETE
+title Activity UC-04: Xóa địa chỉ
+skinparam shadowing false
+|Khách hàng|
+start
+:Chọn xóa địa chỉ;
+:Xác nhận thao tác;
+|Hệ thống|
+:Xác thực tài khoản và quyền sở hữu;
+|Dữ liệu|
+:Tìm địa chỉ theo người dùng;
+|Hệ thống|
+if (Tìm thấy địa chỉ?) then (Có)
+  if (Là địa chỉ mặc định?) then (Có)
+    :Từ chối xóa;
+    :Yêu cầu đặt địa chỉ khác làm mặc định;
+  else (Không)
+    |Dữ liệu|
+    :Xóa địa chỉ;
+    |Hệ thống|
+    :Thông báo xóa thành công;
+  endif
+else (Không)
+  :Thông báo địa chỉ không hợp lệ;
+endif
+|Khách hàng|
+:Nhận kết quả;
+stop
+@enduml
+
+' ============================================================
+' UC-07 - USE CASE
+' ============================================================
+@startuml UC07_USECASE
+title UC-07: Quản lý thuộc tính, biến thể và SKU
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+actor "Admin" as Admin
+rectangle "Hệ thống MarcusStore" {
+  usecase "Xem danh sách\nthuộc tính" as U07_ViewAttr
+  usecase "Thêm thuộc tính" as U07_AddAttr
+  usecase "Cập nhật thuộc tính" as U07_UpdateAttr
+  usecase "Xóa thuộc tính" as U07_DeleteAttr
+  usecase "Quản lý giá trị\nthuộc tính" as U07_Value
+  usecase "Chọn sản phẩm" as U07_Product
+  usecase "Chọn thuộc tính\nvà giá trị" as U07_Select
+  usecase "Sinh tổ hợp\nbiến thể" as U07_Variant
+  usecase "Sinh mã SKU" as U07_Generate
+  usecase "Lưu danh sách SKU" as U07_Save
+  usecase "Cập nhật SKU" as U07_UpdateSku
+  usecase "Vô hiệu hóa SKU" as U07_Disable
+}
+Admin --> U07_ViewAttr
+Admin --> U07_AddAttr
+Admin --> U07_UpdateAttr
+Admin --> U07_DeleteAttr
+Admin --> U07_Value
+Admin --> U07_Product
+Admin --> U07_Select
+Admin --> U07_Variant
+Admin --> U07_Save
+Admin --> U07_UpdateSku
+Admin --> U07_Disable
+U07_Variant ..> U07_Select : <<include>>
+U07_Variant ..> U07_Generate : <<include>>
+U07_Save ..> U07_Generate : <<include>>
+note bottom of U07_Save: Backend kiểm tra SKU trùng trước khi lưu
+note bottom of U07_Disable: Chuyển trạng thái ngừng hoạt động
+@enduml
+
+' UC-07 - ACTIVITY THUỘC TÍNH
+@startuml UC07_ACTIVITY_ATTRIBUTE
+title Activity UC-07: Quản lý thuộc tính và giá trị
+skinparam shadowing false
+|Admin|
+start
+:Đăng nhập và mở quản lý thuộc tính;
+|Hệ thống|
+:Kiểm tra quyền Admin;
+if (Có quyền?) then (Có)
+  |Dữ liệu|
+  :Tải thuộc tính và giá trị;
+  |Hệ thống|
+  :Hiển thị danh sách;
+  |Admin|
+  :Chọn thêm, cập nhật hoặc xóa;
+  |Hệ thống|
+  :Kiểm tra dữ liệu và trùng tên;
+  if (Dữ liệu hợp lệ?) then (Có)
+    |Dữ liệu|
+    :Lưu thay đổi;
+    |Hệ thống|
+    :Thông báo thành công;
+  else (Không)
+    :Thông báo lỗi;
+  endif
+else (Không)
+  :Từ chối truy cập;
+endif
+|Admin|
+:Nhận kết quả;
+stop
+@enduml
+
+' UC-07 - ACTIVITY SINH SKU
+@startuml UC07_ACTIVITY_GENERATE
+title Activity UC-07: Sinh biến thể và SKU
+skinparam shadowing false
+|Admin|
+start
+:Mở chức năng sinh SKU;
+:Chọn sản phẩm;
+|Hệ thống|
+:Kiểm tra quyền SKU_CREATE;
+|Dữ liệu|
+:Tải thuộc tính, giá trị và SKU hiện có;
+|Admin|
+:Chọn thuộc tính và các giá trị;
+:Nhấn sinh biến thể;
+|Hệ thống|
+:Tạo tích Descartes;
+:Sinh mã SKU cho từng tổ hợp;
+:Kiểm tra tổ hợp và mã trùng;
+if (Có dữ liệu trùng?) then (Có)
+  |Admin|
+  :Loại tổ hợp trùng hoặc sửa mã;
+else (Không)
+endif
+:Nhập giá và số lượng ban đầu;
+:Xác nhận lưu;
+|Hệ thống|
+:Kiểm tra dữ liệu lần cuối;
+if (Hợp lệ?) then (Có)
+  |Dữ liệu|
+  :Bắt đầu transaction;
+  :Lưu SKU và quan hệ thuộc tính;
+  :Commit transaction;
+  |Hệ thống|
+  :Thông báo thành công;
+else (Không)
+  |Dữ liệu|
+  :Rollback transaction;
+  |Hệ thống|
+  :Trả thông tin lỗi;
+endif
+|Admin|
+:Xem kết quả;
+stop
+@enduml
+
+' UC-07 - ACTIVITY CẬP NHẬT/VÔ HIỆU HÓA
+@startuml UC07_ACTIVITY_UPDATE
+title Activity UC-07: Cập nhật hoặc vô hiệu hóa SKU
+skinparam shadowing false
+|Admin|
+start
+:Chọn một SKU;
+if (Thao tác?) then (Cập nhật)
+  :Nhập giá và số lượng;
+  |Hệ thống|
+  :Kiểm tra dữ liệu;
+  |Dữ liệu|
+  :Cập nhật SKU;
+else (Vô hiệu hóa)
+  :Xác nhận vô hiệu hóa;
+  |Dữ liệu|
+  :Chuyển isActive thành false;
+endif
+|Hệ thống|
+:Thông báo kết quả;
+|Admin|
+:Xem danh sách đã cập nhật;
+stop
+@enduml
+
+' ============================================================
+' UC-10 - USE CASE
+' ============================================================
+@startuml UC10_USECASE
+title UC-10: Xem trang chủ, Header và Footer
+left to right direction
+skinparam shadowing false
+actor "Khách truy cập" as Guest
+actor "Khách hàng" as Customer
+Customer --|> Guest
+rectangle "Hệ thống MarcusStore" {
+  usecase "Xem trang chủ" as U10_Home
+  usecase "Xem Header" as U10_Header
+  usecase "Xem Footer" as U10_Footer
+  usecase "Xem thông tin cửa hàng" as U10_Settings
+  usecase "Tìm kiếm sản phẩm" as U10_Search
+  usecase "Mở danh mục" as U10_Category
+  usecase "Mở trang đăng nhập" as U10_Login
+  usecase "Xem giỏ hàng" as U10_Cart
+  usecase "Xem yêu thích" as U10_Wishlist
+  usecase "Xem tài khoản" as U10_Account
+  usecase "Xem thông báo" as U10_Notification
+  usecase "Xem chính sách" as U10_Policy
+}
+Guest --> U10_Home
+Guest --> U10_Header
+Guest --> U10_Footer
+Guest --> U10_Search
+Guest --> U10_Category
+Guest --> U10_Login
+Guest --> U10_Policy
+Customer --> U10_Cart
+Customer --> U10_Wishlist
+Customer --> U10_Account
+Customer --> U10_Notification
+U10_Home ..> U10_Header : <<include>>
+U10_Home ..> U10_Footer : <<include>>
+U10_Header ..> U10_Settings : <<include>>
+U10_Footer ..> U10_Settings : <<include>>
+@enduml
+
+' UC-10 - ACTIVITY TẢI HOME
+@startuml UC10_ACTIVITY_HOME
+title Activity UC-10: Tải và hiển thị trang chủ
+skinparam shadowing false
+|Người dùng|
+start
+:Truy cập MarcusStore;
+|Hệ thống|
+:Khởi tạo Home và kiểm tra đăng nhập;
+|Dữ liệu|
+:Tải System Settings và các khối Home;
+:Tải giỏ hàng, yêu thích, thông báo nếu đã đăng nhập;
+|Hệ thống|
+if (System Settings hợp lệ?) then (Có)
+  :Hiển thị theo cấu hình;
+else (Không)
+  :Dùng dữ liệu mặc định an toàn;
+endif
+:Hiển thị Header, Home và Footer;
+:Khởi động Hero Slider và đồng hồ;
+if (Một khối tải lỗi?) then (Có)
+  :Ẩn hoặc dùng nội dung dự phòng;
+else (Không)
+endif
+|Người dùng|
+:Chọn chức năng;
+|Hệ thống|
+:Điều hướng đến trang tương ứng;
+stop
+@enduml
+
+' UC-10 - ACTIVITY HEADER
+@startuml UC10_ACTIVITY_HEADER
+title Activity UC-10: Thao tác trên Header
+skinparam shadowing false
+|Người dùng|
+start
+:Chọn chức năng trên Header;
+if (Chức năng?) then (Tìm kiếm)
+  :Nhập từ khóa;
+  |Hệ thống|
+  :Điều hướng đến kết quả tìm kiếm;
+elseif (Danh mục)
+  :Chọn danh mục;
+  |Hệ thống|
+  :Điều hướng đến trang danh mục;
+else (Tiện ích tài khoản)
+  |Hệ thống|
+  if (Đã đăng nhập?) then (Có)
+    |Dữ liệu|
+    :Tải dữ liệu tương ứng;
+    |Hệ thống|
+    :Hiển thị chức năng;
+  else (Không)
+    :Yêu cầu đăng nhập;
+  endif
+endif
+|Người dùng|
+:Xem kết quả;
+stop
+@enduml
+
+' UC-10 - ACTIVITY FOOTER
+@startuml UC10_ACTIVITY_FOOTER
+title Activity UC-10: Thao tác trên Footer
+skinparam shadowing false
+|Người dùng|
+start
+:Xem Footer và chọn chức năng;
+|Dữ liệu|
+:Cung cấp thông tin cửa hàng;
+|Hệ thống|
+if (Chức năng?) then (Chính sách)
+  :Mở nội dung chính sách;
+elseif (Liên kết)
+  :Điều hướng đến trang tương ứng;
+else (Đăng ký nhận tin)
+  |Người dùng|
+  :Nhập Email;
+  |Hệ thống|
+  if (Email hợp lệ?) then (Có)
+    :Điều hướng đến đăng ký và điền trước Email;
+  else (Không)
+    :Yêu cầu nhập lại;
+  endif
+endif
+|Người dùng|
+:Xem kết quả;
+stop
+@enduml
+
+' ============================================================
+' UC-12 - USE CASE
+' ============================================================
+@startuml UC12_USECASE
+title UC-12: Thực hiện Checkout
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+rectangle "Hệ thống MarcusStore" {
+  usecase "Thực hiện Checkout" as U12_Checkout
+  usecase "Kiểm tra giỏ hàng" as U12_Cart
+  usecase "Chọn phương thức nhận hàng" as U12_Fulfillment
+  usecase "Chọn địa chỉ giao hàng" as U12_Address
+  usecase "Tính phí vận chuyển" as U12_Fee
+  usecase "Áp dụng Voucher" as U12_Voucher
+  usecase "Chọn phương thức thanh toán" as U12_Payment
+  usecase "Kiểm tra giá và tồn khả dụng" as U12_Validate
+  usecase "Tạo đơn hàng" as U12_Create
+}
+Customer --> U12_Checkout
+Customer --> U12_Fulfillment
+Customer --> U12_Address
+Customer --> U12_Voucher
+Customer --> U12_Payment
+Customer --> U12_Create
+U12_Checkout ..> U12_Cart : <<include>>
+U12_Checkout ..> U12_Validate : <<include>>
+U12_Create ..> U12_Validate : <<include>>
+U12_Address ..> U12_Fulfillment : <<extend>>\nGiao tận nơi
+U12_Fee ..> U12_Fulfillment : <<extend>>\nGiao tận nơi
+U12_Voucher ..> U12_Checkout : <<extend>>
+note bottom of U12_Create: Khóa dữ liệu và tạo đơn trong transaction
+@enduml
+
+' UC-12 - ACTIVITY 1: MỞ CHECKOUT
+@startuml UC12_ACTIVITY_OPEN
+title Activity UC-12.1: Mở trang Checkout
+skinparam shadowing false
+|Khách hàng|
+start
+:Chọn Checkout;
+|Hệ thống|
+:Kiểm tra đăng nhập;
+if (Đã đăng nhập?) then (Có)
+  |Dữ liệu|
+  :Tải giỏ hàng;
+  :Tải địa chỉ và cấu hình;
+  |Hệ thống|
+  :Hiển thị Checkout;
+else (Không)
+  :Chuyển tới Đăng nhập;
+endif
+|Khách hàng|
+:Xem thông tin đơn;
+stop
+@enduml
+
+' UC-12 - ACTIVITY 2: CHỌN CÁCH NHẬN HÀNG
+@startuml UC12_ACTIVITY_FULFILLMENT
+title Activity UC-12.2: Chọn cách nhận hàng
+skinparam shadowing false
+|Khách hàng|
+start
+:Chọn cách nhận hàng;
+|Hệ thống|
+if (Giao tận nơi?) then (Có)
+  |Khách hàng|
+  :Chọn địa chỉ;
+  |Hệ thống và GHN|
+  :Kiểm tra địa chỉ;
+  :Tính phí giao hàng;
+else (Tại cửa hàng)
+  |Hệ thống và dữ liệu|
+  :Lấy địa chỉ cửa hàng;
+  :Đặt phí bằng 0;
+endif
+|Hệ thống|
+:Tính lại tổng tiền;
+|Khách hàng|
+:Xem số tiền cần trả;
+stop
+@enduml
+
+' UC-12 - ACTIVITY 3: CHỌN ƯU ĐÃI VÀ THANH TOÁN
+@startuml UC12_ACTIVITY_OPTIONS
+title Activity UC-12.3: Chọn ưu đãi và thanh toán
+skinparam shadowing false
+|Khách hàng|
+start
+:Chọn Voucher;
+:Chọn COD hoặc VNPay;
+|Hệ thống|
+:Kiểm tra Voucher;
+if (Voucher hợp lệ?) then (Có)
+  :Áp dụng giảm giá;
+else (Không)
+  :Không áp dụng Voucher;
+  :Thông báo lý do;
+endif
+:Tính tổng thanh toán;
+|Khách hàng|
+:Kiểm tra và nhấn Đặt hàng;
+stop
+@enduml
+
+' UC-12 - ACTIVITY 4: TẠO ĐƠN
+@startuml UC12_ACTIVITY_CREATE
+title Activity UC-12.4: Kiểm tra và tạo đơn
+skinparam shadowing false
+|Khách hàng|
+start
+:Gửi yêu cầu đặt hàng;
+|Hệ thống|
+:Chặn gửi lặp;
+:Kiểm tra đầu vào;
+|Dữ liệu|
+:Khóa SKU;
+:Đọc tồn kho mới nhất;
+|Hệ thống|
+if (Đủ hàng?) then (Có)
+  :Tính lại giá và ưu đãi;
+  |Dữ liệu|
+  :Tạo đơn và chi tiết;
+  :Trừ tồn và lưu giao dịch;
+  :Xóa sản phẩm đã mua;
+  :Commit;
+  |Hệ thống|
+  :Trả mã đơn;
+else (Không)
+  |Dữ liệu|
+  :Giải phóng khóa;
+  |Hệ thống|
+  :Báo sản phẩm thay đổi;
+endif
+|Khách hàng|
+:Nhận kết quả;
+stop
+@enduml
+
+' UC-12 - ACTIVITY 5: KẾT QUẢ ĐẶT HÀNG
+@startuml UC12_ACTIVITY_RESULT
+title Activity UC-12.5: Xử lý kết quả đặt hàng
+skinparam shadowing false
+|Hệ thống|
+start
+:Tạo thông báo đơn hàng;
+if (Thanh toán VNPay?) then (Có)
+  |VNPay|
+  :Tạo trang thanh toán;
+  |Hệ thống|
+  :Chuyển khách sang VNPay;
+else (COD)
+  :Mở trang thành công;
+endif
+|Khách hàng|
+:Tiếp tục theo kết quả;
+stop
+@enduml
+
+' ============================================================
+' UC-13 - USE CASE
+' ============================================================
+@startuml UC13_USECASE
+title UC-13: Giao hàng qua GHN
+left to right direction
+skinparam shadowing false
+actor "Khách hàng" as Customer
+actor "Nhân viên/Admin" as Staff
+actor "Hệ thống GHN" as GHN
+rectangle "Hệ thống MarcusStore" {
+  usecase "Tính phí giao hàng" as U13_Fee
+  usecase "Tạo vận đơn GHN" as U13_Create
+  usecase "Theo dõi vận đơn" as U13_Track
+  usecase "Đồng bộ trạng thái giao hàng" as U13_Sync
+  usecase "Thông báo trạng thái" as U13_Notify
+}
+Customer --> U13_Fee
+Customer --> U13_Track
+Staff --> U13_Create
+Staff --> U13_Track
+GHN --> U13_Sync
+U13_Create ..> U13_Fee : <<include>>
+U13_Sync ..> U13_Notify : <<include>>
+note bottom of U13_Create: Đơn VNPay phải thanh toán thành công trước
+@enduml
+
+' UC-13 - ACTIVITY TÍNH PHÍ
+@startuml UC13_ACTIVITY_FEE
+title Activity UC-13: Tính phí giao hàng GHN
+skinparam shadowing false
+|Khách hàng|
+start
+:Chọn giao tận nơi và địa chỉ nhận;
+|Hệ thống|
+:Kiểm tra mã huyện và mã xã;
+:Tính tổng khối lượng và giá trị hàng;
+|Dữ liệu và GHN|
+:Lấy cấu hình giới hạn bảo hiểm;
+:Gửi yêu cầu tính phí tới GHN;
+if (GHN trả phí hợp lệ?) then (Có)
+  :Trả phí tiêu chuẩn;
+else (Không)
+  :Trả phí dự phòng an toàn;
+endif
+|Hệ thống|
+:Tính trợ giá và phí khách thực trả;
+|Khách hàng|
+:Xem phí giao hàng;
+stop
+@enduml
+
+' UC-13 - ACTIVITY TẠO VẬN ĐƠN
+@startuml UC13_ACTIVITY_CREATE
+title Activity UC-13: Tạo vận đơn GHN
+skinparam shadowing false
+|Nhân viên/Admin|
+start
+:Chọn tạo vận đơn cho đơn hàng;
+|Hệ thống|
+:Kiểm tra phương thức và trạng thái thanh toán;
+if (Đơn VNPay đã thanh toán?) then (Không)
+  :Từ chối tạo vận đơn;
+else (Có hoặc COD)
+  :Tính tiền thu hộ COD;
+  :Tính khối lượng và bảo hiểm;
+  |Dữ liệu và GHN|
+  :Gửi yêu cầu tạo vận đơn;
+  if (GHN tạo thành công?) then (Có)
+    :Trả mã vận đơn;
+    :Lưu Tracking Code vào đơn hàng;
+    |Hệ thống|
+    :Thông báo tạo vận đơn thành công;
+  else (Không)
+    |Hệ thống|
+    :Thông báo lỗi và không tạo mã giả;
+  endif
+endif
+|Nhân viên/Admin|
+:Nhận kết quả;
+stop
+@enduml
+
+' UC-13 - ACTIVITY WEBHOOK
+@startuml UC13_ACTIVITY_WEBHOOK
+title Activity UC-13: Đồng bộ trạng thái từ GHN
+skinparam shadowing false
+|GHN|
+start
+:Gửi Webhook trạng thái vận đơn;
+|Hệ thống|
+:Xác thực Verification Token;
+if (Token hợp lệ?) then (Có)
+  :Chuẩn hóa trạng thái GHN;
+  |Dữ liệu|
+  :Khóa đơn theo Tracking Code;
+  |Hệ thống|
+  if (Trạng thái được hỗ trợ\nvà chuyển đổi hợp lệ?) then (Có)
+    |Dữ liệu|
+    :Cập nhật đơn và lịch sử trạng thái;
+    :Xử lý tài chính hoặc hủy nếu cần;
+    |Hệ thống|
+    :Gửi thông báo cho khách hàng;
+    :Cảnh báo Admin nếu thất bại hoặc hủy;
+  else (Không)
+    :Bỏ qua trạng thái không hợp lệ;
+  endif
+else (Không)
+  :Từ chối Webhook;
+endif
+|GHN|
+:Nhận phản hồi;
+stop
+@enduml

@@ -88,6 +88,15 @@ public class AdminBackupController {
         return ApiResponse.success("Đã xóa file sao lưu khỏi máy chủ.");
     }
 
+    @PostMapping("/{id}/test-restore")
+    public ApiResponse<BackupRecordResponse> testRestore(
+            @PathVariable String id,
+            Authentication authentication,
+            HttpServletRequest servletRequest) {
+        return ApiResponse.success(backupService.testRestore(
+                id, authentication.getName(), resolveClientIp(servletRequest)));
+    }
+
     private String resolveClientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {

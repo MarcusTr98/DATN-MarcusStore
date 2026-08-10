@@ -18,4 +18,9 @@ public class UpdateOrderStatusRequest {
     @Size(max = 500, message = "Lý do hoặc ghi chú không được vượt quá 500 ký tự")
     private String note;
 
+    // Marcus thêm: frontend gửi mã ổn định, backend vẫn lưu note để người dùng
+    // giải thích chi tiết khi chọn "Lý do khác".
+    @Pattern(regexp = "^[A-Z][A-Z0-9_]{2,49}$", message = "Mã lý do hủy không hợp lệ")
+    private String cancellationReasonCode;
+
 }

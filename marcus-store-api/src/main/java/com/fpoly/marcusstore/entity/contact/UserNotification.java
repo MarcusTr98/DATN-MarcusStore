@@ -38,6 +38,22 @@ public class UserNotification {
     @Column(name = "reference_id", length = 50)
     private String referenceId;
 
+    // Marcus thêm: khóa sự kiện theo từng khách, chống chuông trùng do callback retry.
+    @Column(name = "event_key", length = 180, unique = true)
+    private String eventKey;
+
+    @Column(name = "category", nullable = false, length = 20)
+    private String category = "INFO";
+
+    @Column(name = "icon", length = 80)
+    private String icon;
+
+    @Column(name = "deep_link", length = 300)
+    private String deepLink;
+
+    @Column(name = "expires_at")
+    private LocalDateTime expiresAt;
+
     @Column(name = "is_read", nullable = false)
     private Boolean isRead = false;
 

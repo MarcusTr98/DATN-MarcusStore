@@ -25,4 +25,9 @@ public class BackupRecordResponse {
     private LocalDateTime createdAt;
     private LocalDateTime completedAt;
     private String errorMessage;
+    private String sourceDatabase;
+    private Boolean integrityVerified;
+    private String restoreTestStatus;
+    private String restoreTestMessage;
+    private LocalDateTime restoreTestedAt;
 }

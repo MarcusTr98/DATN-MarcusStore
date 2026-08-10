@@ -5,13 +5,14 @@
         <div class="spinner-content-box">
           <div class="spinner-box">
             <div class="spinner-ring"></div>
-            <div class="spinner-logo">
-              <i class="fas fa-mobile-alt"></i>
+            <div class="spinner-logo" :class="{ 'has-site-logo': siteLogoUrl }">
+              <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" />
+              <i v-else class="fas fa-mobile-alt"></i>
             </div>
           </div>
 
           <div class="spinner-text-wrap">
-            <p class="spinner-title">Marcus Store</p>
+            <p class="spinner-title">{{ siteName }}</p>
             <p class="spinner-subtitle">
               Đang xử lý dữ liệu<span>.</span><span>.</span><span>.</span>
             </p>
@@ -24,8 +25,13 @@
 
 <script setup>
 import { useLoadingStore } from '@/stores/useLoadingStore'
+import { onMounted } from 'vue'
+import { useSettings } from '@/composables/useSettings'
 
 const loadingStore = useLoadingStore()
+const { siteName, siteLogoUrl, fetchSettings } = useSettings()
+
+onMounted(fetchSettings)
 </script>
 
 <style scoped>
@@ -70,6 +76,26 @@ const loadingStore = useLoadingStore()
   color: #d70018;
   font-size: 20px;
   animation: pulse 1.5s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Marcus sửa: logo loading có nền riêng, không phụ thuộc màu nền ảnh được tải lên. */
+.spinner-logo.has-site-logo {
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 4px 12px rgba(215, 0, 24, 0.12);
+}
+
+.spinner-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 /* Cụm Text */

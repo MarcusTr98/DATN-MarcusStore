@@ -264,14 +264,19 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
                 c.category_name AS categoryName,
                 parent.category_name AS parentCategoryName,
                 sku.price AS price,
+                sku.max_price AS maxPrice,
                 sku.stock_quantity AS stockQuantity
             FROM Products p
             INNER JOIN (
                 SELECT s.product_id,
                        MIN(s.price) AS price,
+                       MAX(s.price) AS max_price,
                        SUM(COALESCE(s.stock_quantity, 0)) AS stock_quantity
                 FROM Product_Skus s
+                -- Marcus sửa: giá AI phải là giá của SKU thực sự còn hàng, không
+                -- lấy MIN(price) từ một SKU active nhưng đã hết tồn.
                 WHERE s.is_active = 1
+                  AND COALESCE(s.stock_quantity, 0) > 0
                 GROUP BY s.product_id
             ) sku ON sku.product_id = p.product_id
             INNER JOIN Categories c ON c.category_id = p.category_id
@@ -288,7 +293,9 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
             ORDER BY
                 CASE WHEN LOWER(p.product_name) LIKE LOWER(CONCAT('%', :keyword, '%')) THEN 0 ELSE 1 END,
                 CASE WHEN :targetPrice IS NULL THEN 0 ELSE ABS(sku.price - :targetPrice) END,
-                sku.price DESC,
+                -- Marcus sửa: câu hỏi giá/hãng không có mức mục tiêu sẽ hiển
+                -- thị lựa chọn còn hàng có giá thấp trước.
+                sku.price ASC,
                 p.created_at DESC
             """, nativeQuery = true)
     List<AiProductProjection> findProductsForAiAdvisor(
@@ -297,6 +304,61 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
             @Param("minPrice") BigDecimal minPrice,
             @Param("maxPrice") BigDecimal maxPrice,
             @Param("targetPrice") BigDecimal targetPrice);
+
+    // Marcus thêm: câu “máy này/con này” đọc đúng sản phẩm khách đã click, không
+    // chạy lại xếp hạng rồi tự chuyển sang model khác.
+    @Query(value = """
+            SELECT
+                p.product_id AS productId,
+                p.product_name AS productName,
+                p.slug AS slug,
+                p.thumbnail_url AS thumbnailUrl,
+                p.brand AS brand,
+                c.category_name AS categoryName,
+                parent.category_name AS parentCategoryName,
+                MIN(s.price) AS price,
+                MAX(s.price) AS maxPrice,
+                SUM(COALESCE(s.stock_quantity, 0)) AS stockQuantity
+            FROM Products p
+            INNER JOIN Product_Skus s ON s.product_id = p.product_id
+            INNER JOIN Categories c ON c.category_id = p.category_id
+            LEFT JOIN Categories parent ON parent.category_id = c.parent_id
+            WHERE p.product_id = :productId
+              AND p.status = 1
+              AND s.is_active = 1
+              AND COALESCE(s.stock_quantity, 0) > 0
+            GROUP BY p.product_id, p.product_name, p.slug, p.thumbnail_url, p.brand,
+                     c.category_name, parent.category_name
+            """, nativeQuery = true)
+    java.util.Optional<AiProductProjection> findFocusedProductForAiAdvisor(
+            @Param("productId") Integer productId);
+
+    // Marcus thêm: trả đúng lựa chọn SKU còn hàng (màu/dung lượng/giá), không chỉ
+    // báo khoảng giá chung của Product.
+    @Query(value = """
+            SELECT
+                s.product_id AS productId,
+                s.sku_id AS skuId,
+                s.sku_code AS skuCode,
+                s.price AS price,
+                s.stock_quantity AS stockQuantity,
+                STRING_AGG(
+                    CASE WHEN a.attribute_name IS NULL OR av.value_string IS NULL THEN NULL
+                         ELSE CONCAT(a.attribute_name, ': ', av.value_string) END,
+                    ', '
+                ) AS attributes
+            FROM Product_Skus s
+            LEFT JOIN Sku_Attribute_Values sav ON sav.sku_id = s.sku_id
+            LEFT JOIN Attribute_Values av ON av.value_id = sav.value_id
+            LEFT JOIN Attributes a ON a.attribute_id = av.attribute_id
+            WHERE s.product_id IN :productIds
+              AND s.is_active = 1
+              AND COALESCE(s.stock_quantity, 0) > 0
+            GROUP BY s.product_id, s.sku_id, s.sku_code, s.price, s.stock_quantity
+            ORDER BY s.product_id, s.price, s.sku_id
+            """, nativeQuery = true)
+    List<AiSkuProjection> findAvailableSkusForAiAdvisor(
+            @Param("productIds") List<Integer> productIds);
 
     // Marcus thêm: cung cấp thông số thật để AI so sánh có căn cứ, không tự bịa
     // cấu hình sản phẩm
@@ -386,6 +448,8 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
 
         BigDecimal getPrice();
 
+        BigDecimal getMaxPrice();
+
         Integer getStockQuantity();
     }
 
@@ -397,5 +461,19 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
         String getSpecValue();
 
         String getUnit();
+    }
+
+    interface AiSkuProjection {
+        Integer getProductId();
+
+        Integer getSkuId();
+
+        String getSkuCode();
+
+        BigDecimal getPrice();
+
+        Integer getStockQuantity();
+
+        String getAttributes();
     }
 }

@@ -27,9 +27,9 @@ class AiUsageEventServiceTest {
     void ignoresInvalidSessionInsteadOfStoringPersonalFallback() {
         AiUsageEventService service = new AiUsageEventService(repository);
 
-        service.recordChatResult("not-a-uuid", true, 250);
+        service.recordChatResult("not-a-uuid", null, true, 250);
 
-        verify(repository, never()).insert(any(), any(), any(), any());
+        verify(repository, never()).insert(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -37,14 +37,15 @@ class AiUsageEventServiceTest {
         AiUsageEventService service = new AiUsageEventService(repository);
         String sessionId = "123e4567-e89b-42d3-a456-426614174000";
 
-        service.recordChatResult(sessionId, true, 999_999);
+        String adviceId = "123e4567-e89b-42d3-a456-426614174001";
+        service.recordChatResult(sessionId, adviceId, true, 999_999);
 
-        verify(repository).insert(eq(sessionId), eq("CHAT_SUCCESS"), eq(null), eq(120_000));
+        verify(repository).insert(eq(sessionId), eq(adviceId), eq("CHAT_RESPONSE"), eq(null), eq(120_000));
     }
 
     @Test
     void calculatesRatesFromAggregateOnly() {
-        AiUsageSummaryRow row = new AiUsageSummaryRow(8, 2, 3, 6, 1_250);
+        AiUsageSummaryRow row = new AiUsageSummaryRow(8, 2, 3, 10, 10, 1_250);
         when(repository.summarize(any(), any())).thenReturn(row);
 
         var response = new AiUsageEventService(repository)
@@ -63,5 +64,18 @@ class AiUsageEventServiceTest {
                 LocalDate.of(2026, 7, 30),
                 LocalDate.of(2026, 7, 1)))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void feedbackMustBelongToTheSameAdviceAndSession() {
+        String sessionId = "123e4567-e89b-42d3-a456-426614174000";
+        String adviceId = "123e4567-e89b-42d3-a456-426614174001";
+        when(repository.existsChatResponse(sessionId, adviceId)).thenReturn(false);
+
+        assertThatThrownBy(() -> new AiUsageEventService(repository)
+                .recordFeedback(sessionId, adviceId, true))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(repository, never()).insert(any(), any(), any(), any(), any());
     }
 }

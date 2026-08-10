@@ -31,4 +31,8 @@ public class SystemSetting {
     @LastModifiedDate
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    // Marcus thêm: biết chính xác ai là người thay đổi cấu hình gần nhất.
+    @Column(name = "updated_by", length = 100)
+    private String updatedBy;
 }

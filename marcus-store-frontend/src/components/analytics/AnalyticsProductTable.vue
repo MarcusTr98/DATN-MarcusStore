@@ -21,8 +21,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(product, index) in products" :key="product.productId">
-            <td><span class="analytics-rank" :class="{ top: index < 3 }">{{ index + 1 }}</span></td>
+          <tr v-for="(product, index) in pagedProducts" :key="product.productId">
+            <td>
+              <span class="analytics-rank" :class="{ top: absoluteIndex(index) < 3 }">
+                {{ absoluteIndex(index) + 1 }}
+              </span>
+            </td>
             <td>
               <strong>{{ product.productName }}</strong>
               <small>{{ product.brand || 'Chưa có thương hiệu' }}</small>
@@ -51,7 +55,28 @@
         </tbody>
       </table>
     </div>
-    <div v-else class="analytics-empty">
+    <!-- Marcus thêm: phân trang cục bộ để bảng dài không kéo vỡ bố cục Analytics. -->
+    <nav
+      v-if="totalPages > 1"
+      class="analytics-table-pagination"
+      aria-label="Phân trang sản phẩm"
+    >
+      <span>Trang {{ page }}/{{ totalPages }}</span>
+      <div>
+        <button type="button" :disabled="page === 1" @click="page--"><i class="bi bi-chevron-left"></i></button>
+        <button
+          v-for="number in totalPages"
+          :key="number"
+          type="button"
+          :class="{ active: page === number }"
+          @click="page = number"
+        >
+          {{ number }}
+        </button>
+        <button type="button" :disabled="page === totalPages" @click="page++"><i class="bi bi-chevron-right"></i></button>
+      </div>
+    </nav>
+    <div v-if="!products.length" class="analytics-empty">
       <i class="bi bi-box-seam"></i>
       <p>Chưa có sản phẩm bán hoàn tất trong khoảng này.</p>
     </div>
@@ -59,9 +84,22 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed, ref, watch } from 'vue'
+
+const props = defineProps({
   products: { type: Array, required: true },
 })
+const page = ref(1)
+const pageSize = 6
+const totalPages = computed(() => Math.max(1, Math.ceil(props.products.length / pageSize)))
+const pagedProducts = computed(() => props.products.slice((page.value - 1) * pageSize, page.value * pageSize))
+watch(
+  () => props.products,
+  () => {
+    page.value = 1
+  },
+)
+const absoluteIndex = (index) => (page.value - 1) * pageSize + index
 
 const integerFormatter = new Intl.NumberFormat('vi-VN')
 const moneyFormatter = new Intl.NumberFormat('vi-VN', {

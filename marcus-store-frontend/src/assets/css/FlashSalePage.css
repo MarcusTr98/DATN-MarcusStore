@@ -1013,6 +1013,17 @@
   color: var(--flame-red);
   font-size: 1.4rem;
 }
+.footer-logo.has-site-logo .site-logo-image {
+  width: 52px;
+  height: 52px;
+  padding: 4px;
+  flex: 0 0 52px;
+  object-fit: contain;
+  border-radius: 11px;
+  background: #ffffff;
+  border: 1px solid var(--ms-border);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+}
 .footer-logo strong {
   color: var(--flame-orange);
 }
@@ -1367,4 +1378,3 @@
 @media (prefers-reduced-motion: reduce) {
   .waiting-icon { animation: none; }
 }
-

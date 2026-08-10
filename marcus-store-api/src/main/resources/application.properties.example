@@ -81,8 +81,8 @@ ghn.api.url.create=https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shippin
 ghn.store.district-id=1526
 ghn.store.ward-code=20310
 
-# token verify webhook từ GHN Dashboard
-# Nếu chưa có thì để trống, webhook sẽ không verify (dùng khi test Ngrok)
+# Marcus sửa: token xác thực webhook GHN là bắt buộc, kể cả khi demo bằng
+# Postman/ngrok. Request phải gửi cùng giá trị trong header X-Verification-Token.
 ghn.webhook.token=MARCUS_GHN_TEST_2026_SECRET
 
 # cấu hình đăng nhập đăng ký GG
@@ -95,8 +95,18 @@ frontend.url=http://localhost:5173
 # Thư mục phải là đường dẫn tuyệt đối, SQL Server service và backend đều có quyền đọc/ghi.
 backup.storage-path=D:/MarcusStoreBackups
 backup.sqlserver-directory=D:/MarcusStoreBackups
+backup.retention.max-successful=10
+backup.storage-warning-free-mb=1024
+analytics.behavior.retention-days=365
 
 # Marcus AI - Gemini Free Tier
 gemini.api-key=
 gemini.model=gemini-3.5-flash-lite
 gemini.base-url=https://generativelanguage.googleapis.com
+
+# Marcus thêm: profile dùng khi demo/bảo vệ, giảm log nội bộ nhưng giữ nguyên
+# application.properties cho môi trường phát triển của cả nhóm.
+spring.jpa.show-sql=false
+spring.jpa.properties.hibernate.format_sql=false
+logging.level.org.springframework.security=WARN
+logging.level.org.springframework.security.web.authentication=WARN

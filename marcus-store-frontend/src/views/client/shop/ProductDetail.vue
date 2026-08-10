@@ -142,6 +142,7 @@ import api from '@/utils/api'
 import { useCartStore } from '@/stores/cartStore'
 import wishlist, { state as wishlistState } from '@/composables/useWishlistShared'
 import BaseModal from '@/components/BaseModal.vue'
+import { trackBehavior } from '@/api/behaviorApi'
 
 import ProductGallery from '@/layouts/product-detail/ProductGallery.vue'
 import ProductInfo from '@/layouts/product-detail/ProductInfo.vue'
@@ -209,6 +210,9 @@ async function fetchProduct() {
   try {
     const res = await api.get(`/client/products/${slug}`)
     product.value = res.data?.data ?? null
+    // Marcus thêm tại ranh giới module: chỉ ghi lượt xem sản phẩm tổng hợp,
+    // không thay đổi nghiệp vụ chi tiết sản phẩm của thành viên.
+    if (product.value?.productId) trackBehavior('PRODUCT_VIEW', product.value.productId).catch(() => {})
 
     // Set SKU mặc định
     currentSku.value = firstSku.value
@@ -231,9 +235,6 @@ async function fetchProduct() {
 // ===== Variants =====
 function onVariantChange({ attributeId, valueId }) {
   if (!product.value?.skus?.length || !currentSku.value) return
-
-  // Lấy tất cả attributeIds của SKU hiện tại
-  const currentAttrIds = (currentSku.value.attributeValues || []).map((av) => av.attributeId)
 
   // Nếu user click vào attribute đã có trong SKU hiện tại → thay đổi trực tiếp
   const existingAttr = (currentSku.value.attributeValues || []).find((av) => av.attributeId === attributeId)

@@ -18,6 +18,7 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import com.fpoly.marcusstore.security.OAuth2SuccessHandler;
 import org.springframework.http.HttpMethod;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -27,6 +28,9 @@ public class SecurityConfig {
 
     @Autowired
     private AuthTokenFilter authTokenFilter;
+
+    @Autowired
+    private RequestRateLimitFilter requestRateLimitFilter;
 
     @Autowired
     private OAuth2SuccessHandler oAuth2SuccessHandler;
@@ -47,6 +51,16 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(); // Dùng BCrypt
+    }
+
+    @Bean
+    public FilterRegistrationBean<RequestRateLimitFilter> disableStandaloneRateLimitRegistration(
+            RequestRateLimitFilter filter) {
+        // Marcus sửa: filter chỉ chạy trong Spring Security sau JWT, không bị
+        // Servlet container gọi thêm một lần theo IP trước khi xác thực.
+        FilterRegistrationBean<RequestRateLimitFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
     }
 
     @Bean
@@ -86,14 +100,22 @@ public class SecurityConfig {
                         .requestMatchers("/oauth2/**","/login/oauth2/**").permitAll()
 
                         .requestMatchers("/api/public/**").permitAll()
-                        .requestMatchers("/api/client/**").permitAll()
+                        // Marcus sửa: chỉ dữ liệu catalog thực sự công khai mới được anonymous
+                        // truy cập. Profile, sổ địa chỉ, voucher cá nhân và tính phí GHN nằm
+                        // dưới /api/client nhưng vẫn phải có JWT hợp lệ.
+                        .requestMatchers(HttpMethod.GET, "/api/client/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/client/categories/**").permitAll()
+                        .requestMatchers("/api/client/**").authenticated()
                         .requestMatchers("/api/home/**").permitAll()
                         .requestMatchers("/api/admin/user/verify-email").permitAll() // Khách hàng nhập OTP xác thực
                                                                                      // email
-                        .requestMatchers("/api/vnpay/**").permitAll() // Marcus test môi trường Ngrok webhook Vnpay
+                        // Marcus sửa: chỉ IPN được VNPAY gọi từ bên ngoài. Không mở rộng toàn
+                        // bộ namespace để tránh endpoint mới vô tình trở thành public.
+                        .requestMatchers(HttpMethod.GET, "/api/vnpay/ipn").permitAll()
 
-                        // Mở khóa toàn bộ nhánh GHN và mở endpoint báo lỗi của Spring Boot
-                        .requestMatchers("/api/ghn/**").permitAll()
+                        // Marcus sửa: webhook GHN public ở tầng network nhưng controller bắt
+                        // buộc kiểm tra X-Verification-Token. Endpoint GHN khác không được mở.
+                        .requestMatchers(HttpMethod.POST, "/api/ghn/webhook").permitAll()
                         .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
                         // 2. Nhóm API dành cho Khách hàng đã đăng nhập
@@ -111,6 +133,9 @@ public class SecurityConfig {
 
         http.authenticationProvider(authenticationProvider());
         http.addFilterBefore(authTokenFilter, UsernamePasswordAuthenticationFilter.class);
+        // Marcus thêm: chạy sau JWT để API quản trị giới hạn theo tài khoản,
+        // còn API public giới hạn theo địa chỉ kết nối.
+        http.addFilterAfter(requestRateLimitFilter, AuthTokenFilter.class);
 
         return http.build();
     }

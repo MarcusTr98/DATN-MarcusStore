@@ -88,8 +88,8 @@
 }
 
 .logo-icon {
-  width: 46px;
-  height: 46px;
+  width: 54px;
+  height: 54px;
   background: #ffffff;
   border-radius: 12px;
   display: flex;
@@ -98,26 +98,50 @@
   font-size: 22px;
   color: #e11d1d;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  flex: 0 0 54px;
+}
+
+/* Marcus sửa: tạo khoảng thở riêng cho ảnh logo trên nền header đỏ. */
+.logo-icon.has-site-logo {
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 5px 16px rgba(100, 10, 18, 0.22);
+}
+
+.logo-icon .site-logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
 }
 
 .logo-text {
   display: flex;
   flex-direction: column;
-  line-height: 1;
+  line-height: 1.05;
+  min-width: 0;
 }
 
 .logo-brand {
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 800;
   color: #ffffff;
   letter-spacing: -0.5px;
+  max-width: 190px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .logo-store {
-  font-size: 0.65rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.8);
-  letter-spacing: 3px;
+  margin-top: 4px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.92);
+  letter-spacing: 2px;
+  line-height: 1.15;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 /* Search Area */
@@ -770,6 +794,194 @@
   color: #d70018;
 }
 
+/* Marcus nâng cấp: Header Client thích ứng desktop, tablet và mobile. */
+@media (max-width: 1199px) {
+  .main-header-inner {
+    gap: 14px;
+  }
+
+  .h-action-btn {
+    padding-inline: 8px;
+  }
+
+  .logo-brand {
+    max-width: 150px;
+    font-size: 1.4rem;
+  }
+}
+
+@media (max-width: 991px) {
+  .topbar-right .topbar-divider,
+  .topbar-right .topbar-link:not(:first-child) {
+    display: none;
+  }
+
+  .main-header {
+    padding: 10px 0 12px;
+  }
+
+  .main-header-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px 12px;
+  }
+
+  .ms-logo {
+    min-width: 0;
+  }
+
+  .search-bar-wrapper {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .search-suggest-panel {
+    width: 100%;
+    max-height: min(62vh, 520px);
+    overflow-y: auto;
+  }
+
+  .header-actions {
+    justify-self: end;
+    gap: 2px;
+  }
+
+  .header-actions .h-action-text {
+    display: none !important;
+  }
+
+  .h-action-btn {
+    padding: 5px;
+  }
+
+  .h-action-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .client-notification-panel {
+    position: fixed;
+    top: 76px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: min(70vh, 520px);
+  }
+
+  .main-nav .container {
+    max-width: 100%;
+    padding: 0;
+  }
+
+  .nav-list {
+    justify-content: flex-start !important;
+    gap: 4px !important;
+    padding: 6px 12px !important;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-list > .nav-item {
+    flex: 0 0 auto;
+  }
+
+  .nav-link {
+    padding: 7px 12px !important;
+    white-space: nowrap;
+  }
+
+  .dropdown-hover > .dropdown-menu.show {
+    display: block;
+  }
+}
+
+@media (max-width: 575px) {
+  .topbar {
+    padding: 5px 0;
+  }
+
+  .topbar-inner {
+    justify-content: center;
+  }
+
+  .topbar-left {
+    min-width: 0;
+  }
+
+  .topbar-left .topbar-item {
+    max-width: 100%;
+    font-size: 11px;
+  }
+
+  .topbar-left .topbar-item span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .topbar-right {
+    display: none;
+  }
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    flex-basis: 48px;
+  }
+
+  .logo-brand {
+    max-width: 118px;
+    font-size: 1.12rem;
+  }
+
+  .logo-store {
+    margin-top: 3px;
+    font-size: 0.66rem;
+    letter-spacing: 1.5px;
+  }
+
+  .header-actions {
+    gap: 0;
+  }
+
+  .h-action-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 15px;
+  }
+
+  .search-bar {
+    min-height: 44px;
+  }
+
+  .search-input {
+    min-width: 0;
+    padding-left: 38px;
+    font-size: 13px;
+  }
+
+  .search-btn {
+    padding: 0 14px;
+    font-size: 12px;
+  }
+
+  .ss-products {
+    grid-template-columns: 1fr;
+  }
+
+  .client-notification-panel {
+    top: 64px;
+    right: 8px;
+    left: 8px;
+    border-radius: 14px;
+  }
+}
+
 /* Dropdown Items (Các mục con bên trong Danh mục) */
 .dropdown-item {
   font-size: 14px;
@@ -857,6 +1069,18 @@
   justify-content: center;
   color: #fff;
   font-size: 24px;
+}
+
+/* Marcus sửa: modal yêu cầu đăng nhập dùng cùng quy tắc nền logo với header. */
+.logo-icon-box.has-site-logo {
+  padding: 7px;
+  background: #ffffff;
+  border: 1px solid #fee2e2;
+  box-shadow: 0 5px 14px rgba(215, 0, 24, 0.12);
+}
+
+.logo-icon-box.has-site-logo .site-logo-image {
+  border-radius: 6px;
 }
 
 .logo-text-box {

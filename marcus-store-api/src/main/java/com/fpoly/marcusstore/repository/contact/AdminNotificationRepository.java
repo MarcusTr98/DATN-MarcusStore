@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Repository
 public interface AdminNotificationRepository extends JpaRepository<AdminNotification, Integer> {
@@ -20,6 +22,12 @@ public interface AdminNotificationRepository extends JpaRepository<AdminNotifica
     Page<AdminNotification> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<AdminNotification> findByIsReadFalseOrderByCreatedAtDesc(Pageable pageable);
+
+    Page<AdminNotification> findByCategoryOrderByCreatedAtDesc(String category, Pageable pageable);
+
+    Optional<AdminNotification> findByEventKey(String eventKey);
+
+    long deleteByExpiresAtBefore(LocalDateTime cutoff);
 
     @Modifying
     @Transactional

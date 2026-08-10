@@ -9,6 +9,7 @@ import com.fpoly.marcusstore.service.OrderCancellationService;
 import com.fpoly.marcusstore.service.OrderTransactionService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
 import com.fpoly.marcusstore.service.UserNotificationService;
+import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +38,7 @@ public class VnPayController {
     private final OrderTransactionService orderTransactionService;
     private final AdminNotificationService notificationService;
     private final UserNotificationService userNotificationService;
+    private final BehaviorEventService behaviorEventService;
 
     @Transactional
     @GetMapping("/ipn")
@@ -75,7 +77,8 @@ public class VnPayController {
         String computedHash = vnPayConfig.hmacSHA512(vnPayConfig.getHashSecret(), rawData.toString());
 
         if (!computedHash.equalsIgnoreCase(receivedHash)) {
-            log.warn("[VNPAY IPN] Chữ ký không hợp lệ. Received={}", receivedHash);
+            // Marcus sửa: không ghi chữ ký thanh toán nhận được vào log.
+            log.warn("[VNPAY IPN] Chữ ký callback không hợp lệ.");
             return ok("97", "Invalid Checksum");
         }
 
@@ -151,6 +154,12 @@ public class VnPayController {
             order.setTransactionId(transactionId);
             order.setPaymentDate(LocalDateTime.now());
             orderTransactionService.markVnPayPaymentSuccess(order, transactionId, responseCode);
+            // Marcus thêm: chỉ ghi mốc funnel sau IPN hợp lệ; callback lặp đã bị
+            // chặn ở bước idempotency phía trên.
+            try {
+                behaviorEventService.recordSystem("PAYMENT_SUCCESS", order.getOrderId());
+            } catch (RuntimeException ignored) {
+            }
             // Marcus sửa lỗi chuông: chỉ IPN thành công mới đưa đơn VNPAY tới admin.
             notificationService.createAndSendNotification(
                     "ORDER",
@@ -174,7 +183,8 @@ public class VnPayController {
             order.setTransactionId(transactionId);
             orderTransactionService.markVnPayPaymentFailed(
                     order, transactionId, responseCode, failureNote);
-            orderCancellationService.cancelAndRestore(order, failureNote);
+            orderCancellationService.cancelAndRestore(
+                    order, "SYSTEM_VNPAY_FAILED", "SYSTEM", failureNote);
             userNotificationService.createOrderStatusNotification(
                     order, "CANCELLED",
                     "Đơn " + orderCode + " đã tự hủy vì thanh toán VNPAY không thành công.");

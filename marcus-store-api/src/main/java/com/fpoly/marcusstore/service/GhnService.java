@@ -108,8 +108,10 @@ public class GhnService {
                 return trackingCode;
             }
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            log.error("❌ GHN tạo đơn lỗi HTTP ({}): {}", e.getStatusCode(), e.getResponseBodyAsString());
-            throw new RuntimeException("GHN từ chối tạo đơn: " + e.getResponseBodyAsString());
+            // Marcus sửa: response của đối tác có thể chứa chi tiết nội bộ; không đẩy
+            // nguyên văn vào log hoặc response gửi về frontend.
+            log.error("GHN từ chối tạo đơn, HTTP status={}", e.getStatusCode().value());
+            throw new RuntimeException("GHN từ chối tạo đơn vận chuyển");
         } catch (Exception e) {
             log.error("❌ Lỗi khi bắn đơn sang GHN: {}", e.getMessage());
             throw new RuntimeException("Không thể tạo đơn vận chuyển trên GHN");
@@ -132,7 +134,8 @@ public class GhnService {
                 return (String) data.get("status");
             }
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
-            log.error("❌ Lỗi HTTP check trạng thái GHN {}: {}", trackingCode, e.getResponseBodyAsString());
+            log.error("Không thể kiểm tra GHN trackingCode={}, HTTP status={}",
+                    trackingCode, e.getStatusCode().value());
         } catch (Exception e) {
             log.error("❌ Lỗi check trạng thái GHN cho {}: {}", trackingCode, e.getMessage());
         }

@@ -5,7 +5,7 @@
       <p class="status-card__eyebrow">ĐẶT HÀNG THÀNH CÔNG</p>
       <h1>Cảm ơn bạn đã mua sắm!</h1>
       <p class="status-card__lead">
-        Đơn hàng đã được ghi nhận. Marcus Store sẽ cập nhật trạng thái sớm nhất cho bạn.
+        Đơn hàng đã được ghi nhận. {{ siteName }} sẽ cập nhật trạng thái sớm nhất cho bạn.
       </p>
 
       <div class="order-code-box">
@@ -22,7 +22,7 @@
           <span class="pickup-guide__icon"><i class="fas fa-store"></i></span>
           <div>
             <small>PHƯƠNG THỨC NHẬN HÀNG</small>
-            <h2>Nhận tại Marcus Store</h2>
+            <h2>Nhận tại {{ siteName }}</h2>
           </div>
           <span class="pickup-guide__badge">Miễn phí</span>
         </div>
@@ -78,6 +78,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import userOrderApi from '@/api/userOrder'
+import { useSettings } from '@/composables/useSettings'
+
+const { siteName, fetchSettings } = useSettings()
 
 const route = useRoute()
 const paymentStatus = ref('SUCCESS')
@@ -112,6 +115,7 @@ const fetchOrderDetail = async () => {
 }
 
 onMounted(async () => {
+  await fetchSettings()
   const vnpResponseCode = route.query.vnp_ResponseCode
   orderCode.value = route.query.vnp_TxnRef || route.query.orderCode || 'Đang cập nhật'
   paymentStatus.value = vnpResponseCode && vnpResponseCode !== '00' ? 'FAILED' : 'SUCCESS'

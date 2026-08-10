@@ -15,6 +15,10 @@ import java.util.List;
 public class OrderDetailResponse {
     private String orderCode;
     private String orderStatus;
+    private String cancellationReasonCode;
+    private String cancellationReasonLabel;
+    private String cancellationActor;
+    private LocalDateTime cancelledAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private String recipientName;
@@ -31,7 +35,14 @@ public class OrderDetailResponse {
     private String paymentStatus;
     private String transactionId;
     private LocalDateTime paymentDate;
+    // Marcus thêm: thời hạn VNPAY được backend tính thống nhất cho Client/Admin.
+    private LocalDateTime paymentExpiresAt;
     private String trackingCode;
+    // Marcus thêm: Admin nhìn được tình trạng kết nối GHN và quyết định retry.
+    private String ghnIntegrationStatus;
+    private Integer ghnRetryCount;
+    private String ghnLastError;
+    private LocalDateTime ghnLastAttemptAt;
     private Integer userId;
     private String fullName;
     private String email;

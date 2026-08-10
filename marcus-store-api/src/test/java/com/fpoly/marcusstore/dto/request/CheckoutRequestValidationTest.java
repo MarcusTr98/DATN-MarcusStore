@@ -81,6 +81,8 @@ class CheckoutRequestValidationTest {
     private static CheckoutRequestDTO validCheckout() {
         CheckoutRequestDTO request = new CheckoutRequestDTO();
         request.setCartItemIds(List.of(1));
+        // Marcus thêm: mỗi lần bấm đặt hàng có một khóa chống gửi lặp.
+        request.setCheckoutRequestId("checkout-test-request-0001");
         request.setRecipientName("Marcus");
         request.setRecipientPhone("0912345678");
         request.setShippingAddress("118 Cát Bi");

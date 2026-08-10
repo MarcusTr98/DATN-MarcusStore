@@ -286,7 +286,10 @@
 }
 
 @keyframes ai-pulse {
-  to { transform: scale(1.25) rotate(8deg); opacity: 0.6; }
+  to {
+    transform: scale(1.25) rotate(8deg);
+    opacity: 0.6;
+  }
 }
 
 .ai-briefing__error {
@@ -322,8 +325,14 @@
   font-weight: 750;
 }
 
-.ai-briefing__meta .outlook-growth { color: #087a55; border-color: #bee5d5; }
-.ai-briefing__meta .outlook-decline { color: #c53144; border-color: #f0c3ca; }
+.ai-briefing__meta .outlook-growth {
+  color: #087a55;
+  border-color: #bee5d5;
+}
+.ai-briefing__meta .outlook-decline {
+  color: #c53144;
+  border-color: #f0c3ca;
+}
 
 .ai-briefing__content {
   display: grid;
@@ -380,9 +389,15 @@
   font-size: 12px;
 }
 
-.ai-signal--positive > span { color: #087a55; background: #e7f7ef; }
+.ai-signal--positive > span {
+  color: #087a55;
+  background: #e7f7ef;
+}
 .ai-signal--warning > span,
-.ai-signal--critical > span { color: #c53144; background: #ffedf0; }
+.ai-signal--critical > span {
+  color: #c53144;
+  background: #ffedf0;
+}
 
 .ai-signal div {
   min-width: 0;
@@ -458,8 +473,14 @@
   white-space: nowrap;
 }
 
-.ai-action em.priority-high { color: #ba293c; background: #ffeaed; }
-.ai-action em.priority-low { color: #657286; background: #edf1f5; }
+.ai-action em.priority-high {
+  color: #ba293c;
+  background: #ffeaed;
+}
+.ai-action em.priority-low {
+  color: #657286;
+  background: #edf1f5;
+}
 
 .ai-product-outlooks {
   display: grid;
@@ -510,8 +531,14 @@
   background: #edf1f5;
 }
 
-.ai-product-outlooks article > span.direction-up { color: #087a55; background: #e7f7ef; }
-.ai-product-outlooks article > span.direction-down { color: #c53144; background: #ffedf0; }
+.ai-product-outlooks article > span.direction-up {
+  color: #087a55;
+  background: #e7f7ef;
+}
+.ai-product-outlooks article > span.direction-down {
+  color: #c53144;
+  background: #ffedf0;
+}
 
 .ai-product-outlooks article > div {
   min-width: 0;
@@ -577,13 +604,34 @@
   box-shadow: 0 5px 16px rgba(15, 35, 64, 0.045);
 }
 
-.analytics-kpi--green { --kpi-color: #07845a; --kpi-bg: #e8f8f1; }
-.analytics-kpi--violet { --kpi-color: #7047c7; --kpi-bg: #f2edff; }
-.analytics-kpi--orange { --kpi-color: #c46a12; --kpi-bg: #fff3e5; }
-.analytics-kpi--cyan { --kpi-color: #087d9b; --kpi-bg: #e8f7fb; }
-.analytics-kpi--red { --kpi-color: #cb3b4d; --kpi-bg: #fff0f2; }
-.analytics-kpi--indigo { --kpi-color: #485cc7; --kpi-bg: #edf0ff; }
-.analytics-kpi--slate { --kpi-color: #526176; --kpi-bg: #edf1f5; }
+.analytics-kpi--green {
+  --kpi-color: #07845a;
+  --kpi-bg: #e8f8f1;
+}
+.analytics-kpi--violet {
+  --kpi-color: #7047c7;
+  --kpi-bg: #f2edff;
+}
+.analytics-kpi--orange {
+  --kpi-color: #c46a12;
+  --kpi-bg: #fff3e5;
+}
+.analytics-kpi--cyan {
+  --kpi-color: #087d9b;
+  --kpi-bg: #e8f7fb;
+}
+.analytics-kpi--red {
+  --kpi-color: #cb3b4d;
+  --kpi-bg: #fff0f2;
+}
+.analytics-kpi--indigo {
+  --kpi-color: #485cc7;
+  --kpi-bg: #edf0ff;
+}
+.analytics-kpi--slate {
+  --kpi-color: #526176;
+  --kpi-bg: #edf1f5;
+}
 
 .analytics-kpi__top {
   display: flex;
@@ -674,7 +722,8 @@
   --insight-color: #1769ca;
   --insight-soft: #eef6ff;
   margin-top: 16px;
-  overflow: hidden;
+  /* Marcus sửa: cho tooltip nguồn phân tích thoát khỏi card thay vì bị cắt mất. */
+  overflow: visible;
   border: 1px solid #cddded;
   border-radius: 16px;
   background: #fff;
@@ -698,9 +747,7 @@
   align-items: center;
   gap: 14px;
   padding: 18px 20px;
-  background:
-    linear-gradient(100deg, var(--insight-soft), rgba(255, 255, 255, 0) 60%),
-    #fff;
+  background: linear-gradient(100deg, var(--insight-soft), rgba(255, 255, 255, 0) 60%), #fff;
 }
 
 .analytics-insight-panel__status-icon {
@@ -735,6 +782,9 @@
   display: flex;
   align-items: flex-end;
   flex-direction: column;
+  /* Marcus sửa: chừa vùng hiển thị cho nhãn nguồn "Thuật toán", tránh che số dự báo. */
+  min-width: 150px;
+  padding-top: 30px;
   padding-left: 18px;
   border-left: 1px solid #dbe5ef;
 }
@@ -835,8 +885,12 @@
   white-space: nowrap;
 }
 
-.analytics-product-signals span.up { color: #07845a; }
-.analytics-product-signals span.down { color: #c53144; }
+.analytics-product-signals span.up {
+  color: #07845a;
+}
+.analytics-product-signals span.down {
+  color: #c53144;
+}
 
 .analytics-product-signals strong {
   overflow: hidden;
@@ -862,6 +916,9 @@
   display: flex;
   align-items: flex-end;
   flex-direction: column;
+  /* Marcus sửa: badge nguồn đặt ở góc phải nên khối số liệu bắt đầu thấp hơn badge. */
+  min-width: 170px;
+  padding-top: 30px;
 }
 
 .analytics-forecast-total small,
@@ -936,8 +993,12 @@
   border-radius: 3px;
 }
 
-.analytics-chart-legend__sales { background: #1769ca; }
-.analytics-chart-legend__orders { background: #13a471; }
+.analytics-chart-legend__sales {
+  background: #1769ca;
+}
+.analytics-chart-legend__orders {
+  background: #13a471;
+}
 
 .analytics-products__count {
   padding: 6px 10px;
@@ -1036,10 +1097,22 @@
   white-space: nowrap;
 }
 
-.analytics-product-trend.up { color: #087a55; background: #e7f7ef; }
-.analytics-product-trend.down { color: #c53144; background: #ffedf0; }
-.analytics-product-trend.steady { color: #66758a; background: #edf1f5; }
-.analytics-product-trend.new { color: #6840bf; background: #eee8ff; }
+.analytics-product-trend.up {
+  color: #087a55;
+  background: #e7f7ef;
+}
+.analytics-product-trend.down {
+  color: #c53144;
+  background: #ffedf0;
+}
+.analytics-product-trend.steady {
+  color: #66758a;
+  background: #edf1f5;
+}
+.analytics-product-trend.new {
+  color: #6840bf;
+  background: #eee8ff;
+}
 
 .analytics-empty {
   display: grid;
@@ -1324,7 +1397,9 @@
 }
 
 @keyframes analytics-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 1280px) {
@@ -1493,7 +1568,7 @@
   .ai-briefing__hero {
     align-items: flex-start;
     flex-direction: column;
-    padding: 18px;
+    padding: 50px 18px 18px;
   }
 
   .ai-briefing__identity {
@@ -1552,6 +1627,7 @@
   .analytics-insight-panel__summary {
     align-items: flex-start;
     flex-wrap: wrap;
+    padding-top: 50px;
   }
 
   .analytics-insight-panel__forecast {
@@ -1560,6 +1636,10 @@
     padding: 10px 0 0;
     border-top: 1px solid #dbe5ef;
     border-left: 0;
+  }
+
+  .analytics-forecast-chart .analytics-panel__header {
+    padding-top: 34px;
   }
 
   .analytics-insight-grid,
@@ -1603,4 +1683,54 @@
   .analytics-loading {
     inset: 160px 14px auto;
   }
+}
+.analysis-source-host {
+  position: relative;
+}
+
+/* Marcus sửa: các panel có hành động/số liệu bên phải đều dành riêng khoảng trống cho badge nguồn. */
+.ai-briefing.analysis-source-host .ai-briefing__action,
+.warranty-quality.analysis-source-host header > strong {
+  padding-top: 32px;
+}
+
+.analytics-table-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 14px;
+}
+.analytics-table-pagination > span {
+  font-size: 13px;
+  color: #6d7f98;
+}
+.analytics-table-pagination > div {
+  display: flex;
+  gap: 6px;
+}
+.analytics-table-pagination button {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #dbe5f2;
+  border-radius: 9px;
+  background: #fff;
+  color: #4e6079;
+  font-weight: 700;
+}
+.analytics-table-pagination button:hover:not(:disabled),
+.analytics-table-pagination button.active {
+  border-color: #6f4bc4;
+  background: #6f4bc4;
+  color: #fff;
+}
+.analytics-table-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.analytics-anchor-section {
+  scroll-margin-top: 92px;
 }
