@@ -329,20 +329,30 @@
           </div>
 
           <h5 class="fw-bold text-primary mb-3 border-bottom pb-2">
-            8. Chính sách tư vấn Marcus AI
+            8. Giọng điệu của Marcus AI
           </h5>
-          <div class="mb-4 rounded-3 border bg-light p-3">
-            <label class="form-label fw-semibold">Hướng dẫn bổ sung cho AI</label>
+          <div class="ai-policy-card mb-4 rounded-3 border p-3">
+            <div class="ai-policy-purpose">
+              <i class="fas fa-circle-info"></i>
+              <div>
+                <strong>Chỉ bổ sung một câu về cách nói chuyện</strong>
+                <p>
+                  Không dùng ô này để sửa nghiệp vụ, giá, tồn kho, cách chọn sản phẩm hoặc quy tắc
+                  bảo mật. Các phần đó được hệ thống kiểm soát cố định.
+                </p>
+              </div>
+            </div>
+            <label class="form-label fw-semibold mt-3">Một câu mô tả giọng điệu mong muốn</label>
             <textarea
               v-model="settings.AI_ADVISOR_POLICY"
               class="form-control"
-              rows="4"
-              maxlength="1000"
-              placeholder="VD: Ưu tiên sản phẩm còn hàng, giải thích dễ hiểu cho sinh viên..."
+              rows="2"
+              maxlength="240"
+              placeholder="Ví dụ: Trả lời thân thiện, ngắn gọn, lịch sự và dễ hiểu với khách hàng trẻ."
             ></textarea>
-            <div class="form-text">
-              Chỉ dùng để chỉnh giọng điệu và ưu tiên tư vấn. Quy tắc bảo mật trong backend không
-              thể bị ghi đè.
+            <div class="ai-policy-notes">
+              <span><i class="fas fa-check-circle"></i> Ví dụ phù hợp: “Thân thiện, ngắn gọn, không dùng từ ngữ quá kỹ thuật.”</span>
+              <span class="ms-auto">{{ settings.AI_ADVISOR_POLICY.length }}/240 ký tự</span>
             </div>
             <div v-if="aiClickStats.length" class="mt-3">
               <div class="fw-semibold mb-2">Sản phẩm được mở nhiều nhất từ Marcus AI</div>
@@ -669,6 +679,14 @@ onBeforeUnmount(releaseLocalLogoPreview)
 
 .branding-fields { min-width: 0; }
 .setting-help { display: block; margin-top: 6px; color: #64748b; line-height: 1.45; }
+.ai-policy-card { background: linear-gradient(135deg, #f5f9ff, #ffffff); border-color: #cfe0f5 !important; }
+.ai-policy-purpose { display: flex; gap: 12px; padding: 14px; border-radius: 13px; background: #eaf4ff; color: #174f8e; }
+.ai-policy-purpose > i { margin-top: 3px; font-size: 18px; }
+.ai-policy-purpose strong { display: block; margin-bottom: 4px; color: #123b6b; }
+.ai-policy-purpose p { margin: 0; color: #496783; line-height: 1.6; }
+.ai-policy-notes { display: grid; gap: 7px; margin-top: 10px; color: #5b6f84; font-size: 13px; }
+.ai-policy-notes span { display: flex; align-items: flex-start; gap: 7px; }
+.ai-policy-notes i { margin-top: 3px; color: #1769ca; }
 .logo-upload-zone {
   width: 100%;
   min-height: 132px;

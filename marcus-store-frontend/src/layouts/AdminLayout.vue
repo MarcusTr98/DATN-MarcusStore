@@ -652,4 +652,141 @@ watch(
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Marcus nâng cấp: lớp responsive dùng chung cho toàn bộ màn Admin trên điện thoại.
+   Chỉ điều chỉnh cách trình bày, không can thiệp nghiệp vụ của các module thành viên. */
+@media (max-width: 720px) {
+  .admin-layout .admin-view {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    overscroll-behavior-y: contain;
+  }
+
+  .admin-layout .admin-view > * {
+    min-width: 0;
+  }
+
+  .admin-layout .admin-view .container,
+  .admin-layout .admin-view .container-fluid,
+  .admin-layout .admin-view .page-container,
+  .admin-layout .admin-view .page-content,
+  .admin-layout .admin-view .content-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding-inline: 12px !important;
+  }
+
+  .admin-layout .admin-page-header,
+  .admin-layout .dashboard-heading,
+  .admin-layout .voucher-hero,
+  .admin-layout .flashsale-hero,
+  .admin-layout .order-hero,
+  .admin-layout .cm-hero,
+  .admin-layout .skug-header,
+  .admin-layout .amg-header,
+  .admin-layout .page-heading,
+  .admin-layout .page-header {
+    margin: 12px 12px 18px !important;
+    padding: 18px !important;
+    border-radius: 16px !important;
+  }
+
+  .admin-layout .admin-page-header h1,
+  .admin-layout .dashboard-heading h1,
+  .admin-layout .voucher-hero h1,
+  .admin-layout .flashsale-hero h1,
+  .admin-layout .order-hero h1,
+  .admin-layout .cm-hero h1,
+  .admin-layout .skug-header h1,
+  .admin-layout .amg-header h1,
+  .admin-layout .page-heading h1,
+  .admin-layout .page-header h1 {
+    font-size: clamp(1.3rem, 6vw, 1.65rem) !important;
+    line-height: 1.25 !important;
+  }
+
+  .admin-layout .admin-page-header__actions,
+  .admin-layout .page-actions,
+  .admin-layout .header-actions,
+  .admin-layout .toolbar-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .admin-layout .admin-page-header__actions > *,
+  .admin-layout .page-actions > *,
+  .admin-layout .header-actions > *,
+  .admin-layout .toolbar-actions > * {
+    min-height: 42px;
+  }
+
+  .admin-layout .filter-row,
+  .admin-layout .filters-row,
+  .admin-layout .filter-grid,
+  .admin-layout .toolbar-panel,
+  .admin-layout .search-filter {
+    min-width: 0;
+    grid-template-columns: 1fr !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .admin-layout input,
+  .admin-layout select,
+  .admin-layout textarea,
+  .admin-layout button,
+  .admin-layout .btn {
+    min-height: 42px;
+  }
+
+  /* Bảng quản trị giữ đủ cột và cuộn trong khung, không kéo vỡ toàn trang. */
+  .admin-layout .table-responsive,
+  .admin-layout .table-wrapper,
+  .admin-layout .data-table-wrapper,
+  .admin-layout .table-container {
+    width: 100%;
+    max-width: calc(100vw - 24px);
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-layout table {
+    min-width: 720px;
+  }
+
+  .admin-layout .modal-dialog,
+  .admin-layout .modal-content,
+  .admin-layout [class*='modal-card'] {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: calc(100dvh - 24px);
+    margin: 12px auto !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .admin-layout .admin-page-header,
+  .admin-layout .dashboard-heading,
+  .admin-layout .voucher-hero,
+  .admin-layout .flashsale-hero,
+  .admin-layout .order-hero,
+  .admin-layout .cm-hero,
+  .admin-layout .skug-header,
+  .admin-layout .amg-header,
+  .admin-layout .page-heading,
+  .admin-layout .page-header {
+    margin-inline: 8px !important;
+    padding: 16px !important;
+  }
+
+  .admin-layout .admin-view .container,
+  .admin-layout .admin-view .container-fluid,
+  .admin-layout .admin-view .page-container,
+  .admin-layout .admin-view .page-content,
+  .admin-layout .admin-view .content-wrapper {
+    padding-inline: 8px !important;
+  }
+}
 </style>

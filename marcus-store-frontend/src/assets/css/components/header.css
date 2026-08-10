@@ -935,8 +935,8 @@
   }
 
   .logo-brand {
-    max-width: 118px;
-    font-size: 1.12rem;
+    max-width: min(34vw, 138px);
+    font-size: clamp(1rem, 4.8vw, 1.2rem);
   }
 
   .logo-store {
@@ -947,6 +947,7 @@
 
   .header-actions {
     gap: 0;
+    min-width: 0;
   }
 
   .h-action-icon {
@@ -979,6 +980,74 @@
     right: 8px;
     left: 8px;
     border-radius: 14px;
+  }
+
+  /* Marcus nâng cấp: giữ cụm nhận diện và hành động cân đối trên màn hình hẹp. */
+  .main-header .container {
+    padding-inline: 10px;
+  }
+
+  .main-header-inner {
+    gap: 9px 6px;
+  }
+
+  .ms-logo {
+    gap: 7px;
+  }
+
+  .header-actions > .h-action,
+  .header-actions > .h-action-btn {
+    flex: 0 0 auto;
+  }
+
+  .cart-count {
+    min-width: 17px;
+    height: 17px;
+    padding-inline: 4px;
+    font-size: 9px;
+  }
+
+  .search-suggest-panel {
+    position: fixed;
+    top: 125px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-height: calc(100dvh - 140px);
+  }
+
+  .nav-list {
+    scroll-snap-type: x proximity;
+  }
+
+  .nav-list > .nav-item {
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 380px) {
+  .logo-icon {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+  }
+
+  .logo-brand {
+    max-width: 104px;
+    font-size: 0.98rem;
+  }
+
+  .logo-store {
+    font-size: 0.58rem;
+  }
+
+  .h-action-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .search-btn {
+    padding-inline: 11px;
   }
 }
 

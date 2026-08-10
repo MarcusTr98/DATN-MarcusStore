@@ -267,6 +267,16 @@
         </button>
       </form>
     </div>
+
+    <!-- Marcus sửa: thay confirm() của trình duyệt bằng modal dùng chung của hệ thống. -->
+    <BaseModal
+      :visible="deleteModal.visible"
+      type="confirm"
+      title="Xóa bản sao lưu?"
+      :message="deleteModal.message"
+      @close="closeDeleteModal"
+      @confirm="confirmDeleteBackup"
+    />
   </main>
 </template>
 
@@ -274,6 +284,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { backupApi } from '@/api/backupApi'
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
+import BaseModal from '@/components/BaseModal.vue'
 import '@/assets/css/DataBackup.css'
 
 const overview = ref({ tables: [], tableCount: 0, totalRecords: 0, storageBytes: 0 })
@@ -285,6 +296,7 @@ const deletingId = ref('')
 const restoreTestingId = ref('')
 const errorMessage = ref('')
 const createModal = reactive({ open: false, type: 'EXCEL', note: '' })
+const deleteModal = reactive({ visible: false, item: null, message: '' })
 let pollTimer = null
 
 const hasProcessing = computed(() => history.value.some((item) => item.status === 'PROCESSING'))
@@ -378,20 +390,34 @@ const downloadBackup = async (item) => {
 }
 
 const deleteBackup = async (item) => {
-  if (
-    !window.confirm(
-      `Xóa "${item.fileName}" khỏi máy chủ?\nHãy chắc chắn bạn đã lưu file vào ổ cứng.`,
-    )
-  )
-    return
+  deleteModal.item = item
+  deleteModal.message = `Bạn sắp xóa “${item.fileName}” khỏi máy chủ. Hãy chắc chắn file cần lưu đã được tải về ổ cứng. Thao tác này không thể hoàn tác.`
+  deleteModal.visible = true
+}
+
+const closeDeleteModal = () => {
+  if (deletingId.value) return
+  deleteModal.visible = false
+  deleteModal.item = null
+  deleteModal.message = ''
+}
+
+const confirmDeleteBackup = async () => {
+  const item = deleteModal.item
+  if (!item || deletingId.value) return
   deletingId.value = item.id
+  errorMessage.value = ''
   try {
     await backupApi.remove(item.id)
     history.value = history.value.filter((entry) => entry.id !== item.id)
+    deleteModal.visible = false
+    deleteModal.message = ''
   } catch (error) {
     errorMessage.value = error.response?.data?.message || 'Không thể xóa bản sao lưu.'
+    deleteModal.visible = false
   } finally {
     deletingId.value = ''
+    deleteModal.item = null
   }
 }
 
