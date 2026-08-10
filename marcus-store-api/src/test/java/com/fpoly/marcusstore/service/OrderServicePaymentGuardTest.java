@@ -2,6 +2,9 @@ package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderItem;
+import com.fpoly.marcusstore.entity.core.Product;
+import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -96,5 +100,53 @@ class OrderServicePaymentGuardTest {
                                 .hasMessageContaining("hủy vận đơn GHN trước");
                 verify(cancellationService, never()).cancelAndRestore(any(), any());
                 verify(orderRepository, never()).save(any(Order.class));
+        }
+
+        @Test
+        void imeiPreviewExcludesNormalSkuFromMixedOrder() {
+                OrderRepository orderRepository = mock(OrderRepository.class);
+                OrderItemRepository orderItemRepository = mock(OrderItemRepository.class);
+                ProductItemRepository productItemRepository = mock(ProductItemRepository.class);
+                Order order = new Order();
+                order.setOrderId(1);
+                order.setOrderCode("ORD-MIXED");
+                when(orderRepository.findByOrderCode("ORD-MIXED")).thenReturn(Optional.of(order));
+
+                OrderItem normalItem = orderItem(11, false, "CASE-NORMAL");
+                OrderItem imeiItem = orderItem(12, true, "PHONE-IMEI");
+                when(orderItemRepository.findByOrder_OrderId(1)).thenReturn(List.of(normalItem, imeiItem));
+                when(productItemRepository.findAvailableBySkuId(imeiItem.getSku().getSkuId()))
+                                .thenReturn(List.of());
+
+                OrderServiceImpl service = new OrderServiceImpl(
+                                orderItemRepository, productItemRepository, orderRepository,
+                                mock(OrderStatusHistoryRepository.class), mock(UserRepository.class),
+                                mock(ProductSkuRepository.class), mock(ApplicationEventPublisher.class),
+                                mock(OrderShippingService.class), mock(OrderPaymentService.class),
+                                mock(OrderCancellationService.class), mock(EmailService.class),
+                                mock(CommentEvaluationRepository.class), mock(AdminNotificationService.class),
+                                mock(UserNotificationService.class));
+
+                var preview = service.getImeiPreview("ORD-MIXED");
+
+                org.assertj.core.api.Assertions.assertThat(preview)
+                                .hasSize(1)
+                                .first().extracting("orderItemId").isEqualTo(12);
+                verify(productItemRepository, never()).findAvailableBySkuId(normalItem.getSku().getSkuId());
+        }
+
+        private OrderItem orderItem(int id, boolean managesImei, String skuCode) {
+                Product product = new Product();
+                product.setStatusImei(managesImei);
+                product.setProductName(skuCode);
+                ProductSku sku = new ProductSku();
+                sku.setSkuId(id + 100);
+                sku.setSkuCode(skuCode);
+                sku.setProduct(product);
+                OrderItem item = new OrderItem();
+                item.setOrderItemId(id);
+                item.setQuantity(1);
+                item.setSku(sku);
+                return item;
         }
 }
