@@ -72,6 +72,8 @@
 
       <AnalyticsWarrantyQuality :data="warrantyQuality" />
 
+      <AnalyticsAiSalesFunnel :data="aiSalesFunnel" />
+
       <AnalyticsBehaviorFunnel :data="behaviorFunnel" />
 
       <AnalyticsSalesChart :monthly="numberOfDays > 120" :trend="trend" />
@@ -112,6 +114,7 @@ import AnalyticsCancellationReasons from '@/components/analytics/AnalyticsCancel
 import AnalyticsSalesChart from '@/components/analytics/AnalyticsSalesChart.vue'
 import AnalyticsWarrantyQuality from '@/components/analytics/AnalyticsWarrantyQuality.vue'
 import AnalyticsBehaviorFunnel from '@/components/analytics/AnalyticsBehaviorFunnel.vue'
+import AnalyticsAiSalesFunnel from '@/components/analytics/AnalyticsAiSalesFunnel.vue'
 import { useBusinessAnalytics } from '@/composables/useBusinessAnalytics'
 
 const {
@@ -121,6 +124,7 @@ const {
   aiLoading,
   aiReport,
   aiUsage,
+  aiSalesFunnel,
   cancellationReasons,
   errorMessage,
   fromDate,

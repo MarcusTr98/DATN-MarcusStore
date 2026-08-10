@@ -47,10 +47,10 @@ export const streamAiAdvisor = async (message, history, sessionId, context, hand
 }
 
 // Marcus thêm: tracking tối thiểu, không gửi nội dung chat hay thông tin người dùng.
-export const trackAiProductClick = (productId, sessionId) =>
+export const trackAiProductClick = (productId, sessionId, adviceId) =>
   api.post(
     '/public/ai-advisor/product-click',
-    { productId, sessionId },
+    { productId, sessionId, adviceId },
     { skipGlobalLoading: true },
   )
 

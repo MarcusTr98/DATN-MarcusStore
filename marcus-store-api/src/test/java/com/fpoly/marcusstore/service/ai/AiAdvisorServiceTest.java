@@ -40,9 +40,6 @@ class AiAdvisorServiceTest {
                                 systemSettingService,
                                 new AiAdvisorIntentRouter(),
                                 new AiStoreKnowledgeService(systemSettingService));
-                ReflectionTestUtils.setField(service, "apiKey", "");
-                ReflectionTestUtils.setField(service, "model", "gemini-3.5-flash-lite");
-                ReflectionTestUtils.setField(service, "baseUrl", "https://generativelanguage.googleapis.com");
         }
 
         @Test

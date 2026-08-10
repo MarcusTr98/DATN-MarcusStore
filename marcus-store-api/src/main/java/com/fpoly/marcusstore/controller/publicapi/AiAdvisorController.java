@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -30,6 +31,7 @@ import java.util.Deque;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.UUID;
 
 import static org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE;
@@ -47,6 +49,7 @@ public class AiAdvisorController {
     private final AiProductClickService aiProductClickService;
     private final AiUsageEventService usageEventService;
     private final BehaviorEventService behaviorEventService;
+    private final @Qualifier("geminiExecutor") Executor geminiExecutor;
     private final Map<String, Deque<Instant>> requestWindows = new ConcurrentHashMap<>();
 
     @GetMapping("/session-version")
@@ -95,7 +98,7 @@ public class AiAdvisorController {
                 recordChatUsage(request.getSessionId(), null, false, startedAt);
                 sendSafeStreamError(emitter, exception);
             }
-        });
+        }, geminiExecutor);
         return emitter;
     }
 
@@ -155,7 +158,8 @@ public class AiAdvisorController {
 
     private void recordProductClickUsage(AiProductClickRequest request) {
         try {
-            usageEventService.recordProductClick(request.getSessionId(), request.getProductId());
+            usageEventService.recordProductClick(
+                    request.getSessionId(), request.getAdviceId(), request.getProductId());
         } catch (RuntimeException ignored) {
             // Marcus sửa: thống kê lỗi không được chặn khách mở trang sản phẩm.
         }

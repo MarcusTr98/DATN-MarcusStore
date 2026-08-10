@@ -12,6 +12,16 @@ public class AiUsageEventRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
+    public boolean existsChatResponse(String sessionId, String adviceId) {
+        if (sessionId == null || adviceId == null) return false;
+        Long count = jdbcTemplate.queryForObject("""
+                SELECT COUNT_BIG(*) FROM AI_Usage_Events
+                WHERE session_id = ? AND advice_id = ?
+                  AND event_type IN ('CHAT_RESPONSE', 'CHAT_SUCCESS')
+                """, Long.class, sessionId, adviceId);
+        return count != null && count > 0;
+    }
+
     public void insert(
             String sessionId,
             String adviceId,
@@ -59,6 +69,63 @@ public class AiUsageEventRepository {
                 toDate);
     }
 
+    public AiSalesFunnelRow salesFunnel(LocalDateTime fromDate, LocalDateTime toDate) {
+        return jdbcTemplate.queryForObject("""
+                WITH AiJourneys AS (
+                    SELECT session_id, MIN(created_at) AS asked_at
+                    FROM Customer_Behavior_Events
+                    WHERE event_type = 'AI_QUESTION'
+                      AND session_id IS NOT NULL
+                      AND created_at >= ? AND created_at < ?
+                    GROUP BY session_id
+                )
+                SELECT
+                    COUNT_BIG(*),
+                    COALESCE(SUM(CAST(COALESCE(response_event.hit, 0) AS BIGINT)), 0),
+                    COALESCE(SUM(CAST(COALESCE(helpful_event.hit, 0) AS BIGINT)), 0),
+                    COALESCE(SUM(CAST(COALESCE(click_event.hit, 0) AS BIGINT)), 0),
+                    COALESCE(SUM(CAST(COALESCE(checkout_event.hit, 0) AS BIGINT)), 0),
+                    COALESCE(SUM(CAST(COALESCE(order_event.hit, 0) AS BIGINT)), 0),
+                    COALESCE(SUM(CAST(COALESCE(payment_event.hit, 0) AS BIGINT)), 0)
+                FROM AiJourneys j
+                OUTER APPLY (
+                    SELECT TOP 1 1 AS hit FROM AI_Usage_Events u
+                        WHERE u.session_id = j.session_id
+                          AND u.event_type IN ('CHAT_RESPONSE','CHAT_SUCCESS')
+                          AND u.created_at >= j.asked_at AND u.created_at < ?
+                ) response_event
+                OUTER APPLY (
+                    SELECT TOP 1 1 AS hit FROM AI_Usage_Events u
+                        WHERE u.session_id = j.session_id
+                          AND u.event_type = 'FEEDBACK_HELPFUL'
+                          AND u.created_at >= j.asked_at AND u.created_at < ?
+                ) helpful_event
+                OUTER APPLY (
+                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                        WHERE e.session_id = j.session_id AND e.event_type = 'AI_PRODUCT_CLICK'
+                          AND e.created_at >= j.asked_at AND e.created_at < ?
+                ) click_event
+                OUTER APPLY (
+                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                        WHERE e.session_id = j.session_id AND e.event_type = 'CHECKOUT_STARTED'
+                          AND e.created_at >= j.asked_at AND e.created_at < ?
+                ) checkout_event
+                OUTER APPLY (
+                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                        WHERE e.session_id = j.session_id AND e.event_type = 'ORDER_CREATED'
+                          AND e.created_at >= j.asked_at AND e.created_at < ?
+                ) order_event
+                OUTER APPLY (
+                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                        WHERE e.session_id = j.session_id AND e.event_type = 'PAYMENT_SUCCESS'
+                          AND e.created_at >= j.asked_at AND e.created_at < ?
+                ) payment_event
+                """, (rs, rowNum) -> new AiSalesFunnelRow(
+                        rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4),
+                        rs.getLong(5), rs.getLong(6), rs.getLong(7)),
+                fromDate, toDate, toDate, toDate, toDate, toDate, toDate, toDate);
+    }
+
     public record AiUsageSummaryRow(
             long successfulChats,
             long failedChats,
@@ -66,5 +133,15 @@ public class AiUsageEventRepository {
             long uniqueSessions,
             long totalAdvisorSessions,
             long averageResponseTimeMs) {
+    }
+
+    public record AiSalesFunnelRow(
+            long questions,
+            long responses,
+            long helpful,
+            long clicks,
+            long checkouts,
+            long orders,
+            long paid) {
     }
 }

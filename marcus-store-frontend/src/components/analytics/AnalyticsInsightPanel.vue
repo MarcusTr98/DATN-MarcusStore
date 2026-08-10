@@ -20,7 +20,18 @@
           {{ formatChange(forecast.changePercent) }}
         </strong>
         <span>Độ tin cậy: {{ forecast.confidence }}</span>
+        <span v-if="forecast.backtest?.available">
+          Kiểm thử {{ forecast.backtest.testedPeriods }} kỳ · sai số
+          {{ formatNumber(forecast.backtest.mape) }}%
+        </span>
       </div>
+    </div>
+
+    <div v-if="forecast?.anomalies?.length" class="analytics-anomaly-list">
+      <strong><i class="bi bi-exclamation-diamond"></i> Kỳ dữ liệu bất thường</strong>
+      <span v-for="point in forecast.anomalies" :key="point.label">
+        {{ formatDate(point.label) }}: thực tế {{ formatMoney(point.actual) }}, lệch đáng kể khỏi xu hướng.
+      </span>
     </div>
 
     <div class="analytics-insight-grid">
@@ -72,4 +83,19 @@ function formatChange(value) {
   const sign = value >= 0 ? '+' : ''
   return `${sign}${formatNumber(value)}%`
 }
+
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString('vi-VN')} VND`
+}
+
+function formatDate(value) {
+  if (!value) return '—'
+  const normalized = value.length === 7 ? `${value}-01` : value
+  return new Intl.DateTimeFormat('vi-VN', { month: '2-digit', year: 'numeric', day: value.length === 7 ? undefined : '2-digit' })
+    .format(new Date(`${normalized}T00:00:00`))
+}
 </script>
+
+<style scoped>
+.analytics-anomaly-list{display:flex;flex-wrap:wrap;gap:8px 16px;padding:12px 20px;border-top:1px solid rgba(219,39,119,.13);color:#53657d;font-size:13px}.analytics-anomaly-list strong{color:#b42352}.analytics-anomaly-list span{padding-left:12px;border-left:2px solid #f3a9bf}
+</style>

@@ -50,6 +50,10 @@ const analyticsApi = {
     return get('/admin/ai-advisor/usage-summary', params)
   },
 
+  getAiSalesFunnel(params) {
+    return get('/admin/ai-advisor/sales-funnel', params)
+  },
+
   generateAiReport(params) {
     const query = queryString(params)
     // Marcus thêm: POST là thao tác duy nhất gọi AI; GET phía trên chỉ đọc DB.

@@ -34,6 +34,7 @@ public record AiAnalyticsReportResponse(
         }
 
         public record Signal(
+                        String evidenceId,
                         String title,
                         String evidence,
                         String interpretation,

@@ -37,6 +37,10 @@ public class AiAnalyticsReport {
     @Column(name = "model_name", nullable = false, length = 100)
     private String modelName;
 
+    // Marcus thêm: nhận diện dữ liệu nguồn đã đổi để không dùng nhầm báo cáo cache cũ.
+    @Column(name = "data_fingerprint", length = 64)
+    private String dataFingerprint;
+
     @Column(name = "generated_at", nullable = false)
     private LocalDateTime generatedAt;
 

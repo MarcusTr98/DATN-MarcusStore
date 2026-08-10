@@ -844,6 +844,8 @@ CREATE TABLE AI_Analytics_Reports (
     to_date DATE NOT NULL,
     report_json NVARCHAR(MAX) NOT NULL,
     model_name VARCHAR(100) NOT NULL,
+    -- Marcus thêm: cache chỉ hợp lệ khi dữ liệu tổng hợp vẫn cùng fingerprint.
+    data_fingerprint VARCHAR(64) NULL,
     generated_at DATETIME2 NOT NULL
         CONSTRAINT DF_AIAnalyticsReports_GeneratedAt DEFAULT SYSDATETIME(),
     CONSTRAINT CK_AIAnalyticsReports_Period CHECK (from_date <= to_date),
@@ -851,6 +853,8 @@ CREATE TABLE AI_Analytics_Reports (
 );
 CREATE INDEX IX_AIAnalyticsReports_PeriodGenerated
     ON AI_Analytics_Reports(from_date, to_date, generated_at DESC);
+CREATE INDEX IX_AIAnalyticsReports_Fingerprint
+    ON AI_Analytics_Reports(from_date, to_date, model_name, data_fingerprint, generated_at DESC);
 
 -- Marcus thêm: telemetry AI ẩn danh; không lưu nội dung chat, IP, email hay user_id.
 CREATE TABLE AI_Usage_Events (
@@ -879,6 +883,20 @@ CREATE INDEX IX_AIUsageEvents_Session
     ON AI_Usage_Events(session_id, created_at DESC);
 CREATE INDEX IX_AIUsageEvents_Advice ON AI_Usage_Events(advice_id, created_at DESC)
     WHERE advice_id IS NOT NULL;
+GO
+CREATE OR ALTER TRIGGER dbo.TR_AIUsageEvents_OneFeedback
+ON dbo.AI_Usage_Events AFTER INSERT, UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (
+        SELECT usage_event.advice_id FROM dbo.AI_Usage_Events usage_event
+        WHERE usage_event.advice_id IS NOT NULL
+          AND usage_event.event_type IN ('FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')
+          AND usage_event.advice_id IN (SELECT advice_id FROM inserted WHERE advice_id IS NOT NULL)
+        GROUP BY usage_event.advice_id HAVING COUNT_BIG(*) > 1
+    ) THROW 51202, N'Mỗi câu tư vấn chỉ được ghi nhận một feedback.', 1;
+END;
+GO
 
 -- Marcus thêm P2: funnel hành vi tối thiểu trên SQL Server, không lưu dữ liệu nhạy cảm.
 CREATE TABLE Customer_Behavior_Events (

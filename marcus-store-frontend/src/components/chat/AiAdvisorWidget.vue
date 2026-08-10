@@ -117,7 +117,7 @@
                   :key="product.productId"
                   :to="`/product/${product.slug}`"
                   class="ai-product"
-                  @click="handleProductClick(product)"
+                  @click="handleProductClick(product, message)"
                 >
                   <img
                     :src="product.thumbnailUrl || '/images/product-placeholder.png'"
@@ -204,6 +204,7 @@ import {
   streamAiAdvisor,
   trackAiProductClick,
 } from '@/api/aiAdvisorApi'
+import { getBehaviorSessionId } from '@/api/behaviorApi'
 import {
   clearFloatingContactPanel,
   setFloatingContactPanelOpen,
@@ -292,13 +293,9 @@ const syncBackendSession = async () => {
 }
 
 const getTrackingSessionId = () => {
-  const storageKey = 'MARCUS_AI_TRACKING_SESSION'
-  let sessionId = sessionStorage.getItem(storageKey)
-  if (!sessionId) {
-    sessionId = crypto.randomUUID()
-    sessionStorage.setItem(storageKey, sessionId)
-  }
-  return sessionId
+  // Marcus sửa: AI, Product View, Checkout, Order và Payment phải dùng chung
+  // anonymous journey ID để đo chuyển đổi thật.
+  return getBehaviorSessionId()
 }
 
 const contextChips = computed(() => {
@@ -375,7 +372,7 @@ const bestProductName = (message) => {
   return product ? `${product.productName} — ` : ''
 }
 
-const handleProductClick = (product) => {
+const handleProductClick = (product, message) => {
   // Marcus thêm: ghi nhớ thẻ khách vừa chọn trong phiên hiện tại. Những câu hỏi
   // tiếp nối không được tự coi sản phẩm “Nên chọn” cũ là lựa chọn của khách.
   advisorContext.value = {
@@ -387,7 +384,7 @@ const handleProductClick = (product) => {
   isOpen.value = false
   // Marcus sửa: tracking không được cản trở thao tác mở sản phẩm nếu API thống kê
   // tạm thời lỗi.
-  trackAiProductClick(product.productId, getTrackingSessionId()).catch(() => {})
+  trackAiProductClick(product.productId, getTrackingSessionId(), message?.adviceId).catch(() => {})
 }
 
 // Marcus thêm: AI và Live Chat có bộ câu hỏi riêng, không trộn trạng thái hai kênh.

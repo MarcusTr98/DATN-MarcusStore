@@ -10,18 +10,11 @@ import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiProductProj
 import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiProductSpecProjection;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiSkuProjection;
 import com.fpoly.marcusstore.service.SystemSettingService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.RestClientException;
 
 import java.text.NumberFormat;
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -34,7 +27,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class AiAdvisorService {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -76,16 +68,28 @@ public class AiAdvisorService {
     private final SystemSettingService systemSettingService;
     private final AiAdvisorIntentRouter intentRouter;
     private final AiStoreKnowledgeService storeKnowledgeService;
+    private final GeminiClient geminiClient;
 
-    @Value("${gemini.api-key:}")
-    private String apiKey;
+    @Autowired
+    public AiAdvisorService(HomeProductRepository homeProductRepository,
+                            SystemSettingService systemSettingService,
+                            AiAdvisorIntentRouter intentRouter,
+                            AiStoreKnowledgeService storeKnowledgeService,
+                            GeminiClient geminiClient) {
+        this.homeProductRepository = homeProductRepository;
+        this.systemSettingService = systemSettingService;
+        this.intentRouter = intentRouter;
+        this.storeKnowledgeService = storeKnowledgeService;
+        this.geminiClient = geminiClient;
+    }
 
-    // dùng Flash Lite để phù hợp quota miễn phí
-    @Value("${gemini.model:gemini-3.5-flash-lite}")
-    private String model;
-
-    @Value("${gemini.base-url:https://generativelanguage.googleapis.com}")
-    private String baseUrl;
+    // Marcus thêm: constructor hẹp phục vụ regression test, không gọi mạng.
+    AiAdvisorService(HomeProductRepository homeProductRepository,
+                     SystemSettingService systemSettingService,
+                     AiAdvisorIntentRouter intentRouter,
+                     AiStoreKnowledgeService storeKnowledgeService) {
+        this(homeProductRepository, systemSettingService, intentRouter, storeKnowledgeService, null);
+    }
 
     public AiAdvisorResponse advise(AiAdvisorRequest request) {
         // Marcus thêm: dữ liệu nhạy cảm và yêu cầu nội bộ được chặn tại backend,
@@ -135,45 +139,19 @@ public class AiAdvisorService {
         }
 
         // Marcus thêm: hết quota/mất key vẫn tư vấn được bằng dữ liệu catalog thật.
-        if (apiKey == null || apiKey.isBlank()) {
+        if (geminiClient == null || !geminiClient.isConfigured()) {
             return attachContext(deterministicFallback(products, criteria), advisorContext);
         }
 
         try {
-            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-            requestFactory.setConnectTimeout(Duration.ofSeconds(8));
-            // Marcus sửa: Gemini 3.x có bước suy luận nên 25 giây dễ timeout dù
-            // nhà cung cấp vẫn đang xử lý yêu cầu.
-            requestFactory.setReadTimeout(Duration.ofSeconds(60));
-
-            JsonNode response = RestClient.builder()
-                    .baseUrl(baseUrl)
-                    .requestFactory(requestFactory)
-                    .defaultHeader("x-goog-api-key", apiKey)
-                    .build()
-                    .post()
-                    .uri("/v1beta/models/{model}:generateContent", model)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of(
-                            "systemInstruction", Map.of(
-                                    "parts", List.of(Map.of("text", systemInstructions()))),
-                            "contents", List.of(Map.of(
-                                    "role", "user",
-                                    "parts", List.of(Map.of("text", input)))),
-                            "generationConfig", Map.of(
-                                    "maxOutputTokens", 1_000,
-                                    "responseMimeType", "application/json",
-                                    "responseJsonSchema", advisorResponseSchema())))
-                    .retrieve()
-                    .body(JsonNode.class);
+            JsonNode response = geminiClient.generate(
+                    systemInstructions(), input, advisorResponseSchema(), 1_000);
 
             AiAdvisorResponse result = buildAdvisorResponse(response, products, productSpecs, advisorContext);
             result.setSource("GEMINI");
             result.setFallbackUsed(false);
             return attachContext(result, advisorContext);
-        } catch (HttpStatusCodeException exception) {
-            return attachContext(deterministicFallback(products, criteria), advisorContext);
-        } catch (RestClientException exception) {
+        } catch (GeminiClient.GeminiClientException exception) {
             return attachContext(deterministicFallback(products, criteria), advisorContext);
         }
     }
@@ -357,18 +335,6 @@ public class AiAdvisorService {
         String normalized = keyword.toLowerCase(Locale.ROOT);
         if (normalized.contains("iphone") || normalized.contains("apple")) return "apple";
         return PHONE_BRANDS.stream().filter(normalized::contains).findFirst().orElse(normalized);
-    }
-
-    private String providerErrorMessage(HttpStatusCodeException exception) {
-        return switch (exception.getStatusCode().value()) {
-            case 400 -> "Gemini từ chối yêu cầu. Hãy kiểm tra API key và model trong application.properties.";
-            case 401, 403 -> "Gemini API key không hợp lệ hoặc chưa được cấp quyền sử dụng.";
-            case 404 -> "Model Gemini đang cấu hình không còn khả dụng. Hãy kiểm tra GEMINI_MODEL.";
-            case 429 -> "Marcus AI đã chạm giới hạn miễn phí. Vui lòng chờ một lúc rồi thử lại.";
-            default -> exception.getStatusCode().is4xxClientError()
-                    ? "Cấu hình hoặc yêu cầu gửi tới Gemini chưa hợp lệ."
-                    : "Dịch vụ Gemini đang gián đoạn. Vui lòng thử lại sau.";
-        };
     }
 
     private AiAdvisorResponse answerKnownBrandQuestion(String rawMessage) {

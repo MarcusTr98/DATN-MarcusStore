@@ -85,7 +85,7 @@
           <h3><i class="bi bi-radar"></i> Tín hiệu AI phát hiện</h3>
           <article
             v-for="signal in report.signals"
-            :key="`${signal.title}-${signal.evidence}`"
+            :key="signal.evidenceId || `${signal.title}-${signal.evidence}`"
             class="ai-signal"
             :class="`ai-signal--${signal.severity.toLowerCase()}`"
           >

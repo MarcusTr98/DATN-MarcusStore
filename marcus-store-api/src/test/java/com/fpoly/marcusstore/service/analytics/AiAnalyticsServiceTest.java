@@ -5,11 +5,19 @@ import com.fpoly.marcusstore.repository.analytics.AiAnalyticsReportRepository;
 import com.fpoly.marcusstore.service.ai.AiUsageEventService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import com.fpoly.marcusstore.dto.analytics.AnalyticsMetric;
+import com.fpoly.marcusstore.dto.analytics.AnalyticsOverviewResponse;
+import com.fpoly.marcusstore.dto.analytics.AnalyticsPeriod;
+import com.fpoly.marcusstore.dto.analytics.AnalyticsRateMetric;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 class AiAnalyticsServiceTest {
 
@@ -23,24 +31,30 @@ class AiAnalyticsServiceTest {
         reportRepository = mock(AiAnalyticsReportRepository.class);
         aiAnalyticsService = new AiAnalyticsService(
                 analyticsService,
-                new ObjectMapper(),
+                new ObjectMapper().findAndRegisterModules(),
                 reportRepository,
                 mock(AiUsageEventService.class));
-        ReflectionTestUtils.setField(aiAnalyticsService, "apiKey", "");
-        ReflectionTestUtils.setField(aiAnalyticsService, "model", "gemini-3.5-flash-lite");
-        ReflectionTestUtils.setField(
-                aiAnalyticsService,
-                "baseUrl",
-                "https://generativelanguage.googleapis.com");
     }
 
     @Test
-    void missingApiKeyStopsBeforeLoadingBusinessData() {
-        assertThrows(
-                IllegalStateException.class,
-                () -> aiAnalyticsService.generateReport(null, null));
+    void missingApiKeyStillReturnsAlgorithmReport() {
+        LocalDate from = LocalDate.of(2026, 7, 1);
+        LocalDate to = LocalDate.of(2026, 7, 30);
+        AnalyticsMetric sales = new AnalyticsMetric(
+                BigDecimal.valueOf(120_000_000), BigDecimal.valueOf(100_000_000), 20D);
+        AnalyticsMetric zero = new AnalyticsMetric(BigDecimal.ZERO, BigDecimal.ZERO, 0D);
+        when(analyticsService.getOverview(any(), any())).thenReturn(new AnalyticsOverviewResponse(
+                new AnalyticsPeriod(from, to, from.minusDays(30), from.minusDays(1), 30),
+                sales, zero, zero, zero,
+                new AnalyticsRateMetric(80, 75, 5), new AnalyticsRateMetric(10, 12, -2), zero, zero));
+        when(analyticsService.getProductTrends(any(), any(), any(Integer.class))).thenReturn(List.of());
+        when(analyticsService.getSalesTrend(any(), any())).thenReturn(List.of());
+        when(analyticsService.getCancellationReasons(any(), any())).thenReturn(List.of());
 
-        // Marcus kiểm tra: cấu hình thiếu không được chạy query thừa hoặc gửi dữ liệu.
-        verifyNoInteractions(analyticsService);
+        var response = aiAnalyticsService.generateReport(from, to);
+
+        // Marcus kiểm tra: thiếu key/quota chỉ hạ cấp sang thuật toán, không làm chết tab.
+        assertThat(response.source()).isEqualTo("ALGORITHM");
+        assertThat(response.signals().getFirst().evidenceId()).isEqualTo("ALG-SALES-CHANGE");
     }
 }

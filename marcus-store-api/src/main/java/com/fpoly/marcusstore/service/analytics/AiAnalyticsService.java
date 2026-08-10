@@ -13,35 +13,30 @@ import com.fpoly.marcusstore.dto.analytics.ProductTrendResponse;
 import com.fpoly.marcusstore.entity.analytics.AiAnalyticsReport;
 import com.fpoly.marcusstore.repository.analytics.AiAnalyticsReportRepository;
 import com.fpoly.marcusstore.service.ai.AiUsageEventService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import com.fpoly.marcusstore.service.ai.GeminiClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.HttpStatusCodeException;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class AiAnalyticsService {
 
-        private static final Duration DOUBLE_SUBMIT_GUARD = Duration.ofSeconds(20);
         // Marcus sửa: đổi version để báo cáo cache cũ không che mất dữ liệu bảo hành
         // mới.
-        private static final String METRIC_SCHEMA_VERSION = "insight-evidence-fallback-v4";
+        private static final String METRIC_SCHEMA_VERSION = "insight-evidence-fingerprint-v5";
         private static final int PRODUCT_LIMIT = 10;
         private static final Set<String> OUTLOOKS = Set.of("GROWTH", "STEADY", "DECLINE", "UNCERTAIN");
         private static final Set<String> SEVERITIES = Set.of("POSITIVE", "INFO", "WARNING", "CRITICAL");
@@ -52,16 +47,27 @@ public class AiAnalyticsService {
         private final ObjectMapper objectMapper;
         private final AiAnalyticsReportRepository reportRepository;
         private final AiUsageEventService aiUsageEventService;
-        private final Map<CacheKey, LocalDateTime> recentGenerations = new ConcurrentHashMap<>();
+        private final GeminiClient geminiClient;
+        private final Map<CacheKey, ReentrantLock> generationLocks = new ConcurrentHashMap<>();
 
-        @Value("${gemini.api-key:}")
-        private String apiKey;
+        @Autowired
+        public AiAnalyticsService(AnalyticsService analyticsService, ObjectMapper objectMapper,
+                                  AiAnalyticsReportRepository reportRepository,
+                                  AiUsageEventService aiUsageEventService,
+                                  GeminiClient geminiClient) {
+                this.analyticsService = analyticsService;
+                this.objectMapper = objectMapper;
+                this.reportRepository = reportRepository;
+                this.aiUsageEventService = aiUsageEventService;
+                this.geminiClient = geminiClient;
+        }
 
-        @Value("${gemini.model:gemini-3.5-flash-lite}")
-        private String model;
-
-        @Value("${gemini.base-url:https://generativelanguage.googleapis.com}")
-        private String baseUrl;
+        // Marcus thêm: constructor hẹp cho unit test fallback, không gọi provider.
+        AiAnalyticsService(AnalyticsService analyticsService, ObjectMapper objectMapper,
+                           AiAnalyticsReportRepository reportRepository,
+                           AiUsageEventService aiUsageEventService) {
+                this(analyticsService, objectMapper, reportRepository, aiUsageEventService, null);
+        }
 
         /**
          * Marcus thêm: Gemini chỉ nhận DTO tổng hợp từ AnalyticsService. Service
@@ -80,23 +86,30 @@ public class AiAnalyticsService {
         }
 
         public AiAnalyticsReportResponse generateReport(LocalDate fromDate, LocalDate toDate) {
-                if (apiKey == null || apiKey.isBlank()) {
-                        throw new IllegalStateException("AI phân tích chưa được cấu hình GEMINI_API_KEY.");
-                }
-
                 AnalyticsOverviewResponse overview = analyticsService.getOverview(fromDate, toDate);
                 CacheKey cacheKey = new CacheKey(
                                 overview.period().fromDate(),
                                 overview.period().toDate());
-                LocalDateTime now = LocalDateTime.now();
-                LocalDateTime recentGeneration = recentGenerations.get(cacheKey);
-                if (recentGeneration != null && now.isBefore(recentGeneration.plus(DOUBLE_SUBMIT_GUARD))) {
-                        AiAnalyticsReportResponse stored = findStoredReport(cacheKey);
+                ReentrantLock lock = generationLocks.computeIfAbsent(cacheKey, ignored -> new ReentrantLock());
+                if (!lock.tryLock()) {
+                        AiAnalyticsReportResponse stored = findLatestReport(fromDate, toDate);
                         if (stored != null) {
                                 return stored;
                         }
+                        throw new IllegalStateException("Báo cáo cho kỳ này đang được tạo. Vui lòng chờ ít phút.");
                 }
+                try {
+                        return generateLocked(cacheKey, overview);
+                } finally {
+                        lock.unlock();
+                        generationLocks.remove(cacheKey, lock);
+                }
+        }
 
+        private AiAnalyticsReportResponse generateLocked(
+                        CacheKey cacheKey,
+                        AnalyticsOverviewResponse overview) {
+                LocalDateTime now = LocalDateTime.now();
                 List<ProductTrendResponse> products = analyticsService.getProductTrends(
                                 overview.period().fromDate(),
                                 overview.period().toDate(),
@@ -110,8 +123,16 @@ public class AiAnalyticsService {
                                 analyticsService.getCancellationReasons(
                                                 overview.period().fromDate(), overview.period().toDate()),
                                 salesTrendBuckets);
+                String fingerprint = fingerprint(context);
+                AiAnalyticsReportResponse exactCache = findStoredReport(cacheKey, fingerprint);
+                if (exactCache != null) {
+                        return exactCache;
+                }
                 AiAnalyticsReportResponse report;
                 try {
+                        if (geminiClient == null || !geminiClient.isConfigured()) {
+                                throw new IllegalStateException("Gemini chưa cấu hình.");
+                        }
                         JsonNode providerResponse = callGemini(context);
                         report = parseReport(providerResponse, products, now, now);
                 } catch (RuntimeException providerFailure) {
@@ -120,31 +141,41 @@ public class AiAnalyticsService {
                         report = algorithmFallback(overview, products, now);
                 }
 
-                saveReport(cacheKey, report);
-                recentGenerations.put(cacheKey, now);
+                saveReport(cacheKey, fingerprint, report);
                 return report;
         }
 
-        private AiAnalyticsReportResponse findStoredReport(CacheKey key) {
+        private AiAnalyticsReportResponse findStoredReport(CacheKey key, String fingerprint) {
                 return reportRepository
-                                .findFirstByFromDateAndToDateAndModelNameOrderByGeneratedAtDesc(
-                                                key.fromDate(), key.toDate(), cacheModelName())
+                                .findFirstByFromDateAndToDateAndModelNameAndDataFingerprintOrderByGeneratedAtDesc(
+                                                key.fromDate(), key.toDate(), cacheModelName(), fingerprint)
                                 .map(this::readStoredReport)
                                 .orElse(null);
         }
 
-        private void saveReport(CacheKey key, AiAnalyticsReportResponse report) {
+        private void saveReport(CacheKey key, String fingerprint, AiAnalyticsReportResponse report) {
                 try {
                         AiAnalyticsReport entity = new AiAnalyticsReport();
                         entity.setFromDate(key.fromDate());
                         entity.setToDate(key.toDate());
                         entity.setReportJson(objectMapper.writeValueAsString(report));
                         entity.setModelName(cacheModelName());
+                        entity.setDataFingerprint(fingerprint);
                         entity.setGeneratedAt(report.generatedAt());
                         reportRepository.save(entity);
                 } catch (Exception exception) {
                         throw new IllegalStateException(
                                         "AI đã phân tích nhưng không thể lưu báo cáo. Vui lòng kiểm tra database.");
+                }
+        }
+
+        private String fingerprint(String safeContext) {
+                try {
+                        byte[] digest = MessageDigest.getInstance("SHA-256")
+                                        .digest(safeContext.getBytes(StandardCharsets.UTF_8));
+                        return java.util.HexFormat.of().formatHex(digest);
+                } catch (Exception exception) {
+                        throw new IllegalStateException("Không thể tạo dấu vân tay dữ liệu Analytics.");
                 }
         }
 
@@ -241,42 +272,13 @@ public class AiAnalyticsService {
         }
 
         private JsonNode callGemini(String context) {
-                SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-                requestFactory.setConnectTimeout(Duration.ofSeconds(8));
-                // Marcus sửa: báo cáo dài cần đủ thời gian hoàn thiện JSON, tránh cắt
-                // phản hồi rồi báo sai định dạng.
-                requestFactory.setReadTimeout(Duration.ofSeconds(60));
-
                 try {
-                        return RestClient.builder()
-                                        .baseUrl(baseUrl)
-                                        .requestFactory(requestFactory)
-                                        .defaultHeader("x-goog-api-key", apiKey)
-                                        .build()
-                                        .post()
-                                        .uri("/v1beta/models/{model}:generateContent", model)
-                                        .contentType(MediaType.APPLICATION_JSON)
-                                        .body(Map.of(
-                                                        "systemInstruction", Map.of(
-                                                                        "parts",
-                                                                        List.of(Map.of("text", systemInstructions()))),
-                                                        "contents", List.of(Map.of(
-                                                                        "role", "user",
-                                                                        "parts", List.of(Map.of(
-                                                                                        "text",
-                                                                                        "DỮ LIỆU TỔNG HỢP ĐÃ KIỂM DUYỆT:\n"
-                                                                                                        + context)))),
-                                                        "generationConfig", Map.of(
-                                                                        "maxOutputTokens", 2_400,
-                                                                        "responseMimeType", "application/json",
-                                                                        "responseJsonSchema",
-                                                                        analyticsResponseSchema())))
-                                        .retrieve()
-                                        .body(JsonNode.class);
-                } catch (HttpStatusCodeException exception) {
-                        throw new IllegalStateException(providerErrorMessage(exception));
-                } catch (RestClientException exception) {
-                        throw new IllegalStateException("Không thể kết nối Gemini để tạo bản tin phân tích.");
+                        return geminiClient.generate(
+                                        systemInstructions(),
+                                        "DỮ LIỆU TỔNG HỢP ĐÃ KIỂM DUYỆT:\n" + context,
+                                        analyticsResponseSchema(), 2_400);
+                } catch (GeminiClient.GeminiClientException exception) {
+                        throw new IllegalStateException(providerErrorMessage(exception.statusCode()));
                 }
         }
 
@@ -330,7 +332,8 @@ public class AiAnalyticsService {
         }
 
         private String cacheModelName() {
-                return METRIC_SCHEMA_VERSION + "|" + model;
+                return METRIC_SCHEMA_VERSION + "|"
+                                + (geminiClient == null ? "algorithm" : geminiClient.modelName());
         }
 
         // Marcus thêm: structured output khóa hình dạng báo cáo ngay từ Gemini,
@@ -406,6 +409,7 @@ public class AiAnalyticsService {
                         root.path("signals").forEach(node -> {
                                 if (signals.size() < 4) {
                                         signals.add(new Signal(
+                                                        "AI-SIGNAL-" + (signals.size() + 1),
                                                         safeText(node, "title", 100),
                                                         safeText(node, "evidence", 180),
                                                         safeText(node, "interpretation", 240),
@@ -474,6 +478,7 @@ public class AiAnalyticsService {
                 String outlook = salesChange > 5 ? "GROWTH" : salesChange < -5 ? "DECLINE" : "STEADY";
                 String direction = salesChange > 5 ? "tăng" : salesChange < -5 ? "giảm" : "đi ngang";
                 List<Signal> signals = List.of(new Signal(
+                                "ALG-SALES-CHANGE",
                                 "Xu hướng doanh thu đã thu đang " + direction,
                                 "Doanh thu kỳ này " + overview.completedSales().currentValue()
                                                 + ", thay đổi "
@@ -545,8 +550,8 @@ public class AiAnalyticsService {
                 return allowed.contains(normalized) ? normalized : fallback;
         }
 
-        private String providerErrorMessage(HttpStatusCodeException exception) {
-                return switch (exception.getStatusCode().value()) {
+        private String providerErrorMessage(int statusCode) {
+                return switch (statusCode) {
                         case 400 -> "Gemini từ chối dữ liệu phân tích hoặc cấu hình model chưa hợp lệ.";
                         case 401, 403 -> "Gemini API key không hợp lệ hoặc chưa được cấp quyền.";
                         case 404 -> "Model Gemini phân tích không còn khả dụng.";

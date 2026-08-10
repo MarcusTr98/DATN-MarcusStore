@@ -386,6 +386,102 @@ END;
 GO
 
 -- ============================================================
+-- P2 AI + ANALYTICS - Marcus thêm cho thành viên chỉ chạy một file
+-- ============================================================
+IF OBJECT_ID('dbo.AI_Usage_Events','U') IS NULL
+BEGIN
+    CREATE TABLE dbo.AI_Usage_Events (
+        event_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+        session_id VARCHAR(36) NOT NULL,
+        advice_id VARCHAR(36) NULL,
+        event_type VARCHAR(30) NOT NULL,
+        product_id INT NULL,
+        response_time_ms INT NULL,
+        created_at DATETIME2 NOT NULL CONSTRAINT DF_AIUsageEvents_CreatedAt DEFAULT SYSDATETIME(),
+        CONSTRAINT CK_AIUsageEvents_Type CHECK (event_type IN ('CHAT_SUCCESS','CHAT_RESPONSE','CHAT_FAILED','PRODUCT_CLICK','FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')),
+        CONSTRAINT CK_AIUsageEvents_ResponseTime CHECK (response_time_ms IS NULL OR response_time_ms BETWEEN 0 AND 120000)
+    );
+END;
+IF COL_LENGTH('dbo.AI_Usage_Events','advice_id') IS NULL ALTER TABLE dbo.AI_Usage_Events ADD advice_id VARCHAR(36) NULL;
+IF COL_LENGTH('dbo.AI_Usage_Events','response_time_ms') IS NULL ALTER TABLE dbo.AI_Usage_Events ADD response_time_ms INT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AIUsageEvents_Advice' AND object_id=OBJECT_ID('dbo.AI_Usage_Events'))
+    CREATE INDEX IX_AIUsageEvents_Advice ON dbo.AI_Usage_Events(advice_id,created_at DESC) WHERE advice_id IS NOT NULL;
+GO
+DECLARE @dropAiEventChecks NVARCHAR(MAX);
+SELECT @dropAiEventChecks=STRING_AGG(N'ALTER TABLE dbo.AI_Usage_Events DROP CONSTRAINT '+QUOTENAME(name),N';')
+FROM sys.check_constraints
+WHERE parent_object_id=OBJECT_ID('dbo.AI_Usage_Events') AND definition LIKE '%event_type%';
+IF @dropAiEventChecks IS NOT NULL EXEC sys.sp_executesql @dropAiEventChecks;
+ALTER TABLE dbo.AI_Usage_Events ADD CONSTRAINT CK_AIUsageEvents_Type CHECK(
+    event_type IN ('CHAT_SUCCESS','CHAT_RESPONSE','CHAT_FAILED','PRODUCT_CLICK','FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')
+);
+GO
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_AIUsageEvents_OneFeedback' AND object_id=OBJECT_ID('dbo.AI_Usage_Events'))
+    DROP INDEX UX_AIUsageEvents_OneFeedback ON dbo.AI_Usage_Events;
+IF COL_LENGTH('dbo.AI_Usage_Events','feedback_advice_key') IS NOT NULL
+    ALTER TABLE dbo.AI_Usage_Events DROP COLUMN feedback_advice_key;
+GO
+;WITH duplicated AS (
+    SELECT event_id,ROW_NUMBER() OVER(PARTITION BY advice_id ORDER BY created_at,event_id) AS row_number
+    FROM dbo.AI_Usage_Events WHERE advice_id IS NOT NULL AND event_type IN ('FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')
+)
+DELETE FROM duplicated WHERE row_number>1;
+GO
+CREATE OR ALTER TRIGGER dbo.TR_AIUsageEvents_OneFeedback
+ON dbo.AI_Usage_Events AFTER INSERT,UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (
+        SELECT usage_event.advice_id FROM dbo.AI_Usage_Events usage_event
+        WHERE usage_event.advice_id IS NOT NULL
+          AND usage_event.event_type IN ('FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')
+          AND usage_event.advice_id IN (SELECT advice_id FROM inserted WHERE advice_id IS NOT NULL)
+        GROUP BY usage_event.advice_id HAVING COUNT_BIG(*)>1
+    ) THROW 51402,N'Mỗi câu tư vấn chỉ được ghi nhận một feedback.',1;
+END;
+GO
+
+IF OBJECT_ID('dbo.AI_Analytics_Reports','U') IS NULL
+BEGIN
+    CREATE TABLE dbo.AI_Analytics_Reports (
+        report_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+        from_date DATE NOT NULL,
+        to_date DATE NOT NULL,
+        report_json NVARCHAR(MAX) NOT NULL,
+        model_name VARCHAR(100) NOT NULL,
+        data_fingerprint VARCHAR(64) NULL,
+        generated_at DATETIME2 NOT NULL CONSTRAINT DF_AIAnalyticsReports_GeneratedAt DEFAULT SYSDATETIME(),
+        CONSTRAINT CK_AIAnalyticsReports_Period CHECK(from_date<=to_date),
+        CONSTRAINT CK_AIAnalyticsReports_Json CHECK(ISJSON(report_json)=1)
+    );
+END;
+IF COL_LENGTH('dbo.AI_Analytics_Reports','data_fingerprint') IS NULL
+    ALTER TABLE dbo.AI_Analytics_Reports ADD data_fingerprint VARCHAR(64) NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AIAnalyticsReports_Fingerprint' AND object_id=OBJECT_ID('dbo.AI_Analytics_Reports'))
+    CREATE INDEX IX_AIAnalyticsReports_Fingerprint ON dbo.AI_Analytics_Reports(from_date,to_date,model_name,data_fingerprint,generated_at DESC);
+GO
+
+IF OBJECT_ID('dbo.Customer_Behavior_Events','U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Customer_Behavior_Events (
+        event_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+        event_type VARCHAR(30) NOT NULL,
+        session_id VARCHAR(36) NULL,
+        product_id INT NULL,
+        order_id INT NULL,
+        created_at DATETIME2 NOT NULL CONSTRAINT DF_CustomerBehaviorEvents_CreatedAt DEFAULT SYSDATETIME(),
+        CONSTRAINT CK_CustomerBehaviorEvents_Type CHECK(event_type IN ('PRODUCT_VIEW','CHECKOUT_STARTED','ORDER_CREATED','PAYMENT_SUCCESS','AI_QUESTION','AI_PRODUCT_CLICK'))
+    );
+END;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_CustomerBehaviorEvents_CreatedType' AND object_id=OBJECT_ID('dbo.Customer_Behavior_Events'))
+    CREATE INDEX IX_CustomerBehaviorEvents_CreatedType ON dbo.Customer_Behavior_Events(created_at DESC,event_type);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_CustomerBehaviorEvents_Session' AND object_id=OBJECT_ID('dbo.Customer_Behavior_Events'))
+    CREATE INDEX IX_CustomerBehaviorEvents_Session ON dbo.Customer_Behavior_Events(session_id,created_at DESC) WHERE session_id IS NOT NULL;
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_CustomerBehaviorEvents_Order' AND object_id=OBJECT_ID('dbo.Customer_Behavior_Events'))
+    CREATE INDEX IX_CustomerBehaviorEvents_Order ON dbo.Customer_Behavior_Events(order_id,created_at DESC) WHERE order_id IS NOT NULL;
+GO
+
+-- ============================================================
 -- KẾT QUẢ CUỐI: THÀNH VIÊN CHỈ CẦN ĐỌC DÒNG NÀY
 -- ============================================================
 DECLARE @missingShipping INT = (
@@ -469,6 +565,9 @@ SELECT
     CASE WHEN COL_LENGTH('dbo.System_Settings', 'updated_by') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS p1_settings,
     CASE WHEN COL_LENGTH('dbo.Contact_Requests', 'handled_by') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS p1_contact,
     CASE WHEN OBJECT_ID(N'dbo.Chat_Session_Metrics', N'U') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS p1_chat,
+    CASE WHEN OBJECT_ID('dbo.TR_AIUsageEvents_OneFeedback','TR') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS p2_feedback_lock,
+    CASE WHEN COL_LENGTH('dbo.AI_Analytics_Reports','data_fingerprint') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS p2_analytics_fingerprint,
+    CASE WHEN OBJECT_ID('dbo.Customer_Behavior_Events','U') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS p2_behavior,
     CASE
         WHEN @shippingColumnsOk = 1
          AND @cancellationColumnsOk = 1
@@ -483,6 +582,9 @@ SELECT
          AND COL_LENGTH('dbo.System_Settings', 'updated_by') IS NOT NULL
          AND COL_LENGTH('dbo.Contact_Requests', 'handled_by') IS NOT NULL
          AND OBJECT_ID(N'dbo.Chat_Session_Metrics', N'U') IS NOT NULL
+         AND OBJECT_ID('dbo.TR_AIUsageEvents_OneFeedback','TR') IS NOT NULL
+         AND COL_LENGTH('dbo.AI_Analytics_Reports','data_fingerprint') IS NOT NULL
+         AND OBJECT_ID('dbo.Customer_Behavior_Events','U') IS NOT NULL
         THEN N'DAT - Khởi động backend mới và chạy UAT.'
         ELSE N'CHUA DAT - Gửi nguyên Result này cho Marcus, không tự sửa SQL.'
     END AS overall_result;

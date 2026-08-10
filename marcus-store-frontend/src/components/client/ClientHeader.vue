@@ -74,6 +74,9 @@ const confirmLogout = () => {
   // Marcus thêm: logout phải kết thúc luôn phiên tư vấn ẩn danh trên thiết bị.
   sessionStorage.removeItem('MARCUS_AI_CONVERSATION')
   sessionStorage.removeItem('MARCUS_AI_TRACKING_SESSION')
+  // Marcus sửa: đăng xuất kết thúc anonymous journey hiện tại; lần truy cập sau
+  // không được nối hành vi của hai người dùng chung trình duyệt.
+  sessionStorage.removeItem('MARCUS_BEHAVIOR_SESSION')
   window.dispatchEvent(new Event('marcus-ai-reset'))
 
   cartStore.cart = null

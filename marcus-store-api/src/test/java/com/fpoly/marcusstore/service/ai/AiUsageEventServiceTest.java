@@ -65,4 +65,17 @@ class AiUsageEventServiceTest {
                 LocalDate.of(2026, 7, 1)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void feedbackMustBelongToTheSameAdviceAndSession() {
+        String sessionId = "123e4567-e89b-42d3-a456-426614174000";
+        String adviceId = "123e4567-e89b-42d3-a456-426614174001";
+        when(repository.existsChatResponse(sessionId, adviceId)).thenReturn(false);
+
+        assertThatThrownBy(() -> new AiUsageEventService(repository)
+                .recordFeedback(sessionId, adviceId, true))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(repository, never()).insert(any(), any(), any(), any(), any());
+    }
 }

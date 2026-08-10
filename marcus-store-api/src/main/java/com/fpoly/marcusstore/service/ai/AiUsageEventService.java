@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.service.ai;
 
 import com.fpoly.marcusstore.dto.ai.AiUsageSummaryResponse;
+import com.fpoly.marcusstore.dto.ai.AiSalesFunnelResponse;
 import com.fpoly.marcusstore.repository.analytics.AiUsageEventRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,12 +26,16 @@ public class AiUsageEventService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordProductClick(String sessionId, Integer productId) {
-        save(sessionId, null, "PRODUCT_CLICK", productId, null);
+    public void recordProductClick(String sessionId, String adviceId, Integer productId) {
+        if (!repository.existsChatResponse(sessionId, adviceId)) return;
+        save(sessionId, adviceId, "PRODUCT_CLICK", productId, null);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFeedback(String sessionId, String adviceId, boolean helpful) {
+        if (!repository.existsChatResponse(sessionId, adviceId)) {
+            throw new IllegalArgumentException("Câu tư vấn không thuộc phiên hiện tại.");
+        }
         save(sessionId, adviceId, helpful ? "FEEDBACK_HELPFUL" : "FEEDBACK_NOT_HELPFUL", null, null);
     }
 
@@ -73,7 +78,31 @@ public class AiUsageEventService {
                 row.averageResponseTimeMs());
     }
 
+    @Transactional(readOnly = true)
+    public AiSalesFunnelResponse salesFunnel(LocalDate fromDate, LocalDate toDate) {
+        LocalDate safeTo = toDate == null ? LocalDate.now() : toDate;
+        LocalDate safeFrom = fromDate == null ? safeTo.minusDays(29) : fromDate;
+        if (safeFrom.isAfter(safeTo) || safeFrom.isBefore(safeTo.minusYears(2))) {
+            throw new IllegalArgumentException("Khoảng ngày funnel AI không hợp lệ.");
+        }
+        var row = repository.salesFunnel(
+                safeFrom.atStartOfDay(), safeTo.plusDays(1).atStartOfDay());
+        return new AiSalesFunnelResponse(
+                row.questions(), row.responses(), row.helpful(), row.clicks(),
+                row.checkouts(), row.orders(), row.paid(),
+                rate(row.responses(), row.questions()),
+                rate(row.helpful(), row.responses()),
+                rate(row.clicks(), row.questions()),
+                rate(row.checkouts(), row.clicks()),
+                rate(row.orders(), row.checkouts()),
+                rate(row.paid(), row.orders()));
+    }
+
     private double round(double value) {
         return Math.round(value * 10.0) / 10.0;
+    }
+
+    private double rate(long value, long base) {
+        return base == 0 ? 0 : round(value * 100.0 / base);
     }
 }

@@ -31,6 +31,47 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AIUsageEvents_Advice' AN
     WHERE advice_id IS NOT NULL;
 GO
 
+-- Marcus sửa: SQL Server không cho filtered index lọc trên computed column.
+IF EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_AIUsageEvents_OneFeedback' AND object_id=OBJECT_ID('dbo.AI_Usage_Events'))
+    DROP INDEX UX_AIUsageEvents_OneFeedback ON dbo.AI_Usage_Events;
+IF COL_LENGTH('dbo.AI_Usage_Events', 'feedback_advice_key') IS NOT NULL
+    ALTER TABLE dbo.AI_Usage_Events DROP COLUMN feedback_advice_key;
+GO
+;WITH duplicated AS (
+    SELECT event_id, ROW_NUMBER() OVER (PARTITION BY advice_id ORDER BY created_at, event_id) AS row_number
+    FROM dbo.AI_Usage_Events
+    WHERE advice_id IS NOT NULL
+      AND event_type IN ('FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')
+)
+DELETE FROM duplicated WHERE row_number > 1;
+GO
+CREATE OR ALTER TRIGGER dbo.TR_AIUsageEvents_OneFeedback
+ON dbo.AI_Usage_Events AFTER INSERT, UPDATE AS
+BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (
+        SELECT usage_event.advice_id
+        FROM dbo.AI_Usage_Events usage_event
+        WHERE usage_event.advice_id IS NOT NULL
+          AND usage_event.event_type IN ('FEEDBACK_HELPFUL','FEEDBACK_NOT_HELPFUL')
+          AND usage_event.advice_id IN (SELECT advice_id FROM inserted WHERE advice_id IS NOT NULL)
+        GROUP BY usage_event.advice_id HAVING COUNT_BIG(*) > 1
+    ) THROW 51202, N'Mỗi câu tư vấn chỉ được ghi nhận một feedback.', 1;
+END;
+GO
+
+-- Marcus thêm: cache AI Analytics tự hết hiệu lực khi dữ liệu tổng hợp thay đổi.
+IF OBJECT_ID(N'dbo.AI_Analytics_Reports', N'U') IS NULL
+    THROW 51201, N'Thiếu AI_Analytics_Reports. Hãy chạy MarcusUpdateHeThong0908/master SQL trước.', 1;
+GO
+IF COL_LENGTH('dbo.AI_Analytics_Reports', 'data_fingerprint') IS NULL
+    ALTER TABLE dbo.AI_Analytics_Reports ADD data_fingerprint VARCHAR(64) NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='IX_AIAnalyticsReports_Fingerprint' AND object_id=OBJECT_ID('dbo.AI_Analytics_Reports'))
+    CREATE INDEX IX_AIAnalyticsReports_Fingerprint
+        ON dbo.AI_Analytics_Reports(from_date,to_date,model_name,data_fingerprint,generated_at DESC);
+GO
+
 -- Marcus thêm: event funnel tối thiểu, UUID ẩn danh; không có cột nội dung/IP/userId.
 IF OBJECT_ID(N'dbo.Customer_Behavior_Events', N'U') IS NULL
 BEGIN
@@ -58,6 +99,8 @@ GO
 
 SELECT
     CASE WHEN COL_LENGTH('dbo.AI_Usage_Events','advice_id') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS ai_feedback_schema,
+    CASE WHEN OBJECT_ID('dbo.TR_AIUsageEvents_OneFeedback','TR') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS ai_feedback_lock,
+    CASE WHEN COL_LENGTH('dbo.AI_Analytics_Reports','data_fingerprint') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS analytics_fingerprint,
     CASE WHEN OBJECT_ID(N'dbo.Customer_Behavior_Events', N'U') IS NOT NULL THEN 'OK' ELSE 'MISSING' END AS behavior_schema,
     CASE WHEN COL_LENGTH('dbo.Customer_Behavior_Events','session_id') IS NOT NULL
           AND COL_LENGTH('dbo.Customer_Behavior_Events','event_type') IS NOT NULL
