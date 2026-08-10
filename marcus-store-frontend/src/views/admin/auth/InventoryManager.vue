@@ -610,9 +610,7 @@ async function fetchList() {
 
 async function fetchSummary() {
   try {
-    // Marcus sửa: truyền hasImei để BE lọc KPI theo đúng kho đang xem — không
-    // gộp cả kho lớn vào kho nhỏ như trước.
-    const res = await inventoryApi.summary({ params: { hasImei: imeiScope.value } })
+    const res = await inventoryApi.summary({ hasImei: imeiScope.value })
     summary.value = res.data?.data || {}
   } catch {
     /* ignore */

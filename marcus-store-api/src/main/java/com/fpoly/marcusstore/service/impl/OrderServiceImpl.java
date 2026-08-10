@@ -64,8 +64,7 @@ public class OrderServiceImpl implements OrderService {
 
     // Marcus thêm: IMEI chỉ gồm chữ số, độ dài 8-20. Validate chặt để FE gõ nhầm
     // IMEI ngắn/dài/ký tự đặc biệt sẽ bị BE chặn ngay tại đầu vào.
-    private static final java.util.regex.Pattern IMEI_PATTERN =
-            java.util.regex.Pattern.compile("^[0-9]{8,20}$");
+    private static final java.util.regex.Pattern IMEI_PATTERN = java.util.regex.Pattern.compile("^[0-9]{8,20}$");
 
     private String normalizeKeyword(String keyword) {
         return keyword == null || keyword.isBlank() ? null : keyword.trim();
@@ -500,7 +499,7 @@ public class OrderServiceImpl implements OrderService {
         return response;
     }
 
-    //Đức thêm xử lý imei cho order
+    // Đức thêm xử lý imei cho order
     @Override
     @Transactional(readOnly = true)
     public List<OrderImeiAssignmentResponse> getImeiPreview(String orderCode) {
@@ -548,11 +547,16 @@ public class OrderServiceImpl implements OrderService {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
 
-        // Marcus sửa: chỉ cho phép gán IMEI khi đơn đang ở PROCESSING hoặc READY_FOR_PICKUP.
-        // - PROCESSING: flow COD (PROCESSING → PACKED) hoặc STORE_PICKUP (PROCESSING → READY_FOR_PICKUP).
-        // - READY_FOR_PICKUP: trường hợp admin đã chuyển READY_FOR_PICKUP trước đó nhưng sau
-        //   đó muốn bổ sung IMEI cho dòng chưa có IMEI (fix gán bổ sung sau auto-transition).
-        // Tránh gán IMEI trên đơn đã SHIPPING/DELIVERED/COMPLETED — lúc đó IMEI thực tế đang
+        // Marcus sửa: chỉ cho phép gán IMEI khi đơn đang ở PROCESSING hoặc
+        // READY_FOR_PICKUP.
+        // - PROCESSING: flow COD (PROCESSING → PACKED) hoặc STORE_PICKUP (PROCESSING →
+        // READY_FOR_PICKUP).
+        // - READY_FOR_PICKUP: trường hợp admin đã chuyển READY_FOR_PICKUP trước đó
+        // nhưng sau
+        // đó muốn bổ sung IMEI cho dòng chưa có IMEI (fix gán bổ sung sau
+        // auto-transition).
+        // Tránh gán IMEI trên đơn đã SHIPPING/DELIVERED/COMPLETED — lúc đó IMEI thực tế
+        // đang
         // ở kho khách, việc đụng vào IMEI là sai nghiệp vụ.
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
         if (!"PROCESSING".equals(currentStatus) && !"READY_FOR_PICKUP".equals(currentStatus)) {
@@ -730,5 +734,34 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return getOrderDetailResponse(orderCode);
+    }
+
+    // Đức thêm: gộp transition PROCESSING + gán IMEI làm 1 transaction duy nhất.
+    // Nếu IMEI không hợp lệ/không đủ số lượng → toàn bộ rollback, đơn vẫn ở
+    // CONFIRMED,
+    // tránh trường hợp đơn bị treo ở PROCESSING mà chưa có IMEI nào.
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OrderDetailResponse startProcessingWithImei(String orderCode, List<UpdateOrderImeiRequest> requests) {
+        Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        String currentStatus = normalizeStatusValue(order.getOrderStatus());
+
+        if (!canChangeStatus(order, currentStatus, "PROCESSING")) {
+            throw new RuntimeException("Không thể chuyển trạng thái từ " + currentStatus + " sang PROCESSING");
+        }
+
+        // Bước 1: chuyển sang PROCESSING trước (trong cùng transaction)
+        UpdateOrderStatusRequest statusRequest = UpdateOrderStatusRequest.builder()
+                .status("PROCESSING")
+                .note(null)
+                .build();
+        updateStatusOrder(orderCode, statusRequest);
+
+        // Bước 2: gán IMEI — lúc này order đã PROCESSING nên pass được validate trong
+        // assignOrderImeis()
+        // Nếu bước này throw exception (IMEI sai/thiếu), @Transactional sẽ rollback
+        // luôn bước 1.
+        return assignOrderImeis(orderCode, requests);
     }
 }

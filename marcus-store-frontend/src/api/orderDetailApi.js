@@ -26,12 +26,15 @@ const OrderDetailApi = {
   },
   // Marcus thêm xác nhận thủ công chỉ dành cho Sandbox, kèm ghi chú audit.
 
-  
   getImeiPreview(orderCode) {
     return api.get(`/admin/order/${orderCode}/imei-preview`)
   },
   assignOrderImeis(orderCode, data) {
     return api.put(`/admin/order/${orderCode}/imeis`, data)
+  },
+
+  startProcessingWithImei(orderCode, requests) {
+    return api.put(`/admin/order/${orderCode}/processing-with-imei`, requests)
   },
 }
 export default OrderDetailApi

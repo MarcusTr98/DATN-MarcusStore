@@ -25,6 +25,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -131,7 +132,7 @@ public class AdminOrderController {
         return refundProcessor.confirmSandbox(refundId, request.getReason());
     }
 
-    //Đức thêm xử lý imei cho order
+    // Đức thêm xử lý imei cho order
     @GetMapping("/order/{orderCode}/imei-preview")
     @PreAuthorize("hasAuthority('ORDER_UPDATE')")
     public java.util.List<OrderImeiAssignmentResponse> getImeiPreview(@PathVariable("orderCode") String orderCode) {
@@ -144,5 +145,13 @@ public class AdminOrderController {
             @PathVariable("orderCode") String orderCode,
             @Valid @RequestBody java.util.List<UpdateOrderImeiRequest> requests) {
         return orderService.assignOrderImeis(orderCode, requests);
+    }
+
+    @PutMapping("/order/{orderCode}/processing-with-imei")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public OrderDetailResponse startProcessingWithImei(
+            @PathVariable("orderCode") @Size(min = 1, max = 50) String orderCode,
+            @Valid @RequestBody List<UpdateOrderImeiRequest> requests) {
+        return orderService.startProcessingWithImei(orderCode, requests);
     }
 }

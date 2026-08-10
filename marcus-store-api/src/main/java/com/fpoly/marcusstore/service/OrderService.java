@@ -40,4 +40,6 @@ public interface OrderService {
     List<OrderImeiAssignmentResponse> getImeiPreview(String orderCode);
 
     OrderDetailResponse assignOrderImeis(String orderCode, List<UpdateOrderImeiRequest> requests);
+
+    OrderDetailResponse startProcessingWithImei(String orderCode, List<UpdateOrderImeiRequest> requests);
 }
