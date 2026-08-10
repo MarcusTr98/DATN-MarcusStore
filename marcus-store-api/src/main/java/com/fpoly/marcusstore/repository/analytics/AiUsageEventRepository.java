@@ -13,7 +13,8 @@ public class AiUsageEventRepository {
     private final JdbcTemplate jdbcTemplate;
 
     public boolean existsChatResponse(String sessionId, String adviceId) {
-        if (sessionId == null || adviceId == null) return false;
+        if (sessionId == null || adviceId == null)
+            return false;
         Long count = jdbcTemplate.queryForObject("""
                 SELECT COUNT_BIG(*) FROM AI_Usage_Events
                 WHERE session_id = ? AND advice_id = ?
@@ -81,48 +82,51 @@ public class AiUsageEventRepository {
                 )
                 SELECT
                     COUNT_BIG(*),
-                    COALESCE(SUM(CAST(COALESCE(response_event.hit, 0) AS BIGINT)), 0),
-                    COALESCE(SUM(CAST(COALESCE(helpful_event.hit, 0) AS BIGINT)), 0),
-                    COALESCE(SUM(CAST(COALESCE(click_event.hit, 0) AS BIGINT)), 0),
-                    COALESCE(SUM(CAST(COALESCE(checkout_event.hit, 0) AS BIGINT)), 0),
-                    COALESCE(SUM(CAST(COALESCE(order_event.hit, 0) AS BIGINT)), 0),
-                    COALESCE(SUM(CAST(COALESCE(payment_event.hit, 0) AS BIGINT)), 0)
+                    COUNT_BIG(response_event.reached_at),
+                    COUNT_BIG(helpful_event.reached_at),
+                    COUNT_BIG(click_event.reached_at),
+                    COUNT_BIG(checkout_event.reached_at),
+                    COUNT_BIG(order_event.reached_at),
+                    COUNT_BIG(payment_event.reached_at)
                 FROM AiJourneys j
                 OUTER APPLY (
-                    SELECT TOP 1 1 AS hit FROM AI_Usage_Events u
+                    SELECT TOP 1 u.created_at AS reached_at FROM AI_Usage_Events u
                         WHERE u.session_id = j.session_id
                           AND u.event_type IN ('CHAT_RESPONSE','CHAT_SUCCESS')
                           AND u.created_at >= j.asked_at AND u.created_at < ?
                 ) response_event
                 OUTER APPLY (
-                    SELECT TOP 1 1 AS hit FROM AI_Usage_Events u
+                    SELECT TOP 1 u.created_at AS reached_at FROM AI_Usage_Events u
                         WHERE u.session_id = j.session_id
                           AND u.event_type = 'FEEDBACK_HELPFUL'
                           AND u.created_at >= j.asked_at AND u.created_at < ?
                 ) helpful_event
                 OUTER APPLY (
-                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                    SELECT TOP 1 e.created_at AS reached_at FROM Customer_Behavior_Events e
                         WHERE e.session_id = j.session_id AND e.event_type = 'AI_PRODUCT_CLICK'
                           AND e.created_at >= j.asked_at AND e.created_at < ?
                 ) click_event
                 OUTER APPLY (
-                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                    SELECT TOP 1 e.created_at AS reached_at FROM Customer_Behavior_Events e
                         WHERE e.session_id = j.session_id AND e.event_type = 'CHECKOUT_STARTED'
-                          AND e.created_at >= j.asked_at AND e.created_at < ?
+                          AND click_event.reached_at IS NOT NULL
+                          AND e.created_at >= click_event.reached_at AND e.created_at < ?
                 ) checkout_event
                 OUTER APPLY (
-                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                    SELECT TOP 1 e.created_at AS reached_at FROM Customer_Behavior_Events e
                         WHERE e.session_id = j.session_id AND e.event_type = 'ORDER_CREATED'
-                          AND e.created_at >= j.asked_at AND e.created_at < ?
+                          AND checkout_event.reached_at IS NOT NULL
+                          AND e.created_at >= checkout_event.reached_at AND e.created_at < ?
                 ) order_event
                 OUTER APPLY (
-                    SELECT TOP 1 1 AS hit FROM Customer_Behavior_Events e
+                    SELECT TOP 1 e.created_at AS reached_at FROM Customer_Behavior_Events e
                         WHERE e.session_id = j.session_id AND e.event_type = 'PAYMENT_SUCCESS'
-                          AND e.created_at >= j.asked_at AND e.created_at < ?
+                          AND order_event.reached_at IS NOT NULL
+                          AND e.created_at >= order_event.reached_at AND e.created_at < ?
                 ) payment_event
                 """, (rs, rowNum) -> new AiSalesFunnelRow(
-                        rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4),
-                        rs.getLong(5), rs.getLong(6), rs.getLong(7)),
+                rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4),
+                rs.getLong(5), rs.getLong(6), rs.getLong(7)),
                 fromDate, toDate, toDate, toDate, toDate, toDate, toDate, toDate);
     }
 

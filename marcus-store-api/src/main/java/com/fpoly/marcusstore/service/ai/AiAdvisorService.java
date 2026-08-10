@@ -72,10 +72,10 @@ public class AiAdvisorService {
 
     @Autowired
     public AiAdvisorService(HomeProductRepository homeProductRepository,
-                            SystemSettingService systemSettingService,
-                            AiAdvisorIntentRouter intentRouter,
-                            AiStoreKnowledgeService storeKnowledgeService,
-                            GeminiClient geminiClient) {
+            SystemSettingService systemSettingService,
+            AiAdvisorIntentRouter intentRouter,
+            AiStoreKnowledgeService storeKnowledgeService,
+            GeminiClient geminiClient) {
         this.homeProductRepository = homeProductRepository;
         this.systemSettingService = systemSettingService;
         this.intentRouter = intentRouter;
@@ -85,9 +85,9 @@ public class AiAdvisorService {
 
     // Marcus thêm: constructor hẹp phục vụ regression test, không gọi mạng.
     AiAdvisorService(HomeProductRepository homeProductRepository,
-                     SystemSettingService systemSettingService,
-                     AiAdvisorIntentRouter intentRouter,
-                     AiStoreKnowledgeService storeKnowledgeService) {
+            SystemSettingService systemSettingService,
+            AiAdvisorIntentRouter intentRouter,
+            AiStoreKnowledgeService storeKnowledgeService) {
         this(homeProductRepository, systemSettingService, intentRouter, storeKnowledgeService, null);
     }
 
@@ -100,7 +100,8 @@ public class AiAdvisorService {
         }
 
         Integer requestedFocusedProductId = request.getContext() == null
-                ? null : request.getContext().getFocusedProductId();
+                ? null
+                : request.getContext().getFocusedProductId();
         AiAdvisorIntent intent = intentRouter.detect(
                 request.getMessage(), requestedFocusedProductId != null);
         String storeAnswer = storeKnowledgeService.answer(intent);
@@ -108,7 +109,8 @@ public class AiAdvisorService {
             return fixedAnswer(storeAnswer);
         }
         AiAdvisorResponse brandAnswer = intent == AiAdvisorIntent.BRAND_KNOWLEDGE
-                ? answerKnownBrandQuestion(request.getMessage()) : null;
+                ? answerKnownBrandQuestion(request.getMessage())
+                : null;
         if (brandAnswer != null) {
             return brandAnswer;
         }
@@ -171,12 +173,15 @@ public class AiAdvisorService {
     }
 
     private void enrichSkuOptions(List<AiAdvisorResponse.ProductSuggestion> products) {
-        if (products == null || products.isEmpty()) return;
-        if (products.stream().allMatch(product -> product.getSkuOptions() != null)) return;
+        if (products == null || products.isEmpty())
+            return;
+        if (products.stream().allMatch(product -> product.getSkuOptions() != null))
+            return;
         List<Integer> productIds = products.stream()
                 .map(AiAdvisorResponse.ProductSuggestion::getProductId)
                 .filter(java.util.Objects::nonNull).toList();
-        if (productIds.isEmpty()) return;
+        if (productIds.isEmpty())
+            return;
         Map<Integer, List<AiAdvisorResponse.SkuSuggestion>> byProduct = new HashMap<>();
         for (AiSkuProjection sku : homeProductRepository.findAvailableSkusForAiAdvisor(productIds)) {
             List<AiAdvisorResponse.SkuSuggestion> options = byProduct.computeIfAbsent(
@@ -203,13 +208,16 @@ public class AiAdvisorService {
                 .category(previous == null ? null : previous.getCategory())
                 .platform(previous == null ? null : previous.getPlatform())
                 .brands(previous == null || previous.getBrands() == null
-                        ? new ArrayList<>() : new ArrayList<>(previous.getBrands()))
+                        ? new ArrayList<>()
+                        : new ArrayList<>(previous.getBrands()))
                 .minBudget(previous == null ? null : previous.getMinBudget())
                 .maxBudget(previous == null ? null : previous.getMaxBudget())
                 .priorities(previous == null || previous.getPriorities() == null
-                        ? new ArrayList<>() : new ArrayList<>(previous.getPriorities()))
+                        ? new ArrayList<>()
+                        : new ArrayList<>(previous.getPriorities()))
                 .selectedProductIds(previous == null || previous.getSelectedProductIds() == null
-                        ? new ArrayList<>() : new ArrayList<>(previous.getSelectedProductIds()))
+                        ? new ArrayList<>()
+                        : new ArrayList<>(previous.getSelectedProductIds()))
                 .focusedProductId(previous == null ? null : previous.getFocusedProductId())
                 .build();
 
@@ -218,13 +226,19 @@ public class AiAdvisorService {
                 ".*(phụ kiện|ốp lưng|bao da|sạc|cáp|tai nghe|kính cường lực).*");
         boolean explicitPhone = message.matches(
                 ".*(điện thoại|smartphone|android|iphone|samsung|xiaomi|oppo|vivo|realme|honor|nokia).*");
-        if (explicitAccessory) context.setCategory("ACCESSORY");
-        else if (explicitPhone) context.setCategory("PHONE");
-        else if (context.getCategory() == null) context.setCategory("PHONE");
+        if (explicitAccessory)
+            context.setCategory("ACCESSORY");
+        else if (explicitPhone)
+            context.setCategory("PHONE");
+        else if (context.getCategory() == null)
+            context.setCategory("PHONE");
 
-        if (message.contains("android")) context.setPlatform("ANDROID");
-        if (message.contains("iphone") || message.contains("ios")) context.setPlatform("IOS");
-        if (context.getPlatform() == null) context.setPlatform("ANY");
+        if (message.contains("android"))
+            context.setPlatform("ANDROID");
+        if (message.contains("iphone") || message.contains("ios"))
+            context.setPlatform("IOS");
+        if (context.getPlatform() == null)
+            context.setPlatform("ANY");
 
         List<String> explicitBrands = extractBrands(message);
         if (!explicitBrands.isEmpty()) {
@@ -246,12 +260,15 @@ public class AiAdvisorService {
                     .filter(brand -> !"apple".equals(brand)).toList());
         } else if (explicitAccessory && context.getBrands().isEmpty()) {
             String historyBrand = findBrandFromRecentHistory(request.getHistory());
-            if (!historyBrand.isBlank()) context.setBrands(List.of(historyBrand));
+            if (!historyBrand.isBlank())
+                context.setBrands(List.of(historyBrand));
         } else if (previous == null && !explicitAccessory) {
             List<String> historyKeywords = findPhoneContextFromRecentHistory(request.getHistory());
             if (!historyKeywords.isEmpty()) {
-                if (historyKeywords.size() > 4) context.setPlatform("ANDROID");
-                else context.setBrands(historyKeywords.stream().map(this::normalizeBrand).distinct().limit(4).toList());
+                if (historyKeywords.size() > 4)
+                    context.setPlatform("ANDROID");
+                else
+                    context.setBrands(historyKeywords.stream().map(this::normalizeBrand).distinct().limit(4).toList());
             }
         }
         if ("IOS".equals(context.getPlatform()) && context.getBrands().isEmpty()) {
@@ -278,17 +295,22 @@ public class AiAdvisorService {
             context.setMaxBudget(null);
         }
         LinkedHashSet<String> priorities = new LinkedHashSet<>(context.getPriorities());
-        if (message.matches(".*(camera|chụp ảnh|quay phim|quay video|ois).*") ) priorities.add("CAMERA");
-        if (message.matches(".*(chơi game|gaming|hiệu năng|chip).*") ) priorities.add("PERFORMANCE");
-        if (message.matches(".*(pin|thời lượng|sạc).*") ) priorities.add("BATTERY");
-        if (message.matches(".*(màn hình|oled|amoled|ltpo|tần số quét).*") ) priorities.add("DISPLAY");
+        if (message.matches(".*(camera|chụp ảnh|quay phim|quay video|ois).*"))
+            priorities.add("CAMERA");
+        if (message.matches(".*(chơi game|gaming|hiệu năng|chip).*"))
+            priorities.add("PERFORMANCE");
+        if (message.matches(".*(pin|thời lượng|sạc).*"))
+            priorities.add("BATTERY");
+        if (message.matches(".*(màn hình|oled|amoled|ltpo|tần số quét).*"))
+            priorities.add("DISPLAY");
         context.setPriorities(priorities.stream().limit(4).toList());
         return context;
     }
 
     private boolean shouldUseFocusedProduct(
             String rawMessage, AiAdvisorIntent intent, Integer focusedProductId) {
-        if (focusedProductId == null) return false;
+        if (focusedProductId == null)
+            return false;
         String message = rawMessage == null ? "" : rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
         boolean genericReference = message.matches(".*(con này|máy này|cái này|sản phẩm này|vừa xem).*");
         return intent == AiAdvisorIntent.PRODUCT_FOLLOW_UP ||
@@ -324,22 +346,26 @@ public class AiAdvisorService {
 
     private List<String> extractBrands(String message) {
         LinkedHashSet<String> brands = new LinkedHashSet<>();
-        if (message.contains("iphone") || message.contains("apple") || message.contains("ios")) brands.add("apple");
+        if (message.contains("iphone") || message.contains("apple") || message.contains("ios"))
+            brands.add("apple");
         for (String brand : List.of("samsung", "xiaomi", "oppo", "vivo", "realme", "honor", "nokia")) {
-            if (message.contains(brand)) brands.add(brand);
+            if (message.contains(brand))
+                brands.add(brand);
         }
         return brands.stream().limit(4).toList();
     }
 
     private String normalizeBrand(String keyword) {
         String normalized = keyword.toLowerCase(Locale.ROOT);
-        if (normalized.contains("iphone") || normalized.contains("apple")) return "apple";
+        if (normalized.contains("iphone") || normalized.contains("apple"))
+            return "apple";
         return PHONE_BRANDS.stream().filter(normalized::contains).findFirst().orElse(normalized);
     }
 
     private AiAdvisorResponse answerKnownBrandQuestion(String rawMessage) {
         String message = rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
-        if (!message.matches(".*(hãng gì|của hãng nào|thương hiệu nào).*") ) return null;
+        if (!message.matches(".*(hãng gì|của hãng nào|thương hiệu nào).*"))
+            return null;
         if (message.contains("iphone") || message.contains("ipad") || message.contains("airpods")) {
             return fixedAnswer("iPhone, iPad và AirPods là sản phẩm thuộc thương hiệu Apple.");
         }
@@ -370,7 +396,8 @@ public class AiAdvisorService {
                 .limit(3).map(this::toSuggestion).toList();
         enrichSkuOptions(suggestions);
         List<String> priceLines = suggestions.stream()
-                .map(product -> formatCatalogPriceLine(product, rawMessage))
+                .flatMap(product -> formatCatalogSkuLines(product, rawMessage).stream())
+                .limit(8)
                 .toList();
         AiAdvisorResponse.AdviceSections sections = AiAdvisorResponse.AdviceSections.builder()
                 .needSummary("Tra cứu giá bán của phiên bản SKU đang còn hàng.")
@@ -381,7 +408,7 @@ public class AiAdvisorService {
                 .bestReason(suggestions.isEmpty()
                         ? "Hiện chưa có phiên bản còn hàng để báo giá."
                         : "Mở thẻ sản phẩm để chọn đúng dung lượng, màu sắc và xem giá tương ứng.")
-                .followUpQuestion("Bạn cần đúng model, dung lượng hoặc khoảng ngân sách nào?")
+                .followUpQuestion("Bạn muốn mình so sánh phiên bản nào theo dung lượng, màu sắc hoặc giá?")
                 .build();
         return AiAdvisorResponse.builder()
                 .answer(buildAnswer(sections, suggestions))
@@ -392,23 +419,39 @@ public class AiAdvisorService {
                 .build();
     }
 
-    private String formatCatalogPriceLine(
+    // Marcus sửa: câu hỏi “có phiên bản nào” phải liệt kê từng SKU và giá,
+    // không được thu gọn thành một khoảng giá chung của sản phẩm.
+    private List<String> formatCatalogSkuLines(
             AiAdvisorResponse.ProductSuggestion product, String rawMessage) {
         AiAdvisorResponse.SkuSuggestion matched = findMatchingSku(product.getSkuOptions(), rawMessage);
-        if (matched == null) {
-            return product.getProductName() + ": " + formatPriceRange(product);
+        if (matched != null) {
+            product.setMatchedSkuId(matched.getSkuId());
+            return List.of(formatSkuPriceLine(product.getProductName(), matched));
         }
-        product.setMatchedSkuId(matched.getSkuId());
-        String attributes = matched.getAttributes() == null || matched.getAttributes().isBlank()
-                ? matched.getSkuCode() : matched.getAttributes();
-        return product.getProductName() + " — " + attributes + ": " + formatCurrency(matched.getPrice());
+        if (product.getSkuOptions() == null || product.getSkuOptions().isEmpty()) {
+            return List.of(product.getProductName() + ": " + formatPriceRange(product));
+        }
+        return product.getSkuOptions().stream().limit(6)
+                .map(sku -> formatSkuPriceLine(product.getProductName(), sku))
+                .toList();
+    }
+
+    private String formatSkuPriceLine(String productName, AiAdvisorResponse.SkuSuggestion sku) {
+        String version = sku.getAttributes() == null || sku.getAttributes().isBlank()
+                ? sku.getSkuCode()
+                : sku.getAttributes();
+        String stock = sku.getStockQuantity() == null
+                ? ""
+                : " · còn " + sku.getStockQuantity() + " sản phẩm";
+        return productName + " — " + version + ": " + formatCurrency(sku.getPrice()) + stock;
     }
 
     // Marcus thêm: nếu khách nêu dung lượng/màu đang có trong Attribute Value,
     // giá phải chốt theo đúng SKU thay vì trả khoảng giá toàn sản phẩm.
     private AiAdvisorResponse.SkuSuggestion findMatchingSku(
             List<AiAdvisorResponse.SkuSuggestion> options, String rawMessage) {
-        if (options == null || options.isEmpty()) return null;
+        if (options == null || options.isEmpty())
+            return null;
         String message = rawMessage == null ? "" : rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
         Matcher storageMatcher = STORAGE_PATTERN.matcher(message);
         String storage = storageMatcher.find()
@@ -417,12 +460,14 @@ public class AiAdvisorService {
         List<AiAdvisorResponse.SkuSuggestion> storageMatches = options.stream()
                 .filter(option -> storage == null || normalizeSkuText(option).contains(storage))
                 .toList();
-        if (storage != null && storageMatches.isEmpty()) return null;
+        if (storage != null && storageMatches.isEmpty())
+            return null;
 
         List<AiAdvisorResponse.SkuSuggestion> candidates = storage == null ? options : storageMatches;
         for (AiAdvisorResponse.SkuSuggestion option : candidates) {
             String attributes = option.getAttributes();
-            if (attributes == null) continue;
+            if (attributes == null)
+                continue;
             for (String attribute : attributes.split(",")) {
                 int separator = attribute.indexOf(':');
                 String value = separator >= 0 ? attribute.substring(separator + 1).trim() : attribute.trim();
@@ -669,7 +714,8 @@ public class AiAdvisorService {
     }
 
     private String formatPriceRange(AiAdvisorResponse.ProductSuggestion product) {
-        if (product.getPrice() == null) return "chưa có giá";
+        if (product.getPrice() == null)
+            return "chưa có giá";
         if (product.getMaxPrice() != null && product.getMaxPrice().compareTo(product.getPrice()) > 0) {
             return "từ " + formatCurrency(product.getPrice()) + " đến " + formatCurrency(product.getMaxPrice());
         }
@@ -688,13 +734,15 @@ public class AiAdvisorService {
                                 productSpecs.get(product.getProductId()), context.getPriorities()))
                         .reversed()
                         .thenComparing(product -> product.getPrice() == null
-                                ? BigDecimal.valueOf(Long.MAX_VALUE) : product.getPrice()))
+                                ? BigDecimal.valueOf(Long.MAX_VALUE)
+                                : product.getPrice()))
                 .limit(8)
                 .toList();
     }
 
     private int evidenceScore(String specs, List<String> priorities) {
-        if (priorities == null) return 0;
+        if (priorities == null)
+            return 0;
         int score = 0;
         for (String priority : priorities) {
             String evidenceKeyword = switch (priority) {
@@ -704,7 +752,8 @@ public class AiAdvisorService {
                 case "DISPLAY" -> "màn hình";
                 default -> null;
             };
-            if (evidenceKeyword != null && hasEvidence(specs, evidenceKeyword)) score++;
+            if (evidenceKeyword != null && hasEvidence(specs, evidenceKeyword))
+                score++;
         }
         return score;
     }
@@ -868,7 +917,8 @@ public class AiAdvisorService {
             }
 
             Integer requestedBestId = result.path("bestProductId").canConvertToInt()
-                    ? result.path("bestProductId").asInt() : null;
+                    ? result.path("bestProductId").asInt()
+                    : null;
             Integer bestProductId = suggestions.stream()
                     .map(AiAdvisorResponse.ProductSuggestion::getProductId)
                     .filter(id -> java.util.Objects.equals(id, requestedBestId))
@@ -963,7 +1013,8 @@ public class AiAdvisorService {
             node.forEach(value -> {
                 if (values.size() < limit) {
                     String sanitized = cleanSectionText(value.asText(""), maxLength, "");
-                    if (!sanitized.isBlank()) values.add(sanitized);
+                    if (!sanitized.isBlank())
+                        values.add(sanitized);
                 }
             });
         }
@@ -979,7 +1030,8 @@ public class AiAdvisorService {
                 .filter(text -> !containsUnsupportedPriorityClaim(text, suggestions, productSpecs, context))
                 .limit(2)
                 .toList();
-        if (!valid.isEmpty()) return valid;
+        if (!valid.isEmpty())
+            return valid;
         if (context.getPriorities() != null && !context.getPriorities().isEmpty()) {
             return List.of("Thông số catalog chưa đủ để kết luận tuyệt đối; hãy mở sản phẩm để đối chiếu chi tiết.");
         }
@@ -1000,17 +1052,20 @@ public class AiAdvisorService {
                 case "DISPLAY" -> "màn hình";
                 default -> null;
             };
-            if (evidenceKeyword == null || !normalized.contains(evidenceKeyword.split("/")[0])) continue;
-            boolean hasAnyEvidence = suggestions.stream().anyMatch(product ->
-                    hasEvidence(productSpecs.get(product.getProductId()), evidenceKeyword));
-            if (!hasAnyEvidence) return true;
+            if (evidenceKeyword == null || !normalized.contains(evidenceKeyword.split("/")[0]))
+                continue;
+            boolean hasAnyEvidence = suggestions.stream()
+                    .anyMatch(product -> hasEvidence(productSpecs.get(product.getProductId()), evidenceKeyword));
+            if (!hasAnyEvidence)
+                return true;
         }
         return false;
     }
 
     private String safeAdvisorText(String value, int maxLength, String fallback) {
         String sanitized = sanitizeConversationText(value);
-        if (sanitized.isBlank()) return fallback;
+        if (sanitized.isBlank())
+            return fallback;
         return sanitized.length() <= maxLength ? sanitized : sanitized.substring(0, maxLength);
     }
 
@@ -1029,7 +1084,8 @@ public class AiAdvisorService {
     }
 
     private String removeProductNamePrefix(String reason, String productName) {
-        if (reason == null || productName == null || productName.isBlank()) return reason;
+        if (reason == null || productName == null || productName.isBlank())
+            return reason;
         return reason.replaceFirst(
                 "(?iu)^" + Pattern.quote(productName) + "\\s*(?:[-—:]\\s*)?", "").trim();
     }
@@ -1053,7 +1109,8 @@ public class AiAdvisorService {
                 .map(AiAdvisorResponse.ProductSuggestion::getProductName)
                 .findFirst().orElse(null);
         answer.append("\n**Nên chọn:** ");
-        if (bestName != null) answer.append(bestName).append(" — ");
+        if (bestName != null)
+            answer.append(bestName).append(" — ");
         answer.append(sections.getBestReason());
         answer.append("\n*Hỏi thêm:* ").append(sections.getFollowUpQuestion());
         return normalizeAdvisorLanguage(answer.toString());

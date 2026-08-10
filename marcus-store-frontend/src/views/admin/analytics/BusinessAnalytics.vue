@@ -43,42 +43,58 @@
         <span>{{ numberOfDays.toLocaleString('vi-VN') }} ngày</span>
       </div>
 
-      <AiBusinessBriefing
-        :error="aiError"
-        :loading="aiLoading"
-        :report="aiReport"
-        :usage="aiUsage"
-        @generate="generateAiReport"
-      />
+      <AnalyticsSectionNav />
+
+      <div id="ai-conclusion" class="analytics-anchor-section">
+        <AiBusinessBriefing
+          :error="aiError"
+          :loading="aiLoading"
+          :report="aiReport"
+          :usage="aiUsage"
+          @generate="generateAiReport"
+        />
+      </div>
 
       <AnalyticsInsightPanel v-if="analysis" :analysis="analysis" :forecast="forecast" />
 
-      <AnalyticsForecastChart v-if="forecast" :forecast="forecast" />
+      <div id="forecast" class="analytics-anchor-section">
+        <AnalyticsForecastChart v-if="forecast" :forecast="forecast" />
+      </div>
 
-      <div class="analytics-history-divider">
+      <div
+        id="ai-effectiveness"
+        class="analytics-history-divider analytics-history-divider--ai analytics-anchor-section"
+      >
         <div>
-          <span>Dữ liệu hệ thống</span>
-          <h2>Số liệu dùng để kiểm chứng phân tích</h2>
-          <p>
-            KPI và lịch sử bán hàng được đặt sau phần kết luận để tránh biến trang thành Dashboard.
-          </p>
+          <span>Hiệu quả hỗ trợ bán hàng</span>
+          <h2>Khách tiếp tục làm gì sau khi hỏi Marcus AI?</h2>
+          <p>Theo dõi hành trình ẩn danh từ lúc nhận tư vấn đến khi tạo đơn và thanh toán.</p>
+        </div>
+        <i class="bi bi-stars"></i>
+      </div>
+
+      <AnalyticsAiSalesFunnel :data="aiSalesFunnel" />
+
+      <div id="business-evidence" class="analytics-history-divider analytics-anchor-section">
+        <div>
+          <span>Cơ sở kiểm chứng</span>
+          <h2>Dữ liệu kinh doanh làm căn cứ phân tích</h2>
+          <p>Doanh thu, đơn hàng và sản phẩm giúp kiểm tra lại các dự báo và đề xuất phía trên.</p>
         </div>
         <i class="bi bi-database-check"></i>
       </div>
 
       <AnalyticsKpiGrid :overview="overview" />
 
-      <AnalyticsCancellationReasons :reasons="cancellationReasons" />
-
-      <AnalyticsWarrantyQuality :data="warrantyQuality" />
-
-      <AnalyticsAiSalesFunnel :data="aiSalesFunnel" />
-
-      <AnalyticsBehaviorFunnel :data="behaviorFunnel" />
-
       <AnalyticsSalesChart :monthly="numberOfDays > 120" :trend="trend" />
 
       <AnalyticsProductTable :products="products" />
+
+      <div id="product-quality" class="analytics-anchor-section">
+        <AnalyticsCancellationReasons :reasons="cancellationReasons" />
+        <AnalyticsWarrantyQuality :data="warrantyQuality" />
+        <AnalyticsBehaviorFunnel :data="behaviorFunnel" />
+      </div>
 
       <aside class="analytics-scope-note">
         <i class="bi bi-info-circle"></i>
@@ -115,6 +131,7 @@ import AnalyticsSalesChart from '@/components/analytics/AnalyticsSalesChart.vue'
 import AnalyticsWarrantyQuality from '@/components/analytics/AnalyticsWarrantyQuality.vue'
 import AnalyticsBehaviorFunnel from '@/components/analytics/AnalyticsBehaviorFunnel.vue'
 import AnalyticsAiSalesFunnel from '@/components/analytics/AnalyticsAiSalesFunnel.vue'
+import AnalyticsSectionNav from '@/components/analytics/AnalyticsSectionNav.vue'
 import { useBusinessAnalytics } from '@/composables/useBusinessAnalytics'
 
 const {

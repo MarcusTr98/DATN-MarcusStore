@@ -2,7 +2,10 @@
   <!-- Marcus thêm cho Analytics: hiển thị thống kê đọc từ module bảo hành của Đạt,
        không thực hiện cập nhật trạng thái hay thay đổi dữ liệu bảo hành. -->
   <section v-if="data" class="warranty-quality analysis-source-host">
-    <AnalysisSourceBadge source="algorithm" />
+    <AnalysisSourceBadge
+      source="algorithm"
+      detail="Tỷ lệ xử lý = yêu cầu đã kết thúc / tổng yêu cầu × 100%; tỷ lệ duyệt = số đã duyệt / (đã duyệt + từ chối) × 100%. Đây không phải tỷ lệ lỗi sản phẩm."
+    />
     <header>
       <div>
         <span><i class="bi bi-shield-check"></i> Hậu mãi & chất lượng sản phẩm</span>
@@ -60,10 +63,26 @@
             </tbody>
           </table>
         </div>
-        <nav v-if="totalPages > 1" class="warranty-pagination" aria-label="Phân trang sản phẩm bảo hành">
-          <button type="button" :disabled="page === 1" @click="page--"><i class="bi bi-chevron-left"></i></button>
-          <button v-for="number in totalPages" :key="number" type="button" :class="{ active: page === number }" @click="page = number">{{ number }}</button>
-          <button type="button" :disabled="page === totalPages" @click="page++"><i class="bi bi-chevron-right"></i></button>
+        <nav
+          v-if="totalPages > 1"
+          class="warranty-pagination"
+          aria-label="Phân trang sản phẩm bảo hành"
+        >
+          <button type="button" :disabled="page === 1" @click="page--">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <button
+            v-for="number in totalPages"
+            :key="number"
+            type="button"
+            :class="{ active: page === number }"
+            @click="page = number"
+          >
+            {{ number }}
+          </button>
+          <button type="button" :disabled="page === totalPages" @click="page++">
+            <i class="bi bi-chevron-right"></i>
+          </button>
         </nav>
         <p v-else class="warranty-quality__empty">Chưa phát sinh yêu cầu bảo hành trong kỳ.</p>
       </div>
@@ -97,9 +116,7 @@ const totalPages = computed(() =>
   Math.max(1, Math.ceil((props.data?.productQuality?.length || 0) / pageSize)),
 )
 const pagedProducts = computed(
-  () =>
-    props.data?.productQuality?.slice((page.value - 1) * pageSize, page.value * pageSize) ||
-    [],
+  () => props.data?.productQuality?.slice((page.value - 1) * pageSize, page.value * pageSize) || [],
 )
 watch(
   () => props.data,
@@ -271,7 +288,35 @@ function changeClass(value) {
   background: #fff;
   border-radius: 14px;
 }
-.warranty-pagination{display:flex;justify-content:flex-end;align-items:center;gap:6px;margin-top:12px}.warranty-pagination button{display:grid;place-items:center;min-width:34px;height:34px;padding:0 8px;border:1px solid #d6e3f5;border-radius:9px;background:#fff;color:#49617f;font-weight:700}.warranty-pagination button:hover:not(:disabled),.warranty-pagination button.active{border-color:#2e75d3;background:#2e75d3;color:#fff}.warranty-pagination button:disabled{opacity:.4;cursor:not-allowed}
+.warranty-pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.warranty-pagination button {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #d6e3f5;
+  border-radius: 9px;
+  background: #fff;
+  color: #49617f;
+  font-weight: 700;
+}
+.warranty-pagination button:hover:not(:disabled),
+.warranty-pagination button.active {
+  border-color: #2e75d3;
+  background: #2e75d3;
+  color: #fff;
+}
+.warranty-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 @media (max-width: 900px) {
   .warranty-quality__kpis {
     grid-template-columns: repeat(2, 1fr);

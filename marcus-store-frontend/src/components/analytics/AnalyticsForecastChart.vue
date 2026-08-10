@@ -1,7 +1,10 @@
 <template>
   <article class="analytics-panel analytics-forecast-chart analysis-source-host">
     <!-- Marcus thêm: dự báo hồi quy tuyến tính được ghi rõ là Thuật toán. -->
-    <AnalysisSourceBadge source="algorithm" />
+    <AnalysisSourceBadge
+      source="algorithm"
+      detail="Dự báo dùng hồi quy tuyến tính OLS: ŷ = a + bx. Biên trên/dưới = ŷ ± RMSE; R² và backtest các kỳ cuối dùng để đánh giá độ tin cậy."
+    />
     <div class="analytics-panel__header">
       <div>
         <span class="analytics-panel__eyebrow">Dự báo thống kê</span>

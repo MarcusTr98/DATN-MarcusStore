@@ -34,9 +34,9 @@ import java.util.stream.Collectors;
 @Service
 public class AiAnalyticsService {
 
-        // Marcus sửa: đổi version để báo cáo cache cũ không che mất dữ liệu bảo hành
-        // mới.
-        private static final String METRIC_SCHEMA_VERSION = "insight-evidence-fingerprint-v5";
+        // Marcus sửa: đổi version để loại báo cáo cache còn dài và lộ tên khóa JSON kỹ
+        // thuật.
+        private static final String METRIC_SCHEMA_VERSION = "decision-readable-v8";
         private static final int PRODUCT_LIMIT = 10;
         private static final Set<String> OUTLOOKS = Set.of("GROWTH", "STEADY", "DECLINE", "UNCERTAIN");
         private static final Set<String> SEVERITIES = Set.of("POSITIVE", "INFO", "WARNING", "CRITICAL");
@@ -52,9 +52,9 @@ public class AiAnalyticsService {
 
         @Autowired
         public AiAnalyticsService(AnalyticsService analyticsService, ObjectMapper objectMapper,
-                                  AiAnalyticsReportRepository reportRepository,
-                                  AiUsageEventService aiUsageEventService,
-                                  GeminiClient geminiClient) {
+                        AiAnalyticsReportRepository reportRepository,
+                        AiUsageEventService aiUsageEventService,
+                        GeminiClient geminiClient) {
                 this.analyticsService = analyticsService;
                 this.objectMapper = objectMapper;
                 this.reportRepository = reportRepository;
@@ -64,8 +64,8 @@ public class AiAnalyticsService {
 
         // Marcus thêm: constructor hẹp cho unit test fallback, không gọi provider.
         AiAnalyticsService(AnalyticsService analyticsService, ObjectMapper objectMapper,
-                           AiAnalyticsReportRepository reportRepository,
-                           AiUsageEventService aiUsageEventService) {
+                        AiAnalyticsReportRepository reportRepository,
+                        AiUsageEventService aiUsageEventService) {
                 this(analyticsService, objectMapper, reportRepository, aiUsageEventService, null);
         }
 
@@ -114,15 +114,16 @@ public class AiAnalyticsService {
                                 overview.period().fromDate(),
                                 overview.period().toDate(),
                                 PRODUCT_LIMIT);
-                List<Map<String, Object>> salesTrendBuckets = summarizeSalesTrend(
-                                analyticsService.getSalesTrend(
-                                                overview.period().fromDate(), overview.period().toDate()));
+                List<AnalyticsTrendPoint> rawTrend = analyticsService.getSalesTrend(
+                                overview.period().fromDate(), overview.period().toDate());
+                List<Map<String, Object>> salesTrendBuckets = summarizeSalesTrend(rawTrend);
                 String context = buildSafeContext(
                                 overview,
                                 products,
                                 analyticsService.getCancellationReasons(
                                                 overview.period().fromDate(), overview.period().toDate()),
-                                salesTrendBuckets);
+                                salesTrendBuckets,
+                                buildAlgorithmEvidence(salesTrendBuckets));
                 String fingerprint = fingerprint(context);
                 AiAnalyticsReportResponse exactCache = findStoredReport(cacheKey, fingerprint);
                 if (exactCache != null) {
@@ -193,7 +194,8 @@ public class AiAnalyticsService {
                         AnalyticsOverviewResponse overview,
                         List<ProductTrendResponse> products,
                         List<com.fpoly.marcusstore.dto.analytics.CancellationReasonResponse> cancellationReasons,
-                        List<Map<String, Object>> salesTrendBuckets) {
+                        List<Map<String, Object>> salesTrendBuckets,
+                        Map<String, Object> algorithmEvidence) {
                 Map<String, Object> context = new LinkedHashMap<>();
                 // Marcus thêm: gửi định nghĩa chỉ số để AI không diễn giải final_amount
                 // của đơn chưa thu được tiền thành doanh thu.
@@ -217,6 +219,9 @@ public class AiAnalyticsService {
                 // Marcus nâng cấp: nén chuỗi thời gian thành tối đa 12 giai đoạn để AI
                 // nhận ra đà tăng/giảm mà vẫn tiết kiệm quota Gemini miễn phí.
                 context.put("salesTrendBuckets", salesTrendBuckets);
+                // Marcus thêm: Gemini đọc trực tiếp kết quả thuật toán đã tính và
+                // kiểm chứng, không tự bịa lại hệ số hồi quy hay ngày bất thường.
+                context.put("algorithmEvidence", algorithmEvidence);
                 // Marcus thêm: AI chỉ nhận nhóm lý do và số đếm đã chuẩn hóa, không nhận
                 // ghi chú hủy tự do hay thông tin nhận diện khách hàng.
                 context.put("cancellationReasons", cancellationReasons);
@@ -243,6 +248,90 @@ public class AiAnalyticsService {
                 } catch (Exception exception) {
                         throw new IllegalStateException("Không thể chuẩn bị dữ liệu tổng hợp cho AI.");
                 }
+        }
+
+        private Map<String, Object> buildAlgorithmEvidence(List<Map<String, Object>> buckets) {
+                List<Double> values = buckets.stream()
+                                .map(bucket -> ((java.math.BigDecimal) bucket.get("completedSales")).doubleValue())
+                                .toList();
+                Map<String, Object> evidence = new LinkedHashMap<>();
+                evidence.put("formula", "OLS yHat = intercept + slope*x; bounds = yHat +/- RMSE");
+                evidence.put("sampleSize", values.size());
+                if (values.size() < 3) {
+                        evidence.put("available", false);
+                        evidence.put("reason", "Cần ít nhất 3 giai đoạn doanh thu.");
+                        return evidence;
+                }
+
+                RegressionMetric full = regression(values);
+                evidence.put("available", true);
+                evidence.put("slope", roundMetric(full.slope()));
+                evidence.put("rSquared", roundMetric(full.rSquared()));
+                evidence.put("rmse", Math.round(full.rmse()));
+
+                if (values.size() >= 6) {
+                        int holdout = Math.min(3, Math.max(1, values.size() / 5));
+                        List<Double> training = values.subList(0, values.size() - holdout);
+                        RegressionMetric trained = regression(training);
+                        double absolutePercentageError = 0;
+                        int percentageSamples = 0;
+                        for (int index = 0; index < holdout; index++) {
+                                double actual = values.get(training.size() + index);
+                                double predicted = Math.max(0,
+                                                trained.intercept() + trained.slope() * (training.size() + index));
+                                if (actual > 0) {
+                                        absolutePercentageError += Math.abs(actual - predicted) / actual * 100;
+                                        percentageSamples++;
+                                }
+                        }
+                        evidence.put("backtestPeriods", holdout);
+                        evidence.put("backtestMape", percentageSamples == 0 ? null
+                                        : roundMetric(absolutePercentageError / percentageSamples));
+                }
+
+                List<Map<String, Object>> anomalies = new ArrayList<>();
+                if (full.rmse() > 0 && values.size() >= 5) {
+                        for (int index = 0; index < values.size(); index++) {
+                                double expected = Math.max(0, full.intercept() + full.slope() * index);
+                                double score = Math.abs(values.get(index) - expected) / full.rmse();
+                                if (score >= 2) {
+                                        anomalies.add(Map.of(
+                                                        "fromDate", buckets.get(index).get("fromDate"),
+                                                        "toDate", buckets.get(index).get("toDate"),
+                                                        "actualSales", Math.round(values.get(index)),
+                                                        "expectedSales", Math.round(expected),
+                                                        "deviationRmse", roundMetric(score)));
+                                }
+                        }
+                }
+                evidence.put("anomalies", anomalies.stream().limit(3).toList());
+                return evidence;
+        }
+
+        private RegressionMetric regression(List<Double> values) {
+                double xMean = (values.size() - 1) / 2D;
+                double yMean = values.stream().mapToDouble(Double::doubleValue).average().orElse(0);
+                double numerator = 0;
+                double denominator = 0;
+                for (int index = 0; index < values.size(); index++) {
+                        numerator += (index - xMean) * (values.get(index) - yMean);
+                        denominator += Math.pow(index - xMean, 2);
+                }
+                double slope = denominator == 0 ? 0 : numerator / denominator;
+                double intercept = yMean - slope * xMean;
+                double residualSum = 0;
+                double totalSum = 0;
+                for (int index = 0; index < values.size(); index++) {
+                        residualSum += Math.pow(values.get(index) - (intercept + slope * index), 2);
+                        totalSum += Math.pow(values.get(index) - yMean, 2);
+                }
+                double rmse = Math.sqrt(residualSum / values.size());
+                double rSquared = totalSum == 0 ? 0 : Math.max(0, 1 - residualSum / totalSum);
+                return new RegressionMetric(slope, intercept, rmse, rSquared);
+        }
+
+        private double roundMetric(double value) {
+                return Math.round(value * 100D) / 100D;
         }
 
         private List<Map<String, Object>> summarizeSalesTrend(List<AnalyticsTrendPoint> trend) {
@@ -299,12 +388,28 @@ public class AiAnalyticsService {
                                 Nếu một sản phẩm có ít yêu cầu, phải ghi rõ dữ liệu còn ít và không kết luận chất lượng kém.
                                 salesTrendBuckets là chuỗi thời gian đã nén theo thứ tự cũ đến mới;
                                 dùng để nhận diện đà tăng/giảm, điểm bứt phá và mức biến động thay vì chỉ đọc tổng KPI.
+                                algorithmEvidence là kết quả OLS/backtest/phát hiện bất thường do backend tính sẵn.
+                                Chỉ được nhắc hệ số, sai số hoặc ngày bất thường có trong algorithmEvidence;
+                                dùng backtestMape và rSquared để hạ mức tin cậy khi mô hình yếu.
                                 Không đưa ra con số dự báo doanh thu tuyệt đối nếu chuỗi biến động mạnh hoặc dữ liệu quá ít.
                                 Mọi kết luận phải gắn với evidence có số liệu trong JSON.
                                 Mỗi signal bắt buộc có confidence, action và verification; cách kiểm chứng phải chỉ rõ số liệu cần xem ở kỳ sau.
                                 Có thể dự đoán HƯỚNG tăng/đi ngang/giảm của sản phẩm, nhưng phải dùng UNCERTAIN khi dữ liệu yếu.
                                 headline và executiveSummary phải ưu tiên triển vọng sắp tới, rủi ro chính và quyết định quản lý;
                                 không chỉ liệt kê lại KPI giống dashboard.
+                                Headline phải là một KẾT LUẬN có hướng hành động, không dùng tiêu đề chung như “Tổng quan kinh doanh”.
+                                ExecutiveSummary phải trả lời đủ ba ý: điều gì có khả năng xảy ra, bằng chứng mạnh nhất là gì,
+                                và chủ cửa hàng nên ưu tiên quyết định nào ngay trong kỳ kế tiếp.
+                                Tuyệt đối không in tên khóa JSON hoặc thuật ngữ nội bộ như completedSales, successfulRefundAmount,
+                                rSquared, backtestMape, productId, salesTrendBuckets, algorithmEvidence, slope.
+                                Dùng từ quản trị dễ hiểu tương ứng: doanh thu đã thu của đơn hoàn tất, tiền hoàn thành công,
+                                độ phù hợp của mô hình, mức sai lệch dự báo khi đối chiếu dữ liệu cũ, sản phẩm và xu hướng tăng/giảm/đi ngang.
+                                Không in hệ số xu hướng dạng số khoa học như -2.23e7; chỉ diễn giải hướng và mức độ biến động.
+                                Mọi tỷ lệ phải dùng ký hiệu %, không viết chữ “phần trăm”. Tiền phải dùng dấu chấm phân cách
+                                hàng nghìn và kết thúc bằng VNĐ. Không dùng dấu chấm phẩy trong câu trả lời.
+                                ExecutiveSummary chỉ 1-2 câu, tối đa khoảng 280 ký tự. Mỗi evidence, interpretation,
+                                action, verification và reason chỉ 1 câu ngắn, ưu tiên con số dễ đọc và việc có thể làm ngay.
+                                Không lặp cùng một nhận xét ở headline, signal và action.
                                 Sắp xếp productOutlooks theo mức cần hành động: xu hướng tăng rõ, xu hướng giảm rõ, rồi mới chưa chắc chắn.
                                 Signals ưu tiên tín hiệu có giá trị dự báo, biến động lý do hủy và hành vi khách; tránh lặp cùng một KPI.
                                 Actions phải cụ thể, có thể thực hiện trong kỳ kế tiếp và nói rõ căn cứ dữ liệu.
@@ -315,7 +420,7 @@ public class AiAnalyticsService {
                                 Trả JSON thuần, không Markdown, đúng cấu trúc:
                                 {
                                   "headline":"một kết luận nổi bật",
-                                  "executiveSummary":"tóm tắt 2-3 câu có dẫn chứng",
+                                  "executiveSummary":"tóm tắt 1-2 câu ngắn: xu hướng, căn cứ và ưu tiên",
                                   "outlook":"GROWTH|STEADY|DECLINE|UNCERTAIN",
                                   "confidence":"HIGH|MEDIUM|LOW",
                                   "signals":[
@@ -411,12 +516,12 @@ public class AiAnalyticsService {
                                         signals.add(new Signal(
                                                         "AI-SIGNAL-" + (signals.size() + 1),
                                                         safeText(node, "title", 100),
-                                                        safeText(node, "evidence", 180),
-                                                        safeText(node, "interpretation", 240),
+                                                        safeText(node, "evidence", 160),
+                                                        safeText(node, "interpretation", 180),
                                                         allowedValue(node.path("confidence").asText(), PRIORITIES,
                                                                         "LOW"),
-                                                        safeText(node, "action", 220),
-                                                        safeText(node, "verification", 220),
+                                                        safeText(node, "action", 160),
+                                                        safeText(node, "verification", 160),
                                                         allowedValue(node.path("severity").asText(), SEVERITIES,
                                                                         "INFO")));
                                 }
@@ -427,7 +532,7 @@ public class AiAnalyticsService {
                                 if (actions.size() < 3) {
                                         actions.add(new Action(
                                                         safeText(node, "title", 120),
-                                                        safeText(node, "reason", 240),
+                                                        safeText(node, "reason", 160),
                                                         allowedValue(node.path("priority").asText(), PRIORITIES,
                                                                         "MEDIUM")));
                                 }
@@ -446,7 +551,7 @@ public class AiAnalyticsService {
                                                         product.productName(),
                                                         allowedValue(node.path("direction").asText(), DIRECTIONS,
                                                                         "UNCERTAIN"),
-                                                        safeText(node, "reason", 240)));
+                                                        safeText(node, "reason", 160)));
                                 }
                         });
 
@@ -456,7 +561,7 @@ public class AiAnalyticsService {
                                         false,
                                         "AI",
                                         requiredText(root, "headline", 180),
-                                        requiredText(root, "executiveSummary", 600),
+                                        requiredText(root, "executiveSummary", 280),
                                         allowedValue(root.path("outlook").asText(), OUTLOOKS, "UNCERTAIN"),
                                         allowedValue(root.path("confidence").asText(), PRIORITIES, "LOW"),
                                         List.copyOf(signals),
@@ -541,8 +646,131 @@ public class AiAnalyticsService {
         }
 
         private String safeText(JsonNode node, String field, int maxLength) {
-                String value = node.path(field).asText("").replaceAll("\\s+", " ").trim();
-                return value.length() <= maxLength ? value : value.substring(0, maxLength);
+                String value = sanitizeManagementLanguage(node.path(field).asText(""));
+                if (value.length() <= maxLength) {
+                        return value;
+                }
+                // Marcus sửa: cắt tại ranh giới từ để câu kết luận không bị cụt giữa chữ.
+                String shortened = value.substring(0, maxLength);
+                int lastSpace = shortened.lastIndexOf(' ');
+                return (lastSpace > maxLength * 0.7 ? shortened.substring(0, lastSpace) : shortened).trim() + "…";
+        }
+
+        /**
+         * Marcus thêm: Gemini đọc JSON kỹ thuật nhưng màn quản trị chỉ được hiển thị
+         * ngôn ngữ kinh doanh. Đây là lớp chặn cuối, không phụ thuộc model có tuân
+         * prompt hay không.
+         */
+        private String sanitizeManagementLanguage(String raw) {
+                String value = raw == null ? "" : raw.replaceAll("\\s+", " ").trim();
+                value = replaceTrendCoefficient(value);
+                value = replaceModelFit(value);
+                value = replaceBacktestError(value);
+                value = value.replaceAll("(?i)\\bcompletedSales\\b", "doanh thu đã thu của đơn hoàn tất")
+                                .replaceAll("(?i)\\bsuccessfulRefundAmount\\b", "tiền hoàn thành công")
+                                .replaceAll("(?i)\\brSquared\\b", "độ phù hợp của mô hình")
+                                .replaceAll("(?i)\\bbacktestMape\\b", "mức sai lệch dự báo khi đối chiếu dữ liệu cũ")
+                                .replaceAll("(?i)\\bproductId\\b", "sản phẩm")
+                                .replaceAll("(?i)\\bsalesTrendBuckets\\b", "chuỗi doanh thu theo thời gian")
+                                .replaceAll("(?i)\\balgorithmEvidence\\b", "kết quả thuật toán kiểm chứng")
+                                .replaceAll("(?i)\\baiAdvisorUsage\\b", "hiệu quả tư vấn AI")
+                                .replaceAll("(?i)\\bwarrantyQuality\\b", "dữ liệu bảo hành tổng hợp")
+                                .replaceAll("(?i)(-?\\d+(?:[.,]\\d+)?)\\s*phần trăm", "$1%")
+                                .replaceAll("(?i)\\bVND\\b", "VNĐ")
+                                .replace(';', '.');
+                return normalizePercentages(formatCurrencyAmounts(expandVietnameseCurrency(value)))
+                                .replaceAll("\\s+", " ").trim();
+        }
+
+        private String normalizePercentages(String value) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                                .compile("(\\d+)\\.(\\d+)%").matcher(value);
+                return matcher.replaceAll("$1,$2%");
+        }
+
+        private String expandVietnameseCurrency(String value) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                                .compile("(?i)(\\d+(?:[.,]\\d+)?)\\s*(tỷ|triệu)\\s*(?:đồng|VNĐ)?")
+                                .matcher(value);
+                StringBuffer result = new StringBuffer();
+                while (matcher.find()) {
+                        java.math.BigDecimal amount = new java.math.BigDecimal(matcher.group(1).replace(',', '.'));
+                        long multiplier = matcher.group(2).equalsIgnoreCase("tỷ") ? 1_000_000_000L : 1_000_000L;
+                        String formatted = new java.text.DecimalFormat("#,###")
+                                        .format(amount.multiply(java.math.BigDecimal.valueOf(multiplier))
+                                                        .toBigInteger())
+                                        .replace(',', '.');
+                        matcher.appendReplacement(result,
+                                        java.util.regex.Matcher.quoteReplacement(formatted + " VNĐ"));
+                }
+                matcher.appendTail(result);
+                return result.toString();
+        }
+
+        private String replaceBacktestError(String value) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                                .compile("(?i)\\bbacktestMape\\s*[:=]?\\s*(\\d+(?:[.,]\\d+)?)%?")
+                                .matcher(value);
+                StringBuffer result = new StringBuffer();
+                while (matcher.find()) {
+                        String replacement = "mức sai lệch dự báo khi đối chiếu dữ liệu cũ "
+                                        + matcher.group(1).replace('.', ',') + "%";
+                        matcher.appendReplacement(result, java.util.regex.Matcher.quoteReplacement(replacement));
+                }
+                matcher.appendTail(result);
+                return result.toString();
+        }
+
+        private String formatCurrencyAmounts(String value) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                                .compile("(?<![\\d.,])(\\d{4,})(?:\\.0+)?\\s*(VNĐ|đồng)",
+                                                java.util.regex.Pattern.CASE_INSENSITIVE
+                                                                | java.util.regex.Pattern.UNICODE_CASE)
+                                .matcher(value);
+                StringBuffer result = new StringBuffer();
+                while (matcher.find()) {
+                        String formatted = new java.text.DecimalFormat("#,###")
+                                        .format(new java.math.BigInteger(matcher.group(1))).replace(',', '.');
+                        matcher.appendReplacement(result,
+                                        java.util.regex.Matcher.quoteReplacement(formatted + " VNĐ"));
+                }
+                matcher.appendTail(result);
+                return result.toString();
+        }
+
+        private String replaceModelFit(String value) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                                .compile("(?i)\\brSquared\\s*[:=]?\\s*(0(?:\\.\\d+)?|1(?:\\.0+)?)")
+                                .matcher(value);
+                StringBuffer result = new StringBuffer();
+                while (matcher.find()) {
+                        double percent = Double.parseDouble(matcher.group(1)) * 100;
+                        String replacement = "độ phù hợp của mô hình "
+                                        + String.format(java.util.Locale.forLanguageTag("vi-VN"), "%.0f%%", percent);
+                        matcher.appendReplacement(result, java.util.regex.Matcher.quoteReplacement(replacement));
+                }
+                matcher.appendTail(result);
+                return result.toString();
+        }
+
+        private String replaceTrendCoefficient(String value) {
+                java.util.regex.Matcher matcher = java.util.regex.Pattern
+                                .compile("(?i)\\bslope\\s*[:=]?\\s*(-?\\d+(?:\\.\\d+)?(?:e[+-]?\\d+)?)")
+                                .matcher(value);
+                StringBuffer result = new StringBuffer();
+                while (matcher.find()) {
+                        double coefficient;
+                        try {
+                                coefficient = Double.parseDouble(matcher.group(1));
+                        } catch (NumberFormatException ignored) {
+                                coefficient = 0;
+                        }
+                        String replacement = coefficient < 0 ? "xu hướng đang giảm"
+                                        : coefficient > 0 ? "xu hướng đang tăng" : "xu hướng đi ngang";
+                        matcher.appendReplacement(result, java.util.regex.Matcher.quoteReplacement(replacement));
+                }
+                matcher.appendTail(result);
+                return result.toString();
         }
 
         private String allowedValue(String value, Set<String> allowed, String fallback) {
@@ -561,6 +789,9 @@ public class AiAnalyticsService {
         }
 
         private record CacheKey(LocalDate fromDate, LocalDate toDate) {
+        }
+
+        private record RegressionMetric(double slope, double intercept, double rmse, double rSquared) {
         }
 
 }

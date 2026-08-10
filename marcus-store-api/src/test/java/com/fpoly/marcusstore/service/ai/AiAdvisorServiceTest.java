@@ -266,6 +266,49 @@ class AiAdvisorServiceTest {
         }
 
         @Test
+        void focusedProductVersionQuestionListsEveryAvailableSkuWithPrice() {
+                HomeProductRepository.AiProductProjection product = mock(
+                                HomeProductRepository.AiProductProjection.class);
+                when(product.getProductId()).thenReturn(22);
+                when(product.getProductName()).thenReturn("Xiaomi 14 Ultra");
+                when(product.getPrice()).thenReturn(new BigDecimal("16990000"));
+                when(product.getMaxPrice()).thenReturn(new BigDecimal("25980000"));
+                when(product.getStockQuantity()).thenReturn(5);
+                when(repository.findFocusedProductForAiAdvisor(22)).thenReturn(java.util.Optional.of(product));
+
+                HomeProductRepository.AiSkuProjection sku256 = mock(HomeProductRepository.AiSkuProjection.class);
+                when(sku256.getProductId()).thenReturn(22);
+                when(sku256.getSkuId()).thenReturn(221);
+                when(sku256.getSkuCode()).thenReturn("MI14U-256-BLK");
+                when(sku256.getPrice()).thenReturn(new BigDecimal("16990000"));
+                when(sku256.getStockQuantity()).thenReturn(3);
+                when(sku256.getAttributes()).thenReturn("Dung lượng: 256GB, Màu sắc: Đen");
+                HomeProductRepository.AiSkuProjection sku512 = mock(HomeProductRepository.AiSkuProjection.class);
+                when(sku512.getProductId()).thenReturn(22);
+                when(sku512.getSkuId()).thenReturn(222);
+                when(sku512.getSkuCode()).thenReturn("MI14U-512-WHT");
+                when(sku512.getPrice()).thenReturn(new BigDecimal("25980000"));
+                when(sku512.getStockQuantity()).thenReturn(2);
+                when(sku512.getAttributes()).thenReturn("Dung lượng: 512GB, Màu sắc: Trắng");
+                when(repository.findAvailableSkusForAiAdvisor(List.of(22)))
+                                .thenReturn(List.of(sku256, sku512));
+
+                AiAdvisorRequest request = new AiAdvisorRequest();
+                request.setMessage("Máy này có những phiên bản nào và giá bao nhiêu?");
+                request.setContext(AiAdvisorContext.builder()
+                                .category("PHONE").platform("ANDROID").brands(List.of("xiaomi"))
+                                .focusedProductId(22).priorities(List.of()).build());
+
+                AiAdvisorResponse response = service.advise(request);
+
+                assertEquals(2, response.getSections().getSuggestions().size());
+                assertTrue(response.getSections().getSuggestions().get(0).contains("256GB"));
+                assertTrue(response.getSections().getSuggestions().get(0).contains("16.990.000 VND"));
+                assertTrue(response.getSections().getSuggestions().get(1).contains("512GB"));
+                assertTrue(response.getSections().getSuggestions().get(1).contains("25.980.000 VND"));
+        }
+
+        @Test
         void answersKnownBrandWithoutCallingCatalogOrAi() {
                 AiAdvisorRequest request = new AiAdvisorRequest();
                 request.setMessage("Galaxy S24 của hãng nào?");
