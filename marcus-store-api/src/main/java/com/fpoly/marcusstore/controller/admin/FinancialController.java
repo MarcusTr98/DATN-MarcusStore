@@ -35,6 +35,8 @@ public class FinancialController {
     private final FinancialService financialService;
 
     @GetMapping("/export")
+    // Marcus sửa: quyền xem báo cáo không đồng nghĩa với quyền tải toàn bộ dữ liệu.
+    @PreAuthorize("hasAuthority('DONGTIEN_EXPORT')")
     public ResponseEntity<byte[]> exportExcel() throws IOException {
         byte[] data = financialService.exportTransactionsToExcel();
         return ResponseEntity.ok()

@@ -32,8 +32,26 @@ class RequestRateLimitFilterTest {
         assertThat(blocked.getContentAsString()).contains("thao tác quá nhanh");
     }
 
+    @Test
+    void limitsPublicBehaviorEventsWithoutBlockingNormalPageUsage() throws Exception {
+        RequestRateLimitFilter filter = new RequestRateLimitFilter();
+
+        for (int attempt = 1; attempt <= 60; attempt++) {
+            MockHttpServletResponse response = execute(filter, "POST", "/api/public/behavior/events", "127.0.0.9");
+            assertThat(response.getStatus()).isEqualTo(200);
+        }
+
+        assertThat(execute(filter, "POST", "/api/public/behavior/events", "127.0.0.9").getStatus())
+                .isEqualTo(429);
+    }
+
     private MockHttpServletResponse execute(RequestRateLimitFilter filter, String address) throws Exception {
-        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/auth/login");
+        return execute(filter, "POST", "/api/auth/login", address);
+    }
+
+    private MockHttpServletResponse execute(RequestRateLimitFilter filter, String method, String uri, String address)
+            throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(method, uri);
         request.setRemoteAddr(address);
         MockHttpServletResponse response = new MockHttpServletResponse();
         filter.doFilter(request, response, new MockFilterChain());

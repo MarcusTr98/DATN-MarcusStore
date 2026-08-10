@@ -100,15 +100,23 @@ public class SystemSettingService {
     @Transactional
     @CacheEvict(value = "public-settings", allEntries = true)
     public void updateSettings(Map<String, String> payload) {
-        List<SystemSetting> existingSettings = repository.findAllById(payload.keySet());
+        // Marcus sửa: chuẩn hóa key trước khi query và save để service luôn xử lý
+        // nhất quán, kể cả khi được gọi nội bộ không đi qua validation controller.
+        Map<String, String> normalizedPayload = payload.entrySet().stream()
+                .collect(Collectors.toMap(
+                        entry -> entry.getKey() == null ? "" : entry.getKey().trim().toUpperCase(),
+                        Map.Entry::getValue,
+                        (first, duplicate) -> duplicate,
+                        java.util.LinkedHashMap::new));
+        List<SystemSetting> existingSettings = repository.findAllById(normalizedPayload.keySet());
 
         Map<String, SystemSetting> existingMap = existingSettings.stream()
                 .collect(Collectors.toMap(SystemSetting::getSettingKey, s -> s));
 
         List<SystemSetting> toSave = new ArrayList<>();
 
-        for (Map.Entry<String, String> entry : payload.entrySet()) {
-            String key = entry.getKey() == null ? "" : entry.getKey().trim().toUpperCase();
+        for (Map.Entry<String, String> entry : normalizedPayload.entrySet()) {
+            String key = entry.getKey();
             String value = validateSettingValue(key, entry.getValue());
 
             // Bỏ qua nếu giá trị null

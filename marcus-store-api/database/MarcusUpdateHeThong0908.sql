@@ -1,16 +1,10 @@
 /*
-  MARCUS UPDATE HE THONG - GOM P0 + P1
-  Dành cho thành viên có MarcusStoreDB từ nhánh dev/schema Orders cũ.
-
   CÁCH CHẠY:
   1. Dừng backend và backup MarcusStoreDB.
   2. Mở đúng file này trong SSMS.
   3. Ctrl+A -> Execute TOÀN BỘ đúng một lần.
   4. File có thể chạy lại an toàn nếu lần đầu bị gián đoạn.
   5. Chỉ chạy backend mới khi Result cuối có overall_result = DAT.
-
-  Marcus làm: file KHÔNG yêu cầu Orders từng có các cột GHN/cancellation tạm.
-  Nếu cột cũ tồn tại thì copy dữ liệu; nếu không tồn tại thì dùng giá trị an toàn.
 */
 USE MarcusStoreDB;
 GO

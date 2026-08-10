@@ -34,6 +34,9 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             Map.entry("POST:/api/auth/register/request", new Rule(5, Duration.ofMinutes(10))),
             Map.entry("POST:/api/auth/register/verify", new Rule(8, Duration.ofMinutes(10))),
             Map.entry("POST:/api/public/contact", new Rule(5, Duration.ofMinutes(10))),
+            // Marcus thêm: event công khai chỉ phục vụ funnel, giới hạn đủ rộng cho
+            // thao tác thật nhưng chặn script làm phình và sai lệch dữ liệu Analytics.
+            Map.entry("POST:/api/public/behavior/events", new Rule(60, Duration.ofMinutes(1))),
             Map.entry("POST:/api/public/ai-advisor/chat", new Rule(12, Duration.ofMinutes(1))),
             Map.entry("POST:/api/public/ai-advisor/chat-stream", new Rule(12, Duration.ofMinutes(1))),
             Map.entry("POST:/api/admin/analytics/ai-report", new Rule(3, Duration.ofMinutes(1))));

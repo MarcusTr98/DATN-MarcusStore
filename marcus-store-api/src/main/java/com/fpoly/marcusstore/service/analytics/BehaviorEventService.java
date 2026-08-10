@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.service.analytics;
 
 import com.fpoly.marcusstore.repository.analytics.BehaviorEventRepository;
+import com.fpoly.marcusstore.repository.core.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -17,6 +18,7 @@ import com.fpoly.marcusstore.dto.analytics.BehaviorFunnelResponse;
 public class BehaviorEventService {
     private static final Set<String> CLIENT_EVENTS = Set.of("PRODUCT_VIEW", "CHECKOUT_STARTED");
     private final BehaviorEventRepository repository;
+    private final ProductRepository productRepository;
 
     @Value("${analytics.behavior.retention-days:365}")
     private int retentionDays;
@@ -25,6 +27,16 @@ public class BehaviorEventService {
     public void recordClient(String eventType, String sessionId, Integer productId) {
         if (!CLIENT_EVENTS.contains(eventType))
             throw new IllegalArgumentException("Sự kiện hành vi không hợp lệ");
+        // Marcus thêm: PRODUCT_VIEW phải trỏ tới sản phẩm thật; không cho request
+        // public tự bơm productId rác làm sai báo cáo hành vi.
+        if ("PRODUCT_VIEW".equals(eventType)) {
+            if (productId == null || productId <= 0) {
+                throw new IllegalArgumentException("Sản phẩm cần ghi nhận không hợp lệ");
+            }
+            if (!productRepository.existsById(productId)) {
+                throw new IllegalArgumentException("Sản phẩm cần ghi nhận không tồn tại");
+            }
+        }
         save(eventType, sessionId, productId, null);
     }
 
