@@ -1,8 +1,10 @@
 package com.fpoly.marcusstore.controller.admin;
 
 import com.fpoly.marcusstore.dto.request.CreateRefundRequest;
+import com.fpoly.marcusstore.dto.request.UpdateOrderImeiRequest;
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
+import com.fpoly.marcusstore.dto.response.OrderImeiAssignmentResponse;
 import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
 import com.fpoly.marcusstore.dto.response.RefundResponse;
@@ -23,6 +25,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -127,5 +130,28 @@ public class AdminOrderController {
             @PathVariable @Positive Long refundId,
             @Valid @RequestBody CreateRefundRequest request) {
         return refundProcessor.confirmSandbox(refundId, request.getReason());
+    }
+
+    // Đức thêm xử lý imei cho order
+    @GetMapping("/order/{orderCode}/imei-preview")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public java.util.List<OrderImeiAssignmentResponse> getImeiPreview(@PathVariable("orderCode") String orderCode) {
+        return orderService.getImeiPreview(orderCode);
+    }
+
+    @PutMapping("/order/{orderCode}/imeis")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public OrderDetailResponse assignImeis(
+            @PathVariable("orderCode") String orderCode,
+            @Valid @RequestBody java.util.List<UpdateOrderImeiRequest> requests) {
+        return orderService.assignOrderImeis(orderCode, requests);
+    }
+
+    @PutMapping("/order/{orderCode}/processing-with-imei")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public OrderDetailResponse startProcessingWithImei(
+            @PathVariable("orderCode") @Size(min = 1, max = 50) String orderCode,
+            @Valid @RequestBody List<UpdateOrderImeiRequest> requests) {
+        return orderService.startProcessingWithImei(orderCode, requests);
     }
 }

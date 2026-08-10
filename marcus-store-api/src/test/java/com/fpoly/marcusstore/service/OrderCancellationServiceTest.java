@@ -9,6 +9,7 @@ import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderTransaction;
 import com.fpoly.marcusstore.entity.shopping.UserVoucher;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
@@ -38,6 +39,7 @@ class OrderCancellationServiceTest {
         private OrderRepository orderRepository;
         private OrderItemRepository orderItemRepository;
         private ProductSkuRepository productSkuRepository;
+        private ProductItemRepository productItemRepository;
         private FlashSaleItemRepository flashSaleItemRepository;
         private CartRepository cartRepository;
         private CartItemRepository cartItemRepository;
@@ -52,6 +54,7 @@ class OrderCancellationServiceTest {
                 orderRepository = mock(OrderRepository.class);
                 orderItemRepository = mock(OrderItemRepository.class);
                 productSkuRepository = mock(ProductSkuRepository.class);
+                productItemRepository = mock(ProductItemRepository.class);
                 flashSaleItemRepository = mock(FlashSaleItemRepository.class);
                 cartRepository = mock(CartRepository.class);
                 cartItemRepository = mock(CartItemRepository.class);
@@ -64,6 +67,7 @@ class OrderCancellationServiceTest {
                                 orderRepository,
                                 orderItemRepository,
                                 productSkuRepository,
+                                productItemRepository,
                                 flashSaleItemRepository,
                                 cartRepository,
                                 cartItemRepository,

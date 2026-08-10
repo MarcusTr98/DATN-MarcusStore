@@ -191,6 +191,10 @@ export function useCheckoutPage() {
 
     // Sync cartData cục bộ với server (đảm bảo UI đúng giá)
     const revertedItems = [] // Lưu các cartItemId vừa bị revert giá (để hiện cảnh báo)
+    // Marcus thêm: đảm bảo luồng Buy Now không bị server sync ghi đè quantity.
+    // Nếu SP đã có sẵn trong cart, server có thể cộng dồn quantity khi addToCart,
+    // và findCancelledFlashSaleItem sẽ vô tình ghi đè quantity bằng giá trị lớn hơn.
+    const buyNowQuantities = readBuyNowCartItemQuantities()
     if (Array.isArray(cartData.value.items)) {
       for (const fresh of serverItems) {
         const idx = cartData.value.items.findIndex((i) => i.cartItemId === fresh.cartItemId)
@@ -227,9 +231,22 @@ export function useCheckoutPage() {
             productName: fresh.productName ?? oldItem.productName,
             variantName: fresh.variantName ?? fresh.variantText ?? oldItem.variantName,
             thumbnailUrl: fresh.thumbnailUrl ?? oldItem.thumbnailUrl,
-            quantity: Number(fresh.quantity ?? oldItem.quantity ?? 1),
+            // Marcus sửa: ưu tiên quantity Buy Now đã được user chốt (khi SP đã có
+            // sẵn trong cart, server có thể cộng dồn quantity). Nếu không phải luồng
+            // Buy Now → lấy quantity từ server.
+            quantity:
+              Number(buyNowQuantities[fresh.cartItemId]) ||
+              Number(fresh.quantity ?? oldItem.quantity ?? 1),
             price: fresh.price ?? oldItem.price,
-            totalPrice: fresh.totalPrice ?? oldItem.totalPrice,
+            // Marcus thêm: totalPrice phải đồng bộ với quantity Buy Now
+            // (nếu có), không phụ thuộc vào server totalPrice đã bị cộng dồn.
+            totalPrice: (() => {
+              const useQty =
+                Number(buyNowQuantities[fresh.cartItemId]) ||
+                Number(fresh.quantity ?? oldItem.quantity ?? 1)
+              const usePrice = Number(fresh.price ?? oldItem.price ?? 0)
+              return Number((usePrice * useQty).toFixed(2))
+            })(),
             originalPrice: fresh.originalPrice ?? oldItem.originalPrice,
             isFlashSale: fresh.isFlashSale === true,
             flashSaleSlotId: fresh.flashSaleSlotId ?? null,
@@ -361,10 +378,53 @@ export function useCheckoutPage() {
       localStorage.removeItem('selectedCartItemIds')
     }
 
+    // Marcus thêm: tương thích luồng Buy Now từ ProductDetail — fallback đọc sessionStorage
+    try {
+      const buyNowIds = sessionStorage.getItem('buyNowCartItemIds')
+      if (buyNowIds) {
+        const ids = JSON.parse(buyNowIds)
+        if (Array.isArray(ids) && ids.length) {
+          const cleaned = ids.map(Number).filter(Number.isInteger)
+          if (cleaned.length) {
+            // Promote sang localStorage để lần F5/re-mount vẫn giữ được lựa chọn
+            localStorage.setItem('selectedCartItemIds', JSON.stringify(cleaned))
+            return cleaned
+          }
+        }
+      }
+    } catch {
+      sessionStorage.removeItem('buyNowCartItemIds')
+    }
+
     // Marcus tương thích snapshot cũ trước khi Cart bổ sung selectedCartItemIds.
     return (cartData.value.items || [])
       .map((item) => Number(item.cartItemId))
       .filter(Number.isInteger)
+  }
+
+  // Marcus thêm: đọc snapshot quantity của Buy Now (đã chốt tại thời điểm user bấm
+  // "Mua ngay"). Nếu SP đã có sẵn trong giỏ, backend có thể cộng dồn quantity
+  // khi addToCart, khiến cartItem.quantity lớn hơn số user thật sự chọn mua.
+  // Áp dụng snapshot này sẽ tránh lấy nhầm số lượng lớn hơn về Checkout.
+  function readBuyNowCartItemQuantities() {
+    try {
+      const raw = sessionStorage.getItem('buyNowCartItemQuantities')
+      if (!raw) return {}
+      const parsed = JSON.parse(raw)
+      if (!parsed || typeof parsed !== 'object') return {}
+      const cleaned = {}
+      for (const [key, value] of Object.entries(parsed)) {
+        const cartItemId = Number(key)
+        const quantity = Number(value)
+        if (Number.isInteger(cartItemId) && Number.isInteger(quantity) && quantity > 0) {
+          cleaned[cartItemId] = quantity
+        }
+      }
+      return cleaned
+    } catch {
+      sessionStorage.removeItem('buyNowCartItemQuantities')
+      return {}
+    }
   }
 
   function persistCheckoutSelection() {
@@ -403,9 +463,30 @@ export function useCheckoutPage() {
       return
     }
 
+    // Marcus thêm: snapshot quantity Buy Now. Áp dụng SAU khi filter theo
+    // selectedIds để không override các cartItem khác (Cart bình thường).
+    const buyNowQuantities = readBuyNowCartItemQuantities()
+
     const selectedItems = serverItems
       .filter((item) => selectedIds.has(Number(item.cartItemId)))
-      .map(normalizeServerCartItem)
+      .map((item) => {
+        const normalized = normalizeServerCartItem(item)
+        //Đức sửa
+        // Nếu cartItem này thuộc luồng Buy Now và có snapshot quantity riêng
+        // → override quantity + totalPrice theo snapshot. Tránh lấy nhầm
+        // số lượng cộng dồn từ cart có sẵn.
+        const overrideQty = buyNowQuantities[normalized.cartItemId]
+        if (Number.isInteger(overrideQty) && overrideQty > 0) {
+          const quantity = overrideQty
+          const price = normalized.price
+          return {
+            ...normalized,
+            quantity,
+            totalPrice: Number((price * quantity).toFixed(2)),
+          }
+        }
+        return normalized
+      })
 
     cartData.value = {
       items: selectedItems,
@@ -991,6 +1072,9 @@ export function useCheckoutPage() {
       localStorage.removeItem('selectedCartItemIds')
       localStorage.removeItem('selectedSubtotal')
       localStorage.removeItem('selectedVoucher')
+      // Marcus thêm: dọn flag Buy Now để lần checkout sau không bị kẹt với cartItemId cũ
+      sessionStorage.removeItem('buyNowCartItemIds')
+      sessionStorage.removeItem('buyNowCartItemQuantities')
 
       if (orderForm.value.paymentMethod === 'VNPAY' && data?.data?.paymentUrl) {
         window.location.href = data.data.paymentUrl
@@ -1084,6 +1168,11 @@ export function useCheckoutPage() {
     hasHandledCancelled.value = false
     pendingRemovalSkuIds.value = []
     revertedCartItemIds.value = []
+    // Marcus thêm: dọn flag Buy Now khi user rời Checkout (back/điều hướng sang trang khác
+    // mà không đặt hàng). Nếu không dọn, sessionStorage sẽ kẹt cartItemIds cũ và lần sau
+    // user mở Cart bấm Đặt hàng → reconcileSelectedItems filter sai nhóm sản phẩm.
+    sessionStorage.removeItem('buyNowCartItemIds')
+    sessionStorage.removeItem('buyNowCartItemQuantities')
     // Cleanup event listener
     window.removeEventListener('fs-event', handleFsEvent)
   })

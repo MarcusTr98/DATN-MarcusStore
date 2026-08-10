@@ -1,5 +1,6 @@
 package com.fpoly.marcusstore.service;
 
+import com.fpoly.marcusstore.entity.core.ProductItem;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.promotion.FlashSaleItem;
 import com.fpoly.marcusstore.entity.shopping.Cart;
@@ -9,6 +10,7 @@ import com.fpoly.marcusstore.entity.shopping.OrderItem;
 import com.fpoly.marcusstore.entity.shopping.OrderTransaction;
 import com.fpoly.marcusstore.entity.shopping.UserVoucher;
 import com.fpoly.marcusstore.entity.shopping.Voucher;
+import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import com.fpoly.marcusstore.repository.promotion.UserVoucherRepository;
@@ -34,6 +36,7 @@ public class OrderCancellationService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final ProductSkuRepository productSkuRepository;
+    private final ProductItemRepository productItemRepository;
     private final FlashSaleItemRepository flashSaleItemRepository;
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
@@ -55,6 +58,7 @@ public class OrderCancellationService {
         boolean paidByVnPay = isPaidVnPay(order);
         Map<Integer, FlashSaleItem> restorableFlashSaleContexts = restoreFlashSaleQuantity(order);
         restoreStock(order, restorableFlashSaleContexts);
+        restoreImeisToStock(order);
         restoreVoucher(order);
         markPendingVnPayTransactionFailed(order, reason);
 
@@ -230,6 +234,32 @@ public class OrderCancellationService {
         int remainingQuantity = flashSaleItem.getFlashSaleQuantity() - flashSaleItem.getSoldQuantity();
         boolean hasQuota = remainingQuantity >= restoredQuantity;
         return usableStatus && withinTime && hasQuota;
+    }
+
+    private void restoreImeisToStock(Order order) {
+        List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
+        if (orderItems.isEmpty()) {
+            return;
+        }
+
+        int restoredCount = 0;
+        for (OrderItem orderItem : orderItems) {
+            List<ProductItem> assignedItems = orderItem.getProductItems();
+            if (assignedItems == null || assignedItems.isEmpty()) {
+                continue;
+            }
+            for (ProductItem item : assignedItems) {
+                item.setOrderItem(null);
+                item.setStatus(ProductItemService.STATUS_IN_STOCK);
+                productItemRepository.save(item);
+                restoredCount++;
+            }
+        }
+
+        if (restoredCount > 0) {
+            System.out.println("[OrderCancellation] Hoàn " + restoredCount
+                    + " IMEI về kho cho đơn " + order.getOrderCode());
+        }
     }
 
     private void restoreVoucher(Order order) {

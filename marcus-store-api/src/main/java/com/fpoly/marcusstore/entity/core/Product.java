@@ -30,6 +30,9 @@ public class Product {
     @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")
     private String description;
 
+    @Column(name = "status_imei")
+    private Boolean statusImei;
+
     @Column(name = "brand", length = 50)
     private String brand;
 

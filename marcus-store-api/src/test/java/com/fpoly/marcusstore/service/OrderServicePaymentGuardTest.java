@@ -3,7 +3,9 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.core.ProductItemRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.repository.statistics.CommentEvaluationRepository;
@@ -30,6 +32,8 @@ class OrderServicePaymentGuardTest {
                 when(orderRepository.findByOrderCodeForUpdate("ORD-PENDING")).thenReturn(Optional.of(order));
 
                 OrderServiceImpl service = new OrderServiceImpl(
+                                mock(OrderItemRepository.class),
+                                mock(ProductItemRepository.class),
                                 orderRepository,
                                 mock(OrderStatusHistoryRepository.class),
                                 mock(UserRepository.class),
@@ -66,6 +70,8 @@ class OrderServicePaymentGuardTest {
                                 .thenReturn(Optional.of(order));
 
                 OrderServiceImpl service = new OrderServiceImpl(
+                                mock(OrderItemRepository.class),
+                                mock(ProductItemRepository.class),
                                 orderRepository,
                                 mock(OrderStatusHistoryRepository.class),
                                 mock(UserRepository.class),
