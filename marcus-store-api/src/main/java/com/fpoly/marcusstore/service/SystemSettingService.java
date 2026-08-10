@@ -27,17 +27,22 @@ public class SystemSettingService {
             Map.entry("SITE_NAME", "Marcus Store"), Map.entry("SITE_LOGO_URL", ""),
             Map.entry("HOTLINE", "0907640098"), Map.entry("EMAIL", "support@marcusstore.com"),
             Map.entry("ADDRESS", "118 Cát Bi, Hải An, Hải Phòng"),
-            Map.entry("WORKING_HOURS", "8:00 - 21:00 (Thứ 2 - Chủ nhật)"),
-            Map.entry("PROMO_TEXT", "Sản phẩm chính hãng - Hỗ trợ tận tâm"),
+            Map.entry("WORKING_HOURS", "08:00 - 21:00 (Thứ Hai - Chủ Nhật)"),
+            Map.entry("PROMO_TEXT", "Hàng chính hãng - Giá minh bạch - Hỗ trợ tận tâm"),
             Map.entry("FACEBOOK_URL", ""), Map.entry("TIKTOK_URL", ""),
             Map.entry("INSTAGRAM_URL", ""), Map.entry("YOUTUBE_URL", ""),
             Map.entry("STORE_LOCATION",
                     "{\"lat\":20.82716,\"lng\":106.70466,\"name\":\"Marcus Store\",\"address\":\"118 Cát Bi, Hải An, Hải Phòng\"}"),
-            Map.entry("HOME_HERO_BADGE", "Sản phẩm công nghệ chính hãng"),
-            Map.entry("HOME_HERO_TITLE", "Công nghệ mới."),
-            Map.entry("HOME_HERO_TITLE_ACCENT", "Trải nghiệm tốt hơn."),
-            Map.entry("HOME_HERO_LEAD", "Khám phá điện thoại và phụ kiện phù hợp tại Marcus Store."),
-            Map.entry("HOME_HERO_SLIDES", "[]"), Map.entry("AI_ADVISOR_POLICY", ""));
+            Map.entry("HOME_HERO_BADGE", "Công nghệ chính hãng tại Hải Phòng"),
+            Map.entry("HOME_HERO_TITLE", "Chọn đúng thiết bị."),
+            Map.entry("HOME_HERO_TITLE_ACCENT", "Tận hưởng đúng nhu cầu."),
+            Map.entry("HOME_HERO_LEAD",
+                    "Khám phá điện thoại và phụ kiện chính hãng, giá minh bạch cùng dịch vụ hỗ trợ tận tâm tại Marcus Store."),
+            Map.entry("HOME_HERO_SLIDES", """
+                    [{"kicker":"NỔI BẬT","name":"Điện thoại chính hãng","price":"Giá minh bạch","tag":"Bảo hành uy tín"},{"kicker":"LỰA CHỌN THÔNG MINH","name":"Phụ kiện phù hợp","price":"Đa dạng lựa chọn","tag":"Tư vấn tận tâm"},{"kicker":"MUA SẮM THUẬN TIỆN","name":"Nhận hàng tại cửa hàng","price":"Miễn phí nhận hàng","tag":"118 Cát Bi, Hải Phòng"}]
+                    """),
+            Map.entry("AI_ADVISOR_POLICY",
+                    "Trả lời thân thiện, ngắn gọn, lịch sự và dễ hiểu với khách hàng trẻ."));
 
     private static final Set<String> PUBLIC_SETTING_KEYS = Set.of(
             "SITE_NAME", "SITE_LOGO_URL",
@@ -185,7 +190,7 @@ public class SystemSettingService {
         int maxLength = switch (key) {
             case "HOME_HERO_SLIDES" -> 20_000;
             case "STORE_LOCATION" -> 2_000;
-            case "AI_ADVISOR_POLICY" -> 1_000;
+            case "AI_ADVISOR_POLICY" -> 240;
             case "HOME_HERO_LEAD", "PROMO_TEXT", "ADDRESS" -> 500;
             default -> 255;
         };
@@ -204,13 +209,13 @@ public class SystemSettingService {
 
     private String validateAiPolicy(String value) {
         String policy = value.trim();
-        if (policy.length() > 1_000) {
-            throw new IllegalArgumentException("Chính sách Marcus AI không được vượt quá 1.000 ký tự.");
+        if (policy.length() > 240) {
+            throw new IllegalArgumentException("Mô tả giọng điệu Marcus AI không được vượt quá 240 ký tự.");
         }
         if (policy.matches("(?is).*(bỏ qua|phớt lờ).*(quy tắc|chỉ dẫn|bảo mật|system|prompt).*")
                 || policy.matches("(?is).*(sql|database|api[ -]?key|mật khẩu|password|delete|update|insert).*")) {
             throw new IllegalArgumentException(
-                    "Chính sách Marcus AI chứa chỉ dẫn có thể làm suy yếu quy tắc bảo mật.");
+                    "Mô tả giọng điệu chứa chỉ dẫn không phù hợp hoặc có thể làm suy yếu bảo mật.");
         }
         return policy;
     }

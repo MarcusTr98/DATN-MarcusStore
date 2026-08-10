@@ -1,181 +1,164 @@
 <template>
   <aside class="sidebar">
-    <div class="logo">
+    <div class="logo" title="Khu vực quản trị hệ thống">
       <div class="logo-icon" :class="{ 'has-site-logo': siteLogoUrl }">
         <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
         <i v-else class="fa-solid fa-mobile-screen-button"></i>
       </div>
       <div class="logo-text">
-        <h2>{{ siteName }}</h2>
+        <h2 :title="siteName">{{ siteName }}</h2>
         <span>Admin Panel</span>
       </div>
     </div>
 
-    <div class="menu-section">
-      <p class="menu-title">TỔNG QUAN</p>
+    <!-- Marcus sắp xếp lại menu theo đúng luồng vận hành cửa hàng; route và quyền giữ nguyên. -->
+    <section class="menu-section">
+      <p class="menu-title">OVERVIEW</p>
       <router-link to="/admin/dashboard" class="menu-item" active-class="active">
-        <img :src="pieChartIcon" class="menu-icon" />
-        <span>Bảng điều khiển</span>
+        <img :src="pieChartIcon" class="menu-icon" alt="" />
+        <span>Dashboard</span>
       </router-link>
-    </div>
+    </section>
 
-    <div v-if="showSanPhamKho" class="menu-section">
-      <p class="menu-title">SẢN PHẨM & KHO</p>
-
-      <router-link v-if="canAccessRoute('/admin/category')" to="/admin/category" class="menu-item"
+    <section v-if="showSales" class="menu-section">
+      <p class="menu-title">BÁN HÀNG</p>
+      <router-link v-if="canAccessRoute('/admin/order')" to="/admin/order" class="menu-item" active-class="active">
+        <img :src="cartIcon" class="menu-icon" alt="" />
+        <span>Đơn hàng</span>
+      </router-link>
+      <!-- Marcus giữ nguyên module thành viên: chỉ ghép route bảo hành vào
+           cấu trúc Sidebar mới, không thay đổi quyền hay nghiệp vụ bảo hành. -->
+      <router-link v-if="canAccessRoute('/admin/warranty')" to="/admin/warranty" class="menu-item"
         active-class="active">
-        <img :src="layersIcon" class="menu-icon" />
-        <span>Quản lý danh mục</span>
+        <i class="bi bi-arrow-repeat menu-icon"></i>
+        <span>Đổi trả & Bảo hành</span>
       </router-link>
+    </section>
 
+    <section v-if="showSanPhamKho" class="menu-section">
+      <p class="menu-title">SẢN PHẨM & KHO</p>
       <template v-if="showProductParent">
-        <div class="menu-item menu-parent" :class="{ active: isProductMenuActive }" @click="toggleProductMenu">
-          <img :src="boxIcon" class="menu-icon" />
-          <span>Sản phẩm</span>
-          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isProductMenuOpen }" />
-        </div>
-
+        <button class="menu-item menu-parent" :class="{ active: isProductMenuActive }" type="button"
+          @click="toggleProductMenu">
+          <img :src="boxIcon" class="menu-icon" alt="" />
+          <span>Catalog sản phẩm</span>
+          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isProductMenuOpen }" alt="" />
+        </button>
         <div v-if="isProductMenuOpen" class="submenu">
           <router-link v-if="canAccessRoute('/admin/product')" to="/admin/product" class="submenu-item"
-            active-class="active">Sản phẩm gốc</router-link>
+            active-class="active">Sản phẩm</router-link>
           <router-link v-if="canAccessRoute('/admin/attribute')" to="/admin/attribute" class="submenu-item"
             active-class="active">Thuộc tính</router-link>
           <router-link v-if="canAccessRoute('/admin/skugenerator')" to="/admin/skugenerator" class="submenu-item"
-            active-class="active">Tạo SKU</router-link>
+            active-class="active">SKU Builder</router-link>
         </div>
       </template>
-
-      
+      <router-link v-if="canAccessRoute('/admin/category')" to="/admin/category" class="menu-item"
+        active-class="active">
+        <img :src="layersIcon" class="menu-icon" alt="" />
+        <span>Danh mục</span>
+      </router-link>
+      <!-- Marcus ghép route kho mới của thành viên vào đúng cấu trúc Sidebar
+           mới; giữ nguyên quyền và không thay đổi nghiệp vụ kho. -->
       <template v-if="showInventoryParent">
-        <div class="menu-item menu-parent" :class="{ active: isInventoryMenuActive }" @click="toggleInventoryMenu">
-          <i class="bi bi-box-seam menu-icon" style="font-size: 16px"></i>
-          <span>Quản lý kho</span>
-          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isInventoryMenuOpen }" />
-        </div>
-
+        <button class="menu-item menu-parent" :class="{ active: isInventoryMenuActive }" type="button"
+          @click="toggleInventoryMenu">
+          <i class="bi bi-box-seam menu-icon"></i>
+          <span>Kho & IMEI</span>
+          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isInventoryMenuOpen }" alt="" />
+        </button>
         <div v-if="isInventoryMenuOpen" class="submenu">
-          <router-link v-if="canAccessRoute('/admin/inventoryManager/with-imei')" to="/admin/inventoryManager/with-imei" class="submenu-item" active-class="active">
+          <router-link v-if="canAccessRoute('/admin/inventoryManager/with-imei')"
+            to="/admin/inventoryManager/with-imei" class="submenu-item" active-class="active">
             Kho có IMEI
           </router-link>
-          <router-link v-if="canAccessRoute('/admin/inventoryManager/no-imei')" to="/admin/inventoryManager/no-imei" class="submenu-item" active-class="active">
+          <router-link v-if="canAccessRoute('/admin/inventoryManager/no-imei')"
+            to="/admin/inventoryManager/no-imei" class="submenu-item" active-class="active">
             Kho không IMEI
           </router-link>
         </div>
       </template>
-    </div>
+    </section>
 
-    <div v-if="showKenhBanHang" class="menu-section">
-      <p class="menu-title">KÊNH BÁN HÀNG</p>
-
-      <router-link v-if="canAccessRoute('/admin/order')" to="/admin/order" class="menu-item" active-class="active">
-        <img :src="cartIcon" class="menu-icon" />
-        <span>Quản lý đơn hàng</span>
-      </router-link>
-
-      <router-link v-if="canAccessRoute('/admin/warranty')" to="/admin/warranty" class="menu-item" active-class="active">
-        <i class="bi bi-arrow-repeat menu-icon" style="font-size: 16px"></i>
-        <span>Đổi trả / Bảo hành</span>
-      </router-link>
-
+    <section v-if="showMarketing" class="menu-section">
+      <p class="menu-title">MARKETING</p>
       <router-link v-if="canAccessRoute('/admin/voucher')" to="/admin/voucher" class="menu-item" active-class="active">
-        <img :src="tagsIcon" class="menu-icon" />
-        <span>Quản lý voucher</span>
+        <img :src="tagsIcon" class="menu-icon" alt="" />
+        <span>Voucher</span>
       </router-link>
-
-      <router-link v-if="canAccessRoute('/admin/flash-sale')" to="/admin/flash-sale" class="menu-item"
-        active-class="active">
-        <img :src="tagsIcon" class="menu-icon" />
+      <router-link v-if="canAccessRoute('/admin/flash-sale')" to="/admin/flash-sale" class="menu-item" active-class="active">
+        <i class="bi bi-lightning-charge menu-icon"></i>
         <span>Flash Sale</span>
       </router-link>
-    </div>
+      <router-link v-if="canAccessRoute('/admin/banner')" to="/admin/banner" class="menu-item" active-class="active">
+        <img :src="barChartIcon" class="menu-icon" alt="" />
+        <span>Banner</span>
+      </router-link>
+    </section>
 
-    <div v-if="showNoiDung" class="menu-section">
-      <p class="menu-title">NỘI DUNG</p>
+    <section v-if="showCustomerCare" class="menu-section">
+      <p class="menu-title">CUSTOMER CARE</p>
+      <router-link v-if="canAccessRoute('/admin/customer')" to="/admin/customer" class="menu-item" active-class="active">
+        <i class="bi bi-person-heart menu-icon"></i>
+        <span>Khách hàng</span>
+      </router-link>
+      <router-link v-if="canAccessRoute('/admin/contact-management')" to="/admin/contact-management" class="menu-item" active-class="active">
+        <i class="fa-solid fa-headset menu-icon"></i>
+        <span>Liên hệ hỗ trợ</span>
+      </router-link>
+      <router-link v-if="canAccessRoute('/admin/reviews')" to="/admin/reviews" class="menu-item" active-class="active">
+        <i class="bi bi-star menu-icon"></i>
+        <span>Đánh giá & bình luận</span>
+      </router-link>
+    </section>
 
-      <router-link v-if="canAccessRoute('/admin/post')" to="/admin/post" class="menu-item" active-class="active">
-        <img :src="newspaperIcon" class="menu-icon" />
+    <section v-if="canAccessRoute('/admin/post')" class="menu-section">
+      <p class="menu-title">CONTENT</p>
+      <router-link to="/admin/post" class="menu-item" active-class="active">
+        <img :src="newspaperIcon" class="menu-icon" alt="" />
         <span>Bài viết</span>
       </router-link>
+    </section>
 
-      <router-link v-if="canAccessRoute('/admin/banner')" to="/admin/banner" class="menu-item" active-class="active">
-        <img :src="barChartIcon" class="menu-icon" />
-        <span>Quản lý Banner</span>
-      </router-link>
-
-      <router-link v-if="canAccessRoute('/admin/contact-management')" to="/admin/contact-management" class="menu-item"
-        active-class="active">
-        <i class="fa-solid fa-headset menu-icon" style="font-size: 16px"></i>
-        <span>Quản lý liên hệ</span>
-      </router-link>
-          <router-link
-    v-if="canAccessRoute('/admin/reviews')"
-    to="/admin/reviews"
-    class="menu-item"
-    active-class="active"
-  >
-    <i class="bi bi-star menu-icon"></i>
-    <span>Quản lý đánh giá & bình luận</span>
-  </router-link>
-    </div>
-    <div v-if="showBaoCao" class="menu-section">
-      <p class="menu-title">BÁO CÁO</p>
-      <router-link v-if="canAccessRoute('/admin/analytics')" to="/admin/analytics" class="menu-item"
-        active-class="active">
+    <section v-if="showBaoCao" class="menu-section">
+      <p class="menu-title">ANALYTICS & FINANCE</p>
+      <router-link v-if="canAccessRoute('/admin/analytics')" to="/admin/analytics" class="menu-item" active-class="active">
         <i class="bi bi-graph-up-arrow menu-icon"></i>
-        <span>Phân tích kinh doanh</span>
+        <span>AI Business Analytics</span>
       </router-link>
-      <router-link v-if="canAccessRoute('/admin/finance-reports')" to="/admin/finance-reports" class="menu-item"
-        active-class="active">
+      <router-link v-if="canAccessRoute('/admin/finance-reports')" to="/admin/finance-reports" class="menu-item" active-class="active">
         <i class="bi bi-wallet2 menu-icon"></i>
-        <span>Quản lý đối soát</span>
+        <span>Đối soát tài chính</span>
       </router-link>
-        <router-link
-    v-if="canAccessRoute('/admin/activity-log')"
-    to="/admin/activity-log"
-    class="menu-item"
-    active-class="active"
-  >
-    <i class="bi bi-clock-history menu-icon"></i>
-    <span>Quản lý thao tác</span>
-  </router-link>
-    </div>
+    </section>
 
-    <div v-if="showHeThong" class="menu-section">
-      <p class="menu-title">HỆ THỐNG</p>
-
-      <!-- Quản lý tài khoản: chỉ còn Tài khoản nhân viên + Tài khoản khách hàng -->
-      <template v-if="showAccountParent">
-        <div class="menu-item menu-parent" :class="{ active: isAccountMenuActive }" @click="toggleAccountMenu">
-          <img :src="peopleIcon" class="menu-icon" />
-          <span>Quản lý tài khoản</span>
-          <img :src="chevronDownIcon" class="submenu-arrow" :class="{ open: isAccountMenuOpen }" />
-        </div>
-        <div v-if="isAccountMenuOpen" class="submenu">
-          <router-link v-if="canAccessRoute('/admin/employee')" to="/admin/employee" class="submenu-item"
-            active-class="active">Tài khoản nhân viên</router-link>
-          <router-link v-if="canAccessRoute('/admin/customer')" to="/admin/customer" class="submenu-item"
-            active-class="active">Tài khoản khách hàng</router-link>
-        </div>
-      </template>
-
-      <!-- Quản lý phân quyền: route chỉ yêu cầu roles: ['ROLE_ADMIN'], không có permission -->
+    <section v-if="showHumanResources" class="menu-section">
+      <p class="menu-title">NHÂN SỰ & QUYỀN</p>
+      <router-link v-if="canAccessRoute('/admin/employee')" to="/admin/employee" class="menu-item" active-class="active">
+        <img :src="peopleIcon" class="menu-icon" alt="" />
+        <span>Nhân viên</span>
+      </router-link>
       <router-link v-if="canAccessRoute('/admin/role')" to="/admin/role" class="menu-item" active-class="active">
-        <i class="fa-solid fa-shield-halved menu-icon" style="font-size: 16px"></i>
-        <span>Quản lý phân quyền</span>
+        <i class="fa-solid fa-shield-halved menu-icon"></i>
+        <span>Access Control</span>
       </router-link>
+    </section>
 
-      <router-link v-if="canAccessRoute('/admin/settings')" to="/admin/settings" class="menu-item"
-        active-class="active">
-        <img :src="gearIcon" class="menu-icon" />
-        <span>Cấu hình chung</span>
+    <section v-if="showHeThong" class="menu-section">
+      <p class="menu-title">SYSTEM</p>
+      <router-link v-if="canAccessRoute('/admin/settings')" to="/admin/settings" class="menu-item" active-class="active">
+        <img :src="gearIcon" class="menu-icon" alt="" />
+        <span>Website Settings</span>
       </router-link>
-
-      <router-link v-if="canAccessRoute('/admin/data-backup')" to="/admin/data-backup" class="menu-item"
-        active-class="active">
+      <router-link v-if="canAccessRoute('/admin/data-backup')" to="/admin/data-backup" class="menu-item" active-class="active">
         <i class="bi bi-database-down menu-icon"></i>
-        <span>Sao lưu dữ liệu</span>
+        <span>Data Backup</span>
       </router-link>
-    </div>
+      <router-link v-if="canAccessRoute('/admin/activity-log')" to="/admin/activity-log" class="menu-item" active-class="active">
+        <i class="bi bi-clock-history menu-icon"></i>
+        <span>Audit Log</span>
+      </router-link>
+    </section>
   </aside>
 </template>
 
@@ -275,13 +258,6 @@ const showInventoryParent = computed(() => {
   );
 });
 
-const showAccountParent = computed(() => {
-  return (
-    canAccessRoute("/admin/employee") ||
-    canAccessRoute("/admin/customer")
-  );
-});
-
 const showSanPhamKho = computed(() => {
   return (
     canAccessRoute("/admin/category") ||
@@ -290,39 +266,45 @@ const showSanPhamKho = computed(() => {
   );
 });
 
-const showKenhBanHang = computed(() => {
+// Marcus thêm: nhóm Bán hàng hiển thị nếu người dùng được xem đơn hàng hoặc
+// module đổi trả/bảo hành vừa được tích hợp từ nhánh thành viên.
+const showSales = computed(() => {
+  return canAccessRoute("/admin/order") || canAccessRoute("/admin/warranty");
+});
+
+const showMarketing = computed(() => {
   return (
-    canAccessRoute("/admin/order") ||
-    canAccessRoute("/admin/warranty") ||
     canAccessRoute("/admin/voucher") ||
-    canAccessRoute("/admin/flash-sale")
+    canAccessRoute("/admin/flash-sale") ||
+    canAccessRoute("/admin/banner")
   );
 });
 
-const showNoiDung = computed(() => {
+const showCustomerCare = computed(() => {
   return (
-    canAccessRoute("/admin/post") ||
-    canAccessRoute("/admin/banner") ||
-    canAccessRoute("/admin/contact-management")||
-     canAccessRoute("/admin/reviews")
+    canAccessRoute("/admin/customer") ||
+    canAccessRoute("/admin/contact-management") ||
+    canAccessRoute("/admin/reviews")
   );
 });
 
 const showBaoCao = computed(() => {
   return (
     canAccessRoute("/admin/analytics") ||
-    canAccessRoute("/admin/finance-reports") ||
-    canAccessRoute("/admin/activity-log")
+    canAccessRoute("/admin/finance-reports")
   );
 });
 
 const showHeThong = computed(() => {
   return (
-    showAccountParent.value ||
-    canAccessRoute("/admin/role") ||
     canAccessRoute("/admin/settings") ||
-    canAccessRoute("/admin/data-backup")
+    canAccessRoute("/admin/data-backup") ||
+    canAccessRoute("/admin/activity-log")
   );
+});
+
+const showHumanResources = computed(() => {
+  return canAccessRoute("/admin/employee") || canAccessRoute("/admin/role");
 });
 
 /* ===========================
@@ -330,9 +312,6 @@ const showHeThong = computed(() => {
 =========================== */
 
 const isProductMenuOpen = ref(false);
-
-const isAccountMenuOpen = ref(false);
-
 const isInventoryMenuOpen = ref(false);
 
 const isProductMenuActive = computed(() => {
@@ -343,26 +322,16 @@ const isProductMenuActive = computed(() => {
   ].some(path => route.path.startsWith(path));
 });
 
-const isInventoryMenuActive = computed(() => {
-  return route.path.startsWith("/admin/inventoryManager");
-});
+const isInventoryMenuActive = computed(() =>
+  route.path.startsWith("/admin/inventoryManager")
+);
 
-const isAccountMenuActive = computed(() => {
-  return [
-    "/admin/employee",
-    "/admin/customer",
-  ].some(path => route.path.startsWith(path));
-});
 /* ===========================
    TOGGLE MENU
 =========================== */
 
 const toggleProductMenu = () => {
   isProductMenuOpen.value = !isProductMenuOpen.value;
-};
-
-const toggleAccountMenu = () => {
-  isAccountMenuOpen.value = !isAccountMenuOpen.value;
 };
 
 const toggleInventoryMenu = () => {
@@ -379,26 +348,35 @@ onMounted(() => {
     isProductMenuOpen.value = true;
   }
 
-  // Tự động mở submenu Quản lý kho nếu đang ở các trang liên quan
   if (isInventoryMenuActive.value) {
     isInventoryMenuOpen.value = true;
   }
 
-  // Tự động mở submenu Quản lý tài khoản nếu đang ở các trang liên quan
-  if (isAccountMenuActive.value) {
-    isAccountMenuOpen.value = true;
-  }
 });
 </script>
 <style scoped>
 /* Sidebar tổng thể: Nền trắng sạch, viền nhẹ */
 .sidebar {
-  width: 260px;
+  width: clamp(260px, 20vw, 292px);
+  flex: 0 0 clamp(260px, 20vw, 292px);
   height: 100vh;
   background: #ffffff;
-  border-right: 1px solid #fee2e2;
-  padding: 24px 16px;
+  border-right: 1px solid #e8edf5;
+  padding: 18px 14px 24px;
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+  transition: width 0.25s ease, flex-basis 0.25s ease, padding 0.25s ease, transform 0.25s ease;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
 }
 
 /* Logo mới: Chữ đậm, dễ nhìn */
@@ -406,9 +384,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 13px;
-  margin-bottom: 32px;
-  padding: 4px 6px;
+  margin-bottom: 24px;
+  padding: 10px;
   min-width: 0;
+  border: 1px solid #edf1f7;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ffffff 0%, #fff7f8 100%);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .logo-icon {
@@ -446,20 +428,24 @@ onMounted(() => {
 }
 
 .logo-text h2 {
-  font-size: 19px;
+  font-size: clamp(16px, 1.28vw, 19px);
   font-weight: 900;
   color: #111827;
   margin: 0;
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1.12;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .logo-text span {
-  font-size: 13px;
-  color: #111827;
-  font-weight: 700;
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -486,6 +472,11 @@ onMounted(() => {
   font-weight: 700;
   text-decoration: none;
   cursor: pointer;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
 }
 
 .menu-item:hover {
@@ -526,5 +517,37 @@ onMounted(() => {
   background: #fff0f5;
   color: #ff4d94;
   font-weight: 900;
+}
+
+@media (max-width: 1180px) and (min-width: 901px) {
+  .sidebar {
+    width: 250px;
+    flex-basis: 250px;
+    padding-inline: 11px;
+  }
+
+  .logo {
+    gap: 10px;
+    padding: 8px;
+  }
+
+  .logo-icon {
+    width: 52px;
+    height: 52px;
+    flex-basis: 52px;
+  }
+
+  .menu-item {
+    gap: 11px;
+    padding-inline: 13px;
+  }
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    width: min(86vw, 292px);
+    flex-basis: min(86vw, 292px);
+    border-right: 0;
+  }
 }
 </style>

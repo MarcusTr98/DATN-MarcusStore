@@ -435,4 +435,26 @@
   .footer-logo-brand {
     font-size: 1.35rem;
   }
+
+  /* Marcus nâng cấp: footer mobile gọn, dễ chạm và không tạo khoảng trống dài. */
+  .support-bar {
+    padding-block: 12px;
+  }
+  .support-item {
+    padding: 7px 4px;
+  }
+  .footer-main {
+    padding: 24px 0 18px;
+  }
+  .footer-col {
+    padding-block: 16px;
+  }
+  .footer-links a,
+  .contact-item,
+  .social-link {
+    min-height: 40px;
+  }
+  .footer-bottom {
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+  }
 }
