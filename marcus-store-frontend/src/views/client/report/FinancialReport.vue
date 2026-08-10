@@ -174,8 +174,14 @@
           </div>
 
           <div class="field field-dates">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-              <label class="form-label mb-0">Thời gian</label>
+            <div class="date-filter-head">
+              <div class="date-filter-title">
+                <span class="date-filter-icon"><i class="bi bi-calendar3"></i></span>
+                <div>
+                  <label class="form-label">Khoảng thời gian</label>
+                  <small>Chọn nhanh hoặc tùy chỉnh ngày bắt đầu và kết thúc</small>
+                </div>
+              </div>
               <div class="quick-dates">
                 <button
                   type="button"
@@ -235,23 +241,29 @@
                 </button>
               </div>
             </div>
-            <div class="d-flex gap-2">
-              <input
-                v-model="filters.fromDate"
-                type="date"
-                class="form-control"
-                @change="onDateFilterChange"
-                title="Từ ngày"
-              />
-              <input
-                v-model="filters.toDate"
-                type="date"
-                class="form-control"
-                @change="onDateFilterChange"
-                title="Đến ngày"
-              />
-              <button class="btn-soft" @click="resetFilters" title="Đặt lại bộ lọc">
+            <div class="date-controls">
+              <label class="date-input-wrap">
+                <span>Từ ngày</span>
+                <input
+                  v-model="filters.fromDate"
+                  type="date"
+                  class="form-control"
+                  @change="onDateFilterChange"
+                />
+              </label>
+              <span class="date-separator"><i class="bi bi-arrow-right"></i></span>
+              <label class="date-input-wrap">
+                <span>Đến ngày</span>
+                <input
+                  v-model="filters.toDate"
+                  type="date"
+                  class="form-control"
+                  @change="onDateFilterChange"
+                />
+              </label>
+              <button class="btn-soft btn-reset-filter" @click="resetFilters" title="Đặt lại bộ lọc">
                 <i class="bi bi-arrow-counterclockwise"></i>
+                <span>Đặt lại</span>
               </button>
             </div>
           </div>

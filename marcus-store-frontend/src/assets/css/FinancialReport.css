@@ -201,8 +201,8 @@
 }
 .toolbar-row {
   display: grid;
-  grid-template-columns: 1.4fr 0.75fr 0.75fr 2.4fr;
-  gap: 20px;
+  grid-template-columns: minmax(280px, 2fr) repeat(3, minmax(170px, 1fr));
+  gap: 18px;
   align-items: end;
 }
 .field {
@@ -211,7 +211,11 @@
   gap: 6px;
 }
 .field-dates {
-  gap: 8px;
+  grid-column: 1 / -1;
+  gap: 12px;
+  margin-top: 2px;
+  padding-top: 16px;
+  border-top: 1px solid #e3edfb;
 }
 .form-label {
   font-size: 0.78rem;
@@ -223,7 +227,7 @@
 .form-control,
 .form-select {
   height: 42px;
-  width: 100px;
+  width: 100%;
   padding: 0 12px;
   border: 1px solid #d6e6fb;
   border-radius: 9px;
@@ -261,20 +265,73 @@
   border-radius: 0;
   background: transparent;
 }
+.date-filter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+.date-filter-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+}
+.date-filter-title small {
+  display: block;
+  margin-top: 2px;
+  color: #8295b4;
+  font-size: 0.72rem;
+}
+.date-filter-icon {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 36px;
+  border-radius: 10px;
+  color: #1f6fd7;
+  background: #eaf3ff;
+}
+.date-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.date-input-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: min(230px, 100%);
+}
+.date-input-wrap > span {
+  color: #687d9e;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
 .field-dates .form-control {
-  width: auto;
-  flex: 1;
+  width: 100%;
+}
+.date-separator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  color: #7fa1d1;
 }
 .quick-dates {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 6px;
+  gap: 8px;
 }
 .btn-quick-date {
-  font-size: 0.75rem;
-  padding: 4px 10px;
-  border-radius: 6px;
+  min-height: 34px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 9px;
   border: 1px solid #d6e6fb;
   background: #fff;
   color: #2f80ed;
@@ -286,7 +343,9 @@
 .btn-quick-date:hover,
 .btn-quick-date.active {
   background: #2f80ed;
+  border-color: #2f80ed;
   color: #ffffff;
+  box-shadow: 0 5px 12px rgba(47, 128, 237, 0.2);
 }
 .btn-soft {
   display: inline-flex;
@@ -305,7 +364,12 @@
 }
 .btn-soft:hover {
   background: #e3effd;
-  transform: rotate(-25deg);
+}
+.btn-reset-filter {
+  gap: 7px;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 /* Table */
@@ -794,6 +858,13 @@
   .field-dates {
     grid-column: 1 / -1;
   }
+  .date-filter-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .quick-dates {
+    justify-content: flex-start;
+  }
   .chart-header {
     align-items: flex-start;
   }
@@ -827,11 +898,19 @@
   .quick-dates {
     justify-content: flex-start;
   }
-  .field-dates > .d-flex:last-child {
+  .date-controls {
     flex-wrap: wrap;
   }
-  .field-dates .form-control {
+  .date-input-wrap {
+    width: calc(50% - 19px);
     min-width: 135px;
+    flex: 1;
+  }
+  .date-separator {
+    display: none;
+  }
+  .btn-reset-filter {
+    width: 100%;
   }
   .id-row,
   .badge-row {
