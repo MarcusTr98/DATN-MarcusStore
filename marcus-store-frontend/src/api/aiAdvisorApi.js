@@ -1,17 +1,21 @@
 import api from '@/utils/api'
 
 // Marcus thêm: AI dùng public API nhưng key nhà cung cấp chỉ tồn tại ở backend.
-export const askAiAdvisor = (message, history, sessionId) =>
+export const askAiAdvisor = (message, history, sessionId, context) =>
   // Marcus sửa: chat có trạng thái đang trả lời riêng trong widget, không che toàn
   // bộ website bằng GlobalSpinner.
-  api.post('/public/ai-advisor/chat', { message, history, sessionId }, { skipGlobalLoading: true })
+  api.post(
+    '/public/ai-advisor/chat',
+    { message, history, sessionId, context },
+    { skipGlobalLoading: true },
+  )
 
 // Marcus thêm: dùng fetch để đọc POST SSE; EventSource mặc định không hỗ trợ body.
-export const streamAiAdvisor = async (message, history, sessionId, handlers = {}) => {
+export const streamAiAdvisor = async (message, history, sessionId, context, handlers = {}) => {
   const response = await fetch(`${api.defaults.baseURL}/public/ai-advisor/chat-stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify({ message, history, sessionId }),
+    body: JSON.stringify({ message, history, sessionId, context }),
   })
 
   if (!response.ok || !response.body) {
@@ -57,3 +61,7 @@ export const sendAiAdvisorFeedback = (adviceId, sessionId, helpful) =>
     { adviceId, sessionId, helpful },
     { skipGlobalLoading: true },
   )
+
+// Marcus thêm: nhận diện backend vừa restart để bỏ context AI thuộc phiên cũ.
+export const getAiServerSession = () =>
+  api.get('/public/ai-advisor/session-version', { skipGlobalLoading: true })

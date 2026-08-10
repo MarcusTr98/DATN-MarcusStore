@@ -47,6 +47,23 @@
             </div>
           </div>
 
+          <div
+            v-if="contextChips.length"
+            class="ai-context"
+            aria-label="Điều kiện tư vấn đang áp dụng"
+          >
+            <span>AI đang hiểu</span>
+            <button
+              v-for="chip in contextChips"
+              :key="chip.key"
+              type="button"
+              :title="`Bỏ điều kiện ${chip.label}`"
+              @click="removeContextChip(chip)"
+            >
+              {{ chip.label }} <i class="fas fa-times"></i>
+            </button>
+          </div>
+
           <article
             v-for="message in messages"
             :key="message.id"
@@ -56,7 +73,29 @@
             <div class="ai-message">
               <span v-if="message.role === 'assistant'" class="message-author">Marcus AI</span>
               <!-- Marcus thêm: render Markdown giới hạn bằng Vue, không dùng v-html để tránh XSS. -->
-              <div v-if="message.role === 'assistant'" class="message-content">
+              <div v-if="message.role === 'assistant' && message.sections" class="message-sections">
+                <p><strong>Nhu cầu:</strong> {{ message.sections.needSummary }}</p>
+                <template v-if="message.sections.suggestions?.length">
+                  <strong>Gợi ý:</strong>
+                  <ul>
+                    <li v-for="item in message.sections.suggestions" :key="item">{{ item }}</li>
+                  </ul>
+                </template>
+                <template v-if="message.sections.considerations?.length">
+                  <strong>Điểm cần cân nhắc:</strong>
+                  <ul>
+                    <li v-for="item in message.sections.considerations" :key="item">{{ item }}</li>
+                  </ul>
+                </template>
+                <p>
+                  <strong>Nên chọn:</strong> {{ bestProductName(message)
+                  }}{{ message.sections.bestReason }}
+                </p>
+                <p class="follow-up">
+                  <em>Hỏi thêm: {{ message.sections.followUpQuestion }}</em>
+                </p>
+              </div>
+              <div v-else-if="message.role === 'assistant'" class="message-content">
                 <p
                   v-for="(line, lineIndex) in formatAssistantMessage(message.content)"
                   :key="`${message.id}-${lineIndex}`"
@@ -86,18 +125,40 @@
                   />
                   <div>
                     <strong>{{ product.productName }}</strong>
-                    <span class="product-price">{{ formatPrice(product.price) }}</span>
+                    <!-- Marcus sửa: hiển thị khoảng giá SKU còn hàng, tránh hiểu
+                    nhầm giá thấp nhất là giá của mọi phiên bản. -->
+                    <span class="product-price">{{ formatProductPrice(product) }}</span>
                     <small :class="{ 'out-of-stock': !product.inStock }">
                       {{ product.inStock ? 'Còn hàng' : 'Tạm hết hàng' }}
                     </small>
+                    <span v-if="product.skuOptions?.length" class="sku-summary">
+                      {{ formatSkuSummary(product) }}
+                    </span>
                   </div>
                   <i class="fas fa-chevron-right"></i>
                 </router-link>
               </div>
-              <div v-if="message.role === 'assistant' && message.adviceId && !message.isError" class="ai-feedback">
+              <div
+                v-if="message.role === 'assistant' && message.adviceId && !message.isError"
+                class="ai-feedback"
+              >
                 <span>Câu trả lời này có hữu ích?</span>
-                <button type="button" :class="{ active: message.feedback === true }" :disabled="message.feedback !== undefined" @click="submitFeedback(message, true)"><i class="far fa-thumbs-up"></i> Hữu ích</button>
-                <button type="button" :class="{ active: message.feedback === false }" :disabled="message.feedback !== undefined" @click="submitFeedback(message, false)"><i class="far fa-thumbs-down"></i> Chưa hữu ích</button>
+                <button
+                  type="button"
+                  :class="{ active: message.feedback === true }"
+                  :disabled="message.feedback !== undefined"
+                  @click="submitFeedback(message, true)"
+                >
+                  <i class="far fa-thumbs-up"></i> Hữu ích
+                </button>
+                <button
+                  type="button"
+                  :class="{ active: message.feedback === false }"
+                  :disabled="message.feedback !== undefined"
+                  @click="submitFeedback(message, false)"
+                >
+                  <i class="far fa-thumbs-down"></i> Chưa hữu ích
+                </button>
               </div>
             </div>
           </article>
@@ -136,8 +197,13 @@
 </template>
 
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { sendAiAdvisorFeedback, streamAiAdvisor, trackAiProductClick } from '@/api/aiAdvisorApi'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  getAiServerSession,
+  sendAiAdvisorFeedback,
+  streamAiAdvisor,
+  trackAiProductClick,
+} from '@/api/aiAdvisorApi'
 import {
   clearFloatingContactPanel,
   setFloatingContactPanelOpen,
@@ -150,8 +216,10 @@ const inputMessage = ref('')
 const messageBody = ref(null)
 const messageInput = ref(null)
 const messages = ref([])
+const advisorContext = ref(null)
 let messageId = 0
 const AI_HISTORY_STORAGE_KEY = 'MARCUS_AI_CONVERSATION'
+const AI_SERVER_SESSION_KEY = 'MARCUS_AI_SERVER_SESSION'
 const AI_HISTORY_TTL_MS = 4 * 60 * 60 * 1000
 const AI_HISTORY_LIMIT = 16
 
@@ -162,12 +230,15 @@ const restoreConversation = () => {
     const stored = JSON.parse(sessionStorage.getItem(AI_HISTORY_STORAGE_KEY) || 'null')
     if (!stored || Date.now() - Number(stored.savedAt) > AI_HISTORY_TTL_MS) {
       sessionStorage.removeItem(AI_HISTORY_STORAGE_KEY)
-      return []
+      return { messages: [], context: null }
     }
-    return Array.isArray(stored.messages) ? stored.messages.slice(-AI_HISTORY_LIMIT) : []
+    return {
+      messages: Array.isArray(stored.messages) ? stored.messages.slice(-AI_HISTORY_LIMIT) : [],
+      context: stored.context || null,
+    }
   } catch {
     sessionStorage.removeItem(AI_HISTORY_STORAGE_KEY)
-    return []
+    return { messages: [], context: null }
   }
 }
 
@@ -182,13 +253,41 @@ const persistConversation = () => {
       fallbackUsed: Boolean(message.fallbackUsed),
       isError: Boolean(message.isError),
       feedback: message.feedback,
+      sections: message.sections,
     }))
     sessionStorage.setItem(
       AI_HISTORY_STORAGE_KEY,
-      JSON.stringify({ savedAt: Date.now(), messages: safeMessages }),
+      JSON.stringify({
+        savedAt: Date.now(),
+        messages: safeMessages,
+        context: advisorContext.value,
+      }),
     )
   } catch {
     // sessionStorage đầy/bị chặn không được làm gián đoạn thao tác chat.
+  }
+}
+
+const clearConversation = () => {
+  messages.value = []
+  advisorContext.value = null
+  messageId = 0
+  sessionStorage.removeItem(AI_HISTORY_STORAGE_KEY)
+  sessionStorage.removeItem('MARCUS_AI_TRACKING_SESSION')
+}
+
+const syncBackendSession = async () => {
+  try {
+    const response = await getAiServerSession()
+    const serverSessionId = response?.data?.serverSessionId
+    if (!serverSessionId) return
+    const previousServerSessionId = sessionStorage.getItem(AI_SERVER_SESSION_KEY)
+    if (!previousServerSessionId || previousServerSessionId !== serverSessionId) {
+      clearConversation()
+    }
+    sessionStorage.setItem(AI_SERVER_SESSION_KEY, serverSessionId)
+  } catch {
+    // Backend tạm thời chưa lên không được làm mất lịch sử đang có.
   }
 }
 
@@ -202,7 +301,89 @@ const getTrackingSessionId = () => {
   return sessionId
 }
 
+const contextChips = computed(() => {
+  const context = advisorContext.value
+  if (!context) return []
+  const chips = []
+  if (context.category === 'ACCESSORY') chips.push({ key: 'category', label: 'Phụ kiện' })
+  if (context.category === 'PHONE') chips.push({ key: 'category', label: 'Điện thoại' })
+  if (context.platform === 'ANDROID') chips.push({ key: 'platform', label: 'Android' })
+  if (context.platform === 'IOS') chips.push({ key: 'platform', label: 'iOS' })
+  const brands = context.brands || []
+  brands.forEach((brand) =>
+    chips.push({ key: `brand-${brand}`, type: 'brand', value: brand, label: brandLabel(brand) }),
+  )
+  if (context.maxBudget != null) {
+    chips.push({ key: 'maxBudget', label: `≤ ${formatCompactPrice(context.maxBudget)}` })
+  }
+  const priorityLabels = {
+    CAMERA: 'Camera',
+    PERFORMANCE: 'Hiệu năng',
+    BATTERY: 'Pin/sạc',
+    DISPLAY: 'Màn hình',
+    BRAND: 'Thương hiệu',
+  }
+  const priorities = context.priorities || []
+  priorities.forEach((priority) =>
+    chips.push({
+      key: `priority-${priority}`,
+      type: 'priority',
+      value: priority,
+      label: priorityLabels[priority] || priority,
+    }),
+  )
+  return chips
+})
+
+const brandLabel = (brand) =>
+  ({
+    apple: 'Apple',
+    samsung: 'Samsung',
+    xiaomi: 'Xiaomi',
+    oppo: 'OPPO',
+    vivo: 'Vivo',
+    realme: 'Realme',
+    honor: 'HONOR',
+    nokia: 'Nokia',
+  })[brand] || brand
+
+const formatCompactPrice = (value) => {
+  const amount = Number(value || 0)
+  return amount >= 1_000_000
+    ? `${Number((amount / 1_000_000).toFixed(1))} triệu`
+    : formatPrice(amount)
+}
+
+const removeContextChip = (chip) => {
+  if (!advisorContext.value) return
+  const next = { ...advisorContext.value }
+  if (chip.type === 'brand')
+    next.brands = (next.brands || []).filter((brand) => brand !== chip.value)
+  else if (chip.type === 'priority')
+    next.priorities = (next.priorities || []).filter((item) => item !== chip.value)
+  else if (chip.key === 'category') next.category = null
+  else if (chip.key === 'platform') next.platform = 'ANY'
+  else next[chip.key] = null
+  advisorContext.value = next
+  persistConversation()
+}
+
+const bestProductName = (message) => {
+  const product = message.products?.find(
+    (item) => item.productId === message.sections?.bestProductId,
+  )
+  return product ? `${product.productName} — ` : ''
+}
+
 const handleProductClick = (product) => {
+  // Marcus thêm: ghi nhớ thẻ khách vừa chọn trong phiên hiện tại. Những câu hỏi
+  // tiếp nối không được tự coi sản phẩm “Nên chọn” cũ là lựa chọn của khách.
+  advisorContext.value = {
+    ...(advisorContext.value || {}),
+    selectedProductIds: [product.productId],
+    focusedProductId: product.productId,
+  }
+  persistConversation()
   isOpen.value = false
   // Marcus sửa: tracking không được cản trở thao tác mở sản phẩm nếu API thống kê
   // tạm thời lỗi.
@@ -288,7 +469,7 @@ const sendMessage = async () => {
       products: [],
     }
     messages.value.push(assistantMessage)
-    await streamAiAdvisor(content, history, getTrackingSessionId(), {
+    await streamAiAdvisor(content, history, getTrackingSessionId(), advisorContext.value, {
       onToken: (token) => {
         isStreamingText.value = true
         assistantMessage.content += token
@@ -300,6 +481,8 @@ const sendMessage = async () => {
         assistantMessage.products = data?.products ?? []
         assistantMessage.adviceId = data?.adviceId
         assistantMessage.fallbackUsed = Boolean(data?.fallbackUsed)
+        assistantMessage.sections = data?.sections || null
+        advisorContext.value = data?.context || advisorContext.value
       },
     })
   } catch (error) {
@@ -337,16 +520,39 @@ const scrollToBottom = async () => {
 const formatPrice = (price) =>
   price == null ? 'Liên hệ' : `${Number(price).toLocaleString('vi-VN')} ₫`
 
+const formatProductPrice = (product) => {
+  const minPrice = Number(product?.price || 0)
+  const maxPrice = Number(product?.maxPrice || 0)
+  if (maxPrice > minPrice) return `${formatPrice(minPrice)} – ${formatPrice(maxPrice)}`
+  return formatPrice(product?.price)
+}
+
+const formatSkuSummary = (product) => {
+  const skuOptions = product?.skuOptions || []
+  const first = skuOptions.find((item) => item.skuId === product?.matchedSkuId) || skuOptions[0]
+  const label = first?.attributes || first?.skuCode
+  if (!label) return `${skuOptions.length} phiên bản còn hàng`
+  return skuOptions.length > 1 ? `${label} và ${skuOptions.length - 1} phiên bản khác` : label
+}
+
 watch(isOpen, (opened) => setFloatingContactPanelOpen('ai', opened))
 watch(messages, persistConversation, { deep: true })
-onMounted(() => {
-  messages.value = restoreConversation()
+watch(advisorContext, persistConversation, { deep: true })
+onMounted(async () => {
+  await syncBackendSession()
+  const restored = restoreConversation()
+  messages.value = restored.messages
+  advisorContext.value = restored.context
   messageId = messages.value.reduce(
     (highestId, message) => Math.max(highestId, Number(message.id) || 0),
     0,
   )
+  window.addEventListener('marcus-ai-reset', clearConversation)
 })
-onBeforeUnmount(() => clearFloatingContactPanel('ai'))
+onBeforeUnmount(() => {
+  clearFloatingContactPanel('ai')
+  window.removeEventListener('marcus-ai-reset', clearConversation)
+})
 </script>
 
 <style scoped>
@@ -551,6 +757,42 @@ onBeforeUnmount(() => clearFloatingContactPanel('ai'))
   cursor: pointer;
 }
 
+.ai-context {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  margin: -6px 0 10px;
+  padding-bottom: 3px;
+  scrollbar-width: thin;
+}
+
+.ai-context > span {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.ai-context button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  border: 1px solid #c4b5fd;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: #f5f3ff;
+  color: #5b21b6;
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.ai-context button:hover {
+  border-color: #8b5cf6;
+  background: #ede9fe;
+}
+
 .ai-message-row {
   display: flex;
   margin: 8px 0;
@@ -614,6 +856,34 @@ onBeforeUnmount(() => clearFloatingContactPanel('ai'))
   color: #64748b;
 }
 
+.message-sections {
+  display: grid;
+  gap: 5px;
+}
+
+.message-sections p,
+.message-sections ul {
+  margin: 0;
+}
+
+.message-sections ul {
+  display: grid;
+  gap: 3px;
+  padding-left: 17px;
+}
+
+.message-sections li::marker {
+  color: #7c3aed;
+}
+
+.message-sections strong {
+  color: #312e81;
+}
+
+.message-sections .follow-up {
+  color: #64748b;
+}
+
 .message-author {
   display: block;
   margin-bottom: 3px;
@@ -628,11 +898,38 @@ onBeforeUnmount(() => clearFloatingContactPanel('ai'))
   margin-top: 9px;
 }
 
-.ai-feedback { display:flex; flex-wrap:wrap; align-items:center; gap:5px; margin-top:8px; padding-top:7px; border-top:1px solid #eef2f7; font-size:9px; color:#64748b }
-.ai-feedback span { width:100% }
-.ai-feedback button { border:1px solid #ddd6fe; border-radius:999px; padding:4px 7px; background:#fff; color:#5b21b6; font-size:9px; cursor:pointer }
-.ai-feedback button.active { border-color:#7c3aed; background:#ede9fe; font-weight:700 }
-.ai-feedback button:disabled { cursor:default; opacity:.75 }
+.ai-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding-top: 7px;
+  border-top: 1px solid #eef2f7;
+  font-size: 9px;
+  color: #64748b;
+}
+.ai-feedback span {
+  width: 100%;
+}
+.ai-feedback button {
+  border: 1px solid #ddd6fe;
+  border-radius: 999px;
+  padding: 4px 7px;
+  background: #fff;
+  color: #5b21b6;
+  font-size: 9px;
+  cursor: pointer;
+}
+.ai-feedback button.active {
+  border-color: #7c3aed;
+  background: #ede9fe;
+  font-weight: 700;
+}
+.ai-feedback button:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
 
 .ai-product {
   display: grid;
@@ -683,6 +980,16 @@ onBeforeUnmount(() => clearFloatingContactPanel('ai'))
 
 .ai-product small.out-of-stock {
   color: #94a3b8;
+}
+
+.ai-product .sku-summary {
+  overflow: hidden;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 8px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-product > i {

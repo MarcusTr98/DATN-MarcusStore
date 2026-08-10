@@ -4,9 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fpoly.marcusstore.dto.ai.AiAdvisorRequest;
 import com.fpoly.marcusstore.dto.ai.AiAdvisorResponse;
+import com.fpoly.marcusstore.dto.ai.AiAdvisorContext;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiProductProjection;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiProductSpecProjection;
+import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiSkuProjection;
 import com.fpoly.marcusstore.service.SystemSettingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +40,8 @@ public class AiAdvisorService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final Pattern MILLION_PATTERN = Pattern.compile(
             "(\\d+(?:[.,]\\d+)?)\\s*(?:triệu|trieu)", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+    private static final Pattern STORAGE_PATTERN = Pattern.compile(
+            "\\b(\\d+)\\s*(gb|tb)\\b", Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
             "\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern PHONE_PATTERN = Pattern.compile(
@@ -70,6 +74,8 @@ public class AiAdvisorService {
 
     private final HomeProductRepository homeProductRepository;
     private final SystemSettingService systemSettingService;
+    private final AiAdvisorIntentRouter intentRouter;
+    private final AiStoreKnowledgeService storeKnowledgeService;
 
     @Value("${gemini.api-key:}")
     private String apiKey;
@@ -89,13 +95,28 @@ public class AiAdvisorService {
             return safetyAnswer;
         }
 
-        AiAdvisorResponse knownAnswer = answerKnownStoreQuestion(request.getMessage());
-        if (knownAnswer != null) {
-            return knownAnswer;
+        Integer requestedFocusedProductId = request.getContext() == null
+                ? null : request.getContext().getFocusedProductId();
+        AiAdvisorIntent intent = intentRouter.detect(
+                request.getMessage(), requestedFocusedProductId != null);
+        String storeAnswer = storeKnowledgeService.answer(intent);
+        if (storeAnswer != null) {
+            return fixedAnswer(storeAnswer);
+        }
+        AiAdvisorResponse brandAnswer = intent == AiAdvisorIntent.BRAND_KNOWLEDGE
+                ? answerKnownBrandQuestion(request.getMessage()) : null;
+        if (brandAnswer != null) {
+            return brandAnswer;
         }
 
-        ProductSearchCriteria criteria = analyzeProductRequest(request);
-        List<AiProductProjection> products = findProducts(criteria);
+        AiAdvisorContext advisorContext = mergeAdvisorContext(request);
+        ProductSearchCriteria criteria = criteriaFromContext(request.getMessage(), advisorContext);
+        boolean useFocusedProduct = shouldUseFocusedProduct(
+                request.getMessage(), intent, advisorContext.getFocusedProductId());
+        List<AiProductProjection> products = useFocusedProduct
+                ? homeProductRepository.findFocusedProductForAiAdvisor(advisorContext.getFocusedProductId())
+                        .map(List::of).orElseGet(List::of)
+                : findProducts(criteria);
         // Marcus sửa: nếu khách gọi đúng dòng máy nhưng dữ liệu không khớp, chỉ nới
         // từ khóa trong cùng danh mục; tuyệt đối không fallback sang phụ kiện.
         if (products.isEmpty() && !criteria.keyword().isBlank() && !criteria.contextLocked()
@@ -104,11 +125,18 @@ public class AiAdvisorService {
                     "", criteria.categoryKeyword(), criteria.minPrice(), criteria.maxPrice(), criteria.targetPrice());
         }
         Map<Integer, String> productSpecs = loadProductSpecs(products);
+        products = rankProducts(products, productSpecs, advisorContext);
         String input = buildInput(request, products, productSpecs, criteria);
+
+        // Marcus thêm: giá là dữ liệu xác định từ SKU còn hàng, không giao cho
+        // Gemini tự suy luận hoặc tự gõ con số.
+        if (intent == AiAdvisorIntent.PRICE_LOOKUP) {
+            return attachContext(catalogPriceAnswer(products, request.getMessage()), advisorContext);
+        }
 
         // Marcus thêm: hết quota/mất key vẫn tư vấn được bằng dữ liệu catalog thật.
         if (apiKey == null || apiKey.isBlank()) {
-            return deterministicFallback(products, criteria);
+            return attachContext(deterministicFallback(products, criteria), advisorContext);
         }
 
         try {
@@ -139,15 +167,196 @@ public class AiAdvisorService {
                     .retrieve()
                     .body(JsonNode.class);
 
-            AiAdvisorResponse result = buildAdvisorResponse(response, products);
+            AiAdvisorResponse result = buildAdvisorResponse(response, products, productSpecs, advisorContext);
             result.setSource("GEMINI");
             result.setFallbackUsed(false);
-            return result;
+            return attachContext(result, advisorContext);
         } catch (HttpStatusCodeException exception) {
-            return deterministicFallback(products, criteria);
+            return attachContext(deterministicFallback(products, criteria), advisorContext);
         } catch (RestClientException exception) {
-            return deterministicFallback(products, criteria);
+            return attachContext(deterministicFallback(products, criteria), advisorContext);
         }
+    }
+
+    private AiAdvisorResponse attachContext(AiAdvisorResponse response, AiAdvisorContext context) {
+        List<Integer> selectedIds = response.getProducts() == null
+                ? List.of()
+                : response.getProducts().stream()
+                        .map(AiAdvisorResponse.ProductSuggestion::getProductId)
+                        .filter(java.util.Objects::nonNull)
+                        .limit(3)
+                        .toList();
+        context.setSelectedProductIds(selectedIds);
+        enrichSkuOptions(response.getProducts());
+        response.setContext(context);
+        return response;
+    }
+
+    private void enrichSkuOptions(List<AiAdvisorResponse.ProductSuggestion> products) {
+        if (products == null || products.isEmpty()) return;
+        if (products.stream().allMatch(product -> product.getSkuOptions() != null)) return;
+        List<Integer> productIds = products.stream()
+                .map(AiAdvisorResponse.ProductSuggestion::getProductId)
+                .filter(java.util.Objects::nonNull).toList();
+        if (productIds.isEmpty()) return;
+        Map<Integer, List<AiAdvisorResponse.SkuSuggestion>> byProduct = new HashMap<>();
+        for (AiSkuProjection sku : homeProductRepository.findAvailableSkusForAiAdvisor(productIds)) {
+            List<AiAdvisorResponse.SkuSuggestion> options = byProduct.computeIfAbsent(
+                    sku.getProductId(), ignored -> new ArrayList<>());
+            if (options.size() < 6) {
+                options.add(AiAdvisorResponse.SkuSuggestion.builder()
+                        .skuId(sku.getSkuId())
+                        .skuCode(sku.getSkuCode())
+                        .price(sku.getPrice())
+                        .stockQuantity(sku.getStockQuantity())
+                        .attributes(sku.getAttributes())
+                        .build());
+            }
+        }
+        products.forEach(product -> product.setSkuOptions(
+                byProduct.getOrDefault(product.getProductId(), List.of())));
+    }
+
+    // Marcus thêm: hợp nhất điều kiện hiện tại vào context cũ theo từng trường;
+    // câu rút gọn chỉ đổi ngân sách sẽ không làm mất Android/camera/hãng.
+    private AiAdvisorContext mergeAdvisorContext(AiAdvisorRequest request) {
+        AiAdvisorContext previous = request.getContext();
+        AiAdvisorContext context = AiAdvisorContext.builder()
+                .category(previous == null ? null : previous.getCategory())
+                .platform(previous == null ? null : previous.getPlatform())
+                .brands(previous == null || previous.getBrands() == null
+                        ? new ArrayList<>() : new ArrayList<>(previous.getBrands()))
+                .minBudget(previous == null ? null : previous.getMinBudget())
+                .maxBudget(previous == null ? null : previous.getMaxBudget())
+                .priorities(previous == null || previous.getPriorities() == null
+                        ? new ArrayList<>() : new ArrayList<>(previous.getPriorities()))
+                .selectedProductIds(previous == null || previous.getSelectedProductIds() == null
+                        ? new ArrayList<>() : new ArrayList<>(previous.getSelectedProductIds()))
+                .focusedProductId(previous == null ? null : previous.getFocusedProductId())
+                .build();
+
+        String message = request.getMessage().toLowerCase(Locale.forLanguageTag("vi-VN"));
+        boolean explicitAccessory = message.matches(
+                ".*(phụ kiện|ốp lưng|bao da|sạc|cáp|tai nghe|kính cường lực).*");
+        boolean explicitPhone = message.matches(
+                ".*(điện thoại|smartphone|android|iphone|samsung|xiaomi|oppo|vivo|realme|honor|nokia).*");
+        if (explicitAccessory) context.setCategory("ACCESSORY");
+        else if (explicitPhone) context.setCategory("PHONE");
+        else if (context.getCategory() == null) context.setCategory("PHONE");
+
+        if (message.contains("android")) context.setPlatform("ANDROID");
+        if (message.contains("iphone") || message.contains("ios")) context.setPlatform("IOS");
+        if (context.getPlatform() == null) context.setPlatform("ANY");
+
+        List<String> explicitBrands = extractBrands(message);
+        if (!explicitBrands.isEmpty()) {
+            boolean switchedBrand = previous != null && previous.getBrands() != null
+                    && !previous.getBrands().isEmpty()
+                    && previous.getBrands().stream().noneMatch(explicitBrands::contains);
+            context.setBrands(explicitBrands);
+            boolean hasApple = explicitBrands.contains("apple");
+            boolean hasAndroidBrand = explicitBrands.stream().anyMatch(brand -> !"apple".equals(brand));
+            context.setPlatform(hasApple && hasAndroidBrand ? "ANY" : hasApple ? "IOS" : "ANDROID");
+            // Marcus sửa: “thế iPhone thì sao?” là đổi hãng, không phải yêu cầu
+            // giữ âm thầm ngân sách Samsung/Android của lượt trước.
+            if (switchedBrand && !MILLION_PATTERN.matcher(message).find()) {
+                context.setMinBudget(null);
+                context.setMaxBudget(null);
+            }
+        } else if (message.contains("android")) {
+            context.setBrands(context.getBrands().stream()
+                    .filter(brand -> !"apple".equals(brand)).toList());
+        } else if (explicitAccessory && context.getBrands().isEmpty()) {
+            String historyBrand = findBrandFromRecentHistory(request.getHistory());
+            if (!historyBrand.isBlank()) context.setBrands(List.of(historyBrand));
+        } else if (previous == null && !explicitAccessory) {
+            List<String> historyKeywords = findPhoneContextFromRecentHistory(request.getHistory());
+            if (!historyKeywords.isEmpty()) {
+                if (historyKeywords.size() > 4) context.setPlatform("ANDROID");
+                else context.setBrands(historyKeywords.stream().map(this::normalizeBrand).distinct().limit(4).toList());
+            }
+        }
+        if ("IOS".equals(context.getPlatform()) && context.getBrands().isEmpty()) {
+            context.setBrands(List.of("apple"));
+        }
+
+        Matcher budgetMatcher = MILLION_PATTERN.matcher(message);
+        boolean hasBudgetInCurrentMessage = false;
+        if (budgetMatcher.find()) {
+            hasBudgetInCurrentMessage = true;
+            BigDecimal budget = new BigDecimal(budgetMatcher.group(1).replace(',', '.'))
+                    .multiply(BigDecimal.valueOf(1_000_000));
+            if (message.matches(".*(trên|từ ít nhất|tối thiểu).*")) {
+                context.setMinBudget(budget);
+            } else {
+                context.setMaxBudget(budget);
+            }
+        }
+        // Marcus sửa: hỏi giá model/hãng cụ thể phải tra giá thực, không để ngân
+        // sách của lượt trước loại mất sản phẩm đang được hỏi.
+        if (isPriceInquiry(message) && !hasBudgetInCurrentMessage
+                && (!explicitBrands.isEmpty() || !extractSearchKeywords(message).isEmpty())) {
+            context.setMinBudget(null);
+            context.setMaxBudget(null);
+        }
+        LinkedHashSet<String> priorities = new LinkedHashSet<>(context.getPriorities());
+        if (message.matches(".*(camera|chụp ảnh|quay phim|quay video|ois).*") ) priorities.add("CAMERA");
+        if (message.matches(".*(chơi game|gaming|hiệu năng|chip).*") ) priorities.add("PERFORMANCE");
+        if (message.matches(".*(pin|thời lượng|sạc).*") ) priorities.add("BATTERY");
+        if (message.matches(".*(màn hình|oled|amoled|ltpo|tần số quét).*") ) priorities.add("DISPLAY");
+        context.setPriorities(priorities.stream().limit(4).toList());
+        return context;
+    }
+
+    private boolean shouldUseFocusedProduct(
+            String rawMessage, AiAdvisorIntent intent, Integer focusedProductId) {
+        if (focusedProductId == null) return false;
+        String message = rawMessage == null ? "" : rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
+        boolean genericReference = message.matches(".*(con này|máy này|cái này|sản phẩm này|vừa xem).*");
+        return intent == AiAdvisorIntent.PRODUCT_FOLLOW_UP ||
+                (intent == AiAdvisorIntent.PRICE_LOOKUP && genericReference);
+    }
+
+    private ProductSearchCriteria criteriaFromContext(String rawMessage, AiAdvisorContext context) {
+        String message = rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
+        List<String> modelKeywords = extractSearchKeywords(message).stream()
+                .filter(keyword -> !PHONE_BRANDS.contains(keyword))
+                .toList();
+        List<String> keywords;
+        if (!modelKeywords.isEmpty()) {
+            keywords = modelKeywords;
+        } else if (!context.getBrands().isEmpty()) {
+            keywords = context.getBrands();
+        } else if ("ANDROID".equals(context.getPlatform())) {
+            keywords = List.of("samsung", "xiaomi", "oppo", "vivo", "realme", "honor", "nokia");
+        } else if ("IOS".equals(context.getPlatform())) {
+            keywords = List.of("apple");
+        } else {
+            keywords = List.of("");
+        }
+        return new ProductSearchCriteria(
+                keywords.getFirst(),
+                keywords,
+                "ACCESSORY".equals(context.getCategory()) ? "phụ kiện" : "điện thoại",
+                context.getMinBudget(),
+                context.getMaxBudget(),
+                context.getMaxBudget() != null ? context.getMaxBudget() : context.getMinBudget(),
+                !context.getBrands().isEmpty() || !"ANY".equals(context.getPlatform()));
+    }
+
+    private List<String> extractBrands(String message) {
+        LinkedHashSet<String> brands = new LinkedHashSet<>();
+        if (message.contains("iphone") || message.contains("apple") || message.contains("ios")) brands.add("apple");
+        for (String brand : List.of("samsung", "xiaomi", "oppo", "vivo", "realme", "honor", "nokia")) {
+            if (message.contains(brand)) brands.add(brand);
+        }
+        return brands.stream().limit(4).toList();
+    }
+
+    private String normalizeBrand(String keyword) {
+        String normalized = keyword.toLowerCase(Locale.ROOT);
+        if (normalized.contains("iphone") || normalized.contains("apple")) return "apple";
+        return PHONE_BRANDS.stream().filter(normalized::contains).findFirst().orElse(normalized);
     }
 
     private String providerErrorMessage(HttpStatusCodeException exception) {
@@ -162,21 +371,107 @@ public class AiAdvisorService {
         };
     }
 
-    // thông tin cố định của cửa hàng trả ngay, không tốn token và không thể bị AI
-    // bịa.
-    private AiAdvisorResponse answerKnownStoreQuestion(String rawMessage) {
-        String message = rawMessage.toLowerCase(Locale.ROOT);
-        if (message.contains("địa chỉ")
-                || (message.contains("ở đâu")
-                        && (message.contains("marcus") || message.contains("cửa hàng")))) {
-            return fixedAnswer("Dạ, Marcus Store ở địa chỉ 118 Cát Bi, Hải An, Hải Phòng ạ.");
+    private AiAdvisorResponse answerKnownBrandQuestion(String rawMessage) {
+        String message = rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
+        if (!message.matches(".*(hãng gì|của hãng nào|thương hiệu nào).*") ) return null;
+        if (message.contains("iphone") || message.contains("ipad") || message.contains("airpods")) {
+            return fixedAnswer("iPhone, iPad và AirPods là sản phẩm thuộc thương hiệu Apple.");
         }
-        if (message.contains("nhận hàng tại") || message.contains("nhận tại cửa hàng")
-                || message.contains("đến cửa hàng nhận")) {
-            return fixedAnswer(
-                    "Dạ được ạ. Bạn có thể chọn “Nhận hàng tại cửa hàng” khi thanh toán và đến 118 Cát Bi, Hải An, Hải Phòng để nhận sản phẩm.");
+        if (message.contains("galaxy")) {
+            return fixedAnswer("Galaxy là dòng sản phẩm thuộc thương hiệu Samsung.");
+        }
+        if (message.contains("redmi")) {
+            return fixedAnswer("Redmi là dòng sản phẩm thuộc thương hiệu Xiaomi.");
         }
         return null;
+    }
+
+    private boolean isPriceInquiry(String rawMessage) {
+        String message = rawMessage == null ? ""
+                : rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
+        // Marcus sửa: nhận cả câu tự nhiên như “iPhone 15 Pro giá?”, “con này
+        // bao nhiêu?”; mọi câu báo giá đều đi thẳng vào catalog, không qua AI.
+        boolean containsPriceQuestion = message.matches(
+                ".*(giá|bao nhiêu tiền|bao nhiêu|tầm giá|khoảng giá).*");
+        boolean containsProductReference = message.matches(
+                ".*(iphone|ipad|airpods|galaxy|redmi|samsung|xiaomi|oppo|vivo|realme|honor|nokia|"
+                        + "điện thoại|smartphone|phụ kiện|sản phẩm|model|mẫu|máy|con này|cái này).*");
+        return containsPriceQuestion && containsProductReference;
+    }
+
+    private AiAdvisorResponse catalogPriceAnswer(List<AiProductProjection> products, String rawMessage) {
+        List<AiAdvisorResponse.ProductSuggestion> suggestions = products.stream()
+                .limit(3).map(this::toSuggestion).toList();
+        enrichSkuOptions(suggestions);
+        List<String> priceLines = suggestions.stream()
+                .map(product -> formatCatalogPriceLine(product, rawMessage))
+                .toList();
+        AiAdvisorResponse.AdviceSections sections = AiAdvisorResponse.AdviceSections.builder()
+                .needSummary("Tra cứu giá bán của phiên bản SKU đang còn hàng.")
+                .suggestions(priceLines)
+                .considerations(List.of(
+                        "Giá lấy trực tiếp từ các SKU đang hoạt động và còn hàng; mỗi dung lượng hoặc màu có thể khác giá."))
+                .bestProductId(suggestions.isEmpty() ? null : suggestions.getFirst().getProductId())
+                .bestReason(suggestions.isEmpty()
+                        ? "Hiện chưa có phiên bản còn hàng để báo giá."
+                        : "Mở thẻ sản phẩm để chọn đúng dung lượng, màu sắc và xem giá tương ứng.")
+                .followUpQuestion("Bạn cần đúng model, dung lượng hoặc khoảng ngân sách nào?")
+                .build();
+        return AiAdvisorResponse.builder()
+                .answer(buildAnswer(sections, suggestions))
+                .products(suggestions)
+                .sections(sections)
+                .fallbackUsed(false)
+                .source("CATALOG_PRICE")
+                .build();
+    }
+
+    private String formatCatalogPriceLine(
+            AiAdvisorResponse.ProductSuggestion product, String rawMessage) {
+        AiAdvisorResponse.SkuSuggestion matched = findMatchingSku(product.getSkuOptions(), rawMessage);
+        if (matched == null) {
+            return product.getProductName() + ": " + formatPriceRange(product);
+        }
+        product.setMatchedSkuId(matched.getSkuId());
+        String attributes = matched.getAttributes() == null || matched.getAttributes().isBlank()
+                ? matched.getSkuCode() : matched.getAttributes();
+        return product.getProductName() + " — " + attributes + ": " + formatCurrency(matched.getPrice());
+    }
+
+    // Marcus thêm: nếu khách nêu dung lượng/màu đang có trong Attribute Value,
+    // giá phải chốt theo đúng SKU thay vì trả khoảng giá toàn sản phẩm.
+    private AiAdvisorResponse.SkuSuggestion findMatchingSku(
+            List<AiAdvisorResponse.SkuSuggestion> options, String rawMessage) {
+        if (options == null || options.isEmpty()) return null;
+        String message = rawMessage == null ? "" : rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
+        Matcher storageMatcher = STORAGE_PATTERN.matcher(message);
+        String storage = storageMatcher.find()
+                ? storageMatcher.group(1) + storageMatcher.group(2).toLowerCase(Locale.ROOT)
+                : null;
+        List<AiAdvisorResponse.SkuSuggestion> storageMatches = options.stream()
+                .filter(option -> storage == null || normalizeSkuText(option).contains(storage))
+                .toList();
+        if (storage != null && storageMatches.isEmpty()) return null;
+
+        List<AiAdvisorResponse.SkuSuggestion> candidates = storage == null ? options : storageMatches;
+        for (AiAdvisorResponse.SkuSuggestion option : candidates) {
+            String attributes = option.getAttributes();
+            if (attributes == null) continue;
+            for (String attribute : attributes.split(",")) {
+                int separator = attribute.indexOf(':');
+                String value = separator >= 0 ? attribute.substring(separator + 1).trim() : attribute.trim();
+                if (value.length() >= 3 && message.contains(value.toLowerCase(Locale.forLanguageTag("vi-VN")))) {
+                    return option;
+                }
+            }
+        }
+        return storage != null || candidates.size() == 1 ? candidates.getFirst() : null;
+    }
+
+    private String normalizeSkuText(AiAdvisorResponse.SkuSuggestion option) {
+        return ((option.getSkuCode() == null ? "" : option.getSkuCode()) + " "
+                + (option.getAttributes() == null ? "" : option.getAttributes()))
+                .toLowerCase(Locale.ROOT).replaceAll("\\s+", "");
     }
 
     private AiAdvisorResponse fixedAnswer(String answer) {
@@ -226,7 +521,9 @@ public class AiAdvisorService {
                 phải dùng LỊCH SỬ GẦN NHẤT để tiếp tục đúng chủ đề, không quay về câu trả lời từ chối chung.
                 Chỉ được đề xuất sản phẩm có trong NGỮ CẢNH SẢN PHẨM và không tự suy đoán thông số chưa được cung cấp.
                 Chọn tối đa 3 sản phẩm phù hợp nhất. recommendedProductIds phải chứa đúng ID của các sản phẩm được nhắc đến.
-                Trả JSON hợp lệ theo mẫu: {"answer":"nội dung tư vấn","recommendedProductIds":[1,2]}.
+                Không viết lại giá bằng văn bản; giá do giao diện lấy trực tiếp từ database.
+                Trả JSON gồm needSummary, considerations, bestProductId, bestReason,
+                followUpQuestion và recommendedProductIds. recommendedProductIds chỉ chứa ID trong ngữ cảnh.
                 Bạn là AI, không tự nhận mình là nhân viên hoặc Admin.
 
                 CHÍNH SÁCH TƯ VẤN BỔ SUNG DO ADMIN CẤU HÌNH:
@@ -405,6 +702,47 @@ public class AiAdvisorService {
         return uniqueProducts.values().stream().limit(8).toList();
     }
 
+    private String formatPriceRange(AiAdvisorResponse.ProductSuggestion product) {
+        if (product.getPrice() == null) return "chưa có giá";
+        if (product.getMaxPrice() != null && product.getMaxPrice().compareTo(product.getPrice()) > 0) {
+            return "từ " + formatCurrency(product.getPrice()) + " đến " + formatCurrency(product.getMaxPrice());
+        }
+        return formatCurrency(product.getPrice());
+    }
+
+    // Marcus thêm: SQL áp dụng điều kiện bắt buộc; backend xếp hạng mềm theo
+    // bằng chứng nhu cầu trước khi Gemini diễn giải.
+    private List<AiProductProjection> rankProducts(
+            List<AiProductProjection> products,
+            Map<Integer, String> productSpecs,
+            AiAdvisorContext context) {
+        return products.stream()
+                .sorted(java.util.Comparator
+                        .comparingInt((AiProductProjection product) -> evidenceScore(
+                                productSpecs.get(product.getProductId()), context.getPriorities()))
+                        .reversed()
+                        .thenComparing(product -> product.getPrice() == null
+                                ? BigDecimal.valueOf(Long.MAX_VALUE) : product.getPrice()))
+                .limit(8)
+                .toList();
+    }
+
+    private int evidenceScore(String specs, List<String> priorities) {
+        if (priorities == null) return 0;
+        int score = 0;
+        for (String priority : priorities) {
+            String evidenceKeyword = switch (priority) {
+                case "CAMERA" -> "camera";
+                case "PERFORMANCE" -> "hiệu năng";
+                case "BATTERY" -> "pin/sạc";
+                case "DISPLAY" -> "màn hình";
+                default -> null;
+            };
+            if (evidenceKeyword != null && hasEvidence(specs, evidenceKeyword)) score++;
+        }
+        return score;
+    }
+
     // Marcus thêm: hiểu loại hàng, hãng/dòng máy và cách nói ngân sách phổ biến.
     private ProductSearchCriteria analyzeProductRequest(String rawMessage) {
         AiAdvisorRequest request = new AiAdvisorRequest();
@@ -537,11 +875,14 @@ public class AiAdvisorService {
         return List.copyOf(keywords);
     }
 
-    private AiAdvisorResponse buildAdvisorResponse(JsonNode response, List<AiProductProjection> products) {
+    private AiAdvisorResponse buildAdvisorResponse(
+            JsonNode response,
+            List<AiProductProjection> products,
+            Map<Integer, String> productSpecs,
+            AiAdvisorContext context) {
         String output = normalizeJsonOutput(extractOutputText(response));
         try {
             JsonNode result = OBJECT_MAPPER.readTree(output);
-            String answer = normalizeAdvisorLanguage(result.path("answer").asText("").trim());
             Set<Integer> recommendedIds = new LinkedHashSet<>();
             result.path("recommendedProductIds").forEach(id -> {
                 if (id.canConvertToInt()) {
@@ -554,19 +895,78 @@ public class AiAdvisorService {
                     .limit(3)
                     .map(this::toSuggestion)
                     .toList();
+            // Marcus sửa: provider trả thiếu/sai ID không được làm mất thẻ. Danh
+            // sách top 3 này đã qua hard filter và ranking của backend.
+            if (suggestions.isEmpty() && !products.isEmpty()) {
+                suggestions = products.stream().limit(3).map(this::toSuggestion).toList();
+            }
+
+            Integer requestedBestId = result.path("bestProductId").canConvertToInt()
+                    ? result.path("bestProductId").asInt() : null;
+            Integer bestProductId = suggestions.stream()
+                    .map(AiAdvisorResponse.ProductSuggestion::getProductId)
+                    .filter(id -> java.util.Objects.equals(id, requestedBestId))
+                    .findFirst()
+                    .orElse(suggestions.isEmpty() ? null : suggestions.getFirst().getProductId());
+            String bestProductName = suggestions.stream()
+                    .filter(product -> java.util.Objects.equals(product.getProductId(), bestProductId))
+                    .map(AiAdvisorResponse.ProductSuggestion::getProductName)
+                    .findFirst().orElse(null);
+            AiAdvisorResponse.AdviceSections sections = AiAdvisorResponse.AdviceSections.builder()
+                    .needSummary(cleanSectionText(result.path("needSummary").asText(""), 180,
+                            "Mình đã ghi nhận nhu cầu của bạn."))
+                    // Marcus sửa: tên lựa chọn do backend dựng từ catalog đã lọc,
+                    // Gemini không được tự thêm sản phẩm hoặc viết lại giá.
+                    .suggestions(suggestions.stream()
+                            .map(AiAdvisorResponse.ProductSuggestion::getProductName)
+                            .toList())
+                    .considerations(validateConsiderations(
+                            readShortList(result.path("considerations"), 2, 160),
+                            suggestions, productSpecs, context))
+                    .bestProductId(bestProductId)
+                    .bestReason(removeProductNamePrefix(cleanSectionText(
+                            result.path("bestReason").asText(""), 180,
+                            suggestions.isEmpty()
+                                    ? "Chưa có sản phẩm đủ điều kiện để đề xuất."
+                                    : "Đây là lựa chọn khớp điều kiện nhất trong catalog hiện tại."),
+                            bestProductName))
+                    .followUpQuestion(cleanSectionText(result.path("followUpQuestion").asText(""), 160,
+                            "Bạn muốn ưu tiên camera, hiệu năng, pin hay màn hình?"))
+                    .build();
 
             return AiAdvisorResponse.builder()
-                    .answer(answer.isBlank() ? "Mình chưa tìm được lựa chọn đủ phù hợp." : answer)
+                    .answer(buildAnswer(sections, suggestions))
                     .products(suggestions)
+                    .sections(sections)
                     .build();
         } catch (Exception ignored) {
-            // Marcus giữ fallback để widget vẫn trả lời nếu nhà cung cấp lỡ không
-            // tuân thủ JSON, nhưng không gắn thẻ sản phẩm sai.
-            return AiAdvisorResponse.builder()
-                    .answer(output)
-                    .products(List.of())
-                    .build();
+            // Marcus sửa: JSON lỗi vẫn dùng ứng viên backend đã duyệt; không để
+            // khách nhận đoạn text trống thẻ sản phẩm.
+            return catalogRecovery(products);
         }
+    }
+
+    private AiAdvisorResponse catalogRecovery(List<AiProductProjection> products) {
+        List<AiAdvisorResponse.ProductSuggestion> suggestions = products.stream()
+                .limit(3).map(this::toSuggestion).toList();
+        AiAdvisorResponse.AdviceSections sections = AiAdvisorResponse.AdviceSections.builder()
+                .needSummary("Tìm lựa chọn phù hợp trong catalog đang còn hàng.")
+                .suggestions(suggestions.stream()
+                        .map(AiAdvisorResponse.ProductSuggestion::getProductName).toList())
+                .considerations(List.of("Mở thẻ sản phẩm để đối chiếu thông số chi tiết."))
+                .bestProductId(suggestions.isEmpty() ? null : suggestions.getFirst().getProductId())
+                .bestReason(suggestions.isEmpty()
+                        ? "Chưa có sản phẩm đủ điều kiện để đề xuất."
+                        : "Đây là lựa chọn khớp bộ lọc backend nhất trong dữ liệu hiện tại.")
+                .followUpQuestion("Bạn muốn điều chỉnh ngân sách hay ưu tiên sử dụng không?")
+                .build();
+        return AiAdvisorResponse.builder()
+                .answer(buildAnswer(sections, suggestions))
+                .products(suggestions)
+                .sections(sections)
+                .fallbackUsed(true)
+                .source("CATALOG_RECOVERY")
+                .build();
     }
 
     // Marcus thêm: schema buộc Gemini trả đúng contract mà widget đang đọc.
@@ -575,12 +975,122 @@ public class AiAdvisorService {
                 "type", "object",
                 "additionalProperties", false,
                 "properties", Map.of(
-                        "answer", Map.of("type", "string"),
+                        "needSummary", Map.of("type", "string", "maxLength", 180),
+                        "considerations", Map.of(
+                                "type", "array", "maxItems", 2,
+                                "items", Map.of("type", "string", "maxLength", 160)),
+                        "bestProductId", Map.of("type", "integer"),
+                        "bestReason", Map.of("type", "string", "maxLength", 180),
+                        "followUpQuestion", Map.of("type", "string", "maxLength", 160),
                         "recommendedProductIds", Map.of(
                                 "type", "array",
                                 "maxItems", 3,
                                 "items", Map.of("type", "integer"))),
-                "required", List.of("answer", "recommendedProductIds"));
+                "required", List.of(
+                        "needSummary", "considerations", "bestProductId", "bestReason",
+                        "followUpQuestion", "recommendedProductIds"));
+    }
+
+    private List<String> readShortList(JsonNode node, int limit, int maxLength) {
+        List<String> values = new ArrayList<>();
+        if (node != null && node.isArray()) {
+            node.forEach(value -> {
+                if (values.size() < limit) {
+                    String sanitized = cleanSectionText(value.asText(""), maxLength, "");
+                    if (!sanitized.isBlank()) values.add(sanitized);
+                }
+            });
+        }
+        return values;
+    }
+
+    private List<String> validateConsiderations(
+            List<String> considerations,
+            List<AiAdvisorResponse.ProductSuggestion> suggestions,
+            Map<Integer, String> productSpecs,
+            AiAdvisorContext context) {
+        List<String> valid = considerations.stream()
+                .filter(text -> !containsUnsupportedPriorityClaim(text, suggestions, productSpecs, context))
+                .limit(2)
+                .toList();
+        if (!valid.isEmpty()) return valid;
+        if (context.getPriorities() != null && !context.getPriorities().isEmpty()) {
+            return List.of("Thông số catalog chưa đủ để kết luận tuyệt đối; hãy mở sản phẩm để đối chiếu chi tiết.");
+        }
+        return List.of();
+    }
+
+    private boolean containsUnsupportedPriorityClaim(
+            String text,
+            List<AiAdvisorResponse.ProductSuggestion> suggestions,
+            Map<Integer, String> productSpecs,
+            AiAdvisorContext context) {
+        String normalized = text.toLowerCase(Locale.forLanguageTag("vi-VN"));
+        for (String priority : context.getPriorities()) {
+            String evidenceKeyword = switch (priority) {
+                case "CAMERA" -> "camera";
+                case "PERFORMANCE" -> "hiệu năng";
+                case "BATTERY" -> "pin/sạc";
+                case "DISPLAY" -> "màn hình";
+                default -> null;
+            };
+            if (evidenceKeyword == null || !normalized.contains(evidenceKeyword.split("/")[0])) continue;
+            boolean hasAnyEvidence = suggestions.stream().anyMatch(product ->
+                    hasEvidence(productSpecs.get(product.getProductId()), evidenceKeyword));
+            if (!hasAnyEvidence) return true;
+        }
+        return false;
+    }
+
+    private String safeAdvisorText(String value, int maxLength, String fallback) {
+        String sanitized = sanitizeConversationText(value);
+        if (sanitized.isBlank()) return fallback;
+        return sanitized.length() <= maxLength ? sanitized : sanitized.substring(0, maxLength);
+    }
+
+    // Marcus sửa: JSON đã chia section nên provider không được nhét lại Markdown,
+    // tiêu đề hoặc bullet vào giá trị; frontend là nơi duy nhất dựng nhãn.
+    private String cleanSectionText(String value, int maxLength, String fallback) {
+        String cleaned = value == null ? "" : value.trim();
+        cleaned = cleaned.replaceAll("(?iu)^\\s*(?:[-•]\\s*)?(?:\\*{1,2})?"
+                + "(?:Nhu cầu|Gợi ý|Điểm cần cân nhắc|Nên chọn|Hỏi thêm)\\s*:"
+                + "(?:\\*{1,2})?\\s*", "");
+        cleaned = cleaned.replaceAll("^\\s*[-•]\\s*", "")
+                .replace("**", "")
+                .replace("*", "")
+                .trim();
+        return safeAdvisorText(cleaned, maxLength, fallback);
+    }
+
+    private String removeProductNamePrefix(String reason, String productName) {
+        if (reason == null || productName == null || productName.isBlank()) return reason;
+        return reason.replaceFirst(
+                "(?iu)^" + Pattern.quote(productName) + "\\s*(?:[-—:]\\s*)?", "").trim();
+    }
+
+    private String buildAnswer(
+            AiAdvisorResponse.AdviceSections sections,
+            List<AiAdvisorResponse.ProductSuggestion> products) {
+        StringBuilder answer = new StringBuilder("**Nhu cầu:** ").append(sections.getNeedSummary());
+        answer.append("\n**Gợi ý:**");
+        if (sections.getSuggestions().isEmpty()) {
+            answer.append(" Chưa có lựa chọn phù hợp trong catalog hiện tại.");
+        } else {
+            sections.getSuggestions().forEach(name -> answer.append("\n- ").append(name));
+        }
+        if (!sections.getConsiderations().isEmpty()) {
+            answer.append("\n**Điểm cần cân nhắc:**");
+            sections.getConsiderations().forEach(item -> answer.append("\n- ").append(item));
+        }
+        String bestName = products.stream()
+                .filter(product -> java.util.Objects.equals(product.getProductId(), sections.getBestProductId()))
+                .map(AiAdvisorResponse.ProductSuggestion::getProductName)
+                .findFirst().orElse(null);
+        answer.append("\n**Nên chọn:** ");
+        if (bestName != null) answer.append(bestName).append(" — ");
+        answer.append(sections.getBestReason());
+        answer.append("\n*Hỏi thêm:* ").append(sections.getFollowUpQuestion());
+        return normalizeAdvisorLanguage(answer.toString());
     }
 
     private String normalizeJsonOutput(String rawOutput) {
@@ -692,6 +1202,7 @@ public class AiAdvisorService {
                 .map(this::toSuggestion)
                 .toList();
         String answer;
+        AiAdvisorResponse.AdviceSections sections;
         if (suggestions.isEmpty()) {
             String requestedType = "phụ kiện".equals(criteria.categoryKeyword()) ? "phụ kiện" : "điện thoại";
             answer = "**Nhu cầu:** Tìm " + requestedType + " đang còn hàng.\n"
@@ -699,6 +1210,13 @@ public class AiAdvisorService {
                     + "**Điểm cần cân nhắc:** Mình không đoán mẫu ngoài dữ liệu để tránh tư vấn sai.\n"
                     + "**Nên chọn:** Đổi ngân sách hoặc nhờ Live Chat kiểm tra thêm.\n"
                     + "*Hỏi thêm:* Bạn có thể tăng ngân sách hoặc đổi hãng không?";
+            sections = AiAdvisorResponse.AdviceSections.builder()
+                    .needSummary("Tìm " + requestedType + " đang còn hàng.")
+                    .suggestions(List.of())
+                    .considerations(List.of("Không đề xuất mẫu ngoài dữ liệu để tránh tư vấn sai."))
+                    .bestReason("Bạn có thể đổi ngân sách hoặc nhờ Live Chat kiểm tra thêm.")
+                    .followUpQuestion("Bạn có thể tăng ngân sách hoặc đổi hãng không?")
+                    .build();
         } else {
             String names = suggestions.stream().map(AiAdvisorResponse.ProductSuggestion::getProductName)
                     .collect(Collectors.joining(", "));
@@ -710,10 +1228,22 @@ public class AiAdvisorService {
                     + "**Nên chọn:** " + suggestions.getFirst().getProductName()
                     + " đang khớp yêu cầu nhất.\n"
                     + "*Hỏi thêm:* Bạn ưu tiên camera, hiệu năng, pin hay thương hiệu?";
+            sections = AiAdvisorResponse.AdviceSections.builder()
+                    .needSummary("Tìm "
+                            + ("phụ kiện".equals(criteria.categoryKeyword()) ? "phụ kiện" : "điện thoại")
+                            + " đang còn hàng.")
+                    .suggestions(suggestions.stream()
+                            .map(AiAdvisorResponse.ProductSuggestion::getProductName).toList())
+                    .considerations(List.of("Mở thẻ sản phẩm để đối chiếu thông số chi tiết."))
+                    .bestProductId(suggestions.getFirst().getProductId())
+                    .bestReason("Đang khớp điều kiện nhất trong catalog hiện tại.")
+                    .followUpQuestion("Bạn ưu tiên camera, hiệu năng, pin hay thương hiệu?")
+                    .build();
         }
         return AiAdvisorResponse.builder()
                 .answer(answer)
                 .products(suggestions)
+                .sections(sections)
                 .fallbackUsed(true)
                 .source("CATALOG_FALLBACK")
                 .build();
@@ -736,6 +1266,7 @@ public class AiAdvisorService {
                 .slug(product.getSlug())
                 .thumbnailUrl(product.getThumbnailUrl())
                 .price(product.getPrice())
+                .maxPrice(product.getMaxPrice())
                 .inStock(product.getStockQuantity() != null && product.getStockQuantity() > 0)
                 .build();
     }

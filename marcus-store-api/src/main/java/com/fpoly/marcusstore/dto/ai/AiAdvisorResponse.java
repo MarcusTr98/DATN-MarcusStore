@@ -16,6 +16,19 @@ public class AiAdvisorResponse {
     private List<ProductSuggestion> products;
     private boolean fallbackUsed;
     private String source;
+    private AiAdvisorContext context;
+    private AdviceSections sections;
+
+    @Data
+    @Builder
+    public static class AdviceSections {
+        private String needSummary;
+        private List<String> suggestions;
+        private List<String> considerations;
+        private Integer bestProductId;
+        private String bestReason;
+        private String followUpQuestion;
+    }
 
     @Data
     @Builder
@@ -25,6 +38,19 @@ public class AiAdvisorResponse {
         private String slug;
         private String thumbnailUrl;
         private BigDecimal price;
+        private BigDecimal maxPrice;
         private boolean inStock;
+        private List<SkuSuggestion> skuOptions;
+        private Integer matchedSkuId;
+    }
+
+    @Data
+    @Builder
+    public static class SkuSuggestion {
+        private Integer skuId;
+        private String skuCode;
+        private BigDecimal price;
+        private Integer stockQuantity;
+        private String attributes;
     }
 }

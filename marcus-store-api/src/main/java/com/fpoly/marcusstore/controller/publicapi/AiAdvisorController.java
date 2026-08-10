@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,11 +40,19 @@ import static org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE;
 public class AiAdvisorController {
 
     private static final int MAX_REQUESTS_PER_MINUTE = 10;
+    // Marcus thêm: đổi sau mỗi lần backend khởi động để frontend không dùng lại
+    // context/hội thoại thuộc phiên server cũ.
+    private static final String SERVER_SESSION_ID = UUID.randomUUID().toString();
     private final AiAdvisorService aiAdvisorService;
     private final AiProductClickService aiProductClickService;
     private final AiUsageEventService usageEventService;
     private final BehaviorEventService behaviorEventService;
     private final Map<String, Deque<Instant>> requestWindows = new ConcurrentHashMap<>();
+
+    @GetMapping("/session-version")
+    public ResponseEntity<Map<String, String>> sessionVersion() {
+        return ResponseEntity.ok(Map.of("serverSessionId", SERVER_SESSION_ID));
+    }
 
     @PostMapping("/chat")
     public ResponseEntity<ApiResponse<AiAdvisorResponse>> chat(

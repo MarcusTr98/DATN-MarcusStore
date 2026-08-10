@@ -71,6 +71,10 @@ const confirmLogout = () => {
   localStorage.removeItem('ACCESS_TOKEN')
   localStorage.removeItem('USER_ROLE')
   localStorage.removeItem('USERNAME')
+  // Marcus thêm: logout phải kết thúc luôn phiên tư vấn ẩn danh trên thiết bị.
+  sessionStorage.removeItem('MARCUS_AI_CONVERSATION')
+  sessionStorage.removeItem('MARCUS_AI_TRACKING_SESSION')
+  window.dispatchEvent(new Event('marcus-ai-reset'))
 
   cartStore.cart = null
   cartStore.items = []
@@ -260,7 +264,9 @@ function handleClickOutside(e) {
             </div>
             <div class="logo-text">
               <span class="logo-brand">{{ siteNameParts.primary }}</span>
-              <span v-if="siteNameParts.secondary" class="logo-store">{{ siteNameParts.secondary }}</span>
+              <span v-if="siteNameParts.secondary" class="logo-store">{{
+                siteNameParts.secondary
+              }}</span>
             </div>
           </router-link>
 
@@ -409,15 +415,25 @@ function handleClickOutside(e) {
                 </a>
               </template>
               <template v-else>
-                <div class="dropdown dropdown-hover account-dropdown" :class="{ show: showAccountMenu }">
-                  <a href="#" class="h-action-btn" @click.prevent="showAccountMenu = !showAccountMenu">
+                <div
+                  class="dropdown dropdown-hover account-dropdown"
+                  :class="{ show: showAccountMenu }"
+                >
+                  <a
+                    href="#"
+                    class="h-action-btn"
+                    @click.prevent="showAccountMenu = !showAccountMenu"
+                  >
                     <div class="h-action-icon active"><i class="far fa-user"></i></div>
                     <div class="h-action-text">
                       <span class="h-action-sub">Xin chào,</span>
                       <span class="h-action-main">{{ userName }}</span>
                     </div>
                   </a>
-                  <ul class="dropdown-menu dropdown-menu-end ms-dropdown shadow" :class="{ show: showAccountMenu }">
+                  <ul
+                    class="dropdown-menu dropdown-menu-end ms-dropdown shadow"
+                    :class="{ show: showAccountMenu }"
+                  >
                     <li class="dropdown-user-header">
                       <i class="fas fa-user-circle me-2"></i>{{ userName }}
                     </li>
@@ -503,7 +519,10 @@ function handleClickOutside(e) {
           </li>
 
           <!-- 2. Danh mục (Dropdown Hover) -->
-          <li class="nav-item dropdown dropdown-hover category-dropdown" :class="{ show: showCategoryMenu }">
+          <li
+            class="nav-item dropdown dropdown-hover category-dropdown"
+            :class="{ show: showCategoryMenu }"
+          >
             <a
               href="#"
               class="nav-link fw-semibold text-dark px-1 py-2 rounded d-flex align-items-center"
@@ -514,7 +533,10 @@ function handleClickOutside(e) {
             </a>
 
             <!-- Menu xổ xuống -->
-            <ul class="dropdown-menu border-0 shadow-lg mt-0 rounded-3 p-2" :class="{ show: showCategoryMenu }">
+            <ul
+              class="dropdown-menu border-0 shadow-lg mt-0 rounded-3 p-2"
+              :class="{ show: showCategoryMenu }"
+            >
               <li>
                 <router-link to="/category/dien-thoai" class="dropdown-item rounded py-2">
                   <i class="fas fa-mobile-alt fa-fw text-danger me-2"></i> Điện thoại
@@ -599,12 +621,19 @@ function handleClickOutside(e) {
           <div class="modal-body text-center pt-0">
             <div class="brand-logo-wrapper mb-4">
               <div class="logo-icon-box shadow-sm" :class="{ 'has-site-logo': siteLogoUrl }">
-                <img v-if="siteLogoUrl" :src="siteLogoUrl" :alt="siteName" class="site-logo-image" />
+                <img
+                  v-if="siteLogoUrl"
+                  :src="siteLogoUrl"
+                  :alt="siteName"
+                  class="site-logo-image"
+                />
                 <i v-else class="fas fa-mobile-alt"></i>
               </div>
               <div class="logo-text-box">
                 <span class="text-marcus">{{ siteNameParts.primary }}</span>
-                <span v-if="siteNameParts.secondary" class="text-store">{{ siteNameParts.secondary }}</span>
+                <span v-if="siteNameParts.secondary" class="text-store">{{
+                  siteNameParts.secondary
+                }}</span>
               </div>
             </div>
 
