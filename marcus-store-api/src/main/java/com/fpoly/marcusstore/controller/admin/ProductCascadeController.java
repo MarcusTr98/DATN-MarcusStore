@@ -4,13 +4,14 @@ import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.dto.response.ProductCascadeResponse;
 import com.fpoly.marcusstore.service.ProductCascadeService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/products")
-
+@PreAuthorize("hasAuthority('PRODUCT_VIEW')")
 public class ProductCascadeController {
 
     @Autowired

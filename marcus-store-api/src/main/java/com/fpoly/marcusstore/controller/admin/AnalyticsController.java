@@ -23,7 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/analytics")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('DASHBOARD_VIEW')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AnalyticsController {
 
     private final AnalyticsService analyticsService;

@@ -325,9 +325,9 @@ const handleLogin = async () => {
     window.dispatchEvent(new Event('auth-changed'))
 
     if (userData.roles.includes('ROLE_ADMIN')) {
-      router.push('/admin/dashboard')
+      router.push('/admin/welcome')
     } else if (userData.roles.includes('ROLE_STAFF')) {
-      router.push('/admin/dashboard')
+      router.push('/admin/welcome')
     } else {
       router.push('/')
     }

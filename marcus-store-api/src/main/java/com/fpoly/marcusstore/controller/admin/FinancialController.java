@@ -28,15 +28,13 @@ import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/admin/finance-reports")
-@PreAuthorize("hasAuthority('DONGTIEN_VIEW')")
+@PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 @Validated
 public class FinancialController {
     private final FinancialService financialService;
 
     @GetMapping("/export")
-    // Marcus sửa: quyền xem báo cáo không đồng nghĩa với quyền tải toàn bộ dữ liệu.
-    @PreAuthorize("hasAuthority('DONGTIEN_EXPORT')")
     public ResponseEntity<byte[]> exportExcel() throws IOException {
         byte[] data = financialService.exportTransactionsToExcel();
         return ResponseEntity.ok()
@@ -54,7 +52,6 @@ public class FinancialController {
     }
 
     @PostMapping("/{id}/reconcile")
-    @PreAuthorize("hasAuthority('DONGTIEN_EXPORT')")
     public ResponseEntity<?> reconcile(
             @PathVariable @Positive Integer id,
             @Valid @RequestBody FinancialReconcileRequest request) {

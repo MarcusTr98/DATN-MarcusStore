@@ -58,7 +58,7 @@ onMounted(() => {
   }
 
   if (roleList.includes("ROLE_ADMIN") || roleList.includes("ROLE_STAFF")) {
-    router.replace("/admin/dashboard");
+    router.replace("/admin/welcome");
   } else {
     router.replace("/");
   }

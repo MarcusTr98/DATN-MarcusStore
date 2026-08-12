@@ -117,7 +117,7 @@ const routes = [
             meta: { requiresAuth: true },
           },
           {
-            path: '/change-password',
+            path: 'change-password',
             name: 'change-password',
             component: () => import('@/views/client/account/ChangePassword.vue'),
           },
@@ -145,20 +145,25 @@ const routes = [
       roles: ['ROLE_ADMIN', 'ROLE_STAFF'],
     },
     children: [
-      { path: '', redirect: '/admin/dashboard' },
+      { path: '', name: 'AdminWelcome', component: () => import('@/views/admin/Welcome.vue') },
+      {
+        path: 'welcome',
+        name: 'AdminWelcomeAlias',
+        component: () => import('@/views/admin/Welcome.vue'),
+      },
       {
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/Dashboard.vue'),
-        // Marcus sửa: Dashboard có quyền riêng để đồng nhất route và API thống kê.
-        meta: { permission: 'DASHBOARD_VIEW' },
+        // Tổng quan doanh thu chỉ ADMIN được xem.
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'analytics',
         name: 'BusinessAnalytics',
         component: () => import('@/views/admin/analytics/BusinessAnalytics.vue'),
-        // Marcus thêm: tab Phân tích độc lập, dùng cùng quyền xem số liệu quản trị.
-        meta: { permission: 'DASHBOARD_VIEW' },
+        // Phân tích kinh doanh (doanh thu, biên lợi nhuận…) chỉ ADMIN.
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'profile',
@@ -187,7 +192,6 @@ const routes = [
         path: 'skugenerator',
         name: 'Skugeneratorview',
         component: () => import('@/views/admin/product/Skugeneratorview.vue'),
-        // Marcus sửa: đồng bộ route với quyền SKU_CREATE do thành viên định nghĩa.
         meta: { permission: 'SKU_CREATE' },
       },
       {
@@ -236,7 +240,8 @@ const routes = [
         path: 'banner',
         name: 'BannerManager',
         component: () => import('@/views/admin/cms/BannerManager.vue'),
-        meta: { permission: 'BANNER_VIEW' },
+        // Quản lý banner là cấu hình hiển thị toàn site, chỉ ADMIN.
+        meta: { permission: 'BANNER_VIEW'},
       },
       {
         path: 'post',
@@ -248,7 +253,8 @@ const routes = [
         path: 'settings',
         name: 'SystemSettings',
         component: () => import('@/views/admin/settings/SystemSettings.vue'),
-        meta: { permission: 'SYSTEM_VIEW' },
+        // Cấu hình hệ thống chung, chỉ ADMIN được phép thay đổi.
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'data-backup',
@@ -279,29 +285,34 @@ const routes = [
         path: 'finance-reports',
         name: 'FinancialReport',
         component: () => import('@/views/client/report/FinancialReport.vue'),
-        meta: { permission: 'DONGTIEN_VIEW' },
+        // Báo cáo dòng tiền/tài chính, chỉ ADMIN được xem.
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'inventoryManager',
         redirect: '/admin/inventoryManager/with-imei',
+        meta: { roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'inventoryManager/with-imei',
         name: 'InventoryManagerWithImei',
         component: () => import('@/views/admin/auth/InventoryManager.vue'),
-        meta: { permission: 'INVENTORY_MANAGE', imeiScope: true },
+        // Quản lý kho + IMEI là thao tác cấu hình tồn kho, chỉ ADMIN.
+        meta: { permission: 'INVENTORY_MANAGE', imeiScope: true, roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'inventoryManager/no-imei',
         name: 'InventoryManagerNoImei',
         component: () => import('@/views/admin/auth/InventoryManager.vue'),
-        meta: { permission: 'INVENTORY_MANAGE', imeiScope: false },
+        // Quản lý kho không IMEI, chỉ ADMIN.
+        meta: { permission: 'INVENTORY_MANAGE', imeiScope: false, roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'inventoryManager/imei/:skuId',
         name: 'InventoryImeiManager',
         component: () => import('@/views/admin/auth/InventoryImeiManager.vue'),
-        meta: { permission: 'INVENTORY_MANAGE' },
+        // Chi tiết IMEI theo SKU, chỉ ADMIN.
+        meta: { permission: 'INVENTORY_MANAGE', roles: ['ROLE_ADMIN'] },
       },
       {
         path: 'activity-log',
@@ -319,6 +330,7 @@ const routes = [
         path: '/admin/reviews',
         name: 'ReviewManagement',
         component: () => import('@/views/admin/cms/ReviewManagement.vue'),
+        meta: { permission: 'REVIEW_VIEW'},
       },
     ],
   },
@@ -345,9 +357,9 @@ router.beforeEach((to) => {
   const isAdmin = roles.includes('ROLE_ADMIN')
   const isAdminOrStaff = isAdmin || roles.includes('ROLE_STAFF')
 
-  // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào admin
+  // ĐÃ ĐĂNG NHẬP LÀ ADMIN/STAFF mà cố vào trang client hoặc trang login -> đẩy vào trang welcome
   if (token && isAdminOrStaff && (to.path === '/' || to.path.startsWith('/auth/login'))) {
-    return '/admin/dashboard'
+    return '/admin/welcome'
   }
 
   // Chưa login mà cố vào admin
@@ -374,7 +386,7 @@ router.beforeEach((to) => {
     const hasRole = roles.some((role) => requiredRoles.includes(role))
     if (!hasRole) {
       alert('Bạn không có quyền truy cập trang này')
-      return '/admin/dashboard'
+      return '/admin/welcome'
     }
   }
 
@@ -384,7 +396,7 @@ router.beforeEach((to) => {
   if (requiredPermission && !isAdmin) {
     if (!permissions.includes(requiredPermission)) {
       alert('Bạn không có quyền truy cập chức năng này')
-      return '/admin/dashboard'
+      return '/admin/welcome'
     }
   }
 

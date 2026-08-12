@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/ai-advisor")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('DASHBOARD_VIEW')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminAiAdvisorController {
 
     private final AiProductClickService clickService;

@@ -17,6 +17,7 @@ import com.fpoly.marcusstore.dto.response.SystemSettingsAdminResponse;
 
 @RestController
 @RequestMapping("/api")
+@PreAuthorize("hasRole('ADMIN')")
 public class SystemSettingController {
 
     @Autowired

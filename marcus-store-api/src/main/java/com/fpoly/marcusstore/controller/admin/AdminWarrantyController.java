@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.security.Key;
@@ -23,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin/warranties")
 @RequiredArgsConstructor
+@PreAuthorize("hasAuthority('WARRANTY_VIEW')")
 public class AdminWarrantyController {
 
     private final WarrantyService warrantyService;
@@ -80,6 +82,7 @@ public class AdminWarrantyController {
     }
 
     @PutMapping("/{warrantyId}/status")
+    @PreAuthorize("hasAuthority('WARRANTY_PROCESS')")
     public ResponseEntity<ApiResponse<WarrantyResponse>> updateStatus(
             @PathVariable Integer warrantyId,
             @RequestHeader("Authorization") String authHeader,

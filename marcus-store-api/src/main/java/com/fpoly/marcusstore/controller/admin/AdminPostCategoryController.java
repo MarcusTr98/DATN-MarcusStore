@@ -13,7 +13,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/post-categories")
-@PreAuthorize("hasAuthority('POST_CATEGORY_VIEW')")
 public class AdminPostCategoryController {
 
     @Autowired
@@ -33,7 +32,6 @@ public class AdminPostCategoryController {
 
     // POST /api/admin/post-categories
     @PostMapping
-    @PreAuthorize("hasAuthority('POST_CATEGORY_CREATE')")
     public ApiResponse<PostCategoryResponseDTO> add(
             @Valid @RequestBody PostCategoryRequestDTO req) {
         return ApiResponse.success(postCategoryService.add(req));
@@ -41,7 +39,6 @@ public class AdminPostCategoryController {
 
     // PUT /api/admin/post-categories/{id}
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('POST_CATEGORY_UPDATE')")
     public ApiResponse<PostCategoryResponseDTO> update(
             @PathVariable Integer id,
             @Valid @RequestBody PostCategoryRequestDTO req) {
@@ -50,7 +47,6 @@ public class AdminPostCategoryController {
 
     // DELETE /api/admin/post-categories/{id}
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAuthority('POST_CATEGORY_DELETE')")
     public ApiResponse<String> remove(@PathVariable Integer id) {
         postCategoryService.remove(id);
         return ApiResponse.success("Xóa danh mục thành công");
