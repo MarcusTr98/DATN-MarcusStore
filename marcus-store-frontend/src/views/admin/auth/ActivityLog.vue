@@ -144,7 +144,7 @@
             <thead>
               <tr>
                 <th style="width: 56px">STT</th>
-                <th style="width: 130px">HÀNH ĐỘNG</th>
+                <th style="width: 150px">HÀNH ĐỘNG</th>
                 <th style="width: 180px">BẢNG DỮ LIỆU</th>
                 <th style="width: 200px">NGƯỜI THỰC HIỆN</th>
                 <th style="width: 160px">THỜI GIAN</th>
@@ -176,7 +176,7 @@
                     <div class="user-name">{{ log.fullName || log.username }}</div>
                     <div class="user-sub">@{{ log.username }}</div>
                   </template>
-                  <span v-else class="text-muted fst-italic">Khách hàng</span>
+                  <span v-else class="text-muted fst-italic">Hệ thống</span>
                 </td>
                 <td>{{ formatDate(log.createdAt) }}</td>
                 <td class="text-center">
@@ -277,8 +277,8 @@
             </div>
 
             <div v-if="!detailLog.userId" class="guest-note">
-              <i class="bi bi-person-walking"></i>
-              Thao tác thực hiện bởi khách hàng (không đăng nhập hệ thống admin)
+              <i class="bi bi-gear-wide-connected"></i>
+              Thao tác thực hiện bởi Hệ thống tự động
             </div>
 
             <div v-else class="person-grid">
@@ -346,12 +346,18 @@ const filters = reactive({ search: '', actionType: '', tableName: '', fromDate: 
 const activePeriod = ref(null);
 
 // ---- Label Maps ----
-const STANDARD_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'BACKUP_REQUESTED', 'BACKUP_COMPLETED', 'BACKUP_FAILED'];
+const STANDARD_ACTIONS = [
+  'CREATE', 'UPDATE', 'DELETE', 'REVIEW_REPLIED',
+  'BACKUP_REQUESTED', 'BACKUP_COMPLETED', 'BACKUP_FAILED',
+  'BACKUP_DOWNLOADED', 'BACKUP_DELETED', 'BACKUP_RESTORE_TESTED'
+];
+
 const actionOptions = computed(() => {
   const found = new Set(logs.value.map((l) => l.actionType).filter(Boolean));
   const extra = [...found].filter((a) => !STANDARD_ACTIONS.includes(a)).sort();
   return [...STANDARD_ACTIONS, ...extra];
 });
+
 const tableOptions = computed(() =>
   [...new Set(logs.value.map((l) => l.tableName).filter(Boolean))].sort()
 );
@@ -360,18 +366,23 @@ const ACTION_LABELS = {
   CREATE: 'Tạo mới', 
   UPDATE: 'Cập nhật', 
   DELETE: 'Xoá',
+  REVIEW_REPLIED: 'Đã phản hồi',
   BACKUP_REQUESTED: 'Yêu cầu sao lưu',
   BACKUP_COMPLETED: 'Sao lưu hoàn tất',
-  BACKUP_FAILED: 'Sao lưu thất bại'
+  BACKUP_FAILED: 'Sao lưu thất bại',
+  BACKUP_DOWNLOADED: 'Đã tải bản sao lưu',
+  BACKUP_DELETED: 'Đã xóa bản sao lưu',
+  BACKUP_RESTORE_TESTED: 'Đã kiểm tra khả năng phục hồi'
 };
 
 function actionLabel(a) { return a ? (ACTION_LABELS[a.toUpperCase()] || a) : '—'; }
 
 function getActionClass(a) {
   const v = (a || '').toUpperCase();
-  if (v === 'CREATE' || v === 'BACKUP_COMPLETED') return 'bg-success';
-  if (v === 'UPDATE' || v === 'BACKUP_REQUESTED') return 'bg-warning';
-  if (v === 'DELETE' || v === 'BACKUP_FAILED') return 'bg-danger';
+  if (v === 'REVIEW_REPLIED') return 'bg-info';
+  if (v === 'CREATE' || v === 'BACKUP_COMPLETED' || v === 'BACKUP_RESTORE_TESTED') return 'bg-success';
+  if (v === 'UPDATE' || v === 'BACKUP_REQUESTED' || v === 'BACKUP_DOWNLOADED') return 'bg-warning';
+  if (v === 'DELETE' || v === 'BACKUP_FAILED' || v === 'BACKUP_DELETED') return 'bg-danger';
   return 'bg-secondary';
 }
 
@@ -379,20 +390,18 @@ const TABLE_LABELS = {
   Users: 'Người dùng', Roles: 'Vai trò', Permissions: 'Quyền hạn',
   User_Permissions: 'Phân quyền nhân viên', Categories: 'Danh mục sản phẩm',
   Products: 'Sản phẩm', Product_Images: 'Ảnh sản phẩm',
-  Product_Skus: 'Kho hàng / SKU', Product_Items: 'Kho IMEI',
+  Product_Skus: 'Kho không IMEI (SKU)', Product_Items: 'Kho có IMEI (Số IMEI)',
   Attributes: 'Thuộc tính', Attribute_Values: 'Giá trị thuộc tính',
   Vouchers: 'Voucher', User_Vouchers: 'Voucher người dùng',
   Flash_Sale_Slots: 'Khung giờ Flash Sale', Flash_Sale_Items: 'Sản phẩm Flash Sale',
   Orders: 'Đơn hàng', Order_Items: 'Chi tiết đơn hàng',
   Order_Transactions: 'Giao dịch đơn hàng', Post_Categories: 'Danh mục bài viết',
   Posts: 'Bài viết', Banners: 'Banner', Contact_Requests: 'Yêu cầu liên hệ',
+  Product_Reviews: 'Đánh giá & Bình luận',
   System_Settings: 'Cấu hình hệ thống', Shipping_Config: 'Cấu hình vận chuyển',
   Admin_Notifications: 'Thông báo admin', User_Addresses: 'Địa chỉ người dùng',
-  Audit_Logs: 'Nhật ký hoạt động',
-  Inventory: 'Quản lý kho hàng',
-  InventoryService: 'Quản lý kho hàng',
-  'SYSTEM BACKUP': 'Sao lưu hệ thống',
-  'SYSTEM_BACKUP': 'Sao lưu hệ thống'
+  Audit_Logs: 'Nhật ký hoạt động', Inventory: 'Quản lý kho hàng', InventoryService: 'Quản lý kho hàng',
+  'SYSTEM BACKUP': 'Sao lưu hệ thống', 'SYSTEM_BACKUP': 'Sao lưu hệ thống'
 };
 
 function tableLabel(name) { return name ? (TABLE_LABELS[name] || name.replace(/_/g, ' ')) : '—'; }
@@ -402,13 +411,11 @@ const TABLE_KEYS_SORTED = Object.keys(TABLE_LABELS)
   .filter((k) => !SKIP_TRANSLATE_KEYS.has(k))
   .sort((a, b) => b.length - a.length);
 
-// Dịch nội dung mô tả chi tiết sang Tiếng Việt chuẩn
 function translateDescription(desc) {
   if (!desc) return 'Không có mô tả';
 
   let result = desc;
 
-  // 1. Dịch log sao lưu
   if (result.includes('BACKUP_COMPLETED')) {
     const fileName = result.match(/MarcusStore-[^\s()]+/)?.[0] || 'file sao lưu';
     return `Đã hoàn tất sao lưu dữ liệu hệ thống (Tên file: ${fileName})`;
@@ -419,13 +426,20 @@ function translateDescription(desc) {
   if (result.includes('BACKUP_FAILED')) {
     return 'Quá trình sao lưu dữ liệu hệ thống thất bại';
   }
+  if (result.includes('BACKUP_DOWNLOADED')) {
+    return 'Đã tải xuống bản sao lưu dữ liệu hệ thống';
+  }
+  if (result.includes('BACKUP_DELETED')) {
+    return 'Đã xóa tập tin sao lưu dữ liệu khỏi hệ thống';
+  }
+  if (result.includes('BACKUP_RESTORE_TESTED')) {
+    return 'Đã hoàn tất kiểm tra thử nghiệm khả năng phục hồi dữ liệu từ bản sao lưu';
+  }
 
-  // 2. Dịch hành động thao tác chung (CREATE/UPDATE/DELETE)
   result = result.replace(/đã tạo mới/g, 'đã thêm mới');
   result = result.replace(/đã cập nhật/g, 'đã chỉnh sửa');
   result = result.replace(/đã xoá/g, 'đã xóa');
 
-  // 3. Dịch các tên bảng kỹ thuật sang tiếng Việt
   TABLE_KEYS_SORTED.forEach((key) => {
     result = result.replace(new RegExp(`\\b${key}\\b`, 'g'), TABLE_LABELS[key]);
   });
@@ -433,7 +447,6 @@ function translateDescription(desc) {
   return result;
 }
 
-// ---- Date helpers ----
 function parseVnDateTime(str) {
   if (!str) return null;
   const [datePart, timePart] = str.split(' ');
@@ -469,7 +482,6 @@ function setPeriod(period) {
   }
 }
 
-// ---- Stats ----
 const stats = computed(() => {
   let create = 0, update = 0, del = 0;
   logs.value.forEach((l) => {
@@ -481,7 +493,6 @@ const stats = computed(() => {
   return { total: logs.value.length, create, update, delete: del };
 });
 
-// ---- Filter ----
 const filteredLogs = computed(() => {
   let list = [...logs.value];
   if (filters.search.trim()) {
@@ -506,7 +517,6 @@ const filteredLogs = computed(() => {
   return list;
 });
 
-// ---- Chart ----
 const chartDays = computed(() => {
   const byDate = new Map();
   filteredLogs.value.forEach((l) => {
@@ -531,7 +541,6 @@ const chartDays = computed(() => {
 const chartMax = computed(() => Math.max(1, ...chartDays.value.map((d) => d.total)));
 function pct(value, max) { return max ? `${(value / max) * 100}%` : '0%'; }
 
-// ---- Pagination ----
 const page = ref(1);
 const pageSize = ref(10);
 watch(filteredLogs, () => { page.value = 1; });
@@ -691,6 +700,7 @@ async function handleExport() {
 .financial-table tbody tr { transition: background-color 0.12s ease; }
 .financial-table tbody tr:hover { background: #f5faff; }
 .badge { display: inline-block; padding: 5px 13px; border-radius: 20px; color: white; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.01em; }
+.bg-info    { background-color: #0284c7; }
 .bg-success { background-color: #1f9d5e; }
 .bg-warning { background-color: #f29c1f; }
 .bg-danger  { background-color: #e0445c; }

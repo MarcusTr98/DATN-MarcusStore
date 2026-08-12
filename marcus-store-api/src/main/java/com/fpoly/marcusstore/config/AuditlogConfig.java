@@ -3,9 +3,11 @@ package com.fpoly.marcusstore.config;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.contact.ContactRequest;
 import com.fpoly.marcusstore.entity.interaction.AuditLog;
+import com.fpoly.marcusstore.entity.interaction.CommentEvaluation;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
 import com.fpoly.marcusstore.repository.cms.AuditLogRepository;
 import com.fpoly.marcusstore.repository.contact.ContactRequestRepository;
+import com.fpoly.marcusstore.repository.statistics.CommentEvaluationRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.JoinPoint;
@@ -39,6 +41,9 @@ public class AuditlogConfig {
     @Autowired
     private ContactRequestRepository contactRequestRepository;
 
+    @Autowired
+    private CommentEvaluationRepository commentEvaluationRepository;
+
     private static final Map<String, String> AUDITED_SERVICES = Map.ofEntries(
             // Sản phẩm & kho
             Map.entry("CategoriesService", "Categories"),
@@ -57,10 +62,11 @@ public class AuditlogConfig {
             Map.entry("UserVoucherService", "User_Vouchers"),
             Map.entry("FlashSaleService", "Flash_Sale_Slots"),
 
-            // Nội dung
+            // Nội dung & Tương tác
             Map.entry("PostService", "Posts"),
             Map.entry("PostCategoryService", "Post_Categories"),
             Map.entry("BannerService", "Banners"),
+            Map.entry("ReviewAdminService", "Product_Reviews"),
 
             // Liên hệ
             Map.entry("ContactService", "Contact_Requests"),
@@ -79,8 +85,11 @@ public class AuditlogConfig {
     @AfterReturning(pointcut = "anyServiceMethod()", returning = "result")
     public void logAfterSuccess(JoinPoint joinPoint, Object result) {
         try {
-            // Kiểm tra action trước để ngắt sớm các method read-only (get, find, search...)
             String methodName = joinPoint.getSignature().getName();
+
+            // Bỏ qua không ghi log khi khách vãng lai tự gửi form liên hệ
+            if ("submitContact".equals(methodName)) return;
+
             String action = resolveAction(methodName);
             if (action == null) return;
 
@@ -114,6 +123,10 @@ public class AuditlogConfig {
     private String resolveAction(String methodName) {
         String m = methodName.toLowerCase();
 
+        // Tách riêng hành động Phản hồi đánh giá
+        if (m.startsWith("reply"))
+            return "REVIEW_REPLIED";
+
         if (m.startsWith("add") || m.startsWith("create") || m.startsWith("insert")
                 || m.startsWith("batch") || m.startsWith("import"))
             return "CREATE";
@@ -134,7 +147,7 @@ public class AuditlogConfig {
     }
 
     private String buildDescription(String action, String tableName, String methodName,
-                                     JoinPoint joinPoint, Object result, String actorName) {
+                                    JoinPoint joinPoint, Object result, String actorName) {
 
         if ("resolveContact".equals(methodName)) {
             return buildResolveContactDescription(joinPoint, actorName);
@@ -144,10 +157,15 @@ public class AuditlogConfig {
             return buildSubmitContactDescription(joinPoint, actorName);
         }
 
+        if ("Product_Reviews".equals(tableName)) {
+            return buildReviewDescription(action, methodName, joinPoint, actorName);
+        }
+
         String actionText = switch (action) {
             case "CREATE" -> "đã tạo mới";
             case "UPDATE" -> "đã cập nhật";
             case "DELETE" -> "đã xoá";
+            case "REVIEW_REPLIED" -> "đã phản hồi";
             default -> "đã thao tác trên";
         };
 
@@ -162,6 +180,40 @@ public class AuditlogConfig {
         return label != null
                 ? actorName + " " + actionText + " " + tableName + ": " + label
                 : actorName + " " + actionText + " " + tableName;
+    }
+
+    private String buildReviewDescription(String action, String methodName, JoinPoint joinPoint, String actorName) {
+        try {
+            Object[] args = joinPoint.getArgs();
+            if (args.length == 0) return actorName + " đã thao tác trên Đánh giá & Bình luận";
+
+            Integer reviewId = (args[0] instanceof Integer id) ? id : null;
+            String productName = "";
+
+            if (reviewId != null) {
+                CommentEvaluation review = commentEvaluationRepository.findById(reviewId).orElse(null);
+                if (review != null && review.getProduct() != null) {
+                    productName = " (Sản phẩm: " + review.getProduct().getProductName() + ")";
+                }
+            }
+
+            if ("deleteReview".equals(methodName)) {
+                return actorName + " đã xóa đánh giá #" + reviewId + productName;
+            }
+
+            if ("replyReview".equals(methodName)) {
+                return actorName + " đã gửi phản hồi cho đánh giá #" + reviewId + productName;
+            }
+
+            if ("updateReply".equals(methodName)) {
+                return actorName + " đã cập nhật phản hồi cho đánh giá #" + reviewId + productName;
+            }
+
+            return actorName + " đã thao tác trên đánh giá #" + reviewId;
+        } catch (Exception e) {
+            logger.warn("Không build được description cho ReviewAdminService: {}", e.getMessage());
+            return actorName + " đã thao tác trên Đánh giá & Bình luận";
+        }
     }
 
     private String buildResolveContactDescription(JoinPoint joinPoint, String actorName) {
