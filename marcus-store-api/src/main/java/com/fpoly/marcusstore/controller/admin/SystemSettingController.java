@@ -25,27 +25,25 @@ public class SystemSettingController {
     @Autowired
     private CloudinaryService cloudinaryService;
 
+    // Marcus sửa: override class-level @PreAuthorize để anonymous cũng đọc được
     @GetMapping("/public/settings")
+    @PreAuthorize("permitAll()")
     public Map<String, String> getPublicSettings() {
         return service.getPublicSettingsAsMap();
     }
 
     @GetMapping("/admin/settings")
-    // Marcus thêm: tách quyền xem và cập nhật cấu hình hệ thống.
-    @PreAuthorize("hasAuthority('SYSTEM_VIEW')")
     public SystemSettingsAdminResponse getAdminSettings() {
         return service.getAdminSettings();
     }
 
     @PostMapping("/admin/settings/restore-defaults")
-    @PreAuthorize("hasAuthority('SYSTEM_UPDATE')")
     public ApiResponse<Void> restoreDefaults() {
         service.restoreDefaults();
         return ApiResponse.success("Đã khôi phục cấu hình mặc định.");
     }
 
     @PutMapping("/admin/settings/bulk-update")
-    @PreAuthorize("hasAuthority('SYSTEM_UPDATE')")
     public Map<String, Object> updateSettings(@Valid @RequestBody BulkUpdateSettingsRequest request) {
         // Marcus sửa: request có DTO riêng; không nhận Map tùy ý trực tiếp từ client.
         service.updateSettings(request.getSettings());
@@ -55,7 +53,6 @@ public class SystemSettingController {
     }
 
     @PostMapping(value = "/admin/settings/upload-logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('SYSTEM_UPDATE')")
     public ApiResponse<Map<String, String>> uploadLogo(@RequestParam("file") MultipartFile file)
             throws Exception {
         // Marcus thêm: validate tại backend, không tin thuộc tính accept của input.

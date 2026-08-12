@@ -6,7 +6,7 @@
         Xin chào, <span class="welcome-name__highlight">{{ displayName }}</span>
       </h1>
       <p class="welcome-message">
-        Chào mừng bạn đến với trang quản trị Marcus Store.
+        {{ welcomeMessage }}
         <br />
         Hãy chọn một chức năng trong menu bên trái để bắt đầu làm việc.
       </p>
@@ -47,6 +47,12 @@ const roleLabel = computed(() => {
   if (isAdmin) return 'Quản trị viên (Admin)'
   if (isStaff) return 'Nhân viên (Staff)'
   return ''
+})
+
+const welcomeMessage = computed(() => {
+  if (isAdmin) return 'Chào mừng bạn đến với trang quản trị Marcus Store.'
+  if (isStaff) return 'Chào mừng bạn đến với trang quản lý nhân viên Marcus Store.'
+  return 'Chào mừng bạn đến với trang quản trị Marcus Store.'
 })
 
 const greeting = computed(() => {
