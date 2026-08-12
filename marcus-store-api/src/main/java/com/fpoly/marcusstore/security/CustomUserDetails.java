@@ -20,6 +20,7 @@ public class CustomUserDetails implements UserDetails {
     private Integer userId;
     private String username;
     private String email;
+    private String fullName;
 
     @JsonIgnore
     private String password;
@@ -70,6 +71,7 @@ public class CustomUserDetails implements UserDetails {
             user.getUserId(),
             user.getUsername(),
             user.getEmail(),
+            user.getFullName(),
             user.getPasswordHash(),
             authorities,
             user.getIsActive()
