@@ -20,7 +20,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 
 @Aspect
 @Component
@@ -45,6 +47,8 @@ public class AuditlogConfig {
             Map.entry("AttributeService", "Attributes"),
             Map.entry("AttributeValueService", "Attribute_Values"),
             Map.entry("ProductConfigService", "Product_Skus"),
+            Map.entry("InventoryService", "Product_Skus"),
+            Map.entry("ProductItemService", "Product_Items"),
 
             // Kênh bán hàng
             Map.entry("OrderService", "Orders"),
@@ -75,6 +79,12 @@ public class AuditlogConfig {
     @AfterReturning(pointcut = "anyServiceMethod()", returning = "result")
     public void logAfterSuccess(JoinPoint joinPoint, Object result) {
         try {
+            // Kiểm tra action trước để ngắt sớm các method read-only (get, find, search...)
+            String methodName = joinPoint.getSignature().getName();
+            String action = resolveAction(methodName);
+            if (action == null) return;
+
+            // Lấy tên class Service
             String rawName = joinPoint.getSignature().getDeclaringType().getSimpleName();
             String className = rawName.endsWith("Impl")
                     ? rawName.substring(0, rawName.length() - 4)
@@ -83,20 +93,17 @@ public class AuditlogConfig {
             String tableName = AUDITED_SERVICES.get(className);
             if (tableName == null) return;
 
-            String methodName = joinPoint.getSignature().getName();
-            String action = resolveAction(methodName);
-            if (action == null) return;
+            // Query User 1 lần duy nhất
+            Integer currentUserId = safeGetCurrentUserId();
+            User currentUser = (currentUserId != null) ? userRepository.findById(currentUserId).orElse(null) : null;
+            String actorName = resolveActorName(currentUser);
 
             AuditLog log = new AuditLog();
             log.setActionType(action);
             log.setTableName(tableName);
-            log.setDescription(buildDescription(action, tableName, methodName, joinPoint, result));
+            log.setUser(currentUser);
+            log.setDescription(buildDescription(action, tableName, methodName, joinPoint, result, actorName));
             log.setIpAddress(resolveClientIp());
-
-            Integer currentUserId = safeGetCurrentUserId();
-            if (currentUserId != null) {
-                userRepository.findById(currentUserId).ifPresent(log::setUser);
-            }
 
             auditLogRepository.save(log);
         } catch (Exception e) {
@@ -108,7 +115,7 @@ public class AuditlogConfig {
         String m = methodName.toLowerCase();
 
         if (m.startsWith("add") || m.startsWith("create") || m.startsWith("insert")
-                || m.startsWith("import") || m.startsWith("batch"))
+                || m.startsWith("batch") || m.startsWith("import"))
             return "CREATE";
 
         if (m.startsWith("remove") || m.startsWith("delete") || m.startsWith("destroy")
@@ -119,28 +126,24 @@ public class AuditlogConfig {
                 || m.startsWith("process") || m.startsWith("approve") || m.startsWith("reject")
                 || m.startsWith("lock") || m.startsWith("unlock") || m.startsWith("toggle")
                 || m.startsWith("publish") || m.startsWith("changestatus") || m.startsWith("resolve")
-                || m.startsWith("cancel") || m.startsWith("verify") || m.startsWith("bulk"))
+                || m.startsWith("cancel") || m.startsWith("verify") || m.startsWith("bulk")
+                || m.startsWith("adjust") || m.startsWith("restore"))
             return "UPDATE";
 
         return null;
     }
 
     private String buildDescription(String action, String tableName, String methodName,
-                                    JoinPoint joinPoint, Object result) {
-        // Lấy tên người thực hiện để đưa vào đầu câu
-        String actorName = resolveActorName();
+                                     JoinPoint joinPoint, Object result, String actorName) {
 
-        // Xử lý đặc biệt cho resolveContact
         if ("resolveContact".equals(methodName)) {
             return buildResolveContactDescription(joinPoint, actorName);
         }
 
-        // Xử lý đặc biệt cho submitContact
         if ("submitContact".equals(methodName)) {
             return buildSubmitContactDescription(joinPoint, actorName);
         }
 
-        // Xử lý chung — format: "[Tên] đã [hành động] [bảng]: [label]"
         String actionText = switch (action) {
             case "CREATE" -> "đã tạo mới";
             case "UPDATE" -> "đã cập nhật";
@@ -156,10 +159,9 @@ public class AuditlogConfig {
             }
         }
 
-        String base = label != null
+        return label != null
                 ? actorName + " " + actionText + " " + tableName + ": " + label
                 : actorName + " " + actionText + " " + tableName;
-        return base;
     }
 
     private String buildResolveContactDescription(JoinPoint joinPoint, String actorName) {
@@ -190,7 +192,6 @@ public class AuditlogConfig {
 
     private String buildSubmitContactDescription(JoinPoint joinPoint, String actorName) {
         try {
-            // Lấy tên khách từ request arg
             for (Object arg : joinPoint.getArgs()) {
                 String label = extractLabel(arg);
                 if (label != null) {
@@ -203,18 +204,11 @@ public class AuditlogConfig {
         }
     }
 
-    private String resolveActorName() {
-        try {
-            Integer userId = SecurityUtils.getCurrentUserId();
-            if (userId == null) return "Hệ thống";
-            User user = userRepository.findById(userId).orElse(null);
-            if (user == null) return "Hệ thống";
-            return user.getFullName() != null && !user.getFullName().isBlank()
-                    ? user.getFullName()
-                    : user.getUsername();
-        } catch (Exception e) {
-            return "Hệ thống";
-        }
+    private String resolveActorName(User user) {
+        if (user == null) return "Hệ thống";
+        return (user.getFullName() != null && !user.getFullName().isBlank())
+                ? user.getFullName()
+                : user.getUsername();
     }
 
     private static final String[] LABEL_GETTERS = {
@@ -227,6 +221,11 @@ public class AuditlogConfig {
         if (obj == null) return null;
         if (obj instanceof String s) return s;
         if (obj instanceof Integer || obj instanceof Long) return "#" + obj;
+
+        if (obj instanceof Optional<?> opt) return opt.map(this::extractLabel).orElse(null);
+        if (obj instanceof Collection<?> col && !col.isEmpty()) {
+            return extractLabel(col.iterator().next());
+        }
 
         for (String getterName : LABEL_GETTERS) {
             try {
@@ -247,9 +246,12 @@ public class AuditlogConfig {
 
         HttpServletRequest request = attrs.getRequest();
         String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isBlank()) {
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
+            ip = request.getHeader("X-Real-IP");
+        }
+        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getRemoteAddr();
-        } else {
+        } else if (ip.contains(",")) {
             ip = ip.split(",")[0].trim();
         }
         return ip;

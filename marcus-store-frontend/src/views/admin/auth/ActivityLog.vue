@@ -1,7 +1,7 @@
 <template>
   <div class="al-page">
 
-    <!-- Marcus sửa giao diện: giữ nguyên nghiệp vụ của Huy, chỉ dùng header quản trị thống nhất. -->
+    <!-- Header quản trị thống nhất -->
     <AdminPageHeader
       class="al-page-header"
       eyebrow="Kiểm soát hệ thống"
@@ -138,13 +138,13 @@
           </div>
         </div>
 
-        <!-- Bảng — bỏ cột Mô tả & IP, colspan xuống 6 -->
+        <!-- Bảng hiển thị -->
         <div class="table-wrapper">
           <table class="financial-table">
             <thead>
               <tr>
                 <th style="width: 56px">STT</th>
-                <th style="width: 110px">HÀNH ĐỘNG</th>
+                <th style="width: 130px">HÀNH ĐỘNG</th>
                 <th style="width: 180px">BẢNG DỮ LIỆU</th>
                 <th style="width: 200px">NGƯỜI THỰC HIỆN</th>
                 <th style="width: 160px">THỜI GIAN</th>
@@ -163,7 +163,7 @@
                   <div class="mt-2" style="color: #6b7280">Không có log nào phù hợp.</div>
                 </td>
               </tr>
-              <tr v-else v-for="(log, index) in paged" :key="log.logId">
+              <tr v-else v-for="(log) in paged" :key="log.logId">
                 <td class="td-id">#{{ log.logId }}</td>
                 <td>
                   <span class="badge" :class="getActionClass(log.actionType)">
@@ -189,7 +189,7 @@
           </table>
         </div>
 
-        <!-- Pagination -->
+        <!-- Phân trang -->
         <div class="fin-pagination">
           <div class="pagination-summary">
             Tổng <strong>{{ filteredLogs.length }}</strong> log
@@ -232,7 +232,7 @@
       </div>
     </template>
 
-    <!-- Modal Chi tiết — cải thiện layout -->
+    <!-- Modal Chi tiết -->
     <div v-if="detailLog" class="modal-overlay" @click.self="detailLog = null">
       <div class="modal-content">
         <div class="modal-header">
@@ -262,12 +262,12 @@
             </div>
           </div>
 
-          <!-- Mô tả chi tiết thao tác -->
+          <!-- Nội dung thao tác -->
           <div class="desc-section">
             <div class="desc-section-header">
               <i class="bi bi-pencil-square"></i> Nội dung thao tác
             </div>
-            <p class="desc-text">{{ translateDescription(detailLog.description) || 'Không có mô tả' }}</p>
+            <p class="desc-text">{{ translateDescription(detailLog.description) }}</p>
           </div>
 
           <!-- Người thực hiện -->
@@ -276,13 +276,11 @@
               <i class="bi bi-person-fill-check"></i> Người thực hiện
             </div>
 
-            <!-- Khách hàng gửi — không có tài khoản admin -->
             <div v-if="!detailLog.userId" class="guest-note">
               <i class="bi bi-person-walking"></i>
               Thao tác thực hiện bởi khách hàng (không đăng nhập hệ thống admin)
             </div>
 
-            <!-- Admin / nhân viên thực hiện -->
             <div v-else class="person-grid">
               <div class="person-item">
                 <span class="detail-label">Họ tên</span>
@@ -347,8 +345,8 @@ const showToast = (type, title, message) => {
 const filters = reactive({ search: '', actionType: '', tableName: '', fromDate: '', toDate: '' });
 const activePeriod = ref(null);
 
-// ---- Label maps ----
-const STANDARD_ACTIONS = ['CREATE', 'UPDATE', 'DELETE'];
+// ---- Label Maps ----
+const STANDARD_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'BACKUP_REQUESTED', 'BACKUP_COMPLETED', 'BACKUP_FAILED'];
 const actionOptions = computed(() => {
   const found = new Set(logs.value.map((l) => l.actionType).filter(Boolean));
   const extra = [...found].filter((a) => !STANDARD_ACTIONS.includes(a)).sort();
@@ -358,13 +356,22 @@ const tableOptions = computed(() =>
   [...new Set(logs.value.map((l) => l.tableName).filter(Boolean))].sort()
 );
 
-const ACTION_LABELS = { CREATE: 'Tạo mới', UPDATE: 'Cập nhật', DELETE: 'Xoá' };
+const ACTION_LABELS = { 
+  CREATE: 'Tạo mới', 
+  UPDATE: 'Cập nhật', 
+  DELETE: 'Xoá',
+  BACKUP_REQUESTED: 'Yêu cầu sao lưu',
+  BACKUP_COMPLETED: 'Sao lưu hoàn tất',
+  BACKUP_FAILED: 'Sao lưu thất bại'
+};
+
 function actionLabel(a) { return a ? (ACTION_LABELS[a.toUpperCase()] || a) : '—'; }
+
 function getActionClass(a) {
   const v = (a || '').toUpperCase();
-  if (v === 'CREATE') return 'bg-success';
-  if (v === 'UPDATE') return 'bg-warning';
-  if (v === 'DELETE') return 'bg-danger';
+  if (v === 'CREATE' || v === 'BACKUP_COMPLETED') return 'bg-success';
+  if (v === 'UPDATE' || v === 'BACKUP_REQUESTED') return 'bg-warning';
+  if (v === 'DELETE' || v === 'BACKUP_FAILED') return 'bg-danger';
   return 'bg-secondary';
 }
 
@@ -372,7 +379,7 @@ const TABLE_LABELS = {
   Users: 'Người dùng', Roles: 'Vai trò', Permissions: 'Quyền hạn',
   User_Permissions: 'Phân quyền nhân viên', Categories: 'Danh mục sản phẩm',
   Products: 'Sản phẩm', Product_Images: 'Ảnh sản phẩm',
-  Product_Skus: 'Biến thể sản phẩm (SKU)', Product_Items: 'Kho IMEI',
+  Product_Skus: 'Kho hàng / SKU', Product_Items: 'Kho IMEI',
   Attributes: 'Thuộc tính', Attribute_Values: 'Giá trị thuộc tính',
   Vouchers: 'Voucher', User_Vouchers: 'Voucher người dùng',
   Flash_Sale_Slots: 'Khung giờ Flash Sale', Flash_Sale_Items: 'Sản phẩm Flash Sale',
@@ -382,19 +389,47 @@ const TABLE_LABELS = {
   System_Settings: 'Cấu hình hệ thống', Shipping_Config: 'Cấu hình vận chuyển',
   Admin_Notifications: 'Thông báo admin', User_Addresses: 'Địa chỉ người dùng',
   Audit_Logs: 'Nhật ký hoạt động',
+  Inventory: 'Quản lý kho hàng',
+  InventoryService: 'Quản lý kho hàng',
+  'SYSTEM BACKUP': 'Sao lưu hệ thống',
+  'SYSTEM_BACKUP': 'Sao lưu hệ thống'
 };
+
 function tableLabel(name) { return name ? (TABLE_LABELS[name] || name.replace(/_/g, ' ')) : '—'; }
 
 const SKIP_TRANSLATE_KEYS = new Set(['Product_Skus', 'Product_Items']);
 const TABLE_KEYS_SORTED = Object.keys(TABLE_LABELS)
   .filter((k) => !SKIP_TRANSLATE_KEYS.has(k))
   .sort((a, b) => b.length - a.length);
+
+// Dịch nội dung mô tả chi tiết sang Tiếng Việt chuẩn
 function translateDescription(desc) {
-  if (!desc) return desc;
+  if (!desc) return 'Không có mô tả';
+
   let result = desc;
+
+  // 1. Dịch log sao lưu
+  if (result.includes('BACKUP_COMPLETED')) {
+    const fileName = result.match(/MarcusStore-[^\s()]+/)?.[0] || 'file sao lưu';
+    return `Đã hoàn tất sao lưu dữ liệu hệ thống (Tên file: ${fileName})`;
+  }
+  if (result.includes('BACKUP_REQUESTED')) {
+    return 'Đã gửi yêu cầu khởi tạo bản sao lưu dữ liệu hệ thống';
+  }
+  if (result.includes('BACKUP_FAILED')) {
+    return 'Quá trình sao lưu dữ liệu hệ thống thất bại';
+  }
+
+  // 2. Dịch hành động thao tác chung (CREATE/UPDATE/DELETE)
+  result = result.replace(/đã tạo mới/g, 'đã thêm mới');
+  result = result.replace(/đã cập nhật/g, 'đã chỉnh sửa');
+  result = result.replace(/đã xoá/g, 'đã xóa');
+
+  // 3. Dịch các tên bảng kỹ thuật sang tiếng Việt
   TABLE_KEYS_SORTED.forEach((key) => {
     result = result.replace(new RegExp(`\\b${key}\\b`, 'g'), TABLE_LABELS[key]);
   });
+
   return result;
 }
 
@@ -697,7 +732,7 @@ async function handleExport() {
 .btn-close-modal:hover { background: rgba(224,68,92,0.85); transform: rotate(90deg); }
 .modal-body { padding: 22px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
 
-/* Modal — detail sections */
+/* Modal sections */
 .detail-section { background: #f7fbff; border: 1px solid #e3effd; border-radius: 12px; padding: 16px; }
 .detail-section-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .detail-item { display: flex; flex-direction: column; gap: 6px; }
