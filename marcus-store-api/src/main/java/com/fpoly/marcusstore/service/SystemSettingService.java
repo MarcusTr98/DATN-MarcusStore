@@ -155,7 +155,32 @@ public class SystemSettingService {
     @Transactional
     @CacheEvict(value = "public-settings", allEntries = true)
     public void restoreDefaults() {
-        updateSettings(DEFAULT_SETTINGS);
+        // Marcus sửa: gọi internal method thay vì updateSettings()
+        // để tránh Spring AOP self-invocation không evict được cache.
+        List<SystemSetting> existingSettings = repository.findAllById(DEFAULT_SETTINGS.keySet());
+        Map<String, SystemSetting> existingMap = existingSettings.stream()
+                .collect(Collectors.toMap(SystemSetting::getSettingKey, s -> s));
+
+        List<SystemSetting> toSave = new ArrayList<>();
+        for (Map.Entry<String, String> entry : DEFAULT_SETTINGS.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+
+            SystemSetting setting = existingMap.get(key);
+            if (setting != null) {
+                setting.setSettingValue(value);
+            } else {
+                setting = new SystemSetting();
+                setting.setSettingKey(key);
+                setting.setSettingValue(value);
+                setting.setSettingGroup(determineSettingGroup(key));
+                setting.setDescription("Cấu hình mặc định khôi phục từ hệ thống");
+            }
+            setting.setUpdatedBy(SecurityUtils.getCurrentUsername());
+            setting.setUpdatedAt(LocalDateTime.now());
+            toSave.add(setting);
+        }
+        repository.saveAll(toSave);
     }
 
     // Marcus thêm: System Settings chỉ nhận key do hệ thống định nghĩa và validate

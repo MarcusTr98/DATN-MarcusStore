@@ -1,16 +1,5 @@
 export default [
   {
-    section: "Tổng quan",
-    modules: [
-      {
-        key: "DASHBOARD",
-        name: "Bảng điều khiển",
-        icon: "bi-speedometer2"
-      }
-    ]
-  },
-
-  {
     section: "Sản phẩm & kho",
     modules: [
       {
@@ -49,11 +38,6 @@ export default [
         key: "FLASHSALE",
         name: "Flash Sale",
         icon: "bi-lightning"
-      },
-      {
-        key: "DONGTIEN",
-        name: "Quản lý dòng tiền",
-        icon: "bi-cash-stack"
       }
     ]
   },
@@ -69,10 +53,6 @@ export default [
           {
             key: "POST",
             label: "Bài viết"
-          },
-          {
-            key: "POST_CATEGORY",
-            label: "Danh mục bài viết"
           }
         ]
       },
@@ -96,11 +76,22 @@ export default [
         key: "USER",
         name: "Quản lý tài khoản",
         icon: "bi-people"
+      }
+    ]
+  },
+
+  {
+    section: "Chăm sóc khách hàng",
+    modules: [
+      {
+        key: "WARRANTY",
+        name: "Bảo hành & đổi trả",
+        icon: "bi-shield-check"
       },
       {
-        key: "SYSTEM",
-        name: "Cấu hình chung",
-        icon: "bi-gear"
+        key: "REVIEW",
+        name: "Quản lý đánh giá",
+        icon: "bi-star-fill"
       }
     ]
   }

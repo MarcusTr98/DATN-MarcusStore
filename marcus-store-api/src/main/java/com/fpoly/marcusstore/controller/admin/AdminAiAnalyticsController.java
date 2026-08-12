@@ -17,7 +17,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/admin/analytics")
 @RequiredArgsConstructor
-@PreAuthorize("hasAuthority('DASHBOARD_VIEW')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminAiAnalyticsController {
 
     private final AiAnalyticsService aiAnalyticsService;

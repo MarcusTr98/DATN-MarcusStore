@@ -71,6 +71,7 @@ const confirmLogout = () => {
   localStorage.removeItem('ACCESS_TOKEN')
   localStorage.removeItem('USER_ROLE')
   localStorage.removeItem('USERNAME')
+  localStorage.removeItem('USER_INFO')
   // Marcus thêm: logout phải kết thúc luôn phiên tư vấn ẩn danh trên thiết bị.
   sessionStorage.removeItem('MARCUS_AI_CONVERSATION')
   sessionStorage.removeItem('MARCUS_AI_TRACKING_SESSION')

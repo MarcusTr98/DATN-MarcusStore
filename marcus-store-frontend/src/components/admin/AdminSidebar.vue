@@ -14,7 +14,7 @@
     <!-- Marcus sắp xếp lại menu theo đúng luồng vận hành cửa hàng; route và quyền giữ nguyên. -->
     <section class="menu-section">
       <p class="menu-title">OVERVIEW</p>
-      <router-link to="/admin/dashboard" class="menu-item" active-class="active">
+      <router-link v-if="canAccessRoute('/admin/dashboard')" to="/admin/dashboard" class="menu-item" active-class="active">
         <img :src="pieChartIcon" class="menu-icon" alt="" />
         <span>Dashboard</span>
       </router-link>

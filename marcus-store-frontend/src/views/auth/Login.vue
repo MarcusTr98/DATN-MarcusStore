@@ -321,13 +321,19 @@ const handleLogin = async () => {
     localStorage.setItem('USERNAME', userData.username)
     localStorage.setItem('USER_ROLE', JSON.stringify(userData.roles))
     localStorage.setItem('USER_PERMISSIONS', JSON.stringify(userData.permissions || []))
+    localStorage.setItem('USER_INFO', JSON.stringify({
+      username: userData.username,
+      fullName: userData.fullName || userData.username,
+      email: userData.email || '',
+      name: userData.name || userData.username
+    }))
 
     window.dispatchEvent(new Event('auth-changed'))
 
     if (userData.roles.includes('ROLE_ADMIN')) {
-      router.push('/admin/dashboard')
+      router.push('/admin/welcome')
     } else if (userData.roles.includes('ROLE_STAFF')) {
-      router.push('/admin/dashboard')
+      router.push('/admin/welcome')
     } else {
       router.push('/')
     }

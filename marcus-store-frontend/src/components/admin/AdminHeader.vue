@@ -248,6 +248,7 @@ const handleLogout = () => {
   localStorage.removeItem('ACCESS_TOKEN')
   localStorage.removeItem('USERNAME')
   localStorage.removeItem('USER_ROLE')
+  localStorage.removeItem('USER_INFO')
   window.dispatchEvent(new Event('auth-changed'))
   disconnectRealtime()
   router.push('/auth/login')

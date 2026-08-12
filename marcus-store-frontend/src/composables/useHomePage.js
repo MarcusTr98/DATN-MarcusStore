@@ -1,20 +1,13 @@
 ﻿import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '@/utils/api'
 import { watch } from 'vue'
+import { useSettings } from '@/composables/useSettings'
 
 // Marcus refactor: tách settings, hero slider và đồng hồ khỏi Home.vue.
 export function useHomePage() {
-  // Khởi tạo state nội bộ để reactivity 100%
-  const sysSettings = ref({})
-
-  const fetchSettings = async () => {
-    try {
-      const res = await api.get('/public/settings')
-      sysSettings.value = res.data
-    } catch (error) {
-      console.error('Lỗi khi tải cấu hình trang chủ:', error)
-    }
-  }
+  // Marcus sửa: dùng shared state từ useSettings() thay vì tạo ref riêng
+  // để đảm bảo tất cả components cùng nhìn thấy settings mới khi admin cập nhật.
+  const { sysSettings, fetchSettings } = useSettings()
 
   // Marcus sửa: dữ liệu tĩnh không cần ref, giảm proxy reactivity không cần thiết.
   const categories = [

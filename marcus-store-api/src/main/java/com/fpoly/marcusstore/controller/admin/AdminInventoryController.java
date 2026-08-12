@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/inventory")
-@PreAuthorize("hasAuthority('INVENTORY_MANAGE')")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminInventoryController {
 
     @Autowired

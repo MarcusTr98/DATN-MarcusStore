@@ -5,7 +5,6 @@
         <tr>
           <th>ID</th>
           <th>Khách hàng</th>
-          <th>Liên hệ</th>
           <th>Hạng thành viên</th>
           <th>Tổng chi tiêu</th>
           <th>Ngày tạo</th>
@@ -34,12 +33,7 @@
             </div>
           </td>
 
-          <td>
-            <div class="contact-info">
-              <div class="contact-email">{{ item.email }}</div>
-              <div class="contact-phone">{{ item.phoneNumber }}</div>
-            </div>
-          </td>
+
 
           <!-- Hạng thành viên -->
           <td>

@@ -1,6 +1,7 @@
 package com.fpoly.marcusstore.controller.client;
 
 import com.fpoly.marcusstore.dto.request.ProfileRequestDTO;
+import com.fpoly.marcusstore.dto.response.MembershipTierResponseDTO;
 import com.fpoly.marcusstore.dto.response.ProfileResponseDTO;
 import com.fpoly.marcusstore.service.UserProfileService;
 import com.fpoly.marcusstore.service.impl.UserServiceImpl;
@@ -52,6 +53,25 @@ public class UserProfileController {
                         Map<String, Object> response = new HashMap<>();
                         response.put("code", 200);
                         response.put("message", "Cập nhật thành công");
+                        response.put("data", res);
+                        return ResponseEntity.ok(response);
+                } catch (Exception e) {
+                        e.printStackTrace();
+                        Map<String, Object> error = new HashMap<>();
+                        error.put("code", 500);
+                        error.put("message", "Lỗi nội bộ: " + e.getClass().getSimpleName() + " - " + e.getMessage());
+                        return ResponseEntity.status(500).body(error);
+                }
+        }
+
+                // Hạng thành viên của khách đang đăng nhập
+        @GetMapping("/tier")
+        public ResponseEntity<?> getMyTier() {
+                try {
+                        MembershipTierResponseDTO res = userProfileService.getMyMembershipTier();
+                        Map<String, Object> response = new HashMap<>();
+                        response.put("code", 200);
+                        response.put("message", "Thành công");
                         response.put("data", res);
                         return ResponseEntity.ok(response);
                 } catch (Exception e) {

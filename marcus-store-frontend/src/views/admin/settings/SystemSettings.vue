@@ -408,7 +408,7 @@ import BaseModal from '@/components/BaseModal.vue'
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import { useSettings } from '@/composables/useSettings'
 
-const { fetchSettings: refreshPublicSettings } = useSettings()
+const { fetchSettings: refreshPublicSettings, invalidateCache, refreshAndWait } = useSettings()
 
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -621,7 +621,10 @@ const executeModalAction = async () => {
     isSaving.value = true
     await api.post('/admin/settings/restore-defaults')
     await loadSettings()
-    await refreshPublicSettings(true)
+    // Marcus sửa: xóa cache trước khi fetch để đảm bảo load lại dữ liệu mới.
+    invalidateCache()
+    // Đợi fetch hoàn tất trước khi thông báo thành công
+    await refreshAndWait()
     showAlert('success', 'Đã khôi phục', 'Cấu hình mặc định đã được áp dụng.')
   } catch (error) {
     showAlert('error', 'Không thể khôi phục', error.response?.data?.message || 'Vui lòng thử lại.')
@@ -641,10 +644,10 @@ const saveSettings = async () => {
     // ĐÃ FIX: Bỏ "const res =" đi
     // Marcus sửa đồng bộ DTO backend: payload cấu hình nằm trong field settings.
     await api.put('/admin/settings/bulk-update', { settings: settings.value })
-    // Marcus thêm: cập nhật cache nhận diện dùng chung ngay, không bắt Admin F5.
-    await refreshPublicSettings(true)
-
     // ĐÃ FIX: Dùng Modal thay cho alert()
+    // Marcus sửa: xóa cache trước khi fetch và đợi fetch hoàn tất.
+    invalidateCache()
+    await refreshAndWait()
     showAlert('success', 'Thành công', 'Đã cập nhật cấu hình hệ thống thành công!')
   } catch (error) {
     console.error('Lỗi khi cập nhật:', error)

@@ -75,7 +75,7 @@ public class VoucherController {
 
     // ngừng hoạt động (soft-delete) voucher - chỉ cần ID, không cần body
     @DeleteMapping("/voucher/{voucherId}")
-    @PreAuthorize("hasAuthority('VOUCHER_UPDATE')")
+    @PreAuthorize("hasAuthority('VOUCHER_DELETE')")
     public ResponseEntity<Void> deleteVoucher(@PathVariable("voucherId") Integer voucherId) {
         voucherService.deleteVoucher(voucherId);
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
