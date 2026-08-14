@@ -706,3 +706,13 @@ textarea.finput { height: auto; }
   background: linear-gradient(135deg, #ec4d8d, #e04580);
   box-shadow: 0 4px 12px rgba(245, 93, 155, .4);
 }
+
+.act-btn.spec-btn {
+  background: #e0f7fa;
+  color: #006064;
+  border: 1px solid #b2ebf2;
+}
+.act-btn.spec-btn:hover {
+  background: #b2ebf2;
+  color: #004d40;
+}
