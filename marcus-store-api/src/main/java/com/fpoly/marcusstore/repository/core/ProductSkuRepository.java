@@ -25,6 +25,8 @@ public interface ProductSkuRepository extends JpaRepository<ProductSku, Integer>
 
     boolean existsBySkuCodeIgnoreCase(String skuCode);
 
+    boolean existsByProductProductId(Integer productId);
+
     @EntityGraph(attributePaths = { "attributeValues" })
     List<ProductSku> findByProductProductIdAndIsActiveTrue(Integer productId);
 

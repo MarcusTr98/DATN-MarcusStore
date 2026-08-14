@@ -54,7 +54,8 @@ public class ProductSkuController {
             @PathVariable @Positive Integer skuId,
             @Valid @RequestBody SkuSingleUpdateRequest request) {
         return ApiResponse
-                .success(configService.updateSingleSku(skuId, request.getOriginalPrice(), request.getPrice()));
+                .success(configService.updateSingleSku(
+                        skuId, request.getOriginalPrice(), request.getPrice(), request.getWeightGram()));
     }
 
     // Marcus thêm: ảnh đại diện biến thể được lưu tại Product_Skus.sku_image_url;

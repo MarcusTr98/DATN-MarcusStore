@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -33,6 +34,8 @@ public class SpecAttributeRequest {
     @Pattern(regexp = "^(text|number|boolean)$", message = "Kiểu dữ liệu phải là text, number hoặc boolean")
     private String dataType = "text";
 
-    @Positive(message = "Thứ tự hiển thị phải >= 0")
+    // Marcus sửa: giao diện dùng thứ tự 0 làm mặc định nên validation phải chấp
+    // nhận 0.
+    @PositiveOrZero(message = "Thứ tự hiển thị phải từ 0 trở lên")
     private Integer displayOrder = 0;
 }

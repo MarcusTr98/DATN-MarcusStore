@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,6 +24,13 @@ public class SkuSingleUpdateRequest {
     @DecimalMin(value = "0.01", message = "Giá niêm yết phải lớn hơn 0")
     @Digits(integer = 13, fraction = 2, message = "Giá gốc không hợp lệ")
     private BigDecimal originalPrice;
+
+    // Marcus thêm: Admin sửa khối lượng đóng gói tại SKU để Checkout và GHN
+    // dùng cùng một nguồn dữ liệu.
+    @NotNull(message = "Khối lượng SKU không được để trống")
+    @Min(value = 1, message = "Khối lượng SKU phải lớn hơn 0 gram")
+    @Max(value = 50000, message = "Khối lượng SKU không được vượt quá 50.000 gram")
+    private Integer weightGram;
 
     // Marcus thêm: giá bán thường không được cao hơn giá niêm yết. Flash Sale có
     // bảng giá riêng nên không gửi giá Flash Sale qua DTO này.

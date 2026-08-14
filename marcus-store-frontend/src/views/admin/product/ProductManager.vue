@@ -97,6 +97,7 @@
                 <th class="th">Tên sản phẩm</th>
                 <th class="th">Thương hiệu</th>
                 <th class="th">Danh mục</th>
+                <th class="th">Quản lý kho</th>
                 <th class="th">Slug</th>
                 <th class="th text-center">Trạng thái</th>
                 <th class="th text-center">Thao tác</th>
@@ -104,7 +105,7 @@
             </thead>
             <tbody>
               <tr v-if="!products.length">
-                <td colspan="8" class="text-center py-5 text-muted">
+                <td colspan="9" class="text-center py-5 text-muted">
                   <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
                   Không có dữ liệu
                 </td>
@@ -130,6 +131,11 @@
                   <span class="cate-badge">{{ item.categoryName || 'Chưa phân loại' }}</span>
                 </td>
                 <td>
+                  <span :class="item.statusImei ? 'badge-on' : 'cate-badge'">
+                    {{ item.statusImei ? 'Theo IMEI / Serial' : 'Theo số lượng' }}
+                  </span>
+                </td>
+                <td>
                   <span class="slug-badge">{{ item.slug }}</span>
                 </td>
                 <td class="text-center">
@@ -143,6 +149,7 @@
                       <i class="bi bi-pencil"></i>
                     </button>
                     <button
+                      v-if="canUpdateProduct"
                       class="act-btn spec-btn"
                       title="Thông số kỹ thuật"
                       @click="goToSpecs(item)"
@@ -274,6 +281,32 @@
                   </option>
                 </select>
                 <div class="invalid-feedback">{{ err.categoryId }}</div>
+              </div>
+
+              <!-- Marcus thêm: chọn nguồn tồn kho trước khi tạo SKU. -->
+              <div class="col-12">
+                <label class="flabel">Cách quản lý tồn kho <span class="text-danger">*</span></label>
+                <div class="inventory-mode-grid">
+                  <label :class="['inventory-mode-option', { active: form.statusImei === true }]">
+                    <input v-model="form.statusImei" type="radio" :value="true" />
+                    <i class="bi bi-upc-scan"></i>
+                    <span>
+                      <strong>Theo IMEI / Serial</strong>
+                      <small>Điện thoại và thiết bị cần quản lý từng mã vật lý.</small>
+                    </span>
+                  </label>
+                  <label :class="['inventory-mode-option', { active: form.statusImei === false }]">
+                    <input v-model="form.statusImei" type="radio" :value="false" />
+                    <i class="bi bi-boxes"></i>
+                    <span>
+                      <strong>Theo số lượng</strong>
+                      <small>Phụ kiện và hàng hóa không có IMEI.</small>
+                    </span>
+                  </label>
+                </div>
+                <small class="form-text text-muted">
+                  Chỉ được đổi lựa chọn này trước khi sản phẩm có SKU.
+                </small>
               </div>
 
               <!-- Thumbnail URL -->
@@ -506,6 +539,13 @@ import { Modal } from 'bootstrap'
 
 const router = useRouter()
 
+// Marcus thêm: STAFF chỉ có PRODUCT_VIEW không nhìn thấy nút dẫn vào màn chỉnh thông số.
+const currentRoles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
+const currentPermissions = JSON.parse(localStorage.getItem('USER_PERMISSIONS') || '[]')
+const canUpdateProduct = computed(
+  () => currentRoles.includes('ROLE_ADMIN') || currentPermissions.includes('PRODUCT_UPDATE'),
+)
+
 const productApi = {
   getAll: (keyword, status, brand, page, size) =>
     api.get('/admin/product', { params: { keyword, filter: status, brand, page, size } }),
@@ -547,6 +587,7 @@ const filter = ref({ keyword: '', status: 'all', brand: '' })
 
 const isEdit = ref(false)
 const editId = ref(null)
+const originalCategoryId = ref(null)
 const form = ref({
   productName: '',
   brand: '',
@@ -554,6 +595,7 @@ const form = ref({
   thumbnailUrl: '',
   description: '',
   status: true,
+  statusImei: false,
 })
 const err = ref({})
 
@@ -623,7 +665,6 @@ function clearThumbnail() {
 }
 
 function showModal(type, title, message, onConfirm = null) {
-  console.log('showModal called:', type, title)
   baseModal.value.type = type
   baseModal.value.title = title
   baseModal.value.message = message
@@ -636,7 +677,9 @@ function onModalClose() {
 }
 
 function onModalConfirm() {
-  if (baseModal.value.onConfirm) baseModal.value.onConfirm()
+  const callback = baseModal.value.onConfirm
+  baseModal.value.visible = false
+  if (callback) callback()
 }
 
 async function fetchProducts() {
@@ -649,7 +692,6 @@ async function fetchProducts() {
       page.value,
       pageSize.value,
     )
-    console.log('raw response:', res.data)
     const payload = res.data?.data ?? res.data
     const content = Array.isArray(payload) ? payload : (payload.content ?? [])
     products.value = content
@@ -676,7 +718,9 @@ async function fetchCategories() {
     const res = await categoryApi.getAll()
     const payload = res.data?.data ?? res.data
     categories.value = Array.isArray(payload) ? payload : (payload.content ?? [])
-  } catch {}
+  } catch (error) {
+    console.error('Không thể tải danh mục sản phẩm:', error)
+  }
 }
 
 async function doCreate() {
@@ -688,21 +732,37 @@ async function doCreate() {
       categoryId: form.value.categoryId,
       thumbnailUrl: '',
       description: form.value.description,
+      statusImei: form.value.statusImei,
     })
 
     const newProductId = res.data?.data?.productId ?? res.data?.productId
 
+    let imageUploadFailed = false
     if (thumbnailFile.value && newProductId) {
-      const formData = new FormData()
-      formData.append('file', thumbnailFile.value)
-      formData.append('isPrimary', true)
-      await productImgApi.uploadImage(newProductId, formData)
+      try {
+        const formData = new FormData()
+        formData.append('file', thumbnailFile.value)
+        formData.append('isPrimary', true)
+        await productImgApi.uploadImage(newProductId, formData)
+      } catch {
+        // Marcus sửa: Product đã commit thì không được báo "thêm thất bại" khiến
+        // Admin bấm lại và tạo trùng. Ảnh có thể bổ sung tại thư viện ảnh sau.
+        imageUploadFailed = true
+      }
     }
 
-    showToast('Thêm sản phẩm thành công!', 'success')
     clearThumbnail()
     bsModal.hide()
     await Promise.all([fetchProducts(), fetchAllBrands()])
+    if (imageUploadFailed) {
+      showModal(
+        'warning',
+        'Sản phẩm đã được tạo',
+        'Ảnh đại diện tải lên chưa thành công. Hãy mở mục Danh sách ảnh của sản phẩm để tải lại.',
+      )
+    } else {
+      showToast('Thêm sản phẩm thành công!', 'success')
+    }
   } catch (e) {
     showToast(e.response?.data?.message ?? 'Lỗi khi thêm sản phẩm', 'error')
   } finally {
@@ -720,6 +780,7 @@ async function doUpdate() {
       thumbnailUrl: form.value.thumbnailUrl,
       description: form.value.description,
       status: form.value.status,
+      statusImei: form.value.statusImei,
     })
     showToast('Cập nhật thành công!', 'success')
     bsModal.hide()
@@ -752,6 +813,7 @@ async function onHide(item) {
 function openCreate() {
   isEdit.value = false
   editId.value = null
+  originalCategoryId.value = null
   form.value = {
     productName: '',
     brand: '',
@@ -759,6 +821,7 @@ function openCreate() {
     thumbnailUrl: '',
     description: '',
     status: true,
+    statusImei: false,
   }
   err.value = {}
   clearThumbnail()
@@ -768,14 +831,16 @@ function openCreate() {
 function openEdit(item) {
   isEdit.value = true
   editId.value = item.productId
+  originalCategoryId.value = item.categoryId ?? null
   form.value = {
     productName: item.productName,
     brand: item.brand ?? '',
-    categoryId:
-      categories.value.find((c) => c.categoryName === item.categoryName)?.categoryId ?? null,
+    // Marcus sửa: dùng ID backend trả về, không dò theo tên vì hai danh mục có thể trùng tên.
+    categoryId: item.categoryId ?? null,
     thumbnailUrl: item.thumbnailUrl ?? '',
     description: item.description ?? '',
     status: item.status,
+    statusImei: item.statusImei === true,
   }
   err.value = {}
   bsModal.show()
@@ -791,7 +856,20 @@ function validate() {
 
 function onSubmit() {
   if (!validate()) return
-  isEdit.value ? doUpdate() : doCreate()
+  if (!isEdit.value) {
+    doCreate()
+    return
+  }
+  if (originalCategoryId.value && originalCategoryId.value !== form.value.categoryId) {
+    showModal(
+      'confirm',
+      'Xác nhận đổi danh mục',
+      'Đổi danh mục sẽ xóa các giá trị thông số kỹ thuật cũ vì chúng không còn đúng ngữ cảnh. SKU và kho không bị thay đổi. Bạn có tiếp tục không?',
+      doUpdate,
+    )
+    return
+  }
+  doUpdate()
 }
 
 function onFilterChange() {
@@ -937,4 +1015,40 @@ function goToSpecs(item) {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.inventory-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.inventory-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 82px;
+  padding: 14px 16px;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  background: #fff;
+  cursor: pointer;
+  transition: .18s ease;
+}
+
+.inventory-mode-option.active {
+  border-color: #eb5b9a;
+  background: #fff5fa;
+  box-shadow: 0 0 0 3px rgba(235, 91, 154, .1);
+}
+
+.inventory-mode-option input { accent-color: #db2777; }
+.inventory-mode-option > i { color: #ca246d; font-size: 24px; }
+.inventory-mode-option span { display: grid; gap: 2px; }
+.inventory-mode-option strong { color: #172c4d; }
+.inventory-mode-option small { color: #718097; line-height: 1.35; }
+
+@media (max-width: 767.98px) {
+  .inventory-mode-grid { grid-template-columns: 1fr; }
+}
+</style>

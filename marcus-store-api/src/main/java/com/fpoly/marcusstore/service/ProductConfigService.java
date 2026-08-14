@@ -10,6 +10,7 @@ import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
 import com.fpoly.marcusstore.repository.core.ProductRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,9 @@ public class ProductConfigService {
 
     @Autowired
     private FlashSaleItemRepository flashSaleItemRepository;
+
+    @Autowired
+    private OrderItemRepository orderItemRepository;
 
     @Autowired
     private CloudinaryService cloudinaryService;
@@ -111,7 +115,7 @@ public class ProductConfigService {
             // Marcus sửa sau khi tích hợp module kho: SKU mới luôn bắt đầu từ 0.
             // Mọi đơn vị hàng phải đi qua Nhập kho để số lượng và IMEI cùng một luồng.
             sku.setStockQuantity(0);
-            sku.setWeightGram(500);
+            sku.setWeightGram(item.getWeightGram());
             sku.setIsActive(true);
 
             sku.setAttributeValues(attributeValues);
@@ -152,12 +156,17 @@ public class ProductConfigService {
     }
 
     @Transactional
-    public ProductSku updateSingleSku(Integer skuId, BigDecimal originalPrice, BigDecimal price) {
+    public ProductSku updateSingleSku(Integer skuId, BigDecimal originalPrice, BigDecimal price, Integer weightGram) {
         ProductSku sku = skuRepository.findByIdForUpdate(skuId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy SKU cần cập nhật."));
         ensureActive(sku);
         ensureNoOpenFlashSale(sku);
+        if (weightGram != null && !weightGram.equals(sku.getWeightGram())
+                && orderItemRepository.existsDeliveryOrderWaitingForShipmentBySkuId(skuId)) {
+            throw new IllegalArgumentException("Không thể đổi khối lượng vì SKU đang có đơn chờ tạo vận đơn GHN.");
+        }
         applyPrices(sku, originalPrice, price);
+        applyWeight(sku, weightGram);
         return skuRepository.save(sku);
     }
 
@@ -187,8 +196,9 @@ public class ProductConfigService {
             throw new IllegalArgumentException("Ảnh biến thể không được vượt quá 5 MB.");
         }
         String contentType = file.getContentType();
-        if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
-            throw new IllegalArgumentException("Tệp tải lên phải là hình ảnh.");
+        Set<String> allowedImageTypes = Set.of("image/jpeg", "image/png", "image/webp");
+        if (contentType == null || !allowedImageTypes.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Ảnh biến thể chỉ hỗ trợ JPG, PNG hoặc WebP.");
         }
 
         List<Integer> distinctIds = skuIds.stream().distinct().sorted().toList();
@@ -232,6 +242,13 @@ public class ProductConfigService {
         }
         sku.setOriginalPrice(originalPrice);
         sku.setPrice(price);
+    }
+
+    private void applyWeight(ProductSku sku, Integer weightGram) {
+        if (weightGram == null || weightGram <= 0 || weightGram > 50000) {
+            throw new IllegalArgumentException("Khối lượng SKU phải từ 1 đến 50.000 gram.");
+        }
+        sku.setWeightGram(weightGram);
     }
 
     private void ensureNoOpenFlashSale(ProductSku sku) {

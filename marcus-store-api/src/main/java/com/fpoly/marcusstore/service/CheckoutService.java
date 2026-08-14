@@ -3,6 +3,8 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.request.ApplyVoucherRequest;
 import com.fpoly.marcusstore.dto.request.CalculateFeeRequestDTO;
 import com.fpoly.marcusstore.dto.request.CheckoutRequestDTO;
+import com.fpoly.marcusstore.dto.request.ShippingCalculateRequest;
+import com.fpoly.marcusstore.dto.response.ShippingCalculationResponse;
 import com.fpoly.marcusstore.dto.response.VoucherApplyResult;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.core.ProductSku;
@@ -73,6 +75,53 @@ public class CheckoutService {
         // Admin xác nhận. Idempotent retry được xử lý trước nên không bị tính nhầm.
         @Value("${checkout.cod.max-pending-orders:3}")
         private long maxPendingCodOrders;
+
+        // Marcus thêm: phí xem trước và phí lúc đặt đơn cùng đọc giá/khối lượng
+        // SKU từ server, không dùng số do trình duyệt tự khai báo.
+        @Transactional(readOnly = true)
+        public ShippingCalculationResponse calculateShippingForSelection(ShippingCalculateRequest req) {
+                Integer currentUserId = SecurityUtils.getCurrentUserId();
+                List<Integer> requestedIds = req.getCartItemIds().stream().distinct().toList();
+                if (requestedIds.size() != req.getCartItemIds().size()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Danh sách sản phẩm tính phí đang bị trùng.");
+                }
+
+                List<CartItem> cartItems = cartItemRepository
+                                .findByCart_User_UserIdAndCartItemIdIn(currentUserId, requestedIds);
+                if (cartItems.size() != requestedIds.size()) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Có sản phẩm không còn trong giỏ hàng của bạn.");
+                }
+
+                int totalWeightGram = 0;
+                BigDecimal cartTotal = BigDecimal.ZERO;
+                for (CartItem item : cartItems) {
+                        Integer quantity = item.getQuantity();
+                        ProductSku sku = item.getSku();
+                        if (quantity == null || quantity <= 0 || sku == null
+                                        || !Boolean.TRUE.equals(sku.getIsActive())
+                                        || sku.getPrice() == null || sku.getPrice().signum() <= 0) {
+                                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                                "Giỏ hàng có SKU không còn hợp lệ.");
+                        }
+                        int weightGram = sku.getWeightGram() != null && sku.getWeightGram() > 0
+                                        ? sku.getWeightGram()
+                                        : 500;
+                        totalWeightGram = Math.addExact(totalWeightGram,
+                                        Math.multiplyExact(weightGram, quantity));
+                        BigDecimal unitPrice = item.getFlashSalePrice() != null
+                                        && item.getFlashSalePrice().signum() > 0
+                                                        ? item.getFlashSalePrice()
+                                                        : sku.getPrice();
+                        cartTotal = cartTotal.add(unitPrice.multiply(BigDecimal.valueOf(quantity)));
+                }
+
+                Integer ghnFee = ghnService.calculateShippingFee(
+                                req.getToDistrictId(), req.getToWardCode(), totalWeightGram,
+                                cartTotal.intValue());
+                return shippingService.calculateFinalShipping(cartTotal, BigDecimal.valueOf(ghnFee));
+        }
 
         @Transactional(readOnly = true)
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {

@@ -11,6 +11,7 @@ import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
 import com.fpoly.marcusstore.repository.core.ProductRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
 import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -39,6 +40,8 @@ class ProductConfigServiceTest {
     AttributeValueRepository attributeValueRepository;
     @Mock
     FlashSaleItemRepository flashSaleItemRepository;
+    @Mock
+    OrderItemRepository orderItemRepository;
     @Mock
     CloudinaryService cloudinaryService;
     @InjectMocks
@@ -100,11 +103,12 @@ class ProductConfigServiceTest {
         when(skuRepository.save(sku)).thenReturn(sku);
 
         ProductSku updated = service.updateSingleSku(
-                7, new BigDecimal("12000000"), new BigDecimal("10990000"));
+                7, new BigDecimal("12000000"), new BigDecimal("10990000"), 650);
 
         assertThat(updated.getOriginalPrice()).isEqualByComparingTo("12000000");
         assertThat(updated.getPrice()).isEqualByComparingTo("10990000");
         assertThat(updated.getStockQuantity()).isEqualTo(9);
+        assertThat(updated.getWeightGram()).isEqualTo(650);
     }
 
     @Test
@@ -113,7 +117,7 @@ class ProductConfigServiceTest {
         when(skuRepository.findByIdForUpdate(7)).thenReturn(Optional.of(sku));
 
         assertThatThrownBy(() -> service.updateSingleSku(
-                7, new BigDecimal("10000000"), new BigDecimal("11000000")))
+                7, new BigDecimal("10000000"), new BigDecimal("11000000"), 500))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("không được lớn hơn");
         verify(skuRepository, never()).save(any(ProductSku.class));
@@ -126,7 +130,7 @@ class ProductConfigServiceTest {
         when(flashSaleItemRepository.existsOpenFlashSaleForSku(eq(7), any())).thenReturn(true);
 
         assertThatThrownBy(() -> service.updateSingleSku(
-                7, new BigDecimal("12000000"), new BigDecimal("10990000")))
+                7, new BigDecimal("12000000"), new BigDecimal("10990000"), 500))
                 .hasMessageContaining("Flash Sale chưa kết thúc");
         verify(skuRepository, never()).save(any(ProductSku.class));
     }
@@ -160,8 +164,8 @@ class ProductConfigServiceTest {
 
         List<SkuImageUpdateResponse> updated = service.updateSkuImages(List.of(8, 7), image);
 
-        assertThat(updated).allSatisfy(skuItem ->
-            assertThat(skuItem.getSkuImageUrl()).isEqualTo("https://cdn.example/black.webp"));
+        assertThat(updated).allSatisfy(
+                skuItem -> assertThat(skuItem.getSkuImageUrl()).isEqualTo("https://cdn.example/black.webp"));
         verify(cloudinaryService, times(1)).uploadImage(image);
     }
 
@@ -189,6 +193,7 @@ class ProductConfigServiceTest {
         item.setSkuCode(code);
         item.setPrice(new BigDecimal("1000000"));
         item.setOriginalPrice(new BigDecimal("1200000"));
+        item.setWeightGram(500);
         item.setValueIds(ids);
         return item;
     }

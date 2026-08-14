@@ -11,6 +11,6 @@ public class AttributeValueRequest {
     @NotBlank(message = "Giá trị thuộc tính không được để trống")
     @Size(max = 100, message = "Giá trị thuộc tính không được vượt quá 100 ký tự")
     private String valueString;
-    @Size(max = 255, message = "Dữ liệu bổ sung không được vượt quá 255 ký tự")
+    @Size(max = 50, message = "Dữ liệu bổ sung không được vượt quá 50 ký tự")
     private String valueMeta;
 }

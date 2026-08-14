@@ -119,6 +119,7 @@ CREATE TABLE Products (
     product_name NVARCHAR(150)  NOT NULL,
     description  NVARCHAR(MAX),
     brand        NVARCHAR(50),
+    status_imei  BIT            NOT NULL DEFAULT 0,
     thumbnail_url VARCHAR(500)  NULL,
     category_id  INT            NOT NULL,
     slug         VARCHAR(255)   NOT NULL UNIQUE,
@@ -400,6 +401,7 @@ CREATE TABLE Product_Items (
     order_item_id INT          NULL,
     created_at    DATETIME2    DEFAULT GETDATE(),
     updated_at    DATETIME2    DEFAULT GETDATE(),
+    note          NVARCHAR(500) NULL,
     CONSTRAINT FK_ProductItems_Skus       FOREIGN KEY (sku_id)        REFERENCES Product_Skus(sku_id)    ON DELETE CASCADE,
     CONSTRAINT FK_ProductItems_OrderItems FOREIGN KEY (order_item_id) REFERENCES Order_Items(order_item_id) ON DELETE SET NULL
 );

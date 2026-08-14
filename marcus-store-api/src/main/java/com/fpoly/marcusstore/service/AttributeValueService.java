@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.entity.core.Attribute;
 import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
+import com.fpoly.marcusstore.repository.core.AttributeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,9 @@ public class AttributeValueService {
     @Autowired
     private AttributeValueRepository valueRepository;
 
+    @Autowired
+    private AttributeRepository attributeRepository;
+
     public List<AttributeValue> getValuesByAttributeId(Integer attributeId) {
         return valueRepository.findByAttribute_AttributeId(attributeId);
     }
@@ -28,8 +32,11 @@ public class AttributeValueService {
             throw new RuntimeException("Giá trị này đã tồn tại trong thuộc tính!");
         }
         AttributeValue value = new AttributeValue();
-        Attribute attribute = new Attribute();
-        attribute.setAttributeId(attributeId);
+        // Marcus sửa: kiểm tra Attribute thật thay vì gắn entity giả rồi để lỗi
+        // khóa ngoại thô rơi xuống giao diện.
+        Attribute attribute = attributeRepository.findById(attributeId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Thuộc tính không tồn tại.|ATTRIBUTE_NOT_FOUND"));
         value.setAttribute(attribute);
         value.setValueString(normalizedValue);
         value.setValueMeta(valueMeta);

@@ -5,6 +5,7 @@ import com.fpoly.marcusstore.dto.request.SpecAttributeRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.dto.response.ProductSpecValueResponse;
 import com.fpoly.marcusstore.dto.response.SpecAttributeResponse;
+import com.fpoly.marcusstore.dto.response.SpecCategoryScopeResponse;
 import com.fpoly.marcusstore.service.ProductSpecService;
 
 import jakarta.validation.Valid;
@@ -33,19 +34,25 @@ public class ProductSpecController {
     @Autowired
     private ProductSpecService specService;
 
-
-@GetMapping("/attributes")
-@PreAuthorize("hasAuthority('PRODUCT_VIEW')")
-public ApiResponse<List<SpecAttributeResponse>> getAttributesByCategory(
-        @RequestParam(required = false) @Positive Integer categoryId) {
-    return ApiResponse.success(specService.getAttributesByCategory(categoryId));
-}
+    @GetMapping("/attributes")
+    @PreAuthorize("hasAuthority('PRODUCT_VIEW')")
+    public ApiResponse<List<SpecAttributeResponse>> getAttributesByCategory(
+            @RequestParam(required = false) @Positive Integer categoryId) {
+        return ApiResponse.success(specService.getAttributesByCategory(categoryId));
+    }
 
     @PostMapping("/attributes")
     @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
     public ApiResponse<SpecAttributeResponse> createAttribute(
             @Valid @RequestBody SpecAttributeRequest req) {
         return ApiResponse.success(specService.createAttribute(req));
+    }
+
+    @GetMapping("/category-scopes")
+    @PreAuthorize("hasAuthority('PRODUCT_VIEW')")
+    public ApiResponse<List<SpecCategoryScopeResponse>> getCategoryScopes(
+            @RequestParam @Positive Integer categoryId) {
+        return ApiResponse.success(specService.getCategoryScopes(categoryId));
     }
 
     @PutMapping("/attributes/{id}")
@@ -63,9 +70,10 @@ public ApiResponse<List<SpecAttributeResponse>> getAttributesByCategory(
         return ApiResponse.success("Đã xóa thông số thành công!");
     }
 
-
     @GetMapping("/products/{productId}")
-    @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
+    // Marcus sửa: đọc thông số chỉ cần quyền xem; các API ghi vẫn khóa
+    // PRODUCT_UPDATE.
+    @PreAuthorize("hasAuthority('PRODUCT_VIEW')")
     public ApiResponse<List<ProductSpecValueResponse>> getProductSpecs(
             @PathVariable @Positive Integer productId) {
         return ApiResponse.success(specService.getSpecValuesByProduct(productId));

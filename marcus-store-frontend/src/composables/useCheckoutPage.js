@@ -807,8 +807,9 @@ export function useCheckoutPage() {
       const res = await api.post('/client/shipping/calculate', {
         toDistrictId: toDistrictId.value,
         toWardCode: toWardCode.value,
-        totalWeightGram: 500,
-        cartTotal: cartData.value.totalAmount,
+        // Marcus sửa: backend tự lấy giá và khối lượng từng SKU; frontend chỉ
+        // khai báo phạm vi CartItem đang được Checkout.
+        cartItemIds: cartData.value.items.map((item) => item.cartItemId),
       })
 
       if (res.data?.code === 200 && res.data?.data) {
@@ -1152,10 +1153,7 @@ export function useCheckoutPage() {
       sessionStorage.removeItem(CHECKOUT_REQUEST_STORAGE_KEY)
     }
     const requestId = crypto.randomUUID()
-    sessionStorage.setItem(
-      CHECKOUT_REQUEST_STORAGE_KEY,
-      JSON.stringify({ fingerprint, requestId }),
-    )
+    sessionStorage.setItem(CHECKOUT_REQUEST_STORAGE_KEY, JSON.stringify({ fingerprint, requestId }))
     return requestId
   }
 

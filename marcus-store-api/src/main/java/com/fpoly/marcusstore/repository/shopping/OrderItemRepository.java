@@ -24,4 +24,18 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Integer> {
                   AND o.isHidden = false
             """)
     Long sumSoldQuantityByProductId(@Param("productId") Integer productId);
+
+    // Marcus thêm: chưa cho đổi khối lượng SKU nếu đơn giao tận nơi đã chốt
+    // SKU nhưng chưa tạo vận đơn. Nhờ vậy phí Checkout và payload GHN không lệch.
+    @Query("""
+            SELECT CASE WHEN COUNT(oi) > 0 THEN true ELSE false END
+            FROM OrderItem oi
+            JOIN oi.order o
+            JOIN o.shippingDetail shipping
+            WHERE oi.sku.skuId = :skuId
+              AND shipping.fulfillmentMethod = 'DELIVERY'
+              AND shipping.trackingCode IS NULL
+              AND o.orderStatus NOT IN ('CANCELLED', 'COMPLETED')
+            """)
+    boolean existsDeliveryOrderWaitingForShipmentBySkuId(@Param("skuId") Integer skuId);
 }

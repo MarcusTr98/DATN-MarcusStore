@@ -23,6 +23,9 @@ public class UpdateProduct {
     @NotBlank(message = "Ko được để trống thương hiệu sản phẩm")
     private String brand;
 
+    @NotNull(message = "Vui lòng chọn cách quản lý tồn kho")
+    private Boolean statusImei;
+
     @NotBlank(message = "Ko được để trống đường dẫn ảnh")
     private String thumbnailUrl;
 

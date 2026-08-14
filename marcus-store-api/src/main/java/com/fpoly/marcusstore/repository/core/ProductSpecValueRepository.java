@@ -20,4 +20,8 @@ public interface ProductSpecValueRepository extends JpaRepository<ProductSpecVal
     List<ProductSpecValue> findByProductIdWithSpec(@Param("productId") Integer productId);
 
     long countBySpecAttributeSpecAttributeId(Integer specAttributeId);
+
+    // Marcus thêm: khi đổi danh mục sản phẩm phải dọn thông số thuộc danh mục cũ,
+    // tránh trang khách và Marcus AI tiếp tục đọc dữ liệu sai ngữ cảnh.
+    void deleteByProductProductId(Integer productId);
 }
