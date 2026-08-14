@@ -2,8 +2,10 @@ package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.request.ProductSpecsSaveRequest;
 import com.fpoly.marcusstore.dto.request.SpecAttributeRequest;
+import com.fpoly.marcusstore.dto.request.SpecAttributeReorderRequest;
 import com.fpoly.marcusstore.dto.response.ProductSpecValueResponse;
 import com.fpoly.marcusstore.dto.response.SpecCategoryScopeResponse;
+import com.fpoly.marcusstore.dto.response.SpecCategoryOverviewResponse;
 import com.fpoly.marcusstore.dto.response.SpecAttributeResponse;
 import com.fpoly.marcusstore.entity.core.Category;
 import com.fpoly.marcusstore.entity.core.Product;
@@ -44,6 +46,48 @@ public class ProductSpecService {
     private ProductRepository productRepo;
 
     // ===== SpecAttribute CRUD =====
+
+    @Transactional(readOnly = true)
+    public List<SpecCategoryOverviewResponse> getCategoryOverview() {
+        List<Category> categories = categoryRepo.findAll();
+        Map<Integer, Long> directCount = new HashMap<>();
+        specAttrRepo.findAll().forEach(attribute -> {
+            if (attribute.getCategory() != null) {
+                directCount.merge(attribute.getCategory().getCategoryId(), 1L, Long::sum);
+            }
+        });
+
+        Map<Integer, Long> productCount = new HashMap<>();
+        productRepo.countProductsByCategory()
+                .forEach(row -> productCount.put(row.getCategoryId(), row.getProductCount()));
+
+        // Marcus thêm: tính số trường kế thừa trên bộ nhớ để endpoint chỉ cần các
+        // truy vấn tổng hợp, tránh gọi một API/truy vấn cho từng danh mục.
+        return categories.stream()
+                .sorted(Comparator.comparing(Category::getCategoryName, String.CASE_INSENSITIVE_ORDER))
+                .map(category -> {
+                    long inherited = 0;
+                    Set<Integer> visited = new HashSet<>();
+                    Category parent = category.getParent();
+                    while (parent != null && visited.add(parent.getCategoryId())) {
+                        inherited += directCount.getOrDefault(parent.getCategoryId(), 0L);
+                        parent = parent.getParent();
+                    }
+                    long direct = directCount.getOrDefault(category.getCategoryId(), 0L);
+                    return SpecCategoryOverviewResponse.builder()
+                            .categoryId(category.getCategoryId())
+                            .categoryName(category.getCategoryName())
+                            .parentId(category.getParent() == null ? null : category.getParent().getCategoryId())
+                            .parentName(category.getParent() == null ? null : category.getParent().getCategoryName())
+                            .status(Boolean.TRUE.equals(category.getStatus()))
+                            .directAttributeCount(direct)
+                            .inheritedAttributeCount(inherited)
+                            .effectiveAttributeCount(direct + inherited)
+                            .productCount(productCount.getOrDefault(category.getCategoryId(), 0L))
+                            .build();
+                })
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public List<SpecAttributeResponse> getAttributesByCategory(Integer categoryId) {
@@ -163,6 +207,26 @@ public class ProductSpecService {
                             + " sản phẩm. Hãy gỡ khỏi sản phẩm trước.");
         }
         specAttrRepo.delete(attr);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<SpecAttributeResponse> reorderAttributes(SpecAttributeReorderRequest req) {
+        List<SpecAttribute> directAttributes = specAttrRepo
+                .findByCategoryCategoryIdOrderByDisplayOrderAsc(req.getCategoryId());
+        Map<Integer, SpecAttribute> byId = new HashMap<>();
+        directAttributes.forEach(attribute -> byId.put(attribute.getSpecAttributeId(), attribute));
+        if (req.getAttributeIds().size() != byId.size()
+                || new HashSet<>(req.getAttributeIds()).size() != byId.size()
+                || !byId.keySet().containsAll(req.getAttributeIds())) {
+            throw new RuntimeException("Danh sách sắp xếp không khớp bộ thông số của danh mục.");
+        }
+        for (int index = 0; index < req.getAttributeIds().size(); index++) {
+            byId.get(req.getAttributeIds().get(index)).setDisplayOrder(index);
+        }
+        return specAttrRepo.saveAll(directAttributes).stream()
+                .sorted(Comparator.comparing(SpecAttribute::getDisplayOrder))
+                .map(this::toAttrResponse)
+                .toList();
     }
 
     // ===== ProductSpecValue =====

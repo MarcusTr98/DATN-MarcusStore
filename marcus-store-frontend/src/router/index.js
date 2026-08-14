@@ -190,6 +190,13 @@ const routes = [
         meta: { permission: 'PRODUCT_UPDATE' },
       },
       {
+        path: 'specification-sets',
+        name: 'SpecificationSetManager',
+        component: () => import('@/views/admin/product/SpecificationSetManager.vue'),
+        // Marcus thêm: cấu trúc bộ thông số tác động toàn danh mục nên dùng quyền cập nhật sản phẩm.
+        meta: { permission: 'PRODUCT_UPDATE' },
+      },
+      {
         path: 'attribute',
         name: 'AttributeManager',
         component: () => import('@/views/admin/product/Attributemanager.vue'),

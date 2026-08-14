@@ -19,6 +19,18 @@ import java.util.Optional;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Integer> {
 
+        // Marcus thêm: thống kê số sản phẩm trực tiếp trong từng danh mục cho màn
+        // quản lý bộ thông số; không tải toàn bộ entity lên bộ nhớ.
+        @Query("SELECT p.category.categoryId AS categoryId, COUNT(p) AS productCount " +
+                        "FROM Product p WHERE p.category IS NOT NULL GROUP BY p.category.categoryId")
+        List<ProductCountByCategory> countProductsByCategory();
+
+        interface ProductCountByCategory {
+                Integer getCategoryId();
+
+                long getProductCount();
+        }
+
         // Marcus thêm: khóa Product khi sinh ma trận để hai Admin không tạo cùng
         // một tổ hợp SKU trong hai request đồng thời.
         @Lock(LockModeType.PESSIMISTIC_WRITE)

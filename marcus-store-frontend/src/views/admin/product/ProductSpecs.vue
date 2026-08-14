@@ -22,6 +22,43 @@
     </div>
 
     <template v-else-if="product">
+      <!-- Marcus sửa: khôi phục khối tiến độ và diễn giải rõ ranh giới giữa thông số, SKU và Kho. -->
+      <section class="spec-overview mb-4">
+        <div class="completion-card">
+          <div class="completion-heading">
+            <div>
+              <span>Mức độ hoàn thiện thông số</span>
+              <small>{{ filledCount }}/{{ totalSpecCount }} thông số đã có dữ liệu</small>
+            </div>
+            <strong>{{ completionPercent }}%</strong>
+          </div>
+          <div
+            class="progress completion-progress"
+            role="progressbar"
+            aria-label="Mức độ hoàn thiện thông số kỹ thuật"
+            :aria-valuenow="completionPercent"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          >
+            <div class="progress-bar" :style="{ width: `${completionPercent}%` }"></div>
+          </div>
+          <p>Đây là chỉ số hỗ trợ nhập liệu, không phải điều kiện để mở bán sản phẩm.</p>
+        </div>
+
+        <div class="spec-guidance">
+          <div class="guidance-icon"><i class="bi bi-info-circle"></i></div>
+          <div>
+            <strong>Phạm vi thông tin cần nhập tại đây</strong>
+            <p>
+              Admin chỉ nhập <b>thông số kỹ thuật dùng chung của sản phẩm</b>. Màu sắc, dung lượng,
+              mã SKU, giá bán và khối lượng đóng gói được lấy từ từng SKU; số lượng tồn được quản lý
+              theo module Kho nên không nhập lặp tại đây. Các trường thông số bên dưới là không bắt
+              buộc, hãy bổ sung theo dữ liệu thực tế của sản phẩm.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section class="filter-card mb-4">
         <div class="row g-3 align-items-end">
           <div class="col-12 col-lg-5">
@@ -45,8 +82,12 @@
             </select>
           </div>
           <div class="col-12 col-md-6 col-lg-3">
-            <button class="btn btn-pink w-100 filter-action" type="button" @click="openAttrForm()">
-              <i class="bi bi-sliders me-2"></i>Thêm vào bộ thông số
+            <button
+              class="btn btn-pink w-100 filter-action"
+              type="button"
+              @click="openSpecificationManager"
+            >
+              <i class="bi bi-ui-checks-grid me-2"></i>Quản lý bộ thông số
             </button>
           </div>
         </div>
@@ -118,26 +159,12 @@
                 <td class="text-center">
                   <div class="row-actions">
                     <button
-                      class="act-btn edit-btn"
-                      title="Sửa cấu trúc thông số"
-                      @click="openAttrForm(item)"
-                    >
-                      <i class="bi bi-pencil"></i>
-                    </button>
-                    <button
                       class="act-btn clear-btn"
                       title="Xóa giá trị của sản phẩm này"
                       :disabled="!hasValue(item.valueText)"
                       @click="clearValue(item)"
                     >
                       <i class="bi bi-eraser"></i>
-                    </button>
-                    <button
-                      class="act-btn hide-btn"
-                      title="Xóa khỏi bộ thông số"
-                      @click="deleteAttribute(item)"
-                    >
-                      <i class="bi bi-trash"></i>
                     </button>
                   </div>
                 </td>
@@ -180,103 +207,12 @@
       @close="closeBaseModal"
       @confirm="onModalConfirm"
     />
-
-    <div class="modal fade" id="specAttrFormModal" tabindex="-1" ref="attrFormEl">
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content rounded-4 border-0 shadow-lg">
-          <div class="modal-header border-0 pb-0">
-            <div>
-              <span class="modal-eyebrow">BỘ THÔNG SỐ DANH MỤC</span>
-              <h5 class="fw-bold mb-0">
-                {{ attrForm.id ? 'Cập nhật thông số' : 'Thêm thông số mới' }}
-              </h5>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body pt-3">
-            <div class="scope-warning">
-              <i class="bi bi-info-circle"></i>
-              Thay đổi cấu trúc tại đây áp dụng cho các sản phẩm thuộc phạm vi đã chọn, không chỉ
-              sản phẩm hiện tại.
-            </div>
-            <div class="mb-3">
-              <label class="flabel">Phạm vi áp dụng <span class="text-danger">*</span></label>
-              <select
-                v-model.number="attrForm.categoryId"
-                class="form-select finput"
-                :disabled="Boolean(attrForm.id)"
-              >
-                <option
-                  v-for="scope in categoryScopes"
-                  :key="scope.categoryId"
-                  :value="scope.categoryId"
-                >
-                  {{
-                    scope.productCategory
-                      ? `Riêng ${scope.categoryName}`
-                      : `Dùng chung: ${scope.categoryName}`
-                  }}
-                </option>
-              </select>
-              <small v-if="attrForm.id" class="form-note"
-                >Không thể chuyển phạm vi của thông số đã có dữ liệu.</small
-              >
-            </div>
-            <div class="mb-3">
-              <label class="flabel">Tên thông số <span class="text-danger">*</span></label>
-              <input
-                v-model="attrForm.name"
-                maxlength="100"
-                class="form-control finput"
-                placeholder="VD: Dung lượng pin"
-              />
-            </div>
-            <div class="row g-3">
-              <div class="col-6">
-                <label class="flabel">Đơn vị</label>
-                <input
-                  v-model="attrForm.unit"
-                  maxlength="20"
-                  class="form-control finput"
-                  placeholder="mAh, inch..."
-                />
-              </div>
-              <div class="col-6">
-                <label class="flabel">Kiểu dữ liệu</label>
-                <select v-model="attrForm.dataType" class="form-select finput">
-                  <option value="text">Văn bản</option>
-                  <option value="number">Số</option>
-                  <option value="boolean">Có / Không</option>
-                </select>
-              </div>
-            </div>
-            <div class="mt-3">
-              <label class="flabel">Thứ tự hiển thị</label>
-              <input
-                v-model.number="attrForm.displayOrder"
-                type="number"
-                min="0"
-                class="form-control finput"
-              />
-            </div>
-          </div>
-          <div class="modal-footer border-0 pt-1">
-            <button class="btn btn-outline-secondary rounded-3" data-bs-dismiss="modal">Hủy</button>
-            <button class="btn btn-pink rounded-3" :disabled="savingAttr" @click="saveAttribute">
-              <span v-if="savingAttr" class="spinner-border spinner-border-sm me-1"></span>
-              {{ attrForm.id ? 'Cập nhật' : 'Thêm vào bộ thông số' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
-import { Modal } from 'bootstrap'
 import BaseModal from '@/components/BaseModal.vue'
 import api from '@/utils/api'
 import '@/assets/css/Product.css'
@@ -287,11 +223,6 @@ const productId = Number(route.params.productId)
 
 const specsApi = {
   getAttributes: (categoryId) => api.get('/admin/specs/attributes', { params: { categoryId } }),
-  getCategoryScopes: (categoryId) =>
-    api.get('/admin/specs/category-scopes', { params: { categoryId } }),
-  createAttribute: (payload) => api.post('/admin/specs/attributes', payload),
-  updateAttribute: (id, payload) => api.put(`/admin/specs/attributes/${id}`, payload),
-  deleteAttribute: (id) => api.delete(`/admin/specs/attributes/${id}`),
   getProductSpecs: (id) => api.get(`/admin/specs/products/${id}`),
   saveProductSpecs: (payload) => api.put('/admin/specs/products', payload),
 }
@@ -301,24 +232,12 @@ const productApi = { getById: (id) => api.get(`/admin/product/${id}`) }
 const product = ref(null)
 const pageLoading = ref(true)
 const saving = ref(false)
-const savingAttr = ref(false)
 const specAttributes = ref([])
 const specRows = ref([])
-const categoryScopes = ref([])
 const specSearch = ref('')
 const specFilter = ref('all')
 const initialSignature = ref('[]')
 
-const attrFormEl = ref(null)
-let bsAttrForm = null
-const attrForm = ref({
-  id: null,
-  categoryId: null,
-  name: '',
-  unit: '',
-  dataType: 'text',
-  displayOrder: 0,
-})
 const baseModal = ref({ visible: false, type: 'error', title: '', message: '', onConfirm: null })
 let leaveResolver = null
 
@@ -333,6 +252,12 @@ const rowsSignature = () =>
   )
 
 const isDirty = computed(() => rowsSignature() !== initialSignature.value)
+// Marcus sửa: tiến độ chỉ phản ánh số trường đã nhập, không dùng để khóa thao tác bán hàng.
+const totalSpecCount = computed(() => specRows.value.length)
+const filledCount = computed(() => specRows.value.filter((row) => hasValue(row.valueText)).length)
+const completionPercent = computed(() =>
+  totalSpecCount.value ? Math.round((filledCount.value / totalSpecCount.value) * 100) : 0,
+)
 
 const filteredSpecs = computed(() => {
   const query = specSearch.value.trim().toLowerCase()
@@ -373,7 +298,7 @@ const emptyStateTitle = computed(() =>
 const emptyStateMessage = computed(() =>
   specAttributes.value.length
     ? 'Hãy đổi từ khóa hoặc trạng thái dữ liệu.'
-    : 'Bấm “Thêm vào bộ thông số” để cấu hình trường đầu tiên.',
+    : 'Mở “Quản lý bộ thông số” để cấu hình trường cho danh mục này.',
 )
 
 function showModal(type, title, message, onConfirm = null) {
@@ -392,16 +317,6 @@ function onModalConfirm() {
   const callback = baseModal.value.onConfirm
   baseModal.value.visible = false
   if (callback) callback()
-}
-
-function ensureValuesSaved() {
-  if (!isDirty.value) return true
-  showModal(
-    'error',
-    'Còn thay đổi chưa lưu',
-    'Hãy lưu giá trị sản phẩm trước khi thay đổi cấu trúc bộ thông số.',
-  )
-  return false
 }
 
 async function loadAll() {
@@ -426,13 +341,11 @@ async function loadAll() {
 }
 
 async function fetchSpecs() {
-  const [attributeResponse, valueResponse, scopeResponse] = await Promise.all([
+  const [attributeResponse, valueResponse] = await Promise.all([
     specsApi.getAttributes(product.value.categoryId),
     specsApi.getProductSpecs(product.value.productId),
-    specsApi.getCategoryScopes(product.value.categoryId),
   ])
   specAttributes.value = attributeResponse.data?.data || []
-  categoryScopes.value = scopeResponse.data?.data || []
   const currentValues = valueResponse.data?.data || []
   const valueByAttribute = new Map(currentValues.map((value) => [value.specAttributeId, value]))
   specRows.value = specAttributes.value.map((attribute) => {
@@ -484,82 +397,18 @@ async function saveSpecs() {
   }
 }
 
-function openAttrForm(row = null) {
-  if (!ensureValuesSaved()) return
-  attrForm.value = row
-    ? {
-        id: row.specAttributeId,
-        categoryId: row.categoryId,
-        name: row.specAttributeName,
-        unit: row.unit || '',
-        dataType: row.dataType || 'text',
-        displayOrder: row.displayOrder ?? 0,
-      }
-    : {
-        id: null,
-        categoryId: product.value.categoryId,
-        name: '',
-        unit: '',
-        dataType: 'text',
-        displayOrder: 0,
-      }
-  bsAttrForm.show()
-}
-
-async function saveAttribute() {
-  if (!attrForm.value.name?.trim()) {
-    showModal('error', 'Thiếu tên thông số', 'Tên thông số không được để trống.')
-    return
-  }
-  savingAttr.value = true
-  try {
-    const payload = {
-      categoryId: attrForm.value.categoryId,
-      name: attrForm.value.name.trim(),
-      unit: attrForm.value.unit?.trim() || null,
-      dataType: attrForm.value.dataType || 'text',
-      displayOrder: attrForm.value.displayOrder ?? 0,
-    }
-    if (attrForm.value.id) await specsApi.updateAttribute(attrForm.value.id, payload)
-    else await specsApi.createAttribute(payload)
-    bsAttrForm.hide()
-    await fetchSpecs()
-    showModal(
-      'success',
-      'Đã cập nhật bộ thông số',
-      'Cấu trúc thông số đã được áp dụng đúng phạm vi danh mục.',
-    )
-  } catch (error) {
+// Marcus sửa: cấu trúc thông số chỉ thay đổi tại màn quản lý tập trung; màn này
+// chỉ nhập giá trị của sản phẩm để tránh vô tình ảnh hưởng toàn danh mục.
+function openSpecificationManager() {
+  if (isDirty.value) {
     showModal(
       'error',
-      'Không thể lưu thông số',
-      error.response?.data?.message ?? 'Vui lòng kiểm tra lại dữ liệu.',
+      'Còn thay đổi chưa lưu',
+      'Hãy lưu giá trị sản phẩm trước khi mở bộ thông số.',
     )
-  } finally {
-    savingAttr.value = false
+    return
   }
-}
-
-function deleteAttribute(row) {
-  if (!ensureValuesSaved()) return
-  showModal(
-    'confirm',
-    'Xóa khỏi bộ thông số?',
-    `Thông số “${row.specAttributeName}” áp dụng cho các sản phẩm thuộc ${row.categoryName}. Chỉ có thể xóa khi chưa sản phẩm nào sử dụng.`,
-    async () => {
-      try {
-        await specsApi.deleteAttribute(row.specAttributeId)
-        await fetchSpecs()
-        showModal('success', 'Đã xóa thông số', 'Bộ thông số danh mục đã được cập nhật.')
-      } catch (error) {
-        showModal(
-          'error',
-          'Không thể xóa thông số',
-          error.response?.data?.message ?? 'Thông số đang được sử dụng.',
-        )
-      }
-    },
-  )
+  router.push({ name: 'SpecificationSetManager' })
 }
 
 function rowNumber(item) {
@@ -594,7 +443,6 @@ onBeforeRouteLeave(() => {
 })
 
 onMounted(async () => {
-  if (attrFormEl.value) bsAttrForm = new Modal(attrFormEl.value)
   await loadAll()
 })
 </script>
@@ -642,8 +490,7 @@ onMounted(async () => {
   margin: 0;
   color: #66758b;
 }
-.header-eyebrow,
-.modal-eyebrow {
+.header-eyebrow {
   color: #c51f64;
   font-size: 12px;
   font-weight: 800;
@@ -663,6 +510,84 @@ onMounted(async () => {
 .spec-loading.is-error i {
   color: #d72d43;
   font-size: 34px;
+}
+.spec-overview {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(420px, 1.5fr);
+  gap: 16px;
+}
+.completion-card,
+.spec-guidance {
+  border: 1px solid #e4eaf3;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(33, 57, 91, 0.06);
+}
+.completion-card {
+  padding: 20px 22px;
+}
+.completion-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+.completion-heading span,
+.spec-guidance strong {
+  color: #243b5c;
+  font-weight: 800;
+}
+.completion-heading small {
+  display: block;
+  margin-top: 4px;
+  color: #7b899c;
+}
+.completion-heading > strong {
+  color: #7a35dc;
+  font-size: 27px;
+  line-height: 1;
+}
+.completion-progress {
+  height: 9px;
+  margin-top: 16px;
+  border-radius: 999px;
+  background: #edf1f7;
+}
+.completion-progress .progress-bar {
+  border-radius: inherit;
+  background: linear-gradient(90deg, #e83f85, #7b3fe4);
+  transition: width 0.25s ease;
+}
+.completion-card > p {
+  margin: 10px 0 0;
+  color: #7b899c;
+  font-size: 12px;
+}
+.spec-guidance {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px 22px;
+  background: linear-gradient(135deg, #fff8fb, #f5f9ff);
+}
+.guidance-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  color: #c51f64;
+  background: #ffe7f1;
+  font-size: 18px;
+}
+.spec-guidance p {
+  margin: 6px 0 0;
+  color: #62728a;
+  line-height: 1.6;
+}
+.spec-guidance b {
+  color: #344f73;
 }
 .filter-action {
   min-height: 48px;
@@ -688,7 +613,7 @@ onMounted(async () => {
   width: 43%;
 }
 .action-column {
-  width: 155px;
+  width: 90px;
 }
 .scope-row td {
   padding: 13px 18px;
@@ -830,23 +755,13 @@ onMounted(async () => {
   min-height: 46px;
   border-radius: 12px;
 }
-.scope-warning {
-  display: flex;
-  gap: 9px;
-  margin-bottom: 16px;
-  padding: 12px 14px;
-  border-radius: 12px;
-  color: #4f627d;
-  background: #eef6ff;
-  font-size: 13px;
-  line-height: 1.45;
-}
-.form-note {
-  display: block;
-  margin-top: 5px;
-  color: #8290a1;
-}
 @media (max-width: 767.98px) {
+  .spec-overview {
+    grid-template-columns: 1fr;
+  }
+  .spec-guidance {
+    padding: 17px;
+  }
   .spec-page-header {
     align-items: flex-start;
     padding: 18px;
