@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
 import com.fpoly.marcusstore.repository.core.ProductRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +34,9 @@ public class ProductConfigService {
 
     @Autowired
     private AttributeValueRepository attributeValueRepository;
+
+    @Autowired
+    private FlashSaleItemRepository flashSaleItemRepository;
 
     // 1. LƯU MA TRẬN SKU TỪ FRONTEND
     @Transactional(rollbackFor = Exception.class)
@@ -97,7 +102,9 @@ public class ProductConfigService {
                 sku.setOriginalPrice(item.getOriginalPrice());
             }
 
-            sku.setStockQuantity(item.getStock());
+            // Marcus sửa sau khi tích hợp module kho: SKU mới luôn bắt đầu từ 0.
+            // Mọi đơn vị hàng phải đi qua Nhập kho để số lượng và IMEI cùng một luồng.
+            sku.setStockQuantity(0);
             sku.setWeightGram(500);
             sku.setIsActive(true);
 
@@ -110,13 +117,26 @@ public class ProductConfigService {
     // 2. CẬP NHẬT HÀNG LOẠT (Giá, Tồn kho)
     @Transactional(rollbackFor = Exception.class)
     public void bulkUpdateSkus(SkuBulkUpdateRequest request) {
-        List<ProductSku> skusToUpdate = new ArrayList<>();
+        // Marcus sửa: khóa toàn bộ SKU theo thứ tự ID, kiểm tra đủ batch rồi mới
+        // ghi. Không cập nhật tồn kho tại luồng giá vì kho/IMEI là nguồn dữ liệu tồn.
+        Map<Integer, SkuBulkUpdateRequest.SkuUpdateItem> itemsById = new java.util.LinkedHashMap<>();
         for (SkuBulkUpdateRequest.SkuUpdateItem item : request.getSkus()) {
-            ProductSku sku = skuRepository.findById(item.getSkuId())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU ID: " + item.getSkuId()));
-            sku.setPrice(item.getPrice());
-            sku.setStockQuantity(item.getStockQuantity());
-            skusToUpdate.add(sku);
+            if (itemsById.putIfAbsent(item.getSkuId(), item) != null) {
+                throw new IllegalArgumentException("SKU ID " + item.getSkuId() + " bị lặp trong danh sách cập nhật.");
+            }
+        }
+        List<Integer> sortedIds = itemsById.keySet().stream().sorted().toList();
+        List<ProductSku> skusToUpdate = skuRepository.findByIdsForUpdate(sortedIds);
+        if (skusToUpdate.size() != sortedIds.size()) {
+            Set<Integer> foundIds = skusToUpdate.stream().map(ProductSku::getSkuId).collect(Collectors.toSet());
+            Integer missingId = sortedIds.stream().filter(id -> !foundIds.contains(id)).findFirst().orElse(null);
+            throw new IllegalArgumentException("Không tìm thấy SKU ID: " + missingId);
+        }
+        for (ProductSku sku : skusToUpdate) {
+            ensureActive(sku);
+            ensureNoOpenFlashSale(sku);
+            SkuBulkUpdateRequest.SkuUpdateItem item = itemsById.get(sku.getSkuId());
+            applyPrices(sku, item.getOriginalPrice(), item.getPrice());
         }
         skuRepository.saveAll(skusToUpdate);
     }
@@ -126,20 +146,48 @@ public class ProductConfigService {
     }
 
     @Transactional
-    public ProductSku updateSingleSku(Integer skuId, BigDecimal price, Integer stockQuantity) {
-        ProductSku sku = skuRepository.findById(skuId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
-        sku.setPrice(price);
-        sku.setStockQuantity(stockQuantity);
+    public ProductSku updateSingleSku(Integer skuId, BigDecimal originalPrice, BigDecimal price) {
+        ProductSku sku = skuRepository.findByIdForUpdate(skuId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy SKU cần cập nhật."));
+        ensureActive(sku);
+        ensureNoOpenFlashSale(sku);
+        applyPrices(sku, originalPrice, price);
         return skuRepository.save(sku);
     }
 
     @Transactional
     public void deleteSku(Integer skuId) {
-        ProductSku sku = skuRepository.findById(skuId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
+        ProductSku sku = skuRepository.findByIdForUpdate(skuId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy SKU cần vô hiệu hóa."));
+        if (!Boolean.TRUE.equals(sku.getIsActive())) {
+            return;
+        }
         sku.setIsActive(false);
         skuRepository.save(sku);
+    }
+
+    private void ensureActive(ProductSku sku) {
+        if (!Boolean.TRUE.equals(sku.getIsActive())) {
+            throw new IllegalArgumentException("SKU " + sku.getSkuCode() + " đã ngừng hoạt động.");
+        }
+    }
+
+    private void applyPrices(ProductSku sku, BigDecimal originalPrice, BigDecimal price) {
+        if (originalPrice == null || originalPrice.signum() <= 0 || price == null || price.signum() <= 0) {
+            throw new IllegalArgumentException("Giá niêm yết và giá bán phải lớn hơn 0.");
+        }
+        if (price.compareTo(originalPrice) > 0) {
+            throw new IllegalArgumentException("Giá bán không được lớn hơn giá niêm yết.");
+        }
+        sku.setOriginalPrice(originalPrice);
+        sku.setPrice(price);
+    }
+
+    private void ensureNoOpenFlashSale(ProductSku sku) {
+        if (flashSaleItemRepository.existsOpenFlashSaleForSku(sku.getSkuId(), LocalDateTime.now())) {
+            throw new IllegalArgumentException("SKU " + sku.getSkuCode()
+                    + " đang thuộc Flash Sale chưa kết thúc. Hãy kết thúc hoặc hủy chương trình trước khi sửa giá thường.");
+        }
     }
 
     private String combinationKey(List<AttributeValue> values) {

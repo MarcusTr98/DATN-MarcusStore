@@ -39,6 +39,13 @@ public interface ProductSkuRepository extends JpaRepository<ProductSku, Integer>
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT s FROM ProductSku s WHERE s.skuId IN :skuIds")
     List<ProductSku> findByIdsForUpdate(@Param("skuIds") List<Integer> skuIds);
+
+    // Marcus thêm: khóa đúng một SKU khi chỉnh giá để hai Admin không ghi đè nhau.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = { "attributeValues", "attributeValues.attribute" })
+    @Query("SELECT s FROM ProductSku s WHERE s.skuId = :skuId")
+    Optional<ProductSku> findByIdForUpdate(@Param("skuId") Integer skuId);
+
     @EntityGraph(attributePaths = { "attributeValues", "attributeValues.attribute" })
     List<ProductSku> findBySkuIdIn(List<Integer> skuIds);
 }

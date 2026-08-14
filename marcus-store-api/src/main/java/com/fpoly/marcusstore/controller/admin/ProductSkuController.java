@@ -38,7 +38,8 @@ public class ProductSkuController {
         return ApiResponse.success("Đã lưu thành công ma trận SKU!");
     }
 
-    // Cập nhật giá, tồn kho đồng loạt
+    // Marcus sửa: cập nhật giá niêm yết và giá bán đồng loạt; tồn kho do module
+    // kho/IMEI quản lý riêng.
     @PutMapping("/bulk-update")
     public ApiResponse<String> bulkUpdateSkus(@Valid @RequestBody SkuBulkUpdateRequest request) {
         configService.bulkUpdateSkus(request);
@@ -51,7 +52,7 @@ public class ProductSkuController {
             @PathVariable @Positive Integer skuId,
             @Valid @RequestBody SkuSingleUpdateRequest request) {
         return ApiResponse
-                .success(configService.updateSingleSku(skuId, request.getPrice(), request.getStockQuantity()));
+                .success(configService.updateSingleSku(skuId, request.getOriginalPrice(), request.getPrice()));
     }
 
     // Xóa mềm SKU

@@ -162,7 +162,7 @@
                 <tr>
                   <th>Tổ hợp biến thể</th>
                   <th>Mã SKU</th>
-                  <th style="width: 140px">Giá gốc (₫)</th>
+                  <th style="width: 140px">Giá niêm yết (₫)</th>
                   <th style="width: 140px">Giá bán (₫)</th>
                   <th>Tồn kho</th>
                   <th>Hành động</th>
@@ -188,15 +188,27 @@
                     {{ formatMoney(sku.originalPrice || sku.price) }}
                   </td>
                   <td style="font-weight: 600">{{ formatMoney(sku.price) }}</td>
-                  <td>{{ sku.stockQuantity }}</td>
                   <td>
-                    <button
-                      class="skug-btn-row-del"
-                      @click="confirmDeleteSku(sku.skuId, idx)"
-                      title="Vô hiệu hóa SKU"
-                    >
-                      <i class="fa-solid fa-trash"></i>
-                    </button>
+                    <span class="skug-stock-readonly">{{ sku.stockQuantity }}</span>
+                    <small class="skug-stock-source">Quản lý tại Kho</small>
+                  </td>
+                  <td>
+                    <div class="skug-row-actions">
+                      <button
+                        class="skug-btn-row-edit"
+                        @click="openEditSku(sku, idx)"
+                        title="Chỉnh giá SKU"
+                      >
+                        <i class="fa-solid fa-pen"></i>
+                      </button>
+                      <button
+                        class="skug-btn-row-del"
+                        @click="confirmDeleteSku(sku.skuId, idx)"
+                        title="Vô hiệu hóa SKU"
+                      >
+                        <i class="fa-solid fa-trash"></i>
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -310,12 +322,14 @@
             <div class="skug-bulk-inputs">
               <div class="skug-bulk-field">
                 <label
-                  >Giá gốc (₫)
+                  >Giá niêm yết (₫)
                   <span style="font-weight: normal; color: #888">(Tùy chọn)</span></label
                 >
                 <input
                   v-model="bulkOriginalPrice"
                   type="number"
+                  min="1"
+                  step="1"
                   placeholder="Trống = Giá bán"
                   class="skug-bulk-input"
                 />
@@ -325,16 +339,9 @@
                 <input
                   v-model="bulkPrice"
                   type="number"
+                  min="1"
+                  step="1"
                   placeholder="VD: 25000000"
-                  class="skug-bulk-input"
-                />
-              </div>
-              <div class="skug-bulk-field">
-                <label>Tồn kho</label>
-                <input
-                  v-model="bulkStock"
-                  type="number"
-                  placeholder="VD: 10"
                   class="skug-bulk-input"
                 />
               </div>
@@ -348,9 +355,9 @@
                 <tr>
                   <th>Biến thể</th>
                   <th>Mã SKU</th>
-                  <th style="width: 140px">Giá gốc (₫)</th>
+                  <th style="width: 140px">Giá niêm yết (₫)</th>
                   <th style="width: 140px">Giá bán (₫)</th>
-                  <th>Tồn kho</th>
+                  <th>Khởi tạo tồn kho</th>
                   <th></th>
                 </tr>
               </thead>
@@ -407,7 +414,8 @@
                       class="skug-table-input is-muted"
                       :class="{ 'is-invalid': fieldErrors[`skus[${index}].originalPrice`] }"
                       placeholder="Trống = Giá bán"
-                      min="0"
+                      min="1"
+                      step="1"
                     />
                   </td>
 
@@ -419,7 +427,8 @@
                       class="skug-table-input"
                       :class="{ 'is-invalid': fieldErrors[`skus[${index}].price`] }"
                       placeholder="0"
-                      min="0"
+                      min="1"
+                      step="1"
                     />
                     <div class="skug-error-text" v-if="fieldErrors[`skus[${index}].price`]">
                       {{ fieldErrors[`skus[${index}].price`] }}
@@ -427,18 +436,8 @@
                   </td>
 
                   <td>
-                    <input
-                      v-model="sku.stock"
-                      @input="clearFieldError(index, 'stock')"
-                      type="number"
-                      class="skug-table-input is-narrow"
-                      :class="{ 'is-invalid': fieldErrors[`skus[${index}].stock`] }"
-                      placeholder="0"
-                      min="0"
-                    />
-                    <div class="skug-error-text" v-if="fieldErrors[`skus[${index}].stock`]">
-                      {{ fieldErrors[`skus[${index}].stock`] }}
-                    </div>
+                    <span class="skug-zero-stock">0</span>
+                    <small class="skug-stock-source">Nhập hàng tại module Kho sau khi tạo SKU</small>
                   </td>
 
                   <td>
@@ -474,6 +473,81 @@
           </div>
         </div>
       </div>
+
+      <!-- Marcus thêm: modal sửa giá SKU, không cho màn giá ghi đè tồn kho/IMEI. -->
+      <Transition name="modal">
+        <div
+          v-if="editModal.show"
+          class="skug-modal-backdrop"
+          @click.self="closeEditSku"
+        >
+          <form class="skug-modal skug-price-modal" @submit.prevent="saveSkuPrices">
+            <div class="skug-price-modal__header">
+              <div>
+                <p class="skug-price-modal__eyebrow">CHỈNH GIÁ BIẾN THỂ</p>
+                <h4>{{ editModal.sku?.skuCode }}</h4>
+                <p>{{ editVariantLabel }}</p>
+              </div>
+              <button type="button" class="skug-modal-close" @click="closeEditSku">×</button>
+            </div>
+
+            <div class="skug-modal-body skug-price-form">
+              <div class="skug-price-note">
+                <i class="fa-solid fa-circle-info"></i>
+                <span>Giá mới áp dụng cho lần mua tiếp theo. Đơn hàng đã tạo vẫn giữ nguyên giá đã chốt.</span>
+              </div>
+
+              <label class="skug-form-field">
+                <span>Giá niêm yết <b>*</b></span>
+                <div class="skug-money-input">
+                  <input
+                    v-model.number="editModal.originalPrice"
+                    type="number"
+                    min="1"
+                    max="9999999999999.99"
+                    step="1"
+                    inputmode="numeric"
+                    @input="editModal.error = ''"
+                  />
+                  <span>₫</span>
+                </div>
+                <small>Giá dùng để tham chiếu và hiển thị mức giảm.</small>
+              </label>
+
+              <label class="skug-form-field">
+                <span>Giá bán hiện tại <b>*</b></span>
+                <div class="skug-money-input">
+                  <input
+                    v-model.number="editModal.price"
+                    type="number"
+                    min="1"
+                    max="9999999999999.99"
+                    step="1"
+                    inputmode="numeric"
+                    @input="editModal.error = ''"
+                  />
+                  <span>₫</span>
+                </div>
+                <small>Giá bán thường, không phải giá Flash Sale hoặc Voucher.</small>
+              </label>
+
+              <div class="skug-price-preview" :class="{ 'has-error': priceEditError }">
+                <span>Mức giảm hiển thị</span>
+                <strong>{{ editDiscountLabel }}</strong>
+              </div>
+              <p v-if="priceEditError" class="skug-form-error">{{ priceEditError }}</p>
+            </div>
+
+            <div class="skug-modal-footer skug-price-actions">
+              <button type="button" class="skug-btn-cancel" @click="closeEditSku">Hủy</button>
+              <button type="submit" class="skug-btn-primary" :disabled="editModal.saving || !!priceEditError">
+                <span v-if="editModal.saving" class="skug-spinner"></span>
+                {{ editModal.saving ? 'Đang lưu...' : 'Lưu giá SKU' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Transition>
 
       <!-- Modal Thông báo -->
       <Transition name="modal">
@@ -546,10 +620,84 @@ const selectedValueIds = ref(new Set())
 
 const generatedSkus = ref([])
 const bulkPrice = ref('')
-const bulkStock = ref('')
 const bulkOriginalPrice = ref('') // BIẾN GIÁ GỐC HÀNG LOẠT
 const alertModal = ref({ show: false, message: '', type: 'success' })
 const existingSkus = ref([])
+const editModal = ref({
+  show: false,
+  saving: false,
+  sku: null,
+  index: -1,
+  originalPrice: '',
+  price: '',
+  error: '',
+})
+
+const editVariantLabel = computed(() => {
+  const values = editModal.value.sku?.attributeValues || []
+  return values.length ? values.map((value) => value.valueString).join(' / ') : 'Biến thể mặc định'
+})
+
+const priceEditError = computed(() => {
+  const originalPrice = Number(editModal.value.originalPrice)
+  const price = Number(editModal.value.price)
+  if (!Number.isFinite(originalPrice) || originalPrice <= 0) return 'Giá niêm yết phải lớn hơn 0.'
+  if (!Number.isFinite(price) || price <= 0) return 'Giá bán phải lớn hơn 0.'
+  if (price > originalPrice) return 'Giá bán không được lớn hơn giá niêm yết.'
+  return editModal.value.error || ''
+})
+
+const editDiscountLabel = computed(() => {
+  if (priceEditError.value) return 'Chưa hợp lệ'
+  const originalPrice = Number(editModal.value.originalPrice)
+  const price = Number(editModal.value.price)
+  if (price === originalPrice) return 'Không giảm giá'
+  return `Giảm ${Math.round(((originalPrice - price) * 100) / originalPrice)}%`
+})
+
+const openEditSku = (sku, index) => {
+  editModal.value = {
+    show: true,
+    saving: false,
+    sku,
+    index,
+    originalPrice: Number(sku.originalPrice || sku.price || 0),
+    price: Number(sku.price || 0),
+    error: '',
+  }
+}
+
+const closeEditSku = () => {
+  if (editModal.value.saving) return
+  editModal.value.show = false
+}
+
+const saveSkuPrices = async () => {
+  if (priceEditError.value || !editModal.value.sku) return
+  editModal.value.saving = true
+  try {
+    const payload = {
+      originalPrice: Number(editModal.value.originalPrice),
+      price: Number(editModal.value.price),
+    }
+    const response = await api.put(`/admin/skus/${editModal.value.sku.skuId}`, payload)
+    const updated = response.data?.data || { ...editModal.value.sku, ...payload }
+    existingSkus.value.splice(editModal.value.index, 1, updated)
+    editModal.value.show = false
+    showAlert(`Đã cập nhật giá SKU ${updated.skuCode || editModal.value.sku.skuCode}.`, 'success')
+  } catch (error) {
+    const validation = error.response?.data?.data
+    editModal.value.error =
+      validation?._global ||
+      validation?.priceRangeValid ||
+      validation?.price ||
+      validation?.originalPrice ||
+      error.response?.data?.message ||
+      'Không thể cập nhật giá SKU.'
+  } finally {
+    editModal.value.saving = false
+  }
+}
 
 const skuToDelete = ref(null) // SKU đang chờ xác nhận xóa
 const confirmDeleteSku = (skuId, index) => {
@@ -778,7 +926,6 @@ const generateVariantsAndNext = () => {
     skuCode: `${baseCode}-${combo.map((v) => generateValueCode(v.valueString)).join('-')}`,
     originalPrice: bulkOriginalPrice.value || '', // ÁP DỤNG GIÁ GỐC TỪ BULK BAR
     price: bulkPrice.value || '',
-    stock: bulkStock.value || '',
     comboValues: combo.map((v) => v.valueString),
     valueIds: combo.map((v) => v.valueId),
   }))
@@ -789,7 +936,6 @@ const applyBulkSettings = () => {
   generatedSkus.value.forEach((sku) => {
     if (bulkOriginalPrice.value !== '') sku.originalPrice = Number(bulkOriginalPrice.value)
     if (bulkPrice.value !== '') sku.price = Number(bulkPrice.value)
-    if (bulkStock.value !== '') sku.stock = Number(bulkStock.value)
   })
 }
 
@@ -806,7 +952,6 @@ const saveAllSkus = async () => {
         skuCode: sku.skuCode,
         originalPrice: sku.originalPrice ? Number(sku.originalPrice) : null, // GỬI GIÁ GỐC LÊN JAVA
         price: Number(sku.price),
-        stock: Number(sku.stock),
         valueIds: sku.valueIds,
       })),
     }

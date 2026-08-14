@@ -25,7 +25,6 @@ class MarcusModuleValidationTest {
         SkuBatchCreateRequest.SkuItem item = new SkuBatchCreateRequest.SkuItem();
         item.setSkuCode("<script>");
         item.setPrice(BigDecimal.ZERO);
-        item.setStock(-1);
         item.setValueIds(List.of(0));
 
         SkuBatchCreateRequest request = new SkuBatchCreateRequest();
@@ -37,7 +36,6 @@ class MarcusModuleValidationTest {
                 "productId",
                 "skus[0].skuCode",
                 "skus[0].price",
-                "skus[0].stock",
                 "skus[0].valueIds[0].<list element>");
     }
 
@@ -46,7 +44,7 @@ class MarcusModuleValidationTest {
         SkuBulkUpdateRequest.SkuUpdateItem item = new SkuBulkUpdateRequest.SkuUpdateItem();
         item.setSkuId(0);
         item.setPrice(new BigDecimal("-1"));
-        item.setStockQuantity(-1);
+        item.setOriginalPrice(BigDecimal.ZERO);
 
         SkuBulkUpdateRequest request = new SkuBulkUpdateRequest();
         request.setSkus(List.of(item));
@@ -54,7 +52,7 @@ class MarcusModuleValidationTest {
         assertThat(fieldNames(request)).contains(
                 "skus[0].skuId",
                 "skus[0].price",
-                "skus[0].stockQuantity");
+                "skus[0].originalPrice");
     }
 
     @Test

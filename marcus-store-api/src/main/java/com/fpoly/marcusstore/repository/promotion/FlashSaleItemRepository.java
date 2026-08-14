@@ -63,6 +63,19 @@ public interface FlashSaleItemRepository extends JpaRepository<FlashSaleItem, Fl
                 @Param("skuId") Integer skuId,
                 @Param("now") LocalDateTime now);
 
+        // Marcus thêm tại ranh giới SKU/Flash Sale: chỉ đọc để ngăn Admin sửa giá
+        // thường khi một chương trình chưa kết thúc có thể khôi phục lại giá cũ.
+        @Query("""
+                        SELECT CASE WHEN COUNT(fi) > 0 THEN true ELSE false END
+                        FROM FlashSaleItem fi
+                        JOIN fi.slot s
+                        WHERE fi.id.skuId = :skuId
+                          AND s.status IN (1, 2)
+                          AND s.endDate > :now
+                        """)
+        boolean existsOpenFlashSaleForSku(@Param("skuId") Integer skuId,
+                                          @Param("now") LocalDateTime now);
+
         /**
          * Khoá dòng FlashSaleItem tại thời điểm checkout (PESSIMISTIC_WRITE) để
          * ngăn 2 request cùng đọc soldQuantity rồi cộng dồn vượt flashSaleQuantity,
