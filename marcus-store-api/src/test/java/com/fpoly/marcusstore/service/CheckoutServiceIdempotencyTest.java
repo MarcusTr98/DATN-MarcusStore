@@ -1,6 +1,8 @@
 package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.request.CheckoutRequestDTO;
+import com.fpoly.marcusstore.entity.core.Product;
+import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.entity.shopping.Cart;
 import com.fpoly.marcusstore.entity.shopping.Order;
 import com.fpoly.marcusstore.repository.auth.UserRepository;
@@ -20,10 +22,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 // Marcus thêm testcase nền thuộc phạm vi Checkout của Marcus:
@@ -99,6 +103,31 @@ class CheckoutServiceIdempotencyTest {
 
         verify(cartRepository).findByUserIdForCheckout(7);
         verifyNoInteractions(productSkuRepository, voucherRepository, flashSaleItemRepository);
+    }
+
+    @Test
+    void inactiveParentProductIsRejectedEvenWhenSkuIsStillActive() {
+        Product product = new Product();
+        product.setStatus(false);
+        ProductSku sku = new ProductSku();
+        sku.setSkuCode("SKU-PARENT-OFF");
+        sku.setIsActive(true);
+        sku.setProduct(product);
+
+        assertThatThrownBy(() -> checkoutService.validateSkuSellable(sku, sku.getSkuCode()))
+                .hasMessageContaining("PRODUCT_INACTIVE");
+    }
+
+    @Test
+    void fourthPendingCodOrderIsRejectedButVnPayIsNotCounted() {
+        ReflectionTestUtils.setField(checkoutService, "maxPendingCodOrders", 3L);
+        when(orderRepository.countPendingCodOrders(7)).thenReturn(3L);
+
+        assertThatThrownBy(() -> checkoutService.validateCodPendingLimit("COD", 7))
+                .hasMessageContaining("COD_PENDING_LIMIT");
+
+        checkoutService.validateCodPendingLimit("VNPAY", 7);
+        verify(orderRepository, times(1)).countPendingCodOrders(7);
     }
 
     private CheckoutRequestDTO request(String requestId) {

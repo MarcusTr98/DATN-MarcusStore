@@ -39,6 +39,9 @@ public class RequestRateLimitFilter extends OncePerRequestFilter {
             Map.entry("POST:/api/public/behavior/events", new Rule(60, Duration.ofMinutes(1))),
             Map.entry("POST:/api/public/ai-advisor/chat", new Rule(12, Duration.ofMinutes(1))),
             Map.entry("POST:/api/public/ai-advisor/chat-stream", new Rule(12, Duration.ofMinutes(1))),
+            // Marcus thêm: chặn burst trước khi Checkout giữ lock DB; giới hạn số
+            // đơn COD PENDING vẫn được kiểm tra bền vững bằng dữ liệu đơn hàng.
+            Map.entry("POST:/api/checkout", new Rule(10, Duration.ofMinutes(1))),
             Map.entry("POST:/api/admin/analytics/ai-report", new Rule(3, Duration.ofMinutes(1))));
 
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();

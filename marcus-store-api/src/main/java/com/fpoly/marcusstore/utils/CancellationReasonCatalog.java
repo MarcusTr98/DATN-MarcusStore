@@ -22,6 +22,7 @@ public final class CancellationReasonCatalog {
             Map.entry("ADMIN_OTHER", "Lý do khác từ Admin"),
             Map.entry("SYSTEM_VNPAY_EXPIRED", "Quá hạn thanh toán VNPAY"),
             Map.entry("SYSTEM_VNPAY_FAILED", "Thanh toán VNPAY không thành công"),
+            Map.entry("SYSTEM_COD_CONFIRMATION_EXPIRED", "Đơn COD quá hạn chờ xác nhận"),
             Map.entry("SYSTEM_OTHER", "Hệ thống tự hủy"),
             Map.entry("GHN_CANCELLED", "Đơn vị vận chuyển hủy vận đơn"));
 

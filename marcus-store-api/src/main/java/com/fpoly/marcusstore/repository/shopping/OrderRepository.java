@@ -54,6 +54,30 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
   List<Order> findByOrderStatusIn(List<String> orderStatuses);
 
+  // Marcus thêm: giới hạn giữ kho bằng nhiều đơn COD chưa xác nhận. Kiểm tra theo
+  // user đã xác thực, không tin phone/userId từ client và không reset theo IP.
+  @Query("""
+      SELECT COUNT(o) FROM Order o
+      WHERE o.user.userId = :userId
+        AND UPPER(o.paymentMethod) = 'COD'
+        AND UPPER(o.orderStatus) = 'PENDING'
+      """)
+  long countPendingCodOrders(@Param("userId") Integer userId);
+
+  // Marcus thêm: scheduler chỉ đọc ID theo lô; mỗi đơn sẽ được khóa và hủy trong
+  // transaction riêng để một đơn lỗi không giữ cả lô.
+  @Query("""
+      SELECT o.orderId FROM Order o
+      WHERE UPPER(o.paymentMethod) = 'COD'
+        AND UPPER(o.paymentStatus) = 'UNPAID'
+        AND UPPER(o.orderStatus) = 'PENDING'
+        AND o.createdAt <= :cutoff
+      ORDER BY o.createdAt
+      """)
+  List<Integer> findExpiredPendingCodOrderIds(
+      @Param("cutoff") java.time.LocalDateTime cutoff,
+      Pageable pageable);
+
   // Marcus thêm: polling chỉ lấy mã vận đơn, không giữ entity/transaction trong
   // lúc gọi HTTP sang GHN.
   @Query(value = """

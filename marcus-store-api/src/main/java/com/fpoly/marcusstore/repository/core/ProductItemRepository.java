@@ -47,4 +47,30 @@ public interface ProductItemRepository
 
     @Query("SELECT COUNT(pi) FROM ProductItem pi WHERE pi.productSku.skuId = :skuId AND pi.status = 1")
     long countInStockBySkuId(@Param("skuId") Integer skuId);
+
+    // Marcus sửa hỗ trợ module kho: lượng đơn đang giữ nhưng chưa có đủ IMEI.
+    // Không tính đơn đã hủy/hoàn thành và không trừ lại các IMEI đã gán.
+    @Query(value = """
+            SELECT COALESCE(SUM(
+                CASE
+                    WHEN oi.quantity > COALESCE(assigned.assigned_qty, 0)
+                    THEN oi.quantity - COALESCE(assigned.assigned_qty, 0)
+                    ELSE 0
+                END
+            ), 0)
+            FROM Order_Items oi
+            INNER JOIN Orders o ON o.order_id = oi.order_id
+            LEFT JOIN (
+                SELECT order_item_id, COUNT(*) AS assigned_qty
+                FROM Product_Items
+                WHERE order_item_id IS NOT NULL
+                GROUP BY order_item_id
+            ) assigned ON assigned.order_item_id = oi.order_item_id
+            WHERE oi.sku_id = :skuId
+              AND o.order_status IN (
+                  'PENDING','CONFIRMED','PROCESSING',
+                  'READY_FOR_PICKUP','PACKED','SHIPPING'
+              )
+            """, nativeQuery = true)
+    long countReservedWithoutImeiBySkuId(@Param("skuId") Integer skuId);
 }

@@ -33,6 +33,9 @@ public class ProductItemService {
     @Autowired
     private ProductSkuRepository skuRepository;
 
+    @Autowired
+    private InventoryAvailabilityService inventoryAvailabilityService;
+
     private String normalizeImei(String raw) {
         if (raw == null)
             return null;
@@ -80,15 +83,9 @@ public class ProductItemService {
     public void resyncStockFromImeis(ProductSku sku) {
         if (sku == null)
             return;
-        long inStockCount = productItemRepo.countInStockBySkuId(sku.getSkuId());
-        ProductSku managed = skuRepository.findById(sku.getSkuId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU: " + sku.getSkuId()));
-        int current = managed.getStockQuantity() == null ? 0 : managed.getStockQuantity();
-        int updated = (int) inStockCount;
-        if (updated != current) {
-            managed.setStockQuantity(updated);
-            skuRepository.save(managed);
-        }
+        // Marcus sửa hỗ trợ module kho: không dùng COUNT(IN_STOCK) trực tiếp vì
+        // Checkout có thể đã giữ hàng trước khi Admin gán IMEI.
+        inventoryAvailabilityService.synchronizeImeiSku(sku.getSkuId());
     }
 
     public static String toStatusLabel(Integer status) {
@@ -128,6 +125,7 @@ public class ProductItemService {
         // SOLD chỉ được thiết lập qua nghiệp vụ gán IMEI vào đơn hàng.
         item.setStatus(STATUS_IN_STOCK);
         ProductItem saved = productItemRepo.save(item);
+        productItemRepo.flush();
         resyncStockFromImeis(sku);
         return toResponse(saved);
     }
@@ -168,6 +166,7 @@ public class ProductItemService {
             item.setStatus(newStatus);
             productItemRepo.save(item);
             if (statusChanged) {
+                productItemRepo.flush();
                 resyncStockFromImeis(item.getProductSku());
             }
         }
@@ -192,6 +191,7 @@ public class ProductItemService {
         }
         ProductSku sku = item.getProductSku();
         productItemRepo.delete(item);
+        productItemRepo.flush();
         resyncStockFromImeis(sku);
     }
 
@@ -229,5 +229,9 @@ public class ProductItemService {
             items.add(item);
         }
         productItemRepo.saveAll(items);
+        productItemRepo.flush();
+        // Marcus sửa hỗ trợ module kho: nhập lô IMEI cũng phải đồng bộ ngay, trước
+        // đây đường này bỏ quên resync nên list ngoài và danh sách IMEI bị lệch.
+        resyncStockFromImeis(sku);
     }
 }

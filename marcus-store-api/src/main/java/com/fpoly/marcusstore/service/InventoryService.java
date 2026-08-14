@@ -224,12 +224,19 @@ public class InventoryService {
         }
 
         int before = sku.getStockQuantity() == null ? 0 : sku.getStockQuantity();
-        int after = before + request.getImportQuantity();
-        sku.setStockQuantity(after);
-        skuRepository.save(sku);
-
-        if (!cleanedImeis.isEmpty()) {
+        int after;
+        if (isImei) {
+            // Marcus sửa hỗ trợ module kho: IMEI là nguồn vật lý; createBatch sẽ
+            // đồng bộ tồn khả dụng theo IMEI trừ lượng đơn đang giữ. Không cộng tay
+            // stock_quantity để tránh đếm hai lần.
             productItemService.createBatchForSku(sku.getSkuId(), cleanedImeis);
+            ProductSku synchronizedSku = skuRepository.findById(sku.getSkuId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU sau khi nhập kho!"));
+            after = synchronizedSku.getStockQuantity() == null ? 0 : synchronizedSku.getStockQuantity();
+        } else {
+            after = before + request.getImportQuantity();
+            sku.setStockQuantity(after);
+            skuRepository.save(sku);
         }
 
         return InventoryTransactionResponse.builder()
@@ -238,7 +245,7 @@ public class InventoryService {
                 .productName(sku.getProduct() != null ? sku.getProduct().getProductName() : "")
                 .transactionType("NHAP")
                 .quantityBefore(before)
-                .quantityChanged(request.getImportQuantity())
+                .quantityChanged(after - before)
                 .quantityAfter(after)
                 .referenceType("IMPORT")
                 .note(request.getNote())

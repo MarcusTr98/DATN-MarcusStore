@@ -26,6 +26,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderStatusHistoryRepository;
 import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -67,6 +68,11 @@ public class CheckoutService {
         private final FlashSaleSlotRepository flashSaleSlotRepository;
         private final SystemSettingRepository systemSettingRepository;
         private final BehaviorEventService behaviorEventService;
+
+        // Marcus thêm: chặn một tài khoản giữ kho bằng quá nhiều đơn COD chưa được
+        // Admin xác nhận. Idempotent retry được xử lý trước nên không bị tính nhầm.
+        @Value("${checkout.cod.max-pending-orders:3}")
+        private long maxPendingCodOrders;
 
         @Transactional(readOnly = true)
         public Integer calculateShippingFeeForCart(CalculateFeeRequestDTO req) {
@@ -181,6 +187,7 @@ public class CheckoutService {
                         throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                                         "Phương thức thanh toán không hợp lệ.|INVALID_PAYMENT_METHOD");
                 }
+                validateCodPendingLimit(paymentMethod, currentUserId);
                 order.setPaymentMethod(paymentMethod);
                 order.setPaymentStatus("COD".equals(paymentMethod) ? "UNPAID" : "PENDING");
                 order.setOrderStatus("PENDING");
@@ -193,10 +200,7 @@ public class CheckoutService {
 
                 for (CartItem cartItem : cartItems) {
                         ProductSku sku = skuMap.get(cartItem.getSku().getSkuId());
-                        if (sku == null || !Boolean.TRUE.equals(sku.getIsActive())) {
-                                throw new RuntimeException(
-                                                "Sản phẩm " + cartItem.getSku().getSkuCode() + " không còn tồn tại.");
-                        }
+                        validateSkuSellable(sku, cartItem.getSku().getSkuCode());
 
                         Integer persistedQuantity = cartItem.getQuantity();
                         if (persistedQuantity == null || persistedQuantity <= 0 || persistedQuantity > 100) {
@@ -488,5 +492,33 @@ public class CheckoutService {
                 return orderRepository
                                 .findByCheckoutRequestIdAndUserUserId(checkoutRequestId, userId)
                                 .orElse(null);
+        }
+
+        // Marcus thêm: tách validation để thống nhất SKU/Product cha và kiểm thử
+        // được độc lập, không chạm nghiệp vụ Product của thành viên.
+        void validateSkuSellable(ProductSku sku, String requestedSkuCode) {
+                if (sku == null || !Boolean.TRUE.equals(sku.getIsActive())) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "Sản phẩm " + requestedSkuCode
+                                                        + " không còn khả dụng.|SKU_INACTIVE");
+                }
+                if (sku.getProduct() == null || !Boolean.TRUE.equals(sku.getProduct().getStatus())) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT,
+                                        "Sản phẩm " + sku.getSkuCode()
+                                                        + " đã ngừng kinh doanh. Vui lòng xóa khỏi giỏ hàng.|PRODUCT_INACTIVE");
+                }
+        }
+
+        // Marcus thêm: tách giới hạn COD để kiểm thử quy tắc giữ kho độc lập.
+        void validateCodPendingLimit(String paymentMethod, Integer userId) {
+                if (!"COD".equalsIgnoreCase(paymentMethod)) {
+                        return;
+                }
+                long pendingCod = orderRepository.countPendingCodOrders(userId);
+                if (pendingCod >= maxPendingCodOrders) {
+                        throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                                        "Bạn đang có quá nhiều đơn COD chờ xác nhận. "
+                                                        + "Vui lòng chờ Admin xử lý hoặc hủy đơn cũ trước khi đặt tiếp.|COD_PENDING_LIMIT");
+                }
         }
 }

@@ -67,6 +67,11 @@ vnpay.allowManualRefundConfirmation=false
 order.auto-complete.delivered-after-hours=72
 order.auto-complete.initial-delay-ms=60000
 order.auto-complete.scan-delay-ms=1800000
+# Marcus thêm: giới hạn đơn COD giữ kho và tự hủy COD chờ xác nhận quá lâu.
+checkout.cod.max-pending-orders=3
+checkout.cod.pending-timeout-hours=24
+checkout.cod.expiry-initial-delay-ms=60000
+checkout.cod.expiry-scan-delay-ms=300000
 
 # CẤU HÌNH CLOUDINARY
 cloudinary.cloud-name=dyeb3lju6
