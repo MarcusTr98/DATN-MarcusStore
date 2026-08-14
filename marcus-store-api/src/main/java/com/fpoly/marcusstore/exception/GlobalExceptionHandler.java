@@ -14,6 +14,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -82,6 +83,33 @@ public class GlobalExceptionHandler {
     }
 
     // 3. Bắt các lỗi văng ra từ logic nghiệp vụ (Custom Exception)
+    // Marcus thêm: không trả nguyên constraint/câu SQL ra modal Admin. Hai lỗi
+    // identity từng xuất hiện khi demo được đổi thành hướng dẫn an toàn, ổn định.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        String detail = ex.getMostSpecificCause() == null
+                ? ""
+                : String.valueOf(ex.getMostSpecificCause().getMessage());
+        log.error("Vi phạm toàn vẹn dữ liệu", ex);
+
+        if (detail.contains("PK_Categories") || detail.contains("PK_Products")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new ApiResponse<>(409,
+                            "Bộ đếm ID của dữ liệu chưa đồng bộ. Vui lòng chạy file MarcusUpdateHeThong0908.sql rồi thử lại.",
+                            "IDENTITY_OUT_OF_SYNC"));
+        }
+        if (detail.toLowerCase().contains("duplicate") || detail.contains("UNIQUE")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(new ApiResponse<>(409,
+                            "Dữ liệu đã tồn tại hoặc bị trùng. Vui lòng kiểm tra lại thông tin.",
+                            "DUPLICATE_DATA"));
+        }
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(400,
+                        "Dữ liệu không hợp lệ hoặc đang được nội dung khác sử dụng.",
+                        "DATA_INTEGRITY_VIOLATION"));
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ApiResponse<Object>> handleRuntimeExceptions(RuntimeException ex) {
         ApiResponse<Object> response = new ApiResponse<>(400, ex.getMessage(), null);
