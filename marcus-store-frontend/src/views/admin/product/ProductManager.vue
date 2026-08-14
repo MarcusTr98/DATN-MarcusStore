@@ -143,6 +143,13 @@
                       <i class="bi bi-pencil"></i>
                     </button>
                     <button
+                      class="act-btn spec-btn"
+                      title="Thông số kỹ thuật"
+                      @click="goToSpecs(item)"
+                    >
+                      <i class="bi bi-list-columns-reverse"></i>
+                    </button>
+                    <button
                       class="act-btn img-btn"
                       title="Xem danh sách ảnh"
                       @click="openImagesModal(item)"
@@ -491,10 +498,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router' // thêm dòng này
 import BaseModal from '@/components/BaseModal.vue'
 import api from '@/utils/api'
 import '@/assets/css/Product.css'
 import { Modal } from 'bootstrap'
+
+const router = useRouter()
 
 const productApi = {
   getAll: (keyword, status, brand, page, size) =>
@@ -600,7 +610,9 @@ function onThumbnailSelect(event) {
   if (!file) return
   thumbnailFile.value = file
   const reader = new FileReader()
-  reader.onload = (e) => { thumbnailPreview.value = e.target.result }
+  reader.onload = (e) => {
+    thumbnailPreview.value = e.target.result
+  }
   reader.readAsDataURL(file)
 }
 
@@ -670,7 +682,7 @@ async function fetchCategories() {
 async function doCreate() {
   saving.value = true
   try {
-    const res =await productApi.create({
+    const res = await productApi.create({
       productName: form.value.productName,
       brand: form.value.brand,
       categoryId: form.value.categoryId,
@@ -686,7 +698,7 @@ async function doCreate() {
       formData.append('isPrimary', true)
       await productImgApi.uploadImage(newProductId, formData)
     }
-    
+
     showToast('Thêm sản phẩm thành công!', 'success')
     clearThumbnail()
     bsModal.hide()
@@ -911,6 +923,18 @@ onMounted(async () => {
 
   await Promise.all([fetchProducts(), fetchCategories(), fetchAllBrands()])
 })
+
+function goToSpecs(item) {
+  router.push({
+    name: 'AdminProductSpecs',
+    params: { productId: item.productId },
+    query: {
+      categoryId: item.categoryId,
+      productName: item.productName,
+      categoryName: item.categoryName,
+    },
+  })
+}
 </script>
 
 <style scoped></style>

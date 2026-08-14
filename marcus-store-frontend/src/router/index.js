@@ -183,6 +183,11 @@ const routes = [
         meta: { permission: 'PRODUCT_VIEW' },
       },
       {
+        path: 'products/:productId/specs',
+        name: 'AdminProductSpecs',
+        component: () => import('@/views/admin/product/ProductSpecs.vue'),
+      },
+      {
         path: 'attribute',
         name: 'AttributeManager',
         component: () => import('@/views/admin/product/Attributemanager.vue'),

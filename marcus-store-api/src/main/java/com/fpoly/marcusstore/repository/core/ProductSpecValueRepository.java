@@ -18,4 +18,6 @@ public interface ProductSpecValueRepository extends JpaRepository<ProductSpecVal
             "WHERE psv.product.productId = :productId " +
             "ORDER BY psv.specAttribute.displayOrder ASC")
     List<ProductSpecValue> findByProductIdWithSpec(@Param("productId") Integer productId);
+
+    long countBySpecAttributeSpecAttributeId(Integer specAttributeId);
 }

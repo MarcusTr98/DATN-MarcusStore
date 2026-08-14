@@ -31,8 +31,10 @@ public class ProductsServiceImpl implements ProductsService {
     // Marcus sửa để làm màn generete SKU admin
     private ProductResponse toProductResponse(Product product) {
         String categoryName = "Chưa phân loại";
+        Integer categoryId = null;
         if (product.getCategory() != null) {
             categoryName = product.getCategory().getCategoryName();
+            categoryId = product.getCategory().getCategoryId();
         }
         return ProductResponse.builder()
                 .productId(product.getProductId())
@@ -43,6 +45,7 @@ public class ProductsServiceImpl implements ProductsService {
                 .status(product.getStatus())
                 .thumbnailUrl(product.getThumbnailUrl())
                 .createdAt(product.getCreatedAt())
+                .categoryId(categoryId)
                 .categoryName(categoryName)
                 .build();
     }
