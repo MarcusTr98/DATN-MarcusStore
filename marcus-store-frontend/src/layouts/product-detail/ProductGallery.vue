@@ -66,20 +66,31 @@ const props = defineProps({
   productName: { type: String, default: '' },
   images: { type: Array, default: () => [] },
   thumbnailUrl: { type: String, default: '' },
+  skuImageUrl: { type: String, default: '' },
   discountPercent: { type: Number, default: 0 },
 })
 
-// Gom tất cả ảnh: ưu tiên images[] từ BE, fallback thumbnailUrl
+// Marcus sửa: ảnh SKU được đặt đầu gallery khi khách chọn biến thể. Danh sách
+// chỉ được ghép lúc hiển thị và loại URL trùng, không ghi ảnh SKU vào Product_Images.
 const imageList = computed(() => {
-  if (Array.isArray(props.images) && props.images.length > 0) {
-    return props.images
-      .filter((i) => i?.imageUrl)
-      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+  const candidates = []
+  if (props.skuImageUrl) {
+    candidates.push({ imageId: `sku-${props.skuImageUrl}`, imageUrl: props.skuImageUrl, isSku: true })
   }
-  if (props.thumbnailUrl) {
-    return [{ imageId: 0, imageUrl: props.thumbnailUrl, displayOrder: 0, isPrimary: true }]
+  if (Array.isArray(props.images)) {
+    candidates.push(...props.images.filter((item) => item?.imageUrl)
+      .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)))
   }
-  return []
+  if (!candidates.length && props.thumbnailUrl) {
+    candidates.push({ imageId: 0, imageUrl: props.thumbnailUrl, displayOrder: 0, isPrimary: true })
+  }
+  const seen = new Set()
+  return candidates.filter((item) => {
+    const normalizedUrl = String(item.imageUrl || '').trim().toLowerCase()
+    if (!normalizedUrl || seen.has(normalizedUrl)) return false
+    seen.add(normalizedUrl)
+    return true
+  })
 })
 
 const activeIndex = ref(0)
@@ -105,7 +116,7 @@ function nextImage() {
 
 // Reset khi đổi sản phẩm
 watch(
-  () => props.images,
+  () => [props.images, props.skuImageUrl],
   () => {
     activeIndex.value = 0
   },

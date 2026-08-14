@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.request.SkuBatchCreateRequest;
 import com.fpoly.marcusstore.dto.request.SkuBulkUpdateRequest;
+import com.fpoly.marcusstore.dto.response.SkuImageUpdateResponse;
 import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
@@ -12,7 +13,9 @@ import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -37,6 +40,9 @@ public class ProductConfigService {
 
     @Autowired
     private FlashSaleItemRepository flashSaleItemRepository;
+
+    @Autowired
+    private CloudinaryService cloudinaryService;
 
     // 1. LƯU MA TRẬN SKU TỪ FRONTEND
     @Transactional(rollbackFor = Exception.class)
@@ -164,6 +170,51 @@ public class ProductConfigService {
         }
         sku.setIsActive(false);
         skuRepository.save(sku);
+    }
+
+    // Marcus thêm: upload ảnh biến thể một lần rồi gắn cùng URL cho những SKU
+    // được Admin chọn (thường là các dung lượng có cùng màu). Ảnh này không được
+    // sao chép sang Product_Images vì đó là thư viện ảnh chung của sản phẩm.
+    @Transactional(rollbackFor = Exception.class)
+    public List<SkuImageUpdateResponse> updateSkuImages(List<Integer> skuIds, MultipartFile file) {
+        if (skuIds == null || skuIds.isEmpty() || skuIds.size() > 100) {
+            throw new IllegalArgumentException("Vui lòng chọn từ 1 đến 100 SKU để áp dụng ảnh.");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Vui lòng chọn ảnh biến thể.");
+        }
+        if (file.getSize() > 5L * 1024 * 1024) {
+            throw new IllegalArgumentException("Ảnh biến thể không được vượt quá 5 MB.");
+        }
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.toLowerCase().startsWith("image/")) {
+            throw new IllegalArgumentException("Tệp tải lên phải là hình ảnh.");
+        }
+
+        List<Integer> distinctIds = skuIds.stream().distinct().sorted().toList();
+        if (distinctIds.size() != skuIds.size()) {
+            throw new IllegalArgumentException("Danh sách SKU áp dụng ảnh đang bị trùng.");
+        }
+        List<ProductSku> skus = skuRepository.findByIdsForUpdate(distinctIds);
+        if (skus.size() != distinctIds.size()) {
+            throw new IllegalArgumentException("Có SKU không tồn tại hoặc đã bị xóa.");
+        }
+        Integer productId = skus.get(0).getProduct().getProductId();
+        if (skus.stream().anyMatch(sku -> !productId.equals(sku.getProduct().getProductId()))) {
+            throw new IllegalArgumentException("Chỉ được áp dụng ảnh cho các SKU của cùng một sản phẩm.");
+        }
+        skus.forEach(this::ensureActive);
+
+        final String imageUrl;
+        try {
+            imageUrl = cloudinaryService.uploadImage(file);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Không thể tải ảnh biến thể. Vui lòng thử lại.", exception);
+        }
+        skus.forEach(sku -> sku.setSkuImageUrl(imageUrl));
+        return skuRepository.saveAll(skus).stream()
+                .map(sku -> new SkuImageUpdateResponse(sku.getSkuId(), sku.getSkuImageUrl()))
+                .toList();
     }
 
     private void ensureActive(ProductSku sku) {

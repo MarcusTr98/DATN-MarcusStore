@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.request.SkuBatchCreateRequest;
 import com.fpoly.marcusstore.dto.request.SkuBulkUpdateRequest;
+import com.fpoly.marcusstore.dto.response.SkuImageUpdateResponse;
 import com.fpoly.marcusstore.entity.core.Attribute;
 import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.entity.core.Product;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -37,6 +39,8 @@ class ProductConfigServiceTest {
     AttributeValueRepository attributeValueRepository;
     @Mock
     FlashSaleItemRepository flashSaleItemRepository;
+    @Mock
+    CloudinaryService cloudinaryService;
     @InjectMocks
     ProductConfigService service;
 
@@ -137,6 +141,47 @@ class ProductConfigServiceTest {
         assertThatThrownBy(() -> service.bulkUpdateSkus(request))
                 .hasMessageContaining("bị lặp");
         verify(skuRepository, never()).findByIdsForUpdate(anyList());
+    }
+
+    @Test
+    void uploadsOnceAndSharesVariantImageForSelectedSkus() throws Exception {
+        Product product = new Product();
+        product.setProductId(1);
+        ProductSku black128 = sku(7, "PHONE-BLACK-128", 2);
+        ProductSku black256 = sku(8, "PHONE-BLACK-256", 3);
+        black128.setProduct(product);
+        black256.setProduct(product);
+        MockMultipartFile image = new MockMultipartFile(
+                "file", "black.webp", "image/webp", new byte[] { 1, 2, 3 });
+
+        when(skuRepository.findByIdsForUpdate(List.of(7, 8))).thenReturn(List.of(black128, black256));
+        when(cloudinaryService.uploadImage(image)).thenReturn("https://cdn.example/black.webp");
+        when(skuRepository.saveAll(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<SkuImageUpdateResponse> updated = service.updateSkuImages(List.of(8, 7), image);
+
+        assertThat(updated).allSatisfy(skuItem ->
+            assertThat(skuItem.getSkuImageUrl()).isEqualTo("https://cdn.example/black.webp"));
+        verify(cloudinaryService, times(1)).uploadImage(image);
+    }
+
+    @Test
+    void rejectsApplyingOneImageAcrossDifferentProducts() {
+        Product firstProduct = new Product();
+        firstProduct.setProductId(1);
+        Product secondProduct = new Product();
+        secondProduct.setProductId(2);
+        ProductSku firstSku = sku(7, "PHONE-A", 1);
+        ProductSku secondSku = sku(8, "PHONE-B", 1);
+        firstSku.setProduct(firstProduct);
+        secondSku.setProduct(secondProduct);
+        MockMultipartFile image = new MockMultipartFile(
+                "file", "variant.png", "image/png", new byte[] { 1 });
+        when(skuRepository.findByIdsForUpdate(List.of(7, 8))).thenReturn(List.of(firstSku, secondSku));
+
+        assertThatThrownBy(() -> service.updateSkuImages(List.of(7, 8), image))
+                .hasMessageContaining("cùng một sản phẩm");
+        verifyNoInteractions(cloudinaryService);
     }
 
     private SkuBatchCreateRequest.SkuItem item(String code, List<Integer> ids) {

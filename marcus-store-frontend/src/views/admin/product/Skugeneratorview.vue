@@ -160,6 +160,7 @@
             <table class="skug-table">
               <thead>
                 <tr>
+                  <th>Ảnh biến thể</th>
                   <th>Tổ hợp biến thể</th>
                   <th>Mã SKU</th>
                   <th style="width: 140px">Giá niêm yết (₫)</th>
@@ -170,6 +171,19 @@
               </thead>
               <tbody>
                 <tr v-for="(sku, idx) in existingSkus" :key="sku.skuId" class="skug-row">
+                  <td>
+                    <button
+                      type="button"
+                      class="skug-sku-image"
+                      :class="{ 'has-image': sku.skuImageUrl }"
+                      title="Tải ảnh đại diện biến thể"
+                      @click="openSkuImageModal(sku)"
+                    >
+                      <img v-if="sku.skuImageUrl" :src="sku.skuImageUrl" :alt="sku.skuCode" />
+                      <i v-else class="fa-regular fa-image"></i>
+                      <span>{{ sku.skuImageUrl ? 'Đổi ảnh' : 'Thêm ảnh' }}</span>
+                    </button>
+                  </td>
                   <td>
                     <div class="skug-variant-cell">
                       <span class="skug-variant-label">
@@ -549,6 +563,56 @@
         </div>
       </Transition>
 
+      <!-- Marcus thêm: modal ảnh SKU. Một file có thể dùng chung cho các dung
+           lượng cùng màu mà không tạo ảnh trùng trong Product_Images. -->
+      <Transition name="modal">
+        <div v-if="imageModal.show" class="skug-modal-backdrop" @click.self="closeSkuImageModal">
+          <form class="skug-modal skug-image-modal" @submit.prevent="saveSkuImage">
+            <div class="skug-price-modal__header">
+              <div>
+                <p class="skug-price-modal__eyebrow">ẢNH ĐẠI DIỆN BIẾN THỂ</p>
+                <h4>{{ imageModal.sku?.skuCode }}</h4>
+                <p>{{ imageVariantLabel }}</p>
+              </div>
+              <button type="button" class="skug-modal-close" @click="closeSkuImageModal">×</button>
+            </div>
+            <div class="skug-modal-body skug-image-form">
+              <div class="skug-image-preview">
+                <img v-if="imageModal.preview || imageModal.sku?.skuImageUrl"
+                  :src="imageModal.preview || imageModal.sku.skuImageUrl" alt="Xem trước ảnh biến thể" />
+                <div v-else class="skug-image-placeholder"><i class="fa-regular fa-image"></i></div>
+              </div>
+              <div class="skug-image-options">
+                <div class="skug-image-picker">
+                  <span>Ảnh biến thể <b>*</b></span>
+                  <label class="skug-file-control">
+                    <input type="file" accept="image/jpeg,image/png,image/webp" @change="onSkuImageSelected" />
+                    <span class="skug-file-button"><i class="fa-solid fa-upload"></i> Chọn ảnh</span>
+                    <span class="skug-file-name">{{ imageModal.file?.name || 'Chưa chọn tệp' }}</span>
+                  </label>
+                  <small>JPG, PNG hoặc WebP · tối đa 5 MB</small>
+                </div>
+                <label v-if="sameColorSkuIds.length > 1" class="skug-image-apply">
+                  <input v-model="imageModal.applySameColor" type="checkbox" />
+                  <span>Áp dụng cho <b>{{ sameColorSkuIds.length }} SKU cùng màu</b> (các bản dung lượng khác).</span>
+                </label>
+                <p class="skug-image-note">
+                  Ảnh được dùng tại chi tiết sản phẩm, giỏ hàng và Checkout. Thư viện ảnh chung của sản phẩm không bị thay đổi.
+                </p>
+                <p v-if="imageModal.error" class="skug-form-error">{{ imageModal.error }}</p>
+              </div>
+            </div>
+            <div class="skug-modal-footer skug-price-actions">
+              <button type="button" class="skug-btn-cancel" @click="closeSkuImageModal">Hủy</button>
+              <button type="submit" class="skug-btn-primary" :disabled="imageModal.saving || !imageModal.file">
+                <span v-if="imageModal.saving" class="skug-spinner"></span>
+                {{ imageModal.saving ? 'Đang tải...' : 'Lưu ảnh biến thể' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Transition>
+
       <!-- Modal Thông báo -->
       <Transition name="modal">
         <div
@@ -632,6 +696,101 @@ const editModal = ref({
   price: '',
   error: '',
 })
+
+const imageModal = ref({
+  show: false,
+  saving: false,
+  sku: null,
+  file: null,
+  preview: '',
+  applySameColor: true,
+  error: '',
+})
+
+const imageVariantLabel = computed(() => {
+  const values = imageModal.value.sku?.attributeValues || []
+  return values.length ? values.map((value) => value.valueString).join(' / ') : 'Biến thể mặc định'
+})
+
+const colorAttribute = computed(() =>
+  attributes.value.find((attribute) => {
+    const name = String(attribute.attributeName || '').toLowerCase()
+    return name.includes('màu') || name.includes('color')
+  }),
+)
+
+const sameColorSkuIds = computed(() => {
+  const sku = imageModal.value.sku
+  if (!sku) return []
+  const colorValueIds = new Set(getAttrValues(colorAttribute.value?.attributeId).map((value) => value.valueId))
+  const selectedColor = (sku.attributeValues || []).find((value) => colorValueIds.has(value.valueId))
+  if (!selectedColor) return [sku.skuId]
+  return existingSkus.value
+    .filter((item) => (item.attributeValues || []).some((value) => value.valueId === selectedColor.valueId))
+    .map((item) => item.skuId)
+})
+
+const openSkuImageModal = (sku) => {
+  imageModal.value = {
+    show: true,
+    saving: false,
+    sku,
+    file: null,
+    preview: '',
+    applySameColor: true,
+    error: '',
+  }
+}
+
+const closeSkuImageModal = () => {
+  if (imageModal.value.saving) return
+  if (imageModal.value.preview) URL.revokeObjectURL(imageModal.value.preview)
+  imageModal.value.show = false
+}
+
+const onSkuImageSelected = (event) => {
+  const file = event.target.files?.[0]
+  imageModal.value.error = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    imageModal.value.error = 'Tệp được chọn không phải hình ảnh.'
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    imageModal.value.error = 'Ảnh biến thể không được vượt quá 5 MB.'
+    return
+  }
+  if (imageModal.value.preview) URL.revokeObjectURL(imageModal.value.preview)
+  imageModal.value.file = file
+  imageModal.value.preview = URL.createObjectURL(file)
+}
+
+const saveSkuImage = async () => {
+  if (!imageModal.value.file || !imageModal.value.sku) return
+  imageModal.value.saving = true
+  imageModal.value.error = ''
+  try {
+    const targetIds = imageModal.value.applySameColor
+      ? sameColorSkuIds.value
+      : [imageModal.value.sku.skuId]
+    const formData = new FormData()
+    targetIds.forEach((skuId) => formData.append('skuIds', skuId))
+    formData.append('file', imageModal.value.file)
+    const response = await api.post('/admin/skus/images', formData)
+    const updatedSkus = response.data?.data || []
+    const updatedById = new Map(updatedSkus.map((sku) => [sku.skuId, sku.skuImageUrl]))
+    existingSkus.value = existingSkus.value.map((sku) =>
+      updatedById.has(sku.skuId) ? { ...sku, skuImageUrl: updatedById.get(sku.skuId) } : sku,
+    )
+    imageModal.value.saving = false
+    closeSkuImageModal()
+    showAlert(`Đã cập nhật ảnh cho ${updatedSkus.length || targetIds.length} SKU.`, 'success')
+  } catch (error) {
+    imageModal.value.error = error.response?.data?.message || 'Không thể tải ảnh biến thể.'
+  } finally {
+    imageModal.value.saving = false
+  }
+}
 
 const editVariantLabel = computed(() => {
   const values = editModal.value.sku?.attributeValues || []

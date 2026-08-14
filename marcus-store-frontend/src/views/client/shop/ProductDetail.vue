@@ -42,6 +42,7 @@
             :product-name="product.productName"
             :images="product.images"
             :thumbnail-url="product.thumbnailUrl"
+            :sku-image-url="currentSku?.skuImageUrl || ''"
             :discount-percent="currentSku?.discountPercent || 0"
           />
 

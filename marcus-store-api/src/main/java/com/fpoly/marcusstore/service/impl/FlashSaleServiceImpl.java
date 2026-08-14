@@ -1026,11 +1026,14 @@ public class FlashSaleServiceImpl implements FlashSaleService {
     }
 
     /**
-     * Lấy ảnh đại diện cho SKU từ Product cha (product.thumbnailUrl).
-     * Giữ nguyên sku.skuImageUrl trong DB, không xóa.
+     * Marcus sửa trên luồng Flash Sale của thành viên: ưu tiên đúng ảnh biến thể
+     * khách đang mua, chỉ fallback ảnh Product khi SKU chưa được cấu hình ảnh.
      */
     private String resolveSkuImageUrl(ProductSku sku) {
-        if (sku == null || sku.getProduct() == null) return null;
+        if (sku == null) return null;
+        String skuImage = sku.getSkuImageUrl();
+        if (skuImage != null && !skuImage.isBlank()) return skuImage;
+        if (sku.getProduct() == null) return null;
         String thumb = sku.getProduct().getThumbnailUrl();
         return (thumb != null && !thumb.isBlank()) ? thumb : null;
     }
