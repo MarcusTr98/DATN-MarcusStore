@@ -916,6 +916,64 @@ CREATE INDEX IX_CustomerBehaviorEvents_CreatedType ON Customer_Behavior_Events(c
 CREATE INDEX IX_CustomerBehaviorEvents_Session ON Customer_Behavior_Events(session_id, created_at DESC) WHERE session_id IS NOT NULL;
 CREATE INDEX IX_CustomerBehaviorEvents_Order ON Customer_Behavior_Events(order_id, created_at DESC) WHERE order_id IS NOT NULL;
 
+-- Đạt/Marcus đồng bộ 14/08/2026: yêu cầu đổi trả, bảo hành và tệp minh chứng.
+-- Hai bảng này là bảng nghiệp vụ chính thức; bảng kỹ thuật dọn dữ liệu cũ
+-- không được tạo lại trong schema chuẩn 52 bảng.
+CREATE TABLE Warranty_Returns (
+    warranty_id INT IDENTITY(1,1) NOT NULL,
+    reason VARCHAR(50) NOT NULL,
+    description NVARCHAR(MAX) NULL,
+    status VARCHAR(50) NOT NULL
+        CONSTRAINT DF_WarrantyReturns_Status DEFAULT 'PENDING',
+    admin_note NVARCHAR(MAX) NULL,
+    order_item_id INT NOT NULL,
+    user_id INT NOT NULL,
+    processed_by INT NULL,
+    processed_at DATETIME2 NULL,
+    created_at DATETIME2 NOT NULL
+        CONSTRAINT DF_WarrantyReturns_CreatedAt DEFAULT SYSDATETIME(),
+    updated_at DATETIME2 NOT NULL
+        CONSTRAINT DF_WarrantyReturns_UpdatedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT PK_Warranty_Returns PRIMARY KEY (warranty_id),
+    CONSTRAINT FK_WarrantyReturns_OrderItem
+        FOREIGN KEY (order_item_id) REFERENCES Order_Items(order_item_id),
+    CONSTRAINT FK_WarrantyReturns_User
+        FOREIGN KEY (user_id) REFERENCES Users(user_id),
+    CONSTRAINT FK_WarrantyReturns_ProcessedBy
+        FOREIGN KEY (processed_by) REFERENCES Users(user_id),
+    CONSTRAINT CK_WarrantyReturns_Reason CHECK (
+        reason IN ('DEFECTIVE','DAMAGED','WRONG_ITEM','NOT_AS_DESCRIBED','ACCESSORY_MISSING','OTHER')
+    ),
+    CONSTRAINT CK_WarrantyReturns_Status CHECK (
+        status IN ('PENDING','CONFIRMED','APPROVED','REJECTED')
+    )
+);
+
+CREATE TABLE Warranty_Attachments (
+    attachment_id INT IDENTITY(1,1) NOT NULL,
+    warranty_id INT NOT NULL,
+    file_url NVARCHAR(500) NOT NULL,
+    file_type VARCHAR(20) NOT NULL,
+    file_name NVARCHAR(255) NULL,
+    file_size BIGINT NULL,
+    created_at DATETIME2 NOT NULL
+        CONSTRAINT DF_WarrantyAttachments_CreatedAt DEFAULT SYSDATETIME(),
+    CONSTRAINT PK_Warranty_Attachments PRIMARY KEY (attachment_id),
+    CONSTRAINT FK_WarrantyAttachments_Warranty
+        FOREIGN KEY (warranty_id) REFERENCES Warranty_Returns(warranty_id) ON DELETE CASCADE,
+    CONSTRAINT CK_WarrantyAttachments_FileType CHECK (file_type IN ('IMAGE','VIDEO')),
+    CONSTRAINT CK_WarrantyAttachments_FileSize CHECK (file_size IS NULL OR file_size >= 0)
+);
+
+CREATE INDEX IX_WarrantyReturns_UserCreated
+    ON Warranty_Returns(user_id, created_at DESC);
+CREATE INDEX IX_WarrantyReturns_OrderItem
+    ON Warranty_Returns(order_item_id);
+CREATE INDEX IX_WarrantyReturns_StatusCreated
+    ON Warranty_Returns(status, created_at DESC);
+CREATE INDEX IX_WarrantyAttachments_Warranty
+    ON Warranty_Attachments(warranty_id);
+
 
 CREATE INDEX IX_OrderTrans_OrderId ON Order_Transactions(order_id);	
 CREATE INDEX IX_UserVouchers_UserId ON User_Vouchers(user_id);
@@ -945,12 +1003,14 @@ IF OBJECT_ID('dbo.Orders', 'U') IS NULL
     OR OBJECT_ID('dbo.AI_Product_Clicks', 'U') IS NULL
     OR OBJECT_ID('dbo.AI_Analytics_Reports', 'U') IS NULL
     OR OBJECT_ID('dbo.AI_Usage_Events', 'U') IS NULL
+    OR OBJECT_ID('dbo.Warranty_Returns', 'U') IS NULL
+    OR OBJECT_ID('dbo.Warranty_Attachments', 'U') IS NULL
 BEGIN
     THROW 51000, N'MarcusStoreDB chưa được tạo đủ bảng mới. Kiểm tra lỗi SQL phía trên.', 1;
 END;
 GO
 
-PRINT N'Marcus: tạo MarcusStoreDB phiên bản 30/07/2026 thành công.';
+PRINT N'Marcus: tạo MarcusStoreDB phiên bản 14/08/2026 thành công với 52 bảng nghiệp vụ.';
 GO
 
 
