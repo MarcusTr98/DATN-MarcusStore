@@ -51,8 +51,6 @@ public class ClientProductDetailService {
             if (p.getSkus() != null) product.setSkus(p.getSkus());
         });
         
-        productDetailRepository.findSkuAttributeValuesByProductSlug(slug);
-
         productDetailRepository.findBySlugWithSpecValues(slug).ifPresent(p -> {
             if (p.getSpecValues() != null) product.setSpecValues(p.getSpecValues());
         });
@@ -110,17 +108,19 @@ public class ClientProductDetailService {
 
         if (product.getSkus() != null) {
             for (ProductSku sku : product.getSkus()) {
+                // Marcus sửa: SKU đã vô hiệu hóa không được xuất hiện hoặc cộng
+                // vào tồn kho/giá trên trang bán hàng.
+                if (!Boolean.TRUE.equals(sku.getIsActive())) {
+                    continue;
+                }
                 ClientProductSkuDetailResponse skuRes = buildSkuResponse(sku);
                 skuResponses.add(skuRes);
-
-                if (Boolean.TRUE.equals(sku.getIsActive())) {
-                    totalSkusActive++;
-                }
+                totalSkusActive++;
                 if (sku.getStockQuantity() != null) {
                     totalStock += sku.getStockQuantity();
                 }
 
-                if (Boolean.TRUE.equals(sku.getIsActive()) && sku.getPrice() != null) {
+                if (sku.getPrice() != null) {
                     BigDecimal p = sku.getPrice();
                     minPrice = (minPrice == null || p.compareTo(minPrice) < 0) ? p : minPrice;
                     maxPrice = (maxPrice == null || p.compareTo(maxPrice) > 0) ? p : maxPrice;

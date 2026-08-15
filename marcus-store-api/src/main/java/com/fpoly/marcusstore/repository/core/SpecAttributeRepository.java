@@ -11,18 +11,21 @@ import java.util.List;
 @Repository
 public interface SpecAttributeRepository extends JpaRepository<SpecAttribute, Integer> {
 
-    List<SpecAttribute> findByCategoryCategoryIdOrderByDisplayOrderAsc(Integer categoryId);
+        List<SpecAttribute> findByCategoryCategoryIdOrderByDisplayOrderAsc(Integer categoryId);
 
-    boolean existsByCategoryCategoryIdAndName(Integer categoryId, String name);
+        boolean existsByCategoryCategoryIdAndName(Integer categoryId, String name);
 
-    @Query("SELECT sa FROM SpecAttribute sa " +
-            "JOIN FETCH sa.category " +
-            "WHERE sa.category.categoryId IN :categoryIds " +
-            "ORDER BY sa.category.categoryId ASC, sa.displayOrder ASC, sa.specAttributeId ASC")
-    List<SpecAttribute> findByCategoryIdsWithCategory(@Param("categoryIds") List<Integer> categoryIds);
+        boolean existsByCategoryCategoryIdAndNameAndSpecAttributeIdNot(
+                        Integer categoryId, String name, Integer specAttributeId);
 
-    @Query("SELECT sa FROM SpecAttribute sa " +
-            "JOIN FETCH sa.category " +
-            "WHERE sa.specAttributeId = :id")
-    java.util.Optional<SpecAttribute> findByIdWithCategory(@Param("id") Integer id);
+        @Query("SELECT sa FROM SpecAttribute sa " +
+                        "JOIN FETCH sa.category " +
+                        "WHERE sa.category.categoryId IN :categoryIds " +
+                        "ORDER BY sa.category.categoryId ASC, sa.displayOrder ASC, sa.specAttributeId ASC")
+        List<SpecAttribute> findByCategoryIdsWithCategory(@Param("categoryIds") List<Integer> categoryIds);
+
+        @Query("SELECT sa FROM SpecAttribute sa " +
+                        "JOIN FETCH sa.category " +
+                        "WHERE sa.specAttributeId = :id")
+        java.util.Optional<SpecAttribute> findByIdWithCategory(@Param("id") Integer id);
 }

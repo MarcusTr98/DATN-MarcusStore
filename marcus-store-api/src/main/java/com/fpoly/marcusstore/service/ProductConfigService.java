@@ -2,16 +2,21 @@ package com.fpoly.marcusstore.service;
 
 import com.fpoly.marcusstore.dto.request.SkuBatchCreateRequest;
 import com.fpoly.marcusstore.dto.request.SkuBulkUpdateRequest;
+import com.fpoly.marcusstore.dto.response.SkuImageUpdateResponse;
 import com.fpoly.marcusstore.entity.core.AttributeValue;
 import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 import com.fpoly.marcusstore.repository.core.AttributeValueRepository;
 import com.fpoly.marcusstore.repository.core.ProductRepository;
 import com.fpoly.marcusstore.repository.core.ProductSkuRepository;
+import com.fpoly.marcusstore.repository.promotion.FlashSaleItemRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderItemRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +38,15 @@ public class ProductConfigService {
 
     @Autowired
     private AttributeValueRepository attributeValueRepository;
+
+    @Autowired
+    private FlashSaleItemRepository flashSaleItemRepository;
+
+    @Autowired
+    private OrderItemRepository orderItemRepository;
+
+    @Autowired
+    private CloudinaryService cloudinaryService;
 
     // 1. LƯU MA TRẬN SKU TỪ FRONTEND
     @Transactional(rollbackFor = Exception.class)
@@ -97,8 +112,10 @@ public class ProductConfigService {
                 sku.setOriginalPrice(item.getOriginalPrice());
             }
 
-            sku.setStockQuantity(item.getStock());
-            sku.setWeightGram(500);
+            // Marcus sửa sau khi tích hợp module kho: SKU mới luôn bắt đầu từ 0.
+            // Mọi đơn vị hàng phải đi qua Nhập kho để số lượng và IMEI cùng một luồng.
+            sku.setStockQuantity(0);
+            sku.setWeightGram(item.getWeightGram());
             sku.setIsActive(true);
 
             sku.setAttributeValues(attributeValues);
@@ -110,13 +127,26 @@ public class ProductConfigService {
     // 2. CẬP NHẬT HÀNG LOẠT (Giá, Tồn kho)
     @Transactional(rollbackFor = Exception.class)
     public void bulkUpdateSkus(SkuBulkUpdateRequest request) {
-        List<ProductSku> skusToUpdate = new ArrayList<>();
+        // Marcus sửa: khóa toàn bộ SKU theo thứ tự ID, kiểm tra đủ batch rồi mới
+        // ghi. Không cập nhật tồn kho tại luồng giá vì kho/IMEI là nguồn dữ liệu tồn.
+        Map<Integer, SkuBulkUpdateRequest.SkuUpdateItem> itemsById = new java.util.LinkedHashMap<>();
         for (SkuBulkUpdateRequest.SkuUpdateItem item : request.getSkus()) {
-            ProductSku sku = skuRepository.findById(item.getSkuId())
-                    .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU ID: " + item.getSkuId()));
-            sku.setPrice(item.getPrice());
-            sku.setStockQuantity(item.getStockQuantity());
-            skusToUpdate.add(sku);
+            if (itemsById.putIfAbsent(item.getSkuId(), item) != null) {
+                throw new IllegalArgumentException("SKU ID " + item.getSkuId() + " bị lặp trong danh sách cập nhật.");
+            }
+        }
+        List<Integer> sortedIds = itemsById.keySet().stream().sorted().toList();
+        List<ProductSku> skusToUpdate = skuRepository.findByIdsForUpdate(sortedIds);
+        if (skusToUpdate.size() != sortedIds.size()) {
+            Set<Integer> foundIds = skusToUpdate.stream().map(ProductSku::getSkuId).collect(Collectors.toSet());
+            Integer missingId = sortedIds.stream().filter(id -> !foundIds.contains(id)).findFirst().orElse(null);
+            throw new IllegalArgumentException("Không tìm thấy SKU ID: " + missingId);
+        }
+        for (ProductSku sku : skusToUpdate) {
+            ensureActive(sku);
+            ensureNoOpenFlashSale(sku);
+            SkuBulkUpdateRequest.SkuUpdateItem item = itemsById.get(sku.getSkuId());
+            applyPrices(sku, item.getOriginalPrice(), item.getPrice());
         }
         skuRepository.saveAll(skusToUpdate);
     }
@@ -126,20 +156,106 @@ public class ProductConfigService {
     }
 
     @Transactional
-    public ProductSku updateSingleSku(Integer skuId, BigDecimal price, Integer stockQuantity) {
-        ProductSku sku = skuRepository.findById(skuId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
-        sku.setPrice(price);
-        sku.setStockQuantity(stockQuantity);
+    public ProductSku updateSingleSku(Integer skuId, BigDecimal originalPrice, BigDecimal price, Integer weightGram) {
+        ProductSku sku = skuRepository.findByIdForUpdate(skuId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy SKU cần cập nhật."));
+        ensureActive(sku);
+        ensureNoOpenFlashSale(sku);
+        if (weightGram != null && !weightGram.equals(sku.getWeightGram())
+                && orderItemRepository.existsDeliveryOrderWaitingForShipmentBySkuId(skuId)) {
+            throw new IllegalArgumentException("Không thể đổi khối lượng vì SKU đang có đơn chờ tạo vận đơn GHN.");
+        }
+        applyPrices(sku, originalPrice, price);
+        applyWeight(sku, weightGram);
         return skuRepository.save(sku);
     }
 
     @Transactional
     public void deleteSku(Integer skuId) {
-        ProductSku sku = skuRepository.findById(skuId)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy SKU!"));
+        ProductSku sku = skuRepository.findByIdForUpdate(skuId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy SKU cần vô hiệu hóa."));
+        if (!Boolean.TRUE.equals(sku.getIsActive())) {
+            return;
+        }
         sku.setIsActive(false);
         skuRepository.save(sku);
+    }
+
+    // Marcus thêm: upload ảnh biến thể một lần rồi gắn cùng URL cho những SKU
+    // được Admin chọn (thường là các dung lượng có cùng màu). Ảnh này không được
+    // sao chép sang Product_Images vì đó là thư viện ảnh chung của sản phẩm.
+    @Transactional(rollbackFor = Exception.class)
+    public List<SkuImageUpdateResponse> updateSkuImages(List<Integer> skuIds, MultipartFile file) {
+        if (skuIds == null || skuIds.isEmpty() || skuIds.size() > 100) {
+            throw new IllegalArgumentException("Vui lòng chọn từ 1 đến 100 SKU để áp dụng ảnh.");
+        }
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Vui lòng chọn ảnh biến thể.");
+        }
+        if (file.getSize() > 5L * 1024 * 1024) {
+            throw new IllegalArgumentException("Ảnh biến thể không được vượt quá 5 MB.");
+        }
+        String contentType = file.getContentType();
+        Set<String> allowedImageTypes = Set.of("image/jpeg", "image/png", "image/webp");
+        if (contentType == null || !allowedImageTypes.contains(contentType.toLowerCase())) {
+            throw new IllegalArgumentException("Ảnh biến thể chỉ hỗ trợ JPG, PNG hoặc WebP.");
+        }
+
+        List<Integer> distinctIds = skuIds.stream().distinct().sorted().toList();
+        if (distinctIds.size() != skuIds.size()) {
+            throw new IllegalArgumentException("Danh sách SKU áp dụng ảnh đang bị trùng.");
+        }
+        List<ProductSku> skus = skuRepository.findByIdsForUpdate(distinctIds);
+        if (skus.size() != distinctIds.size()) {
+            throw new IllegalArgumentException("Có SKU không tồn tại hoặc đã bị xóa.");
+        }
+        Integer productId = skus.get(0).getProduct().getProductId();
+        if (skus.stream().anyMatch(sku -> !productId.equals(sku.getProduct().getProductId()))) {
+            throw new IllegalArgumentException("Chỉ được áp dụng ảnh cho các SKU của cùng một sản phẩm.");
+        }
+        skus.forEach(this::ensureActive);
+
+        final String imageUrl;
+        try {
+            imageUrl = cloudinaryService.uploadImage(file);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Không thể tải ảnh biến thể. Vui lòng thử lại.", exception);
+        }
+        skus.forEach(sku -> sku.setSkuImageUrl(imageUrl));
+        return skuRepository.saveAll(skus).stream()
+                .map(sku -> new SkuImageUpdateResponse(sku.getSkuId(), sku.getSkuImageUrl()))
+                .toList();
+    }
+
+    private void ensureActive(ProductSku sku) {
+        if (!Boolean.TRUE.equals(sku.getIsActive())) {
+            throw new IllegalArgumentException("SKU " + sku.getSkuCode() + " đã ngừng hoạt động.");
+        }
+    }
+
+    private void applyPrices(ProductSku sku, BigDecimal originalPrice, BigDecimal price) {
+        if (originalPrice == null || originalPrice.signum() <= 0 || price == null || price.signum() <= 0) {
+            throw new IllegalArgumentException("Giá niêm yết và giá bán phải lớn hơn 0.");
+        }
+        if (price.compareTo(originalPrice) > 0) {
+            throw new IllegalArgumentException("Giá bán không được lớn hơn giá niêm yết.");
+        }
+        sku.setOriginalPrice(originalPrice);
+        sku.setPrice(price);
+    }
+
+    private void applyWeight(ProductSku sku, Integer weightGram) {
+        if (weightGram == null || weightGram <= 0 || weightGram > 50000) {
+            throw new IllegalArgumentException("Khối lượng SKU phải từ 1 đến 50.000 gram.");
+        }
+        sku.setWeightGram(weightGram);
+    }
+
+    private void ensureNoOpenFlashSale(ProductSku sku) {
+        if (flashSaleItemRepository.existsOpenFlashSaleForSku(sku.getSkuId(), LocalDateTime.now())) {
+            throw new IllegalArgumentException("SKU " + sku.getSkuCode()
+                    + " đang thuộc Flash Sale chưa kết thúc. Hãy kết thúc hoặc hủy chương trình trước khi sửa giá thường.");
+        }
     }
 
     private String combinationKey(List<AttributeValue> values) {

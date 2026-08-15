@@ -22,6 +22,10 @@ public interface CategoryRepository extends JpaRepository<Category, Integer> {
 
     List<Category> findByParent_CategoryIdAndStatusTrue(Integer parentId);
 
+    // Marcus thêm cho bộ thông số kế thừa: kiểm tra cả danh mục con đang ẩn để
+    // không tạo hai trường trùng tên khi danh mục được bật lại.
+    List<Category> findByParent_CategoryId(Integer parentId);
+
     // Marcus thêm: lookup Category theo slug để tra id từ slug trên URL.
     Optional<Category> findBySlug(String slug);
 

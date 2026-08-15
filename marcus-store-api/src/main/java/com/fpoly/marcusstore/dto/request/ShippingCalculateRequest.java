@@ -1,12 +1,14 @@
 package com.fpoly.marcusstore.dto.request;
 
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,11 +20,9 @@ public class ShippingCalculateRequest {
     @NotBlank(message = "Mã Phường/Xã không được để trống")
     private String toWardCode;
 
-    @NotNull(message = "Tổng khối lượng không được để trống")
-    @Min(value = 1, message = "Khối lượng phải lớn hơn 0")
-    private Integer totalWeightGram;
-
-    @NotNull(message = "Tổng giá trị đơn hàng không được để trống")
-    @Min(value = 0, message = "Tổng giá trị đơn hàng không hợp lệ")
-    private BigDecimal cartTotal;
+    // Marcus sửa: client chỉ gửi các dòng Cart được chọn. Khối lượng và giá phải
+    // đọc lại từ database để phí xem trước khớp với lúc tạo đơn.
+    @NotEmpty(message = "Danh sách sản phẩm tính phí không được để trống")
+    @Size(max = 100, message = "Chỉ được tính phí tối đa 100 dòng sản phẩm")
+    private List<@NotNull @Positive Integer> cartItemIds;
 }

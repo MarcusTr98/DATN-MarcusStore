@@ -186,6 +186,15 @@ const routes = [
         path: 'products/:productId/specs',
         name: 'AdminProductSpecs',
         component: () => import('@/views/admin/product/ProductSpecs.vue'),
+        // Marcus thêm: đây là màn thay đổi dữ liệu thông số, không để STAFF chỉ có quyền xem truy cập.
+        meta: { permission: 'PRODUCT_UPDATE' },
+      },
+      {
+        path: 'specification-sets',
+        name: 'SpecificationSetManager',
+        component: () => import('@/views/admin/product/SpecificationSetManager.vue'),
+        // Marcus thêm: cấu trúc bộ thông số tác động toàn danh mục nên dùng quyền cập nhật sản phẩm.
+        meta: { permission: 'PRODUCT_UPDATE' },
       },
       {
         path: 'attribute',
@@ -246,7 +255,7 @@ const routes = [
         name: 'BannerManager',
         component: () => import('@/views/admin/cms/BannerManager.vue'),
         // Quản lý banner là cấu hình hiển thị toàn site, chỉ ADMIN.
-        meta: { permission: 'BANNER_VIEW'},
+        meta: { permission: 'BANNER_VIEW' },
       },
       {
         path: 'post',
@@ -335,7 +344,7 @@ const routes = [
         path: '/admin/reviews',
         name: 'ReviewManagement',
         component: () => import('@/views/admin/cms/ReviewManagement.vue'),
-        meta: { permission: 'REVIEW_VIEW'},
+        meta: { permission: 'REVIEW_VIEW' },
       },
     ],
   },

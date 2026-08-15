@@ -18,6 +18,7 @@ public class ProductResponse {
     private String productName;
     private String description;
     private String brand;
+    private Boolean statusImei;
     private String thumbnailUrl;
     private Boolean status;
     private String slug;

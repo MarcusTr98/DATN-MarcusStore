@@ -13,9 +13,8 @@ import com.fpoly.marcusstore.entity.core.Product;
 import com.fpoly.marcusstore.entity.core.ProductSku;
 
 @Repository
-public interface ClientProductDetailRepository extends JpaRepository<Product, Integer>{
+public interface ClientProductDetailRepository extends JpaRepository<Product, Integer> {
 
-    
         @EntityGraph(attributePaths = { "category", "category.parent" })
         Optional<Product> findBySlugAndStatusTrue(String slug);
 
@@ -29,14 +28,19 @@ public interface ClientProductDetailRepository extends JpaRepository<Product, In
                         "WHERE p.slug = :slug AND p.status = true")
         Optional<Product> findBySlugWithSkus(@Param("slug") String slug);
 
-        //4
+        // 4
         @Query("SELECT DISTINCT s FROM ProductSku s " +
                         "LEFT JOIN FETCH s.attributeValues av " +
                         "LEFT JOIN FETCH av.attribute " +
                         "WHERE s.product.slug = :slug")
         List<ProductSku> findSkuAttributeValuesByProductSlug(@Param("slug") String slug);
 
-        @Query("SELECT p FROM Product p LEFT JOIN FETCH p.specValues psv LEFT JOIN FETCH psv.specAttribute WHERE p.slug = :slug AND p.status = true")
+        // Marcus sửa: tôn trọng thứ tự bộ thông số đã cấu hình ở Admin.
+        @Query("SELECT p FROM Product p " +
+                        "LEFT JOIN FETCH p.specValues psv " +
+                        "LEFT JOIN FETCH psv.specAttribute sa " +
+                        "WHERE p.slug = :slug AND p.status = true " +
+                        "ORDER BY sa.displayOrder ASC, sa.specAttributeId ASC")
         Optional<Product> findBySlugWithSpecValues(@Param("slug") String slug);
 
         @Query(value = """
@@ -71,6 +75,5 @@ public interface ClientProductDetailRepository extends JpaRepository<Product, In
 
                 Long getCount();
         }
-
 
 }

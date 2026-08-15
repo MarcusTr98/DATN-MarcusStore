@@ -25,10 +25,18 @@ public class SkuBulkUpdateRequest {
         @DecimalMin(value = "0.01", message = "Giá phải lớn hơn 0")
         @Digits(integer = 13, fraction = 2, message = "Giá không hợp lệ")
         private BigDecimal price;
-        @NotNull(message = "Tồn kho không được để trống")
-        @Min(value = 0, message = "Tồn kho không được âm")
-        @Max(value = 1_000_000, message = "Tồn kho vượt quá giới hạn")
-        private Integer stockQuantity;
+
+        @NotNull(message = "Giá niêm yết không được để trống")
+        @DecimalMin(value = "0.01", message = "Giá niêm yết phải lớn hơn 0")
+        @Digits(integer = 13, fraction = 2, message = "Giá niêm yết không hợp lệ")
+        private BigDecimal originalPrice;
+
+        // Marcus thêm: bulk SKU chỉ quản lý giá; tồn kho thuộc module kho/IMEI để
+        // tránh một request giá cũ ghi đè số lượng thực tế.
+        @AssertTrue(message = "Giá bán không được lớn hơn giá niêm yết")
+        public boolean isPriceRangeValid() {
+            return price == null || originalPrice == null || price.compareTo(originalPrice) <= 0;
+        }
     }
 
 }

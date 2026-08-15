@@ -22,6 +22,7 @@ import static org.mockito.Mockito.*;
 class ProductItemServiceTest {
     private ProductItemRepository itemRepository;
     private ProductSkuRepository skuRepository;
+    private InventoryAvailabilityService inventoryAvailabilityService;
     private ProductItemService service;
     private ProductSku sku;
 
@@ -29,9 +30,11 @@ class ProductItemServiceTest {
     void setUp() {
         itemRepository = mock(ProductItemRepository.class);
         skuRepository = mock(ProductSkuRepository.class);
+        inventoryAvailabilityService = mock(InventoryAvailabilityService.class);
         service = new ProductItemService();
         ReflectionTestUtils.setField(service, "productItemRepo", itemRepository);
         ReflectionTestUtils.setField(service, "skuRepository", skuRepository);
+        ReflectionTestUtils.setField(service, "inventoryAvailabilityService", inventoryAvailabilityService);
 
         Product product = new Product();
         product.setStatusImei(true);
@@ -54,6 +57,7 @@ class ProductItemServiceTest {
         var response = service.create(10, request);
 
         assertThat(response.getStatus()).isEqualTo(ProductItemService.STATUS_IN_STOCK);
+        verify(inventoryAvailabilityService).synchronizeImeiSku(10);
     }
 
     @Test

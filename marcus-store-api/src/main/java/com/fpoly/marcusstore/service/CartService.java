@@ -114,11 +114,15 @@ public class CartService {
             Integer quantity = item.getQuantity();
             BigDecimal totalPrice = price.multiply(BigDecimal.valueOf(quantity));
 
-            // Ưu tiên lấy Product.thumbnailUrl (ảnh sản phẩm cha).
-            // sku.skuImageUrl trong DB vẫn giữ nguyên, không xóa.
-            String thumbnailUrl = item.getSku().getProduct() != null
-                    ? item.getSku().getProduct().getThumbnailUrl()
-                    : null;
+            // Marcus sửa trên luồng Cart của thành viên: giỏ hàng/Checkout phải
+            // hiển thị đúng màu khách đã chọn. Nếu SKU chưa có ảnh mới fallback
+            // về ảnh chính của Product; không sao chép ảnh giữa hai bảng.
+            String thumbnailUrl = item.getSku().getSkuImageUrl();
+            if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
+                thumbnailUrl = item.getSku().getProduct() != null
+                        ? item.getSku().getProduct().getThumbnailUrl()
+                        : null;
+            }
             if (thumbnailUrl != null && thumbnailUrl.isBlank())
                 thumbnailUrl = null;
 
