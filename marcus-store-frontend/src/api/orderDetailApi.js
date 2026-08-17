@@ -1,17 +1,17 @@
 import api from '@/utils/api.js'
 const OrderDetailApi = {
   getOrderDetail(orderCode) {
-    return api.get(`/admin/order/${orderCode}`)
+    return api.get(`/admin/orders/${orderCode}`)
   },
   updateStatusOrder(orderCode, data) {
-    return api.put(`/admin/order/${orderCode}`, data)
+    return api.put(`/admin/orders/${orderCode}/status`, data)
   },
   assignOrderToStaff(orderCode, data) {
-    return api.put(`/admin/order/${orderCode}/assignment`, data)
+    return api.put(`/admin/order-assignments/${orderCode}`, data)
   },
   // Marcus thêm: Admin thử tạo lại vận đơn khi GHN trả lỗi hoặc mất kết nối.
   retryGhnShipment(orderCode) {
-    return api.post(`/admin/orders/${orderCode}/ghn/retry`)
+    return api.post(`/admin/orders/${orderCode}/shipment/retry`)
   },
 
   // marcus them refund
@@ -34,14 +34,14 @@ const OrderDetailApi = {
   // Marcus thêm xác nhận thủ công chỉ dành cho Sandbox, kèm ghi chú audit.
 
   getImeiPreview(orderCode) {
-    return api.get(`/admin/order/${orderCode}/imei-preview`)
+    return api.get(`/admin/orders/${orderCode}/imeis/preview`)
   },
   assignOrderImeis(orderCode, data) {
-    return api.put(`/admin/order/${orderCode}/imeis`, data)
+    return api.put(`/admin/orders/${orderCode}/imeis`, data)
   },
 
   startProcessingWithImei(orderCode, requests) {
-    return api.put(`/admin/order/${orderCode}/processing-with-imei`, requests)
+    return api.post(`/admin/orders/${orderCode}/imeis/processing`, requests)
   },
 }
 export default OrderDetailApi

@@ -18,12 +18,12 @@ const AdminOrderApi = {
 
   // 4. Lấy chi tiết 1 đơn hàng theo mã
   userOrderDetail(orderCode) {
-    return api.get(`/admin/order/${orderCode}`)
+    return api.get(`/admin/orders/${orderCode}`)
   },
 
   // 5. Cập nhật trạng thái đơn hàng
   updateOrderStatus(orderCode, payload) {
-    return api.put(`/admin/order/${orderCode}`, payload)
+    return api.put(`/admin/orders/${orderCode}/status`, payload)
   },
 }
 

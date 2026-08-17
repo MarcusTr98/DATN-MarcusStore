@@ -5,6 +5,6 @@ export default {
     return api.get('/admin/order-assignments/dashboard')
   },
   assign(orderCode, payload) {
-    return api.put(`/admin/order/${orderCode}/assignment`, payload)
+    return api.put(`/admin/order-assignments/${orderCode}`, payload)
   },
 }
