@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/admin/order-assignments")
-@PreAuthorize("hasAuthority('ORDER_VIEW')")
+@PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 @Validated
 public class AdminOrderAssignmentController {
@@ -27,7 +27,6 @@ public class AdminOrderAssignmentController {
     }
 
     @PutMapping("/{orderCode}")
-    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
     public OrderDetailResponse assignOrder(@PathVariable @Size(min = 1, max = 50) String orderCode,
             @Valid @RequestBody AssignOrderRequest request) {
         return orderService.assignOrderToStaff(orderCode, request.getStaffId(), request.getReason());

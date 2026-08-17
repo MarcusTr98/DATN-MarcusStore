@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -32,14 +34,17 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
     @Override
     @Transactional
     public void assignAutomatically(Order order) {
-        if (order == null || order.getOrderId() == null || assignmentRepository.findCurrentByOrderId(order.getOrderId()).isPresent()) {
+        if (order == null || order.getOrderId() == null) {
             return;
         }
+        Order lockedOrder = orderRepository.findByIdForUpdate(order.getOrderId()).orElse(null);
+        if (lockedOrder == null || assignmentRepository.findCurrentByOrderId(lockedOrder.getOrderId()).isPresent())
+            return;
 
         User selectedStaff = selectLeastLoadedStaff(true);
 
         if (selectedStaff != null) {
-            createAssignment(order, selectedStaff, null, "AUTO", "Hệ thống tự phân theo số đơn đang xử lý");
+            createAssignment(lockedOrder, selectedStaff, null, "AUTO", "Hệ thống tự phân theo số đơn đang xử lý");
         }
     }
 
@@ -49,11 +54,13 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
         Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
         User staff = userRepository.findActiveStaffWithOrderUpdatePermissionById(staffId)
-                .orElseThrow(() -> new IllegalArgumentException("Nhân viên không hoạt động hoặc không có quyền xử lý đơn"));
+                .orElseThrow(
+                        () -> new IllegalArgumentException("Nhân viên không hoạt động hoặc không có quyền xử lý đơn"));
 
         assignmentRepository.findCurrentByOrderIdForUpdate(order.getOrderId()).ifPresent(current -> {
             current.setIsCurrent(false);
             assignmentRepository.save(current);
+            assignmentRepository.flush();
         });
 
         Integer currentUserId = SecurityUtils.getCurrentUserId();
@@ -79,18 +86,31 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
     @Transactional(readOnly = true)
     public OrderAssignmentDashboardResponse getDashboard() {
         List<User> staffs = userRepository.findActiveStaffWithOrderUpdatePermission();
-        long maxLoad = staffs.stream()
-                .mapToLong(staff -> assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES))
-                .max().orElse(0);
+        Map<Integer, Long> activeLoadByStaffId = new HashMap<>();
+        Map<Integer, Long> completedByStaffId = new HashMap<>();
+        for (User staff : staffs) {
+            activeLoadByStaffId.put(staff.getUserId(),
+                    assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES));
+            completedByStaffId.put(staff.getUserId(),
+                    assignmentRepository.countCurrentCompletedOrders(staff.getUserId()));
+        }
+        long maxLoad = activeLoadByStaffId.values().stream().mapToLong(Long::longValue).max().orElse(0);
         List<OrderAssignmentDashboardResponse.StaffLoad> staffLoads = staffs.stream().map(staff -> {
-            long count = assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES);
+            long count = activeLoadByStaffId.get(staff.getUserId());
+            long completed = completedByStaffId.get(staff.getUserId());
+            double completionRate = count + completed == 0 ? 0
+                    : Math.round((completed * 1000.0 / (count + completed))) / 10.0;
             return OrderAssignmentDashboardResponse.StaffLoad.builder()
                     .staffId(staff.getUserId()).staffName(displayName(staff)).activeOrderCount(count)
-                    .workloadRate(maxLoad == 0 ? 0 : Math.round((count * 1000.0 / maxLoad)) / 10.0).build();
+                    .workloadRate(maxLoad == 0 ? 0 : Math.round((count * 1000.0 / maxLoad)) / 10.0)
+                    .completedOrderCount(completed).completionRate(completionRate).build();
         }).toList();
+        Map<Integer, Long> projectedLoadByStaffId = new HashMap<>(activeLoadByStaffId);
         List<OrderAssignmentDashboardResponse.PendingOrder> pendingOrders = orderRepository
                 .findPendingUnassignedOrders(PageRequest.of(0, 100)).stream().map(order -> {
-                    User planned = selectLeastLoadedStaff(false);
+                    User planned = selectLeastLoadedStaff(staffs, projectedLoadByStaffId);
+                    if (planned != null)
+                        projectedLoadByStaffId.merge(planned.getUserId(), 1L, Long::sum);
                     return OrderAssignmentDashboardResponse.PendingOrder.builder()
                             .orderCode(order.getOrderCode()).recipientName(order.getRecipientName())
                             .finalAmount(order.getFinalAmount()).autoAssignAt(order.getAutoAssignAt())
@@ -105,7 +125,14 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
                 ? userRepository.findActiveStaffWithOrderUpdatePermissionForAssignment()
                 : userRepository.findActiveStaffWithOrderUpdatePermission();
         return staffs.stream().min(Comparator
-                .comparingLong((User staff) -> assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES))
+                .comparingLong((User staff) -> assignmentRepository.countCurrentActiveOrders(staff.getUserId(),
+                        ACTIVE_ORDER_STATUSES))
+                .thenComparing(User::getUserId)).orElse(null);
+    }
+
+    private User selectLeastLoadedStaff(List<User> staffs, Map<Integer, Long> loadByStaffId) {
+        return staffs.stream().min(Comparator
+                .comparingLong((User staff) -> loadByStaffId.getOrDefault(staff.getUserId(), 0L))
                 .thenComparing(User::getUserId)).orElse(null);
     }
 
@@ -117,7 +144,9 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
         assignment.setAssignmentType(type);
         assignment.setReason(reason == null || reason.isBlank() ? null : reason.trim());
         assignment.setIsCurrent(true);
-        return assignmentRepository.save(assignment);
+        OrderAssignment savedAssignment = assignmentRepository.save(assignment);
+        assignmentRepository.flush();
+        return savedAssignment;
     }
 
     private OrderAssignmentResponse toResponse(OrderAssignment assignment) {
@@ -131,7 +160,8 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
     }
 
     private String displayName(User user) {
-        if (user == null) return null;
+        if (user == null)
+            return null;
         return user.getFullName() == null || user.getFullName().isBlank() ? user.getUsername() : user.getFullName();
     }
 }

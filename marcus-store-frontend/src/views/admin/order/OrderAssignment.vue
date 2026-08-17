@@ -117,8 +117,8 @@
       <aside class="panel load-panel">
         <div class="panel-heading">
           <div>
-            <h2>Tải xử lý</h2>
-            <p>Tỷ lệ dựa trên số đơn đang mở.</p>
+            <h2>Hiệu suất phân công</h2>
+            <p>Theo dõi đơn đang giao và tỷ lệ hoàn thành của từng nhân viên.</p>
           </div>
         </div>
         <div v-if="dashboard.staffLoads.length === 0" class="empty-staff">
@@ -130,17 +130,29 @@
               <span class="staff-avatar">{{ initials(staff.staffName) }}</span>
               <div>
                 <strong>{{ staff.staffName }}</strong
-                ><small>{{ staff.activeOrderCount }} đơn đang xử lý</small>
+                ><small
+                  >{{ staff.activeOrderCount }} đang giao · {{ staff.completedOrderCount }} hoàn
+                  thành</small
+                >
               </div>
-              <b>{{ staff.workloadRate }}%</b>
+              <b>{{ staff.completionRate }}%</b>
             </div>
-            <div class="load-track">
+            <div class="staff-metrics">
+              <span
+                ><i class="bi bi-inboxes-fill"></i>{{ staff.activeOrderCount }} đang phụ trách</span
+              >
+              <span
+                ><i class="bi bi-check2-circle"></i>{{ staff.completedOrderCount }} hoàn thành</span
+              >
+            </div>
+            <div class="load-track" title="Tỷ lệ hoàn thành">
               <span
                 :style="{
-                  width: `${Math.max(staff.workloadRate, staff.activeOrderCount ? 8 : 0)}%`,
+                  width: `${Math.max(staff.completionRate, staff.completedOrderCount ? 8 : 0)}%`,
                 }"
               ></span>
             </div>
+            <small class="completion-label">Tỷ lệ hoàn thành {{ staff.completionRate }}%</small>
           </article>
         </div>
         <div class="automation-note">
@@ -498,8 +510,26 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 .staff-top b {
-  color: #1d4ed8;
+  color: #15803d;
   font-size: 13px;
+}
+.staff-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.staff-metrics span {
+  border: 1px solid #bfdbfe;
+  border-radius: 7px;
+  padding: 4px 7px;
+  color: #43617f;
+  font-size: 11px;
+  font-weight: 700;
+}
+.staff-metrics i {
+  margin-right: 4px;
+  color: #2563eb;
 }
 .load-track {
   height: 7px;
@@ -513,7 +543,14 @@ onBeforeUnmount(() => {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #60a5fa, #1d4ed8);
+  background: linear-gradient(90deg, #4ade80, #15803d);
+}
+.completion-label {
+  display: block;
+  margin-top: 6px;
+  color: #4b6684;
+  font-size: 11px;
+  font-weight: 700;
 }
 .automation-note {
   display: flex;

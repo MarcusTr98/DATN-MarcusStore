@@ -20,6 +20,8 @@ public class OrderAssignmentDashboardResponse {
         private final String staffName;
         private final long activeOrderCount;
         private final double workloadRate;
+        private final long completedOrderCount;
+        private final double completionRate;
     }
 
     @Getter
