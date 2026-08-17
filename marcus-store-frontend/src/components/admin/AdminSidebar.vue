@@ -36,6 +36,15 @@
         <img :src="cartIcon" class="menu-icon" alt="" />
         <span>Đơn hàng</span>
       </router-link>
+      <router-link
+        v-if="canAccessRoute('/admin/order-assignment')"
+        to="/admin/order-assignment"
+        class="menu-item"
+        active-class="active"
+      >
+        <i class="bi bi-diagram-3 menu-icon"></i>
+        <span>Chia đơn hàng</span>
+      </router-link>
       <!-- Marcus giữ nguyên module thành viên: chỉ ghép route bảo hành vào
            cấu trúc Sidebar mới, không thay đổi quyền hay nghiệp vụ bảo hành. -->
       <router-link

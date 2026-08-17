@@ -1,0 +1,137 @@
+package com.fpoly.marcusstore.service.impl;
+
+import com.fpoly.marcusstore.dto.response.OrderAssignmentResponse;
+import com.fpoly.marcusstore.dto.response.OrderAssignmentDashboardResponse;
+import com.fpoly.marcusstore.entity.auth.User;
+import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderAssignment;
+import com.fpoly.marcusstore.repository.auth.UserRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderAssignmentRepository;
+import com.fpoly.marcusstore.repository.shopping.OrderRepository;
+import com.fpoly.marcusstore.security.SecurityUtils;
+import com.fpoly.marcusstore.service.OrderAssignmentService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+
+@Service
+@RequiredArgsConstructor
+public class OrderAssignmentServiceImpl implements OrderAssignmentService {
+    private static final Set<String> ACTIVE_ORDER_STATUSES = Set.of(
+            "PENDING", "CONFIRMED", "PROCESSING", "READY_FOR_PICKUP", "PACKED", "SHIPPING", "DELIVERED", "FAILED");
+
+    private final OrderAssignmentRepository assignmentRepository;
+    private final OrderRepository orderRepository;
+    private final UserRepository userRepository;
+
+    @Override
+    @Transactional
+    public void assignAutomatically(Order order) {
+        if (order == null || order.getOrderId() == null || assignmentRepository.findCurrentByOrderId(order.getOrderId()).isPresent()) {
+            return;
+        }
+
+        User selectedStaff = selectLeastLoadedStaff(true);
+
+        if (selectedStaff != null) {
+            createAssignment(order, selectedStaff, null, "AUTO", "Hệ thống tự phân theo số đơn đang xử lý");
+        }
+    }
+
+    @Override
+    @Transactional
+    public OrderAssignmentResponse assignManually(String orderCode, Integer staffId, String reason) {
+        Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+        User staff = userRepository.findActiveStaffWithOrderUpdatePermissionById(staffId)
+                .orElseThrow(() -> new IllegalArgumentException("Nhân viên không hoạt động hoặc không có quyền xử lý đơn"));
+
+        assignmentRepository.findCurrentByOrderIdForUpdate(order.getOrderId()).ifPresent(current -> {
+            current.setIsCurrent(false);
+            assignmentRepository.save(current);
+        });
+
+        Integer currentUserId = SecurityUtils.getCurrentUserId();
+        User assignedBy = currentUserId == null ? null : userRepository.getReferenceById(currentUserId);
+        OrderAssignment assignment = createAssignment(order, staff, assignedBy, "MANUAL", reason);
+        return toResponse(assignment);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderAssignmentResponse getCurrentAssignment(Integer orderId) {
+        return assignmentRepository.findCurrentByOrderId(orderId).map(this::toResponse).orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public void assignDueOrders() {
+        orderRepository.findOrdersDueForAutoAssignment(java.time.LocalDateTime.now(), PageRequest.of(0, 100))
+                .forEach(this::assignAutomatically);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrderAssignmentDashboardResponse getDashboard() {
+        List<User> staffs = userRepository.findActiveStaffWithOrderUpdatePermission();
+        long maxLoad = staffs.stream()
+                .mapToLong(staff -> assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES))
+                .max().orElse(0);
+        List<OrderAssignmentDashboardResponse.StaffLoad> staffLoads = staffs.stream().map(staff -> {
+            long count = assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES);
+            return OrderAssignmentDashboardResponse.StaffLoad.builder()
+                    .staffId(staff.getUserId()).staffName(displayName(staff)).activeOrderCount(count)
+                    .workloadRate(maxLoad == 0 ? 0 : Math.round((count * 1000.0 / maxLoad)) / 10.0).build();
+        }).toList();
+        List<OrderAssignmentDashboardResponse.PendingOrder> pendingOrders = orderRepository
+                .findPendingUnassignedOrders(PageRequest.of(0, 100)).stream().map(order -> {
+                    User planned = selectLeastLoadedStaff(false);
+                    return OrderAssignmentDashboardResponse.PendingOrder.builder()
+                            .orderCode(order.getOrderCode()).recipientName(order.getRecipientName())
+                            .finalAmount(order.getFinalAmount()).autoAssignAt(order.getAutoAssignAt())
+                            .plannedStaffId(planned == null ? null : planned.getUserId())
+                            .plannedStaffName(planned == null ? null : displayName(planned)).build();
+                }).toList();
+        return OrderAssignmentDashboardResponse.builder().staffLoads(staffLoads).pendingOrders(pendingOrders).build();
+    }
+
+    private User selectLeastLoadedStaff(boolean lockForAssignment) {
+        List<User> staffs = lockForAssignment
+                ? userRepository.findActiveStaffWithOrderUpdatePermissionForAssignment()
+                : userRepository.findActiveStaffWithOrderUpdatePermission();
+        return staffs.stream().min(Comparator
+                .comparingLong((User staff) -> assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES))
+                .thenComparing(User::getUserId)).orElse(null);
+    }
+
+    private OrderAssignment createAssignment(Order order, User staff, User assignedBy, String type, String reason) {
+        OrderAssignment assignment = new OrderAssignment();
+        assignment.setOrder(order);
+        assignment.setStaff(staff);
+        assignment.setAssignedBy(assignedBy);
+        assignment.setAssignmentType(type);
+        assignment.setReason(reason == null || reason.isBlank() ? null : reason.trim());
+        assignment.setIsCurrent(true);
+        return assignmentRepository.save(assignment);
+    }
+
+    private OrderAssignmentResponse toResponse(OrderAssignment assignment) {
+        return OrderAssignmentResponse.builder()
+                .staffId(assignment.getStaff().getUserId())
+                .staffName(displayName(assignment.getStaff()))
+                .assignmentType(assignment.getAssignmentType())
+                .assignedByName(displayName(assignment.getAssignedBy()))
+                .assignedAt(assignment.getAssignedAt())
+                .build();
+    }
+
+    private String displayName(User user) {
+        if (user == null) return null;
+        return user.getFullName() == null || user.getFullName().isBlank() ? user.getUsername() : user.getFullName();
+    }
+}

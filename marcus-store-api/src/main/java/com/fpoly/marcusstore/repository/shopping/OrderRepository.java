@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import jakarta.persistence.LockModeType;
@@ -26,6 +27,26 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode")
   Optional<Order> findByOrderCodeForUpdate(@Param("orderCode") String orderCode);
+
+  @Query("""
+      SELECT o FROM Order o
+      WHERE o.orderStatus = 'PENDING'
+        AND o.autoAssignAt IS NOT NULL AND o.autoAssignAt <= :now
+        AND NOT EXISTS (SELECT 1 FROM OrderAssignment assignment
+                        WHERE assignment.order = o AND assignment.isCurrent = true)
+      ORDER BY o.autoAssignAt ASC
+      """)
+  List<Order> findOrdersDueForAutoAssignment(@Param("now") LocalDateTime now, Pageable pageable);
+
+  @Query("""
+      SELECT o FROM Order o
+      WHERE o.orderStatus = 'PENDING'
+        AND o.autoAssignAt IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM OrderAssignment assignment
+                        WHERE assignment.order = o AND assignment.isCurrent = true)
+      ORDER BY o.autoAssignAt ASC
+      """)
+  List<Order> findPendingUnassignedOrders(Pageable pageable);
 
   // Marcus thêm: khóa đơn đồng thời kiểm tra chủ sở hữu để khách hủy đơn không
   // chạy song song với VNPAY IPN, scheduler hết hạn hoặc thao tác của Admin.

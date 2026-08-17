@@ -27,6 +27,7 @@ import com.fpoly.marcusstore.service.OrderShippingService;
 import com.fpoly.marcusstore.service.ProductItemService;
 import com.fpoly.marcusstore.service.AdminNotificationService;
 import com.fpoly.marcusstore.service.UserNotificationService;
+import com.fpoly.marcusstore.service.OrderAssignmentService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -66,6 +67,7 @@ public class OrderServiceImpl implements OrderService {
     // Marcus thêm chuông hai chiều cho luồng hủy đơn.
     private final AdminNotificationService adminNotificationService;
     private final UserNotificationService userNotificationService;
+    private final OrderAssignmentService orderAssignmentService;
 
     @Value("${vnpay.paymentTimeoutMinutes:20}")
     private long vnPayPaymentTimeoutMinutes;
@@ -126,6 +128,7 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .orderStatus(order.getOrderStatus())
                 .fulfillmentMethod(order.getFulfillmentMethod())
+                .assignment(orderAssignmentService.getCurrentAssignment(order.getOrderId()))
                 .createdAt(order.getCreatedAt()).build();
     }
 
@@ -388,6 +391,7 @@ public class OrderServiceImpl implements OrderService {
                 .shippingFee(order.getShippingFee())
                 .shippingSubsidy(order.getShippingSubsidy())
                 .deliveryNote(order.getDeliveryNote())
+                .assignment(orderAssignmentService.getCurrentAssignment(order.getOrderId()))
                 .finalAmount(order.getFinalAmount())
                 .paymentMethod(order.getPaymentMethod())
                 .paymentStatus(order.getPaymentStatus())
@@ -455,6 +459,13 @@ public class OrderServiceImpl implements OrderService {
                         }).toList())
                 .history(historyResponses)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public OrderDetailResponse assignOrderToStaff(String orderCode, Integer staffId, String reason) {
+        orderAssignmentService.assignManually(orderCode, staffId, reason);
+        return getOrderDetailResponse(orderCode);
     }
 
     @Override

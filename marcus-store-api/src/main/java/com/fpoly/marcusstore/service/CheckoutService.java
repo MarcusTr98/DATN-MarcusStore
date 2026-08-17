@@ -70,6 +70,7 @@ public class CheckoutService {
         private final FlashSaleSlotRepository flashSaleSlotRepository;
         private final SystemSettingRepository systemSettingRepository;
         private final BehaviorEventService behaviorEventService;
+        private final OrderAssignmentService orderAssignmentService;
 
         // Marcus thêm: chặn một tài khoản giữ kho bằng quá nhiều đơn COD chưa được
         // Admin xác nhận. Idempotent retry được xử lý trước nên không bị tính nhầm.
@@ -469,6 +470,8 @@ public class CheckoutService {
                 order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
                 Order savedOrder = orderRepository.save(order);
+                savedOrder.setAutoAssignAt(LocalDateTime.now().plusMinutes(5));
+                orderRepository.save(savedOrder);
                 // Marcus thêm: chỉ lưu mốc funnel và order_id, không lưu thông tin khách.
                 try {
                         behaviorEventService.recordOrderCreated(savedOrder.getOrderId(), req.getBehaviorSessionId());

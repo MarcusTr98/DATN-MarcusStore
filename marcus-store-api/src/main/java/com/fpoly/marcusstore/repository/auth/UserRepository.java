@@ -6,8 +6,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import jakarta.persistence.LockModeType;
 
 import java.util.List;
 import java.util.Optional;
@@ -99,6 +101,46 @@ LEFT JOIN FETCH u.permissions
 WHERE u.googleAccountId = :googleAccountId
 """)
 Optional<User> findByGoogleAccountId(@Param("googleAccountId") String googleAccountId);
+
+        @Lock(LockModeType.PESSIMISTIC_WRITE)
+        @Query("""
+SELECT DISTINCT u
+FROM User u
+JOIN u.role r
+LEFT JOIN r.permissions rolePermission
+LEFT JOIN u.permissions userPermission
+WHERE r.roleName = 'STAFF'
+  AND u.isActive = true
+  AND (rolePermission.permissionName = 'ORDER_UPDATE' OR userPermission.permissionName = 'ORDER_UPDATE')
+ORDER BY u.userId
+""")
+        List<User> findActiveStaffWithOrderUpdatePermissionForAssignment();
+
+        @Query("""
+SELECT DISTINCT u
+FROM User u
+JOIN u.role r
+LEFT JOIN r.permissions rolePermission
+LEFT JOIN u.permissions userPermission
+WHERE r.roleName = 'STAFF'
+  AND u.isActive = true
+  AND (rolePermission.permissionName = 'ORDER_UPDATE' OR userPermission.permissionName = 'ORDER_UPDATE')
+ORDER BY u.userId
+""")
+        List<User> findActiveStaffWithOrderUpdatePermission();
+
+        @Query("""
+SELECT DISTINCT u
+FROM User u
+JOIN u.role r
+LEFT JOIN r.permissions rolePermission
+LEFT JOIN u.permissions userPermission
+WHERE u.userId = :staffId
+  AND r.roleName = 'STAFF'
+  AND u.isActive = true
+  AND (rolePermission.permissionName = 'ORDER_UPDATE' OR userPermission.permissionName = 'ORDER_UPDATE')
+""")
+        Optional<User> findActiveStaffWithOrderUpdatePermissionById(@Param("staffId") Integer staffId);
 // Load user với permissions (dùng cho phân quyền)
 @Query("""
 SELECT u

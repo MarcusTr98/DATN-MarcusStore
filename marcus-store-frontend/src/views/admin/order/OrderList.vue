@@ -102,6 +102,7 @@
                 <th>Thanh toán</th>
                 <th>Trạng thái TT</th>
                 <th>Trạng thái đơn</th>
+                <th>Phụ trách</th>
                 <th>Ngày tạo</th>
                 <th class="text-end">Thao tác</th>
               </tr>
@@ -137,6 +138,13 @@
                   <span class="status-badge" :class="orderStatusMap[orders.orderStatus]?.className">
                     {{ orderStatusMap[orders.orderStatus]?.label || orders.orderStatus }}
                   </span>
+                </td>
+                <td>
+                  <div v-if="orders.assignment" class="order-code">
+                    {{ orders.assignment.staffName }}
+                    <small class="d-block">{{ orders.assignment.assignmentType === 'AUTO' ? 'Tự động' : 'Thủ công' }}</small>
+                  </div>
+                  <small v-else class="text-muted">Chưa phân công</small>
                 </td>
                 <td>
                   <div class="date-line">Ngày: {{ formatDate1(orders.createdAt) }}</div>

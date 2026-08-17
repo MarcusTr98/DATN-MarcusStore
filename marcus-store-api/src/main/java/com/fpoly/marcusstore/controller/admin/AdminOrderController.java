@@ -3,12 +3,14 @@ package com.fpoly.marcusstore.controller.admin;
 import com.fpoly.marcusstore.dto.request.CreateRefundRequest;
 import com.fpoly.marcusstore.dto.request.UpdateOrderImeiRequest;
 import com.fpoly.marcusstore.dto.request.UpdateOrderStatusRequest;
+import com.fpoly.marcusstore.dto.request.AssignOrderRequest;
 import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
 import com.fpoly.marcusstore.dto.response.OrderImeiAssignmentResponse;
 import com.fpoly.marcusstore.dto.response.OrderResponse;
 import com.fpoly.marcusstore.dto.response.OrderStatsResponse;
 import com.fpoly.marcusstore.dto.response.RefundResponse;
 import com.fpoly.marcusstore.service.OrderService;
+import com.fpoly.marcusstore.service.OrderAssignmentService;
 import com.fpoly.marcusstore.service.RefundProcessor;
 import com.fpoly.marcusstore.service.RefundService;
 import jakarta.validation.Valid;
@@ -37,6 +39,7 @@ public class AdminOrderController {
     private final OrderService orderService;
     private final RefundService refundService;
     private final RefundProcessor refundProcessor;
+    private final OrderAssignmentService orderAssignmentService;
 
     @GetMapping("/orders")
     public Page<OrderResponse> getAllOrder(@RequestParam(defaultValue = "0") int page,
@@ -75,6 +78,19 @@ public class AdminOrderController {
             @PathVariable("orderCode") @Size(min = 1, max = 50) String orderCode,
             @Valid @RequestBody UpdateOrderStatusRequest request) {
         return orderService.updateStatusOrder(orderCode, request);
+    }
+
+    @GetMapping("/order-assignments/dashboard")
+    public com.fpoly.marcusstore.dto.response.OrderAssignmentDashboardResponse getAssignmentDashboard() {
+        return orderAssignmentService.getDashboard();
+    }
+
+    @PutMapping("/order/{orderCode}/assignment")
+    @PreAuthorize("hasAuthority('ORDER_UPDATE')")
+    public OrderDetailResponse assignOrderToStaff(
+            @PathVariable @Size(min = 1, max = 50) String orderCode,
+            @Valid @RequestBody AssignOrderRequest request) {
+        return orderService.assignOrderToStaff(orderCode, request.getStaffId(), request.getReason());
     }
 
     // Marcus thêm: retry chỉ là thao tác xử lý đơn, không mở cho tài khoản chỉ có

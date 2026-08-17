@@ -66,6 +66,8 @@ class CheckoutServiceIdempotencyTest {
     FlashSaleSlotRepository flashSaleSlotRepository;
     @Mock
     SystemSettingRepository systemSettingRepository;
+    @Mock
+    OrderAssignmentService orderAssignmentService;
     @InjectMocks
     CheckoutService checkoutService;
 
