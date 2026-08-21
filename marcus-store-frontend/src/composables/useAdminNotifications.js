@@ -9,6 +9,9 @@ const INITIAL_RETRY_DELAY_MS = 1200
 
 // Marcus thêm: quản lý API + realtime chuông ở một nơi, tránh AdminHeader ôm toàn bộ nghiệp vụ.
 export function useAdminNotifications() {
+  const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
+  const isStaff = roles.includes('ROLE_STAFF') && !roles.includes('ROLE_ADMIN')
+  const apiBase = isStaff ? '/user/notifications' : '/admin/notifications'
   const notifications = ref([])
   const unreadCount = ref(0)
   const activeFilter = ref('ALL')
@@ -40,7 +43,7 @@ export function useAdminNotifications() {
     errorMessage.value = ''
 
     try {
-      const response = await api.get('/admin/notifications', {
+      const response = await api.get(apiBase, {
         params: {
           page: append ? page.value + 1 : 0,
           size: PAGE_SIZE,
@@ -53,7 +56,16 @@ export function useAdminNotifications() {
         skipGlobalLoading: true,
       })
       const data = response.data?.data ?? {}
-      const incoming = Array.isArray(data.list) ? data.list : []
+      const source = Array.isArray(data.list) ? data.list : []
+      const incoming = isStaff
+        ? source.filter((item) => {
+            if (activeFilter.value === 'UNREAD') return !item.isRead
+            if (['INFO', 'WARNING', 'ACTION_REQUIRED'].includes(activeFilter.value)) {
+              return item.category === activeFilter.value
+            }
+            return true
+          })
+        : source
 
       if (append) {
         const knownIds = new Set(notifications.value.map((item) => item.id))
@@ -101,7 +113,7 @@ export function useAdminNotifications() {
   const markAsRead = async (item) => {
     if (item.isRead) return
     try {
-      await api.put(`/admin/notifications/${item.id}/read`)
+      await api.put(`${apiBase}/${item.id}/read`)
       // Marcus sửa: tránh trừ badge hai lần nếu event READ realtime về trước HTTP response.
       if (!item.isRead) {
         item.isRead = true
@@ -118,7 +130,7 @@ export function useAdminNotifications() {
   const markAllAsRead = async () => {
     if (unreadCount.value === 0) return
     try {
-      await api.put('/admin/notifications/mark-all-read')
+      await api.put(`${apiBase}/mark-all-read`)
       unreadCount.value = 0
       if (isUnreadOnly.value) notifications.value = []
       else notifications.value.forEach((item) => (item.isRead = true))
@@ -173,13 +185,16 @@ export function useAdminNotifications() {
       connectHeaders: { Authorization: `Bearer ${token}` },
       onConnect: () => {
         connectionState.value = 'CONNECTED'
-        stompClient.subscribe('/topic/admin/notifications', (message) => {
-          try {
-            handleRealtimeEvent(JSON.parse(message.body))
-          } catch {
-            fetchNotifications()
-          }
-        })
+        stompClient.subscribe(
+          isStaff ? '/user/queue/notifications' : '/topic/admin/notifications',
+          (message) => {
+            try {
+              handleRealtimeEvent(JSON.parse(message.body))
+            } catch {
+              fetchNotifications()
+            }
+          },
+        )
         // Marcus sửa lỗi chuông: sau khi mất mạng/reconnect phải bù các event WebSocket đã lỡ.
         if (hasConnectedOnce) fetchNotifications()
         hasConnectedOnce = true

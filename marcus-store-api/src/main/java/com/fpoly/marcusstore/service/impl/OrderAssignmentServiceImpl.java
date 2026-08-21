@@ -10,6 +10,8 @@ import com.fpoly.marcusstore.repository.shopping.OrderAssignmentRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.security.SecurityUtils;
 import com.fpoly.marcusstore.service.OrderAssignmentService;
+import com.fpoly.marcusstore.service.UserNotificationService;
+import com.fpoly.marcusstore.dto.response.StaffAssignmentStatusResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,16 +23,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class OrderAssignmentServiceImpl implements OrderAssignmentService {
+    private static final int SELF_CLAIM_COOLDOWN_SECONDS = 15;
     private static final Set<String> ACTIVE_ORDER_STATUSES = Set.of(
             "PENDING", "CONFIRMED", "PROCESSING", "READY_FOR_PICKUP", "PACKED", "SHIPPING", "DELIVERED", "FAILED");
 
     private final OrderAssignmentRepository assignmentRepository;
     private final OrderRepository orderRepository;
     private final UserRepository userRepository;
+    private final UserNotificationService userNotificationService;
 
     @Override
     @Transactional
@@ -110,7 +115,13 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
             return OrderAssignmentDashboardResponse.StaffLoad.builder()
                     .staffId(staff.getUserId()).staffName(displayName(staff)).activeOrderCount(count)
                     .workloadRate(maxLoad == 0 ? 0 : Math.round((count * 1000.0 / maxLoad)) / 10.0)
-                    .completedOrderCount(completed).completionRate(completionRate).build();
+                    .completedOrderCount(completed).completionRate(completionRate)
+                    .workloadScore(workloadScore(staff))
+                    .acceptingOrders(Boolean.TRUE.equals(staff.getAcceptingOrders()))
+                    .maxActiveOrders(maxActiveOrders(staff))
+                    .eligibleForAssignment(Boolean.TRUE.equals(staff.getAcceptingOrders())
+                            && count < maxActiveOrders(staff))
+                    .build();
         }).toList();
         Map<Integer, Long> projectedLoadByStaffId = new HashMap<>(activeLoadByStaffId);
         List<OrderAssignmentDashboardResponse.PendingOrder> pendingOrders = orderRepository
@@ -139,6 +150,72 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public StaffAssignmentStatusResponse getCurrentStaffStatus() {
+        return buildStaffStatus(currentStaff());
+    }
+
+    @Override
+    @Transactional
+    public StaffAssignmentStatusResponse setCurrentStaffAvailability(boolean acceptingOrders) {
+        User staff = currentStaff();
+        staff.setAcceptingOrders(acceptingOrders);
+        return buildStaffStatus(userRepository.save(staff));
+    }
+
+    @Override
+    @Transactional
+    public String claimNextOrder() {
+        User staff = userRepository.findEligibleStaffByIdForAssignment(SecurityUtils.getCurrentUserId())
+                .orElseThrow(() -> new IllegalStateException("Bạn không đủ quyền nhận đơn"));
+        StaffAssignmentStatusResponse status = buildStaffStatus(staff);
+        if (!status.isCanClaim()) {
+            throw new IllegalStateException(status.getUnavailableReason());
+        }
+        Order order = orderRepository.findNextClaimableOrderForUpdate(PageRequest.of(0, 1)).stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Hiện không có đơn phù hợp để nhận"));
+        createAssignment(order, staff, staff, "SELF", "Nhân viên chủ động nhận đơn tiếp theo");
+        return order.getOrderCode();
+    }
+
+    @Override
+    @Transactional
+    public StaffAssignmentStatusResponse updateStaffSettings(Integer staffId, boolean acceptingOrders,
+            int maxActiveOrders) {
+        User staff = userRepository.findEligibleStaffByIdForAssignment(staffId)
+                .orElseThrow(() -> new IllegalArgumentException("Nhân viên không đủ điều kiện xử lý đơn"));
+        staff.setAcceptingOrders(acceptingOrders);
+        staff.setMaxActiveOrders(Math.max(1, Math.min(maxActiveOrders, 50)));
+        return buildStaffStatus(userRepository.save(staff));
+    }
+
+    private User currentStaff() {
+        return userRepository.findActiveStaffWithOrderUpdatePermissionById(SecurityUtils.getCurrentUserId())
+                .orElseThrow(() -> new IllegalStateException("Bạn không phải nhân viên xử lý đơn đang hoạt động"));
+    }
+
+    private StaffAssignmentStatusResponse buildStaffStatus(User staff) {
+        long activeCount = activeCount(staff);
+        boolean accepting = Boolean.TRUE.equals(staff.getAcceptingOrders());
+        boolean belowLimit = activeCount < maxActiveOrders(staff);
+        boolean cooldownReady = staff.getLastAssignedAt() == null
+                || !staff.getLastAssignedAt().plusSeconds(SELF_CLAIM_COOLDOWN_SECONDS).isAfter(LocalDateTime.now());
+        String reason = !accepting ? "Bạn đang tạm dừng nhận đơn"
+                : !belowLimit ? "Bạn đã đạt giới hạn đơn đang phụ trách"
+                        : !cooldownReady ? "Vui lòng chờ trước khi nhận đơn tiếp theo" : null;
+        return StaffAssignmentStatusResponse.builder()
+                .acceptingOrders(accepting)
+                .maxActiveOrders(maxActiveOrders(staff))
+                .activeOrderCount(activeCount)
+                .workloadScore(workloadScore(staff))
+                .canClaim(reason == null)
+                .lastAssignedAt(staff.getLastAssignedAt())
+                .unavailableReason(reason)
+                .build();
+    }
+
     private boolean isEligibleForAutoAssignment(Order order) {
         if (!"PENDING".equals(normalize(order.getOrderStatus()))) {
             return false;
@@ -155,16 +232,24 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
         List<User> staffs = lockForAssignment
                 ? userRepository.findActiveStaffWithOrderUpdatePermissionForAssignment()
                 : userRepository.findActiveStaffWithOrderUpdatePermission();
-        return staffs.stream().min(Comparator
-                .comparingLong((User staff) -> assignmentRepository.countCurrentActiveOrders(staff.getUserId(),
-                        ACTIVE_ORDER_STATUSES))
-                .thenComparing(User::getUserId)).orElse(null);
+        return staffs.stream()
+                .filter(staff -> Boolean.TRUE.equals(staff.getAcceptingOrders()))
+                .filter(staff -> activeCount(staff) < maxActiveOrders(staff))
+                .min(Comparator.comparingDouble(this::workloadScore)
+                        .thenComparing(staff -> staff.getLastAssignedAt(),
+                                Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(User::getUserId))
+                .orElse(null);
     }
 
     private User selectLeastLoadedStaff(List<User> staffs, Map<Integer, Long> loadByStaffId) {
-        return staffs.stream().min(Comparator
-                .comparingLong((User staff) -> loadByStaffId.getOrDefault(staff.getUserId(), 0L))
-                .thenComparing(User::getUserId)).orElse(null);
+        return staffs.stream()
+                .filter(staff -> Boolean.TRUE.equals(staff.getAcceptingOrders()))
+                .filter(staff -> loadByStaffId.getOrDefault(staff.getUserId(), 0L) < maxActiveOrders(staff))
+                .min(Comparator
+                        .comparingLong((User staff) -> loadByStaffId.getOrDefault(staff.getUserId(), 0L))
+                        .thenComparing(User::getUserId))
+                .orElse(null);
     }
 
     private OrderAssignment createAssignment(Order order, User staff, User assignedBy, String type, String reason) {
@@ -177,6 +262,9 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
         assignment.setIsCurrent(true);
         OrderAssignment savedAssignment = assignmentRepository.save(assignment);
         assignmentRepository.flush();
+        staff.setLastAssignedAt(LocalDateTime.now());
+        userRepository.save(staff);
+        userNotificationService.notifyOrderAssigned(savedAssignment);
         return savedAssignment;
     }
 
@@ -194,5 +282,31 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
         if (user == null)
             return null;
         return user.getFullName() == null || user.getFullName().isBlank() ? user.getUsername() : user.getFullName();
+    }
+
+    private long activeCount(User staff) {
+        return assignmentRepository.countCurrentActiveOrders(staff.getUserId(), ACTIVE_ORDER_STATUSES);
+    }
+
+    private int maxActiveOrders(User staff) {
+        return staff.getMaxActiveOrders() == null || staff.getMaxActiveOrders() < 1 ? 5 : staff.getMaxActiveOrders();
+    }
+
+    private double workloadScore(User staff) {
+        return assignmentRepository.findCurrentActiveStatuses(staff.getUserId(), ACTIVE_ORDER_STATUSES).stream()
+                .mapToDouble(this::statusWeight).sum();
+    }
+
+    private double statusWeight(String status) {
+        return switch (normalize(status)) {
+            case "CONFIRMED" -> 1.2;
+            case "PROCESSING" -> 2.0;
+            case "READY_FOR_PICKUP" -> 0.7;
+            case "PACKED" -> 0.8;
+            case "SHIPPING" -> 0.4;
+            case "DELIVERED" -> 0.2;
+            case "FAILED" -> 1.5;
+            default -> 1.0;
+        };
     }
 }

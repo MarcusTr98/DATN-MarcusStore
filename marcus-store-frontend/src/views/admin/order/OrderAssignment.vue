@@ -144,6 +144,17 @@
               <span
                 ><i class="bi bi-check2-circle"></i>{{ staff.completedOrderCount }} hoàn thành</span
               >
+              <span><i class="bi bi-speedometer2"></i>{{ staff.workloadScore }} điểm tải</span>
+            </div>
+            <div class="staff-settings">
+              <label>
+                <input v-model="staff.acceptingOrders" type="checkbox" /> Sẵn sàng nhận đơn
+              </label>
+              <label>
+                Tối đa
+                <input v-model.number="staff.maxActiveOrders" type="number" min="1" max="50" />
+              </label>
+              <button type="button" @click="saveStaffSettings(staff)">Lưu</button>
             </div>
             <div class="load-track" title="Tỷ lệ hoàn thành">
               <span
@@ -222,6 +233,19 @@ async function assign(orderCode) {
     showMessage(error.response?.data?.message || 'Không thể giao đơn.', 'error')
   } finally {
     saving.value = ''
+  }
+}
+
+async function saveStaffSettings(staff) {
+  try {
+    await OrderAssignmentApi.updateStaffSettings(staff.staffId, {
+      acceptingOrders: staff.acceptingOrders,
+      maxActiveOrders: Number(staff.maxActiveOrders),
+    })
+    showMessage(`Đã cập nhật cấu hình của ${staff.staffName}.`, 'success')
+    await loadDashboard()
+  } catch (error) {
+    showMessage(error.response?.data?.message || 'Không thể cập nhật nhân viên.', 'error')
   }
 }
 
@@ -530,6 +554,30 @@ onBeforeUnmount(() => {
 .staff-metrics i {
   margin-right: 4px;
   color: #2563eb;
+}
+.staff-settings {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.staff-settings label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.staff-settings input[type='number'] {
+  width: 52px;
+  padding: 3px;
+}
+.staff-settings button {
+  border: 0;
+  border-radius: 6px;
+  padding: 5px 9px;
+  background: #2563eb;
+  color: #fff;
 }
 .load-track {
   height: 7px;

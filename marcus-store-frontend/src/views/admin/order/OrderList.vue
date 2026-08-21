@@ -13,6 +13,34 @@
         </div>
       </section>
 
+      <section v-if="isStaff" class="staff-assignment-bar">
+        <div>
+          <strong>Nhận đơn chủ động</strong>
+          <span>
+            {{ staffStatus.activeOrderCount }} / {{ staffStatus.maxActiveOrders }} đơn ·
+            {{ staffStatus.workloadScore }} điểm tải
+          </span>
+        </div>
+        <label class="availability-toggle">
+          <input
+            v-model="staffStatus.acceptingOrders"
+            type="checkbox"
+            :disabled="staffActionLoading"
+            @change="updateAvailability"
+          />
+          <span>{{ staffStatus.acceptingOrders ? 'Đang sẵn sàng' : 'Tạm dừng nhận đơn' }}</span>
+        </label>
+        <button
+          type="button"
+          class="btn btn-primary"
+          :disabled="staffActionLoading || !staffStatus.canClaim"
+          :title="staffStatus.unavailableReason || 'Nhận đơn cũ nhất đang chờ'"
+          @click="claimNextOrder"
+        >
+          {{ staffActionLoading ? 'Đang xử lý...' : 'Nhận đơn tiếp theo' }}
+        </button>
+      </section>
+
       <section class="stats-grid">
         <article class="stat-card">
           <span>Tổng đơn</span>
@@ -142,7 +170,9 @@
                 <td>
                   <div v-if="orders.assignment" class="order-code">
                     {{ orders.assignment.staffName }}
-                    <small class="d-block">{{ orders.assignment.assignmentType === 'AUTO' ? 'Tự động' : 'Thủ công' }}</small>
+                    <small class="d-block">{{
+                      orders.assignment.assignmentType === 'AUTO' ? 'Tự động' : 'Thủ công'
+                    }}</small>
                   </div>
                   <small v-else class="text-muted">Chưa phân công</small>
                 </td>
@@ -218,9 +248,21 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import OrderListApi from '@/api/orderListApi.js'
+import StaffOrderAssignmentApi from '@/api/staffOrderAssignmentApi.js'
 import '@/assets/css/OrderList.css'
 
 const toastMessage = ref('')
+const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
+const isStaff = roles.includes('ROLE_STAFF') && !roles.includes('ROLE_ADMIN')
+const staffActionLoading = ref(false)
+const staffStatus = ref({
+  acceptingOrders: true,
+  maxActiveOrders: 5,
+  activeOrderCount: 0,
+  workloadScore: 0,
+  canClaim: false,
+  unavailableReason: '',
+})
 const router = useRouter()
 const keyword = ref('')
 const paymentMethod = ref('all')
@@ -276,7 +318,44 @@ onMounted(() => {
   fetchGetAllOrder()
   fetchOrderStats()
   getFilterOption()
+  if (isStaff) fetchStaffStatus()
 })
+
+async function fetchStaffStatus() {
+  const { data } = await StaffOrderAssignmentApi.getStatus()
+  staffStatus.value = data
+}
+
+async function updateAvailability() {
+  staffActionLoading.value = true
+  try {
+    const { data } = await StaffOrderAssignmentApi.setAvailability(
+      staffStatus.value.acceptingOrders,
+    )
+    staffStatus.value = data
+    showToast(data.acceptingOrders ? 'Bạn đã sẵn sàng nhận đơn.' : 'Đã tạm dừng nhận đơn mới.')
+  } catch (e) {
+    await fetchStaffStatus()
+    showToast(e.response?.data?.message || 'Không thể cập nhật trạng thái nhận đơn.')
+  } finally {
+    staffActionLoading.value = false
+  }
+}
+
+async function claimNextOrder() {
+  staffActionLoading.value = true
+  try {
+    const { data } = await StaffOrderAssignmentApi.claimNext()
+    showToast(`Đã nhận đơn ${data.orderCode}.`)
+    await Promise.all([fetchStaffStatus(), fetchGetAllOrder(), fetchOrderStats()])
+    router.push(`/admin/order/${data.orderCode}`)
+  } catch (e) {
+    showToast(e.response?.data?.message || 'Không thể nhận đơn lúc này.')
+    await fetchStaffStatus()
+  } finally {
+    staffActionLoading.value = false
+  }
+}
 watch([keyword, paymentMethod, orderStatus, fromDate, toDate], () => {
   currentPage.value = 0
   fetchGetAllOrder()
@@ -371,4 +450,35 @@ const resetFilters = () => {
 }
 </script>
 
-<style scoped></style>
+<style scoped>
+.staff-assignment-bar {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid #bfdbfe;
+  border-radius: 14px;
+  background: #eff6ff;
+}
+.staff-assignment-bar > div:first-child {
+  display: grid;
+  margin-right: auto;
+}
+.staff-assignment-bar span {
+  color: #64748b;
+  font-size: 13px;
+}
+.availability-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  .staff-assignment-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+</style>

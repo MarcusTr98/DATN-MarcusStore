@@ -1,6 +1,8 @@
 package com.fpoly.marcusstore.controller.admin;
 
 import com.fpoly.marcusstore.dto.request.AssignOrderRequest;
+import com.fpoly.marcusstore.dto.request.StaffAssignmentSettingsRequest;
+import com.fpoly.marcusstore.dto.response.StaffAssignmentStatusResponse;
 import com.fpoly.marcusstore.dto.response.OrderAssignmentDashboardResponse;
 import com.fpoly.marcusstore.dto.response.OrderDetailResponse;
 import com.fpoly.marcusstore.service.OrderAssignmentService;
@@ -30,5 +32,12 @@ public class AdminOrderAssignmentController {
     public OrderDetailResponse assignOrder(@PathVariable @Size(min = 1, max = 50) String orderCode,
             @Valid @RequestBody AssignOrderRequest request) {
         return orderService.assignOrderToStaff(orderCode, request.getStaffId(), request.getReason());
+    }
+
+    @PutMapping("/staff/{staffId}/settings")
+    public StaffAssignmentStatusResponse updateStaffSettings(@PathVariable Integer staffId,
+            @Valid @RequestBody StaffAssignmentSettingsRequest request) {
+        return orderAssignmentService.updateStaffSettings(
+                staffId, request.getAcceptingOrders(), request.getMaxActiveOrders());
     }
 }

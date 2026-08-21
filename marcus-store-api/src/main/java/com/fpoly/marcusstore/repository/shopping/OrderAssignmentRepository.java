@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.List;
 
 public interface OrderAssignmentRepository extends JpaRepository<OrderAssignment, Long> {
 
@@ -45,4 +46,13 @@ public interface OrderAssignmentRepository extends JpaRepository<OrderAssignment
   Optional<OrderAssignment> findCurrentByOrderIdForUpdate(@Param("orderId") Integer orderId);
 
   boolean existsByOrderOrderIdAndStaffUserIdAndIsCurrentTrue(Integer orderId, Integer staffId);
+
+  @Query("""
+      SELECT assignment.order.orderStatus FROM OrderAssignment assignment
+      WHERE assignment.staff.userId = :staffId
+        AND assignment.isCurrent = true
+        AND assignment.order.orderStatus IN :activeStatuses
+      """)
+  List<String> findCurrentActiveStatuses(@Param("staffId") Integer staffId,
+      @Param("activeStatuses") Collection<String> activeStatuses);
 }

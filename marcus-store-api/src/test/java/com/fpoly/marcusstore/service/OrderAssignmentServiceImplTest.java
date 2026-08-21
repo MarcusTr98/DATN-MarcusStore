@@ -39,12 +39,16 @@ class OrderAssignmentServiceImplTest {
                 .thenReturn(List.of(busyStaff, availableStaff));
         when(assignmentRepository.countCurrentActiveOrders(eq(2), any())).thenReturn(4L);
         when(assignmentRepository.countCurrentActiveOrders(eq(3), any())).thenReturn(1L);
+        when(assignmentRepository.findCurrentActiveStatuses(eq(2), any()))
+                .thenReturn(List.of("PROCESSING", "PROCESSING", "PENDING", "PENDING"));
+        when(assignmentRepository.findCurrentActiveStatuses(eq(3), any())).thenReturn(List.of("PENDING"));
         when(assignmentRepository.save(any(OrderAssignment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         OrderRepository orderRepository = mock(OrderRepository.class);
+        UserNotificationService notificationService = mock(UserNotificationService.class);
         when(orderRepository.findByIdForUpdate(101)).thenReturn(Optional.of(order));
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
-                assignmentRepository, orderRepository, userRepository);
+                assignmentRepository, orderRepository, userRepository, notificationService);
 
         service.assignAutomatically(order);
 
@@ -53,6 +57,7 @@ class OrderAssignmentServiceImplTest {
         assertThat(assignmentCaptor.getValue().getStaff()).isSameAs(availableStaff);
         assertThat(assignmentCaptor.getValue().getAssignmentType()).isEqualTo("AUTO");
         assertThat(assignmentCaptor.getValue().getIsCurrent()).isTrue();
+        verify(notificationService).notifyOrderAssigned(assignmentCaptor.getValue());
     }
 
     @Test
@@ -65,7 +70,7 @@ class OrderAssignmentServiceImplTest {
         OrderRepository orderRepository = mock(OrderRepository.class);
         when(orderRepository.findByIdForUpdate(102)).thenReturn(Optional.of(order));
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
-                assignmentRepository, orderRepository, mock(UserRepository.class));
+                assignmentRepository, orderRepository, mock(UserRepository.class), mock(UserNotificationService.class));
 
         service.assignAutomatically(order);
 
@@ -84,7 +89,7 @@ class OrderAssignmentServiceImplTest {
                 pendingOrder("ORD-1"), pendingOrder("ORD-2"), pendingOrder("ORD-3")));
 
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
-                assignmentRepository, orderRepository, userRepository);
+                assignmentRepository, orderRepository, userRepository, mock(UserNotificationService.class));
 
         var dashboard = service.getDashboard();
 
@@ -104,7 +109,7 @@ class OrderAssignmentServiceImplTest {
         when(orderRepository.findByIdForUpdate(103)).thenReturn(Optional.of(order));
 
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
-                assignmentRepository, orderRepository, mock(UserRepository.class));
+                assignmentRepository, orderRepository, mock(UserRepository.class), mock(UserNotificationService.class));
 
         service.assignAutomatically(order);
 
@@ -123,7 +128,7 @@ class OrderAssignmentServiceImplTest {
         when(userRepository.findActiveStaffWithOrderUpdatePermissionById(2)).thenReturn(Optional.of(staff(2, "Staff")));
 
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
-                assignmentRepository, orderRepository, userRepository);
+                assignmentRepository, orderRepository, userRepository, mock(UserNotificationService.class));
 
         org.assertj.core.api.Assertions.assertThatThrownBy(
                 () -> service.assignManually("ORD-DONE", 2, null))
@@ -138,7 +143,8 @@ class OrderAssignmentServiceImplTest {
         authenticate(7, "ROLE_STAFF");
         when(assignmentRepository.existsByOrderOrderIdAndStaffUserIdAndIsCurrentTrue(105, 7)).thenReturn(false);
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
-                assignmentRepository, mock(OrderRepository.class), mock(UserRepository.class));
+                assignmentRepository, mock(OrderRepository.class), mock(UserRepository.class),
+                mock(UserNotificationService.class));
 
         try {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.assertCurrentStaffCanAccess(105))
@@ -153,12 +159,44 @@ class OrderAssignmentServiceImplTest {
         OrderAssignmentRepository assignmentRepository = mock(OrderAssignmentRepository.class);
         authenticate(1, "ROLE_ADMIN");
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
-                assignmentRepository, mock(OrderRepository.class), mock(UserRepository.class));
+                assignmentRepository, mock(OrderRepository.class), mock(UserRepository.class),
+                mock(UserNotificationService.class));
 
         try {
             service.assertCurrentStaffCanAccess(106);
             verify(assignmentRepository, never())
                     .existsByOrderOrderIdAndStaffUserIdAndIsCurrentTrue(anyInt(), anyInt());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void staffClaimsOldestEligibleOrderAsSelfAssignment() {
+        OrderAssignmentRepository assignmentRepository = mock(OrderAssignmentRepository.class);
+        OrderRepository orderRepository = mock(OrderRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        UserNotificationService notificationService = mock(UserNotificationService.class);
+        User staff = staff(8, "Staff 8");
+        staff.setAcceptingOrders(true);
+        staff.setMaxActiveOrders(5);
+        Order order = pendingOrder("ORD-CLAIM");
+        order.setOrderId(107);
+        authenticate(8, "ROLE_STAFF");
+        when(userRepository.findEligibleStaffByIdForAssignment(8)).thenReturn(Optional.of(staff));
+        when(assignmentRepository.findCurrentActiveStatuses(eq(8), any())).thenReturn(List.of());
+        when(orderRepository.findNextClaimableOrderForUpdate(any())).thenReturn(List.of(order));
+        when(assignmentRepository.save(any(OrderAssignment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
+                assignmentRepository, orderRepository, userRepository, notificationService);
+
+        try {
+            assertThat(service.claimNextOrder()).isEqualTo("ORD-CLAIM");
+            ArgumentCaptor<OrderAssignment> captor = ArgumentCaptor.forClass(OrderAssignment.class);
+            verify(assignmentRepository).save(captor.capture());
+            assertThat(captor.getValue().getAssignmentType()).isEqualTo("SELF");
+            assertThat(captor.getValue().getStaff()).isSameAs(staff);
+            verify(notificationService).notifyOrderAssigned(captor.getValue());
         } finally {
             SecurityContextHolder.clearContext();
         }

@@ -3,6 +3,7 @@ package com.fpoly.marcusstore.service;
 import com.fpoly.marcusstore.dto.response.OrderAssignmentResponse;
 import com.fpoly.marcusstore.dto.response.OrderAssignmentDashboardResponse;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.dto.response.StaffAssignmentStatusResponse;
 
 public interface OrderAssignmentService {
     void assignAutomatically(Order order);
@@ -16,4 +17,12 @@ public interface OrderAssignmentService {
     OrderAssignmentDashboardResponse getDashboard();
 
     void assertCurrentStaffCanAccess(Integer orderId);
+
+    StaffAssignmentStatusResponse getCurrentStaffStatus();
+
+    StaffAssignmentStatusResponse setCurrentStaffAvailability(boolean acceptingOrders);
+
+    String claimNextOrder();
+
+    StaffAssignmentStatusResponse updateStaffSettings(Integer staffId, boolean acceptingOrders, int maxActiveOrders);
 }

@@ -320,6 +320,9 @@ CREATE UNIQUE INDEX UX_Orders_CheckoutRequestId
     WHERE checkout_request_id IS NOT NULL;
 ALTER TABLE Orders ADD payment_date DATETIME2;
 ALTER TABLE Orders ADD auto_assign_at DATETIME2 NULL;
+ALTER TABLE Users ADD accepting_orders BIT NOT NULL CONSTRAINT DF_Users_AcceptingOrders DEFAULT 1;
+ALTER TABLE Users ADD max_active_orders INT NOT NULL CONSTRAINT DF_Users_MaxActiveOrders DEFAULT 5;
+ALTER TABLE Users ADD last_assigned_at DATETIME2 NULL;
 
 -- Marcus thêm: snapshot giao nhận và trạng thái tích hợp GHN tách khỏi Orders.
 CREATE TABLE Order_Shipping_Details (
@@ -610,7 +613,7 @@ CREATE TABLE Order_Assignments (
     CONSTRAINT FK_OrderAssignments_Order FOREIGN KEY (order_id) REFERENCES Orders(order_id) ON DELETE CASCADE,
     CONSTRAINT FK_OrderAssignments_Staff FOREIGN KEY (staff_id) REFERENCES Users(user_id),
     CONSTRAINT FK_OrderAssignments_AssignedBy FOREIGN KEY (assigned_by) REFERENCES Users(user_id),
-    CONSTRAINT CK_OrderAssignments_Type CHECK (assignment_type IN ('AUTO', 'MANUAL'))
+    CONSTRAINT CK_OrderAssignments_Type CHECK (assignment_type IN ('AUTO', 'MANUAL', 'SELF'))
 );
 CREATE UNIQUE INDEX UX_OrderAssignments_CurrentOrder
     ON Order_Assignments(order_id) WHERE is_current = 1;

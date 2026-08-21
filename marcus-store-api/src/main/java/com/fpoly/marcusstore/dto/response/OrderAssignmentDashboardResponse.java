@@ -22,6 +22,10 @@ public class OrderAssignmentDashboardResponse {
         private final double workloadRate;
         private final long completedOrderCount;
         private final double completionRate;
+        private final double workloadScore;
+        private final boolean acceptingOrders;
+        private final int maxActiveOrders;
+        private final boolean eligibleForAssignment;
     }
 
     @Getter
