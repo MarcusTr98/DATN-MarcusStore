@@ -134,6 +134,14 @@
       :message="notifyModal.message"
       @close="notifyModal.visible = false"
     />
+
+    <!-- Login Required Modal -->
+    <LoginRequiredModal
+      :visible="showLoginRequired"
+      title="Vui lòng đăng nhập"
+      message="Bạn cần đăng nhập để thêm sản phẩm vào giỏ hàng hoặc mua ngay."
+      @close="showLoginRequired = false"
+    />
   </div>
 </template>
 
@@ -144,6 +152,7 @@ import api from '@/utils/api'
 import { useCartStore } from '@/stores/cartStore'
 import wishlist, { state as wishlistState } from '@/composables/useWishlistShared'
 import BaseModal from '@/components/BaseModal.vue'
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 import { trackBehavior } from '@/api/behaviorApi'
 
 import ProductGallery from '@/layouts/product-detail/ProductGallery.vue'
@@ -175,8 +184,14 @@ let skuUnavailableTimer = null
 
 const notifyModal = ref({ visible: false, type: 'info', title: '', message: '' })
 
+const showLoginRequired = ref(false)
+
 function showNotify(type, title, message) {
   notifyModal.value = { visible: true, type, title, message }
+}
+
+function requireLogin() {
+  showLoginRequired.value = true
 }
 
 function showSkuUnavailable() {
@@ -312,6 +327,10 @@ async function toggleWishlist() {
 
 // ===== Add to cart =====
 async function onAddToCart(quantity) {
+  if (!localStorage.getItem('ACCESS_TOKEN')) {
+    requireLogin()
+    return
+  }
   const sku = currentSku.value
   if (!sku || !sku.inStock) {
     showNotify('error', 'Không thể thêm', 'Sản phẩm hiện đang hết hàng.')
@@ -336,6 +355,10 @@ async function onAddToCart(quantity) {
 
 // ===== Buy now =====
 async function onBuyNow(quantity) {
+  if (!localStorage.getItem('ACCESS_TOKEN')) {
+    requireLogin()
+    return
+  }
   const sku = currentSku.value
   if (!sku || !sku.inStock) {
     showNotify('error', 'Không thể mua', 'Sản phẩm hiện đang hết hàng.')
