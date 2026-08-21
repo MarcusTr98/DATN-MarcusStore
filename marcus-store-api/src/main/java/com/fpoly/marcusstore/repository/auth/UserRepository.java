@@ -25,53 +25,53 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
         boolean existsByEmail(String email);
 
-           @Query("""
-            SELECT DISTINCT u
-            FROM User u
-            JOIN FETCH u.role r
-            LEFT JOIN FETCH r.permissions
-            WHERE u.username = :username
-            """)
-    Optional<User> findByUsername(@Param("username") String username);
+        @Query("""
+                        SELECT DISTINCT u
+                        FROM User u
+                        JOIN FETCH u.role r
+                        LEFT JOIN FETCH r.permissions
+                        WHERE u.username = :username
+                        """)
+        Optional<User> findByUsername(@Param("username") String username);
 
         Optional<User> findByEmail(String email);
 
-@Query("""
-SELECT u
-FROM User u
-JOIN u.role r
-WHERE
-(
-    :keyword IS NULL
-    OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-    OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
-    OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
-    OR u.phoneNumber LIKE CONCAT('%', :keyword, '%')
-)
-AND
-(
-    :rolesEmpty = true
-    OR r.roleName IN :roles
-)
-AND
-(
-    :status IS NULL
-    OR u.isActive = :status
-)
-AND
-(
-    :emailVerified IS NULL
-    OR u.emailVerified = :emailVerified
-)
-""")
-Page<User> findAllByKeywordAndRoles(
-        @Param("keyword") String keyword,
-        @Param("roles") List<String> roles,
-        @Param("rolesEmpty") boolean rolesEmpty,
-        @Param("status") Boolean status,
-        @Param("emailVerified") Boolean emailVerified,
-        Pageable pageable
-);
+        @Query("""
+                        SELECT u
+                        FROM User u
+                        JOIN u.role r
+                        WHERE
+                        (
+                            :keyword IS NULL
+                            OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(u.username) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                            OR u.phoneNumber LIKE CONCAT('%', :keyword, '%')
+                        )
+                        AND
+                        (
+                            :rolesEmpty = true
+                            OR r.roleName IN :roles
+                        )
+                        AND
+                        (
+                            :status IS NULL
+                            OR u.isActive = :status
+                        )
+                        AND
+                        (
+                            :emailVerified IS NULL
+                            OR u.emailVerified = :emailVerified
+                        )
+                        """)
+        Page<User> findAllByKeywordAndRoles(
+                        @Param("keyword") String keyword,
+                        @Param("roles") List<String> roles,
+                        @Param("rolesEmpty") boolean rolesEmpty,
+                        @Param("status") Boolean status,
+                        @Param("emailVerified") Boolean emailVerified,
+                        Pageable pageable);
+
         // Lấy tất cả users có role cụ thể (roleId = 3 cho CUSTOMER)
         List<User> findByRoleRoleId(Integer roleId);
 
@@ -84,69 +84,68 @@ Page<User> findAllByKeywordAndRoles(
                         @Param("keyword") String keyword);
 
         @Query("""
-SELECT DISTINCT u
-FROM User u
-JOIN FETCH u.role r
-LEFT JOIN FETCH r.permissions
-LEFT JOIN FETCH u.permissions
-WHERE u.email = :email
-""")
-Optional<User> findByEmailWithRole(@Param("email") String email);
-@Query("""
-SELECT u
-FROM User u
-JOIN FETCH u.role r
-LEFT JOIN FETCH r.permissions
-LEFT JOIN FETCH u.permissions
-WHERE u.googleAccountId = :googleAccountId
-""")
-Optional<User> findByGoogleAccountId(@Param("googleAccountId") String googleAccountId);
+                        SELECT DISTINCT u
+                        FROM User u
+                        JOIN FETCH u.role r
+                        LEFT JOIN FETCH r.permissions
+                        LEFT JOIN FETCH u.permissions
+                        WHERE u.email = :email
+                        """)
+        Optional<User> findByEmailWithRole(@Param("email") String email);
+
+        @Query("""
+                        SELECT u
+                        FROM User u
+                        JOIN FETCH u.role r
+                        LEFT JOIN FETCH r.permissions
+                        LEFT JOIN FETCH u.permissions
+                        WHERE u.googleAccountId = :googleAccountId
+                        """)
+        Optional<User> findByGoogleAccountId(@Param("googleAccountId") String googleAccountId);
 
         @Lock(LockModeType.PESSIMISTIC_WRITE)
         @Query("""
-SELECT DISTINCT u
-FROM User u
+                        SELECT DISTINCT u
+                        FROM User u
 JOIN u.role r
-LEFT JOIN r.permissions rolePermission
 LEFT JOIN u.permissions userPermission
-WHERE r.roleName = 'STAFF'
-  AND u.isActive = true
-  AND (rolePermission.permissionName = 'ORDER_UPDATE' OR userPermission.permissionName = 'ORDER_UPDATE')
-ORDER BY u.userId
-""")
+                        WHERE r.roleName = 'STAFF'
+                          AND u.isActive = true
+                          AND userPermission.permissionName = 'ORDER_UPDATE'
+                        ORDER BY u.userId
+                        """)
         List<User> findActiveStaffWithOrderUpdatePermissionForAssignment();
 
         @Query("""
-SELECT DISTINCT u
-FROM User u
+                        SELECT DISTINCT u
+                        FROM User u
 JOIN u.role r
-LEFT JOIN r.permissions rolePermission
 LEFT JOIN u.permissions userPermission
-WHERE r.roleName = 'STAFF'
-  AND u.isActive = true
-  AND (rolePermission.permissionName = 'ORDER_UPDATE' OR userPermission.permissionName = 'ORDER_UPDATE')
-ORDER BY u.userId
-""")
+                        WHERE r.roleName = 'STAFF'
+                          AND u.isActive = true
+                          AND userPermission.permissionName = 'ORDER_UPDATE'
+                        ORDER BY u.userId
+                        """)
         List<User> findActiveStaffWithOrderUpdatePermission();
 
         @Query("""
-SELECT DISTINCT u
-FROM User u
+                        SELECT DISTINCT u
+                        FROM User u
 JOIN u.role r
-LEFT JOIN r.permissions rolePermission
 LEFT JOIN u.permissions userPermission
-WHERE u.userId = :staffId
-  AND r.roleName = 'STAFF'
-  AND u.isActive = true
-  AND (rolePermission.permissionName = 'ORDER_UPDATE' OR userPermission.permissionName = 'ORDER_UPDATE')
-""")
+                        WHERE u.userId = :staffId
+                          AND r.roleName = 'STAFF'
+                          AND u.isActive = true
+                          AND userPermission.permissionName = 'ORDER_UPDATE'
+                        """)
         Optional<User> findActiveStaffWithOrderUpdatePermissionById(@Param("staffId") Integer staffId);
-// Load user với permissions (dùng cho phân quyền)
-@Query("""
-SELECT u
-FROM User u
-LEFT JOIN FETCH u.permissions
-WHERE u.userId = :userId
-""")
-Optional<User> findByIdWithPermissions(@Param("userId") Integer userId);
+
+        // Load user với permissions (dùng cho phân quyền)
+        @Query("""
+                        SELECT u
+                        FROM User u
+                        LEFT JOIN FETCH u.permissions
+                        WHERE u.userId = :userId
+                        """)
+        Optional<User> findByIdWithPermissions(@Param("userId") Integer userId);
 }

@@ -9,6 +9,11 @@ import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.service.impl.OrderAssignmentServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
+import com.fpoly.marcusstore.security.CustomUserDetails;
 
 import java.util.List;
 import java.util.Optional;
@@ -88,6 +93,85 @@ class OrderAssignmentServiceImplTest {
                 .containsExactly(1, 2, 1);
     }
 
+    @Test
+    void skipsUnpaidVnPayOrderDuringAutomaticAssignment() {
+        OrderAssignmentRepository assignmentRepository = mock(OrderAssignmentRepository.class);
+        OrderRepository orderRepository = mock(OrderRepository.class);
+        Order order = pendingOrder("ORD-VNPAY");
+        order.setOrderId(103);
+        order.setPaymentMethod("VNPAY");
+        order.setPaymentStatus("UNPAID");
+        when(orderRepository.findByIdForUpdate(103)).thenReturn(Optional.of(order));
+
+        OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
+                assignmentRepository, orderRepository, mock(UserRepository.class));
+
+        service.assignAutomatically(order);
+
+        verifyNoInteractions(assignmentRepository);
+    }
+
+    @Test
+    void rejectsManualAssignmentForCompletedOrder() {
+        OrderAssignmentRepository assignmentRepository = mock(OrderAssignmentRepository.class);
+        OrderRepository orderRepository = mock(OrderRepository.class);
+        UserRepository userRepository = mock(UserRepository.class);
+        Order order = pendingOrder("ORD-DONE");
+        order.setOrderId(104);
+        order.setOrderStatus("COMPLETED");
+        when(orderRepository.findByOrderCodeForUpdate("ORD-DONE")).thenReturn(Optional.of(order));
+        when(userRepository.findActiveStaffWithOrderUpdatePermissionById(2)).thenReturn(Optional.of(staff(2, "Staff")));
+
+        OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
+                assignmentRepository, orderRepository, userRepository);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> service.assignManually("ORD-DONE", 2, null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("COMPLETED");
+        verify(assignmentRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsStaffWhenOrderIsAssignedToSomeoneElse() {
+        OrderAssignmentRepository assignmentRepository = mock(OrderAssignmentRepository.class);
+        authenticate(7, "ROLE_STAFF");
+        when(assignmentRepository.existsByOrderOrderIdAndStaffUserIdAndIsCurrentTrue(105, 7)).thenReturn(false);
+        OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
+                assignmentRepository, mock(OrderRepository.class), mock(UserRepository.class));
+
+        try {
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.assertCurrentStaffCanAccess(105))
+                    .isInstanceOf(AccessDeniedException.class);
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void allowsAdminToWorkOnAnyAssignedOrder() {
+        OrderAssignmentRepository assignmentRepository = mock(OrderAssignmentRepository.class);
+        authenticate(1, "ROLE_ADMIN");
+        OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
+                assignmentRepository, mock(OrderRepository.class), mock(UserRepository.class));
+
+        try {
+            service.assertCurrentStaffCanAccess(106);
+            verify(assignmentRepository, never())
+                    .existsByOrderOrderIdAndStaffUserIdAndIsCurrentTrue(anyInt(), anyInt());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    private void authenticate(int userId, String role) {
+        CustomUserDetails principal = new CustomUserDetails(
+                userId, "user" + userId, "user@example.com", "User", "password",
+                List.of(new SimpleGrantedAuthority(role)), true);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()));
+    }
+
     private User staff(int id, String name) {
         User user = new User();
         user.setUserId(id);
@@ -99,6 +183,9 @@ class OrderAssignmentServiceImplTest {
     private Order pendingOrder(String orderCode) {
         Order order = new Order();
         order.setOrderCode(orderCode);
+        order.setOrderStatus("PENDING");
+        order.setPaymentMethod("COD");
+        order.setPaymentStatus("UNPAID");
         return order;
     }
 }

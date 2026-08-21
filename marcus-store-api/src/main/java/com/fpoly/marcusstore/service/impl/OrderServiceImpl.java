@@ -86,6 +86,7 @@ public class OrderServiceImpl implements OrderService {
     public OrderDetailResponse retryGhnShipment(String orderCode) {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy đơn hàng"));
+        orderAssignmentService.assertCurrentStaffCanAccess(order.getOrderId());
         orderShippingService.createOrRetryGhnOrder(order.getOrderId());
         return getOrderDetailResponse(orderCode);
     }
@@ -193,6 +194,7 @@ public class OrderServiceImpl implements OrderService {
             String orderCode, UpdateOrderStatusRequest request, String cancellationActor) {
         Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        orderAssignmentService.assertCurrentStaffCanAccess(order.getOrderId());
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
         String newStatus = normalizeStatusValue(request.getStatus());
 
@@ -311,10 +313,14 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Page<OrderResponse> getOrdersPage(String keyword, String paymentMethod, String orderStatus,
             LocalDate fromDate, LocalDate toDate, Pageable pageable) {
-        return orderRepository.searchOrders(
-                normalizeKeyword(keyword), normalizePaymentMethod(paymentMethod), normalizeOrderStatus(orderStatus),
-                fromDate, toDate, pageable)
-                .map(this::toResponse);
+        String kw = normalizeKeyword(keyword);
+        String pm = normalizePaymentMethod(paymentMethod);
+        String os = normalizeOrderStatus(orderStatus);
+        Page<Order> orders = SecurityUtils.hasAnyRole("STAFF")
+                ? orderRepository.searchAssignedOrders(SecurityUtils.getCurrentUserId(), kw, pm, os, fromDate, toDate,
+                        pageable)
+                : orderRepository.searchOrders(kw, pm, os, fromDate, toDate, pageable);
+        return orders.map(this::toResponse);
     }
 
     @Override
@@ -322,6 +328,20 @@ public class OrderServiceImpl implements OrderService {
         String kw = normalizeKeyword(keyword);
         String pm = normalizePaymentMethod(paymentMethod);
         String os = normalizeOrderStatus(orderStatus);
+
+        if (SecurityUtils.hasAnyRole("STAFF")) {
+            Map<String, Long> counts = orderRepository
+                    .countAssignedOrdersByStatus(SecurityUtils.getCurrentUserId(), kw, pm, os).stream()
+                    .collect(Collectors.toMap(row -> String.valueOf(row[0]), row -> (Long) row[1]));
+            return OrderStatsResponse.builder()
+                    .total(counts.values().stream().mapToLong(Long::longValue).sum())
+                    .pending(counts.getOrDefault("PENDING", 0L))
+                    .confirmed(counts.getOrDefault("CONFIRMED", 0L))
+                    .shipping(counts.getOrDefault("SHIPPING", 0L))
+                    .completed(counts.getOrDefault("COMPLETED", 0L))
+                    .cancelled(counts.getOrDefault("CANCELLED", 0L))
+                    .build();
+        }
 
         return OrderStatsResponse.builder()
                 .total(orderRepository.countOrders(kw, pm, os))
@@ -348,6 +368,7 @@ public class OrderServiceImpl implements OrderService {
     public OrderDetailResponse getOrderDetailResponse(String orderCode) {
         Order order = orderRepository.findDetailByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        orderAssignmentService.assertCurrentStaffCanAccess(order.getOrderId());
 
         List<OrderStatusHistory> histories = orderStatusHistoryRepository
                 .findByOrder_OrderIdOrderByCreatedAtAsc(order.getOrderId());
@@ -587,6 +608,7 @@ public class OrderServiceImpl implements OrderService {
     public List<OrderImeiAssignmentResponse> getImeiPreview(String orderCode) {
         Order order = orderRepository.findByOrderCode(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        orderAssignmentService.assertCurrentStaffCanAccess(order.getOrderId());
 
         List<OrderItem> orderItems = orderItemRepository.findByOrder_OrderId(order.getOrderId());
 
@@ -631,6 +653,7 @@ public class OrderServiceImpl implements OrderService {
         // tránh hai Admin đồng thời lấy cùng IMEI hoặc chuyển trạng thái hai lần.
         Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        orderAssignmentService.assertCurrentStaffCanAccess(order.getOrderId());
 
         // Marcus sửa: chỉ cho phép gán IMEI khi đơn đang ở PROCESSING hoặc
         // READY_FOR_PICKUP.
@@ -832,6 +855,7 @@ public class OrderServiceImpl implements OrderService {
     public OrderDetailResponse startProcessingWithImei(String orderCode, List<UpdateOrderImeiRequest> requests) {
         Order order = orderRepository.findByOrderCodeForUpdate(orderCode)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        orderAssignmentService.assertCurrentStaffCanAccess(order.getOrderId());
         String currentStatus = normalizeStatusValue(order.getOrderStatus());
 
         if (!canChangeStatus(order, currentStatus, "PROCESSING")) {

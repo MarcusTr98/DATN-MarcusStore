@@ -14,4 +14,6 @@ public interface OrderAssignmentService {
     void assignDueOrders();
 
     OrderAssignmentDashboardResponse getDashboard();
+
+    void assertCurrentStaffCanAccess(Integer orderId);
 }

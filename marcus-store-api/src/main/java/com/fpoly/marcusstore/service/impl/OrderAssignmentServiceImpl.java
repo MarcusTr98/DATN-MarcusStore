@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Comparator;
 import java.util.HashMap;
@@ -38,7 +39,8 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
             return;
         }
         Order lockedOrder = orderRepository.findByIdForUpdate(order.getOrderId()).orElse(null);
-        if (lockedOrder == null || assignmentRepository.findCurrentByOrderId(lockedOrder.getOrderId()).isPresent())
+        if (lockedOrder == null || !isEligibleForAutoAssignment(lockedOrder)
+                || assignmentRepository.findCurrentByOrderId(lockedOrder.getOrderId()).isPresent())
             return;
 
         User selectedStaff = selectLeastLoadedStaff(true);
@@ -56,6 +58,11 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
         User staff = userRepository.findActiveStaffWithOrderUpdatePermissionById(staffId)
                 .orElseThrow(
                         () -> new IllegalArgumentException("Nhân viên không hoạt động hoặc không có quyền xử lý đơn"));
+
+        String status = normalize(order.getOrderStatus());
+        if (!ACTIVE_ORDER_STATUSES.contains(status)) {
+            throw new IllegalStateException("Không thể phân công đơn ở trạng thái " + status);
+        }
 
         assignmentRepository.findCurrentByOrderIdForUpdate(order.getOrderId()).ifPresent(current -> {
             current.setIsCurrent(false);
@@ -118,6 +125,30 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
                             .plannedStaffName(planned == null ? null : displayName(planned)).build();
                 }).toList();
         return OrderAssignmentDashboardResponse.builder().staffLoads(staffLoads).pendingOrders(pendingOrders).build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void assertCurrentStaffCanAccess(Integer orderId) {
+        if (!SecurityUtils.hasAnyRole("STAFF")) {
+            return;
+        }
+        Integer staffId = SecurityUtils.getCurrentUserId();
+        if (!assignmentRepository.existsByOrderOrderIdAndStaffUserIdAndIsCurrentTrue(orderId, staffId)) {
+            throw new AccessDeniedException("Đơn hàng chưa được phân công cho bạn");
+        }
+    }
+
+    private boolean isEligibleForAutoAssignment(Order order) {
+        if (!"PENDING".equals(normalize(order.getOrderStatus()))) {
+            return false;
+        }
+        return !"VNPAY".equals(normalize(order.getPaymentMethod()))
+                || "PAID".equals(normalize(order.getPaymentStatus()));
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toUpperCase();
     }
 
     private User selectLeastLoadedStaff(boolean lockForAssignment) {

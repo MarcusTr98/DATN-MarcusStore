@@ -28,3 +28,11 @@ BEGIN
         ON Order_Assignments(staff_id, is_current, assigned_at DESC);
 END
 GO
+
+-- Đưa đơn cũ đủ điều kiện vào hàng chờ. VNPAY chưa thanh toán tiếp tục chờ IPN.
+UPDATE Orders
+SET auto_assign_at = DATEADD(MINUTE, 5, COALESCE(created_at, GETDATE()))
+WHERE order_status = 'PENDING'
+  AND auto_assign_at IS NULL
+  AND (UPPER(payment_method) <> 'VNPAY' OR UPPER(payment_status) = 'PAID');
+GO
