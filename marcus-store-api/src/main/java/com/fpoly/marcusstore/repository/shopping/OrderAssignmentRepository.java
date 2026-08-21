@@ -7,9 +7,10 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 
 public interface OrderAssignmentRepository extends JpaRepository<OrderAssignment, Long> {
 
@@ -55,4 +56,22 @@ public interface OrderAssignmentRepository extends JpaRepository<OrderAssignment
       """)
   List<String> findCurrentActiveStatuses(@Param("staffId") Integer staffId,
       @Param("activeStatuses") Collection<String> activeStatuses);
+
+  @Query("""
+      SELECT COUNT(assignment) FROM OrderAssignment assignment
+      WHERE assignment.staff.userId = :staffId
+        AND assignment.assignmentType = :type
+        AND assignment.assignedAt >= :since
+      """)
+  long countAssignmentsByTypeSince(@Param("staffId") Integer staffId,
+      @Param("type") String type, @Param("since") LocalDateTime since);
+
+  @Query("""
+      SELECT COUNT(DISTINCT assignment.order.orderId) FROM OrderAssignment assignment
+      WHERE assignment.staff.userId = :staffId
+        AND assignment.assignedAt >= :since
+        AND assignment.order.orderStatus = 'COMPLETED'
+      """)
+  long countCompletedAssignmentsSince(@Param("staffId") Integer staffId,
+      @Param("since") LocalDateTime since);
 }

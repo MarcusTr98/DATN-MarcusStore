@@ -392,7 +392,11 @@ const showSanPhamKho = computed(() => {
 // Marcus thêm: nhóm Bán hàng hiển thị nếu người dùng được xem đơn hàng hoặc
 // module đổi trả/bảo hành vừa được tích hợp từ nhánh thành viên.
 const showSales = computed(() => {
-  return canAccessRoute('/admin/order') || canAccessRoute('/admin/warranty')
+  return (
+    canAccessRoute('/admin/order') ||
+    canAccessRoute('/admin/order-assignment') ||
+    canAccessRoute('/admin/warranty')
+  )
 })
 
 const showMarketing = computed(() => {

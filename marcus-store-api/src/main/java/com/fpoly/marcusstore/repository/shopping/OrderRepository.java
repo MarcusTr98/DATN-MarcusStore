@@ -62,6 +62,16 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
       """)
   List<Order> findNextClaimableOrderForUpdate(Pageable pageable);
 
+  @Query("""
+      SELECT COUNT(o) FROM Order o
+      WHERE o.orderStatus = 'PENDING'
+        AND o.autoAssignAt IS NOT NULL
+        AND (UPPER(o.paymentMethod) <> 'VNPAY' OR UPPER(o.paymentStatus) = 'PAID')
+        AND NOT EXISTS (SELECT 1 FROM OrderAssignment assignment
+                        WHERE assignment.order = o AND assignment.isCurrent = true)
+      """)
+  long countClaimableOrders();
+
   // Marcus thêm: khóa đơn đồng thời kiểm tra chủ sở hữu để khách hủy đơn không
   // chạy song song với VNPAY IPN, scheduler hết hạn hoặc thao tác của Admin.
   @Lock(LockModeType.PESSIMISTIC_WRITE)

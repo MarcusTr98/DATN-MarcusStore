@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.time.LocalDateTime;
+import java.time.Duration;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -98,6 +100,7 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
     @Transactional(readOnly = true)
     public OrderAssignmentDashboardResponse getDashboard() {
         List<User> staffs = userRepository.findActiveStaffWithOrderUpdatePermission();
+        LocalDateTime kpiSince = LocalDateTime.now().minusDays(30);
         Map<Integer, Long> activeLoadByStaffId = new HashMap<>();
         Map<Integer, Long> completedByStaffId = new HashMap<>();
         for (User staff : staffs) {
@@ -112,6 +115,12 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
             long completed = completedByStaffId.get(staff.getUserId());
             double completionRate = count + completed == 0 ? 0
                     : Math.round((completed * 1000.0 / (count + completed))) / 10.0;
+            long selfAssigned = assignmentRepository.countAssignmentsByTypeSince(staff.getUserId(), "SELF", kpiSince);
+            long autoAssigned = assignmentRepository.countAssignmentsByTypeSince(staff.getUserId(), "AUTO", kpiSince);
+            long manualAssigned = assignmentRepository.countAssignmentsByTypeSince(staff.getUserId(), "MANUAL",
+                    kpiSince);
+            long totalAssigned = selfAssigned + autoAssigned + manualAssigned;
+            long completedInPeriod = assignmentRepository.countCompletedAssignmentsSince(staff.getUserId(), kpiSince);
             return OrderAssignmentDashboardResponse.StaffLoad.builder()
                     .staffId(staff.getUserId()).staffName(displayName(staff)).activeOrderCount(count)
                     .workloadRate(maxLoad == 0 ? 0 : Math.round((count * 1000.0 / maxLoad)) / 10.0)
@@ -121,6 +130,16 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
                     .maxActiveOrders(maxActiveOrders(staff))
                     .eligibleForAssignment(Boolean.TRUE.equals(staff.getAcceptingOrders())
                             && count < maxActiveOrders(staff))
+                    .workloadBreakdown(workloadBreakdown(staff))
+                    .selfAssignedCount(selfAssigned)
+                    .autoAssignedCount(autoAssigned)
+                    .manualAssignedCount(manualAssigned)
+                    .totalAssignedCount(totalAssigned)
+                    .selfAssignmentRate(totalAssigned == 0 ? 0
+                            : Math.round(selfAssigned * 1000.0 / totalAssigned) / 10.0)
+                    .completedInPeriodCount(completedInPeriod)
+                    .periodCompletionRate(totalAssigned == 0 ? 0
+                            : Math.round(Math.min(completedInPeriod, totalAssigned) * 1000.0 / totalAssigned) / 10.0)
                     .build();
         }).toList();
         Map<Integer, Long> projectedLoadByStaffId = new HashMap<>(activeLoadByStaffId);
@@ -169,6 +188,9 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
     public String claimNextOrder() {
         User staff = userRepository.findEligibleStaffByIdForAssignment(SecurityUtils.getCurrentUserId())
                 .orElseThrow(() -> new IllegalStateException("Bạn không đủ quyền nhận đơn"));
+        if (!Boolean.TRUE.equals(staff.getAcceptingOrders())) {
+            staff.setAcceptingOrders(true);
+        }
         StaffAssignmentStatusResponse status = buildStaffStatus(staff);
         if (!status.isCanClaim()) {
             throw new IllegalStateException(status.getUnavailableReason());
@@ -198,13 +220,21 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
 
     private StaffAssignmentStatusResponse buildStaffStatus(User staff) {
         long activeCount = activeCount(staff);
+        LocalDateTime kpiSince = LocalDateTime.now().minusDays(30);
+        long selfAssigned = assignmentRepository.countAssignmentsByTypeSince(staff.getUserId(), "SELF", kpiSince);
+        long autoAssigned = assignmentRepository.countAssignmentsByTypeSince(staff.getUserId(), "AUTO", kpiSince);
+        long manualAssigned = assignmentRepository.countAssignmentsByTypeSince(staff.getUserId(), "MANUAL", kpiSince);
+        long totalAssigned = selfAssigned + autoAssigned + manualAssigned;
+        long completedInPeriod = assignmentRepository.countCompletedAssignmentsSince(staff.getUserId(), kpiSince);
         boolean accepting = Boolean.TRUE.equals(staff.getAcceptingOrders());
         boolean belowLimit = activeCount < maxActiveOrders(staff);
         boolean cooldownReady = staff.getLastAssignedAt() == null
                 || !staff.getLastAssignedAt().plusSeconds(SELF_CLAIM_COOLDOWN_SECONDS).isAfter(LocalDateTime.now());
-        String reason = !accepting ? "Bạn đang tạm dừng nhận đơn"
-                : !belowLimit ? "Bạn đã đạt giới hạn đơn đang phụ trách"
-                        : !cooldownReady ? "Vui lòng chờ trước khi nhận đơn tiếp theo" : null;
+        long cooldownRemaining = cooldownReady || staff.getLastAssignedAt() == null ? 0
+                : Math.max(1, Duration.between(LocalDateTime.now(),
+                        staff.getLastAssignedAt().plusSeconds(SELF_CLAIM_COOLDOWN_SECONDS)).toSeconds());
+        String reason = !belowLimit ? "Bạn đã đạt giới hạn đơn đang phụ trách"
+                : !cooldownReady ? "Vui lòng chờ trước khi nhận đơn tiếp theo" : null;
         return StaffAssignmentStatusResponse.builder()
                 .acceptingOrders(accepting)
                 .maxActiveOrders(maxActiveOrders(staff))
@@ -213,6 +243,15 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
                 .canClaim(reason == null)
                 .lastAssignedAt(staff.getLastAssignedAt())
                 .unavailableReason(reason)
+                .pendingOrderCount(orderRepository.countClaimableOrders())
+                .cooldownRemainingSeconds(cooldownRemaining)
+                .assignedInPeriodCount(totalAssigned)
+                .selfAssignedInPeriodCount(selfAssigned)
+                .selfAssignmentRate(totalAssigned == 0 ? 0
+                        : Math.round(selfAssigned * 1000.0 / totalAssigned) / 10.0)
+                .completedInPeriodCount(completedInPeriod)
+                .periodCompletionRate(totalAssigned == 0 ? 0
+                        : Math.round(Math.min(completedInPeriod, totalAssigned) * 1000.0 / totalAssigned) / 10.0)
                 .build();
     }
 
@@ -295,6 +334,11 @@ public class OrderAssignmentServiceImpl implements OrderAssignmentService {
     private double workloadScore(User staff) {
         return assignmentRepository.findCurrentActiveStatuses(staff.getUserId(), ACTIVE_ORDER_STATUSES).stream()
                 .mapToDouble(this::statusWeight).sum();
+    }
+
+    private Map<String, Long> workloadBreakdown(User staff) {
+        return assignmentRepository.findCurrentActiveStatuses(staff.getUserId(), ACTIVE_ORDER_STATUSES).stream()
+                .collect(Collectors.groupingBy(this::normalize, Collectors.counting()));
     }
 
     private double statusWeight(String status) {

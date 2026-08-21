@@ -224,7 +224,7 @@ const routes = [
         path: 'order-assignment',
         name: 'OrderAssignment',
         component: () => import('@/views/admin/order/OrderAssignment.vue'),
-        meta: { roles: ['ROLE_ADMIN'] },
+        meta: { permission: 'ORDER_UPDATE' },
       },
       {
         path: 'order/:id',

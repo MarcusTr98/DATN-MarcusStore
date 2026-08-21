@@ -3,15 +3,19 @@
     <AdminPageHeader
       eyebrow="Điều phối vận hành"
       title="Chia đơn hàng"
-      description="Cân bằng tải xử lý, giao đơn thủ công hoặc để hệ thống tự phân sau 5 phút."
+      :description="
+        isAdmin
+          ? 'Điều phối và theo dõi khối lượng xử lý đơn.'
+          : 'Chủ động nhận đơn tiếp theo theo thứ tự công bằng.'
+      "
       icon="bi bi-diagram-3-fill"
     >
       <template #actions>
         <button
           type="button"
           class="assignment-refresh-btn"
-          :disabled="loading"
-          @click="loadDashboard"
+          :disabled="loading || staffLoading"
+          @click="refreshPage"
         >
           <i class="bi bi-arrow-clockwise" :class="{ spinning: loading }"></i>
           {{ loading ? 'Đang tải...' : 'Làm mới' }}
@@ -19,32 +23,127 @@
       </template>
     </AdminPageHeader>
 
-    <section class="overview-grid">
-      <article class="overview-card overview-card--primary">
-        <span class="overview-icon"><i class="bi bi-hourglass-split"></i></span>
+    <nav v-if="isAdmin" class="assignment-tabs">
+      <button :class="{ active: activeTab === 'dispatch' }" @click="activeTab = 'dispatch'">
+        <i class="bi bi-diagram-3"></i> Điều phối đơn
+      </button>
+      <button :class="{ active: activeTab === 'staff' }" @click="activeTab = 'staff'">
+        <i class="bi bi-bar-chart-line"></i> KPI nhân viên
+      </button>
+    </nav>
+
+    <section v-if="!isAdmin" class="staff-self-panel">
+      <div class="staff-ready-state" :class="{ paused: !staffStatus.acceptingOrders }">
+        <span class="state-icon"><i class="bi bi-person-check-fill"></i></span>
         <div>
-          <span class="overview-label">Đơn đang chờ</span><strong>{{ pendingCount }}</strong
-          ><small>Chờ giao thủ công hoặc tự động</small>
+          <small>Trạng thái nhận đơn</small>
+          <strong>{{ staffStatus.acceptingOrders ? 'Đang sẵn sàng' : 'Đang tạm dừng' }}</strong>
+          <span
+            >{{ staffStatus.activeOrderCount }} / {{ staffStatus.maxActiveOrders }} đơn đang phụ
+            trách</span
+          >
         </div>
-      </article>
-      <article class="overview-card">
-        <span class="overview-icon"><i class="bi bi-people-fill"></i></span>
-        <div>
-          <span class="overview-label">Nhân viên sẵn sàng</span
-          ><strong>{{ dashboard.staffLoads.length }}</strong
-          ><small>Có quyền xử lý đơn hàng</small>
-        </div>
-      </article>
-      <article class="overview-card">
-        <span class="overview-icon"><i class="bi bi-box-seam-fill"></i></span>
-        <div>
-          <span class="overview-label">Đơn đang xử lý</span><strong>{{ activeOrderTotal }}</strong
-          ><small>Trên toàn bộ nhân viên</small>
-        </div>
-      </article>
+        <label class="ready-switch">
+          <input
+            v-model="staffStatus.acceptingOrders"
+            type="checkbox"
+            @change="updateAvailability"
+          />
+          <span></span>
+        </label>
+      </div>
+      <div class="claim-card">
+        <span class="queue-number">{{ staffStatus.pendingOrderCount }}</span>
+        <h2>{{ staffStatus.pendingOrderCount ? 'đơn đang chờ nhận' : 'Hiện chưa có đơn chờ' }}</h2>
+        <p>Hệ thống sẽ giao đơn cũ nhất; thông tin đơn chỉ hiện sau khi nhận thành công.</p>
+        <button
+          type="button"
+          :disabled="staffLoading || !staffStatus.canClaim || staffStatus.pendingOrderCount === 0"
+          @click="claimNextOrder"
+        >
+          <i class="bi bi-hand-index-thumb"></i>
+          {{ staffLoading ? 'Đang nhận đơn...' : 'Nhận đơn tiếp theo' }}
+        </button>
+        <small v-if="staffStatus.unavailableReason">{{ staffStatus.unavailableReason }}</small>
+        <small v-else-if="staffStatus.cooldownRemainingSeconds">
+          Có thể nhận tiếp sau {{ staffStatus.cooldownRemainingSeconds }} giây
+        </small>
+      </div>
+      <div class="my-load-card">
+        <strong>Khối lượng hiện tại: {{ staffStatus.workloadScore }} điểm</strong>
+        <span>{{
+          loadLabel(
+            staffStatus.activeOrderCount,
+            staffStatus.maxActiveOrders,
+            staffStatus.acceptingOrders,
+          )
+        }}</span>
+        <RouterLink to="/admin/order">Xem các đơn tôi đang phụ trách</RouterLink>
+      </div>
+      <section class="my-kpi-panel">
+        <div><strong>KPI 30 ngày của tôi</strong><span>{{ staffStatus.assignedInPeriodCount }} đơn đã nhận</span></div>
+        <article><small>Tỷ lệ tự nhận</small><strong>{{ staffStatus.selfAssignmentRate }}%</strong><span>{{ staffStatus.selfAssignedInPeriodCount }} / {{ staffStatus.assignedInPeriodCount }} đơn</span></article>
+        <article><small>Tỷ lệ hoàn thành</small><strong>{{ staffStatus.periodCompletionRate }}%</strong><span>{{ staffStatus.completedInPeriodCount }} / {{ staffStatus.assignedInPeriodCount }} đơn</span></article>
+      </section>
     </section>
 
-    <section class="workspace-grid">
+    <template v-if="isAdmin && activeTab === 'dispatch'">
+      <section class="overview-grid">
+        <article class="overview-card overview-card--primary">
+          <span class="overview-icon"><i class="bi bi-hourglass-split"></i></span>
+          <div>
+            <span class="overview-label">Đơn đang chờ</span><strong>{{ pendingCount }}</strong
+            ><small>Chờ giao thủ công hoặc tự động</small>
+          </div>
+        </article>
+        <article class="overview-card">
+          <span class="overview-icon"><i class="bi bi-people-fill"></i></span>
+          <div>
+            <span class="overview-label">Nhân viên sẵn sàng</span
+            ><strong>{{ dashboard.staffLoads.length }}</strong
+            ><small>Có quyền xử lý đơn hàng</small>
+          </div>
+        </article>
+        <article class="overview-card">
+          <span class="overview-icon"><i class="bi bi-box-seam-fill"></i></span>
+          <div>
+            <span class="overview-label">Đơn đang xử lý</span><strong>{{ activeOrderTotal }}</strong
+            ><small>Trên toàn bộ nhân viên</small>
+          </div>
+        </article>
+      </section>
+    </template>
+
+    <section v-if="isAdmin && activeTab === 'staff'" class="kpi-dashboard">
+      <div class="kpi-heading">
+        <div>
+          <h2>KPI nhận và hoàn thành đơn</h2>
+          <p>Dữ liệu của các đơn được phân công trong 30 ngày gần nhất.</p>
+        </div>
+        <span><i class="bi bi-calendar3"></i> 30 ngày</span>
+      </div>
+      <div class="kpi-overview">
+        <article><small>Tổng lượt nhận</small><strong>{{ kpiTotals.total }}</strong></article>
+        <article><small>Tự nhận đơn</small><strong>{{ kpiTotals.selfRate }}%</strong><span>{{ kpiTotals.self }} lượt</span></article>
+        <article><small>Hoàn thành</small><strong>{{ kpiTotals.completionRate }}%</strong><span>{{ kpiTotals.completed }} đơn</span></article>
+        <article><small>Nhân viên</small><strong>{{ dashboard.staffLoads.length }}</strong></article>
+      </div>
+      <div class="panel kpi-table-wrap">
+        <table class="kpi-table">
+          <thead><tr><th>Nhân viên</th><th>Tổng nhận</th><th>Tự nhận</th><th>Tự động</th><th>Admin giao</th><th>Tỷ lệ tự nhận</th><th>Hoàn thành</th><th>Tỷ lệ hoàn thành</th></tr></thead>
+          <tbody>
+            <tr v-for="staff in dashboard.staffLoads" :key="staff.staffId">
+              <td><span class="staff-avatar">{{ initials(staff.staffName) }}</span><strong>{{ staff.staffName }}</strong></td>
+              <td>{{ staff.totalAssignedCount }}</td><td>{{ staff.selfAssignedCount }}</td><td>{{ staff.autoAssignedCount }}</td><td>{{ staff.manualAssignedCount }}</td>
+              <td><b class="kpi-rate">{{ staff.selfAssignmentRate }}%</b></td><td>{{ staff.completedInPeriodCount }}</td><td><b class="kpi-rate kpi-rate--green">{{ staff.periodCompletionRate }}%</b></td>
+            </tr>
+            <tr v-if="dashboard.staffLoads.length === 0"><td colspan="8" class="kpi-empty">Chưa có nhân viên để thống kê.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section v-if="isAdmin && activeTab === 'dispatch'" class="workspace-grid">
       <article class="panel pending-panel">
         <div class="panel-heading">
           <div>
@@ -169,9 +268,19 @@
         <div class="automation-note">
           <i class="bi bi-lightning-charge-fill"></i
           ><span
-            ><strong>Quy tắc tự động</strong> Chọn nhân viên có ít đơn mở nhất, nếu bằng nhau, ưu
-            tiên mã nhân viên nhỏ hơn.</span
+            ><strong>Quy tắc tự động</strong> Chọn nhân viên sẵn sàng có điểm tải thấp nhất; nếu
+            bằng nhau, ưu tiên người lâu chưa được giao đơn.</span
           >
+        </div>
+        <div class="score-guide">
+          <strong><i class="bi bi-calculator"></i> Điểm tải được tính thế nào?</strong>
+          <p>Cộng điểm của tất cả đơn đang phụ trách theo trạng thái:</p>
+          <div>
+            <span v-for="(weight, status) in statusWeights" :key="status">
+              {{ statusLabel(status) }} <b>{{ weight }} điểm/đơn</b>
+            </span>
+          </div>
+          <small>Ví dụ: 2 đơn đang chuẩn bị = 2 × 2 = 4 điểm. Điểm thấp hơn được ưu tiên.</small>
         </div>
       </aside>
     </section>
@@ -192,18 +301,53 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import OrderAssignmentApi from '@/api/orderAssignmentApi.js'
+import StaffOrderAssignmentApi from '@/api/staffOrderAssignmentApi.js'
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 
+const roles = JSON.parse(localStorage.getItem('USER_ROLE') || '[]')
+const isAdmin = roles.includes('ROLE_ADMIN')
+const activeTab = ref('dispatch')
 const loading = ref(false)
+const staffLoading = ref(false)
 const saving = ref('')
 const selectedStaff = reactive({})
 const message = ref(null)
 const now = ref(Date.now())
 const dashboard = reactive({ staffLoads: [], pendingOrders: [] })
+const staffStatus = reactive({
+  acceptingOrders: false,
+  maxActiveOrders: 5,
+  activeOrderCount: 0,
+  workloadScore: 0,
+  canClaim: false,
+  pendingOrderCount: 0,
+  cooldownRemainingSeconds: 0,
+  unavailableReason: '',
+  assignedInPeriodCount: 0,
+  selfAssignedInPeriodCount: 0,
+  selfAssignmentRate: 0,
+  completedInPeriodCount: 0,
+  periodCompletionRate: 0,
+})
 const pendingCount = computed(() => dashboard.pendingOrders.length)
 const activeOrderTotal = computed(() =>
   dashboard.staffLoads.reduce((total, staff) => total + staff.activeOrderCount, 0),
 )
+const kpiTotals = computed(() => {
+  const total = dashboard.staffLoads.reduce((sum, staff) => sum + (staff.totalAssignedCount || 0), 0)
+  const self = dashboard.staffLoads.reduce((sum, staff) => sum + (staff.selfAssignedCount || 0), 0)
+  const completed = dashboard.staffLoads.reduce(
+    (sum, staff) => sum + (staff.completedInPeriodCount || 0),
+    0,
+  )
+  return {
+    total,
+    self,
+    completed,
+    selfRate: total ? Math.round((self / total) * 1000) / 10 : 0,
+    completionRate: total ? Math.round((Math.min(completed, total) / total) * 1000) / 10 : 0,
+  }
+})
 let timer
 let messageTimer
 
@@ -217,6 +361,53 @@ async function loadDashboard() {
     showMessage('Không tải được dữ liệu chia đơn. Vui lòng thử lại.', 'error')
   } finally {
     loading.value = false
+  }
+}
+
+async function loadStaffStatus() {
+  staffLoading.value = true
+  try {
+    const { data } = await StaffOrderAssignmentApi.getStatus()
+    Object.assign(staffStatus, data)
+  } catch (error) {
+    showMessage(error.response?.data?.message || 'Không tải được trạng thái nhận đơn.', 'error')
+  } finally {
+    staffLoading.value = false
+  }
+}
+
+function refreshPage() {
+  return isAdmin ? loadDashboard() : loadStaffStatus()
+}
+
+async function updateAvailability() {
+  staffLoading.value = true
+  try {
+    const { data } = await StaffOrderAssignmentApi.setAvailability(staffStatus.acceptingOrders)
+    Object.assign(staffStatus, data)
+    showMessage(
+      data.acceptingOrders ? 'Bạn đã sẵn sàng nhận đơn.' : 'Đã tạm dừng nhận đơn.',
+      'success',
+    )
+  } catch (error) {
+    await loadStaffStatus()
+    showMessage(error.response?.data?.message || 'Không thể cập nhật trạng thái.', 'error')
+  } finally {
+    staffLoading.value = false
+  }
+}
+
+async function claimNextOrder() {
+  staffLoading.value = true
+  try {
+    const { data } = await StaffOrderAssignmentApi.claimNext()
+    showMessage(`Đã nhận đơn ${data.orderCode}.`, 'success')
+    window.setTimeout(() => window.location.assign(`/admin/order/${data.orderCode}`), 350)
+  } catch (error) {
+    showMessage(error.response?.data?.message || 'Không thể nhận đơn lúc này.', 'error')
+    await loadStaffStatus()
+  } finally {
+    staffLoading.value = false
   }
 }
 
@@ -275,6 +466,38 @@ function initials(name) {
     .join('')
     .toUpperCase()
 }
+const statusNames = {
+  PENDING: 'Chờ xác nhận',
+  CONFIRMED: 'Đã xác nhận',
+  PROCESSING: 'Đang chuẩn bị',
+  READY_FOR_PICKUP: 'Sẵn sàng nhận',
+  PACKED: 'Đã đóng gói',
+  SHIPPING: 'Đang giao',
+  DELIVERED: 'Đã giao',
+  FAILED: 'Giao thất bại',
+}
+const statusWeights = {
+  PENDING: 1,
+  CONFIRMED: 1.2,
+  PROCESSING: 2,
+  READY_FOR_PICKUP: 0.7,
+  PACKED: 0.8,
+  SHIPPING: 0.4,
+  DELIVERED: 0.2,
+  FAILED: 1.5,
+}
+function statusLabel(status) {
+  return statusNames[status] || status
+}
+function statusWeight(status) {
+  return statusWeights[status] || 1
+}
+function loadLabel(active, max, accepting) {
+  if (!accepting) return 'Đang tạm dừng'
+  if (active >= max) return 'Đã đầy tải — Không chia thêm'
+  if (active >= Math.max(1, max - 1)) return `Tải vừa — Còn ${max - active} suất`
+  return `Tải thấp — Còn ${max - active} suất`
+}
 function showMessage(text, type) {
   window.clearTimeout(messageTimer)
   message.value = { text, type }
@@ -284,9 +507,13 @@ function showMessage(text, type) {
 }
 
 onMounted(() => {
-  loadDashboard()
+  refreshPage()
   timer = window.setInterval(() => {
     now.value = Date.now()
+    if (!isAdmin && staffStatus.cooldownRemainingSeconds > 0) {
+      staffStatus.cooldownRemainingSeconds -= 1
+      if (staffStatus.cooldownRemainingSeconds === 0) loadStaffStatus()
+    }
   }, 1000)
 })
 onBeforeUnmount(() => {
@@ -314,6 +541,171 @@ onBeforeUnmount(() => {
 .assignment-refresh-btn:disabled {
   opacity: 0.65;
 }
+.assignment-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  border-bottom: 1px solid #dbeafe;
+}
+.assignment-tabs button {
+  border: 0;
+  border-bottom: 3px solid transparent;
+  padding: 11px 16px;
+  background: transparent;
+  color: #64748b;
+  font-weight: 800;
+}
+.assignment-tabs button.active {
+  border-bottom-color: #2563eb;
+  color: #1d4ed8;
+}
+.staff-self-panel {
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+  margin: 24px auto;
+}
+.staff-ready-state,
+.claim-card,
+.my-load-card {
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 8px 24px #1d4ed814;
+}
+.staff-ready-state {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.staff-ready-state > div {
+  display: grid;
+  gap: 3px;
+  margin-right: auto;
+}
+.staff-ready-state strong {
+  color: #15803d;
+  font-size: 18px;
+}
+.staff-ready-state.paused strong {
+  color: #b45309;
+}
+.state-icon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 23px;
+}
+.ready-switch input {
+  display: none;
+}
+.ready-switch span {
+  display: block;
+  width: 48px;
+  height: 26px;
+  border-radius: 99px;
+  background: #cbd5e1;
+  padding: 3px;
+  cursor: pointer;
+}
+.ready-switch span::after {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: 0.2s;
+}
+.ready-switch input:checked + span {
+  background: #22c55e;
+}
+.ready-switch input:checked + span::after {
+  transform: translateX(22px);
+}
+.claim-card {
+  text-align: center;
+  background: linear-gradient(145deg, #eff6ff, #fff);
+}
+.queue-number {
+  display: block;
+  color: #1d4ed8;
+  font-size: 56px;
+  font-weight: 900;
+  line-height: 1;
+}
+.claim-card h2 {
+  margin: 8px 0;
+}
+.claim-card p {
+  color: #64748b;
+}
+.claim-card button {
+  margin: 12px 0 5px;
+  border: 0;
+  border-radius: 12px;
+  padding: 13px 24px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+}
+.claim-card button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+.claim-card small {
+  display: block;
+  color: #b45309;
+}
+.my-load-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.my-load-card span {
+  color: #64748b;
+  margin-right: auto;
+}
+.my-kpi-panel { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 12px; }
+.my-kpi-panel > div, .my-kpi-panel article { padding: 17px; border: 1px solid #bfdbfe; border-radius: 13px; background: #fff; }
+.my-kpi-panel > div { display: flex; flex-direction: column; justify-content: center; background: #eff6ff; }
+.my-kpi-panel small, .my-kpi-panel span { display: block; color: #64748b; font-size: 12px; }
+.my-kpi-panel article strong { display: block; margin: 4px 0; color: #1d4ed8; font-size: 25px; }
+.kpi-dashboard {
+  display: grid;
+  gap: 18px;
+}
+.kpi-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kpi-heading h2 { margin: 0; font-size: 20px; }
+.kpi-heading p { margin: 5px 0 0; color: #64748b; }
+.kpi-heading > span { border-radius: 9px; padding: 8px 11px; background: #eff6ff; color: #1d4ed8; font-weight: 700; }
+.kpi-overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.kpi-overview article { padding: 17px; border: 1px solid #bfdbfe; border-radius: 13px; background: #fff; }
+.kpi-overview small, .kpi-overview span { display: block; color: #64748b; }
+.kpi-overview strong { display: block; margin: 4px 0; color: #1d4ed8; font-size: 27px; }
+.kpi-table-wrap { overflow-x: auto; }
+.kpi-table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+.kpi-table th { padding: 13px 14px; background: #f8fbff; color: #64748b; font-size: 12px; text-align: right; }
+.kpi-table th:first-child { text-align: left; }
+.kpi-table td { padding: 14px; border-top: 1px solid #dbeafe; text-align: right; }
+.kpi-table td:first-child { display: flex; align-items: center; gap: 9px; text-align: left; }
+.kpi-rate { color: #1d4ed8; }
+.kpi-rate--green { color: #15803d; }
+.kpi-empty { display: table-cell !important; padding: 35px !important; color: #64748b; text-align: center !important; }
 .spinning {
   animation: spin 0.9s linear infinite;
 }
@@ -620,6 +1012,17 @@ onBeforeUnmount(() => {
   display: block;
   color: #1f3a63;
 }
+.score-guide {
+  margin: 16px;
+  padding: 14px;
+  border: 1px solid #f0c36a;
+  border-radius: 10px;
+  background: #fffbeb;
+}
+.score-guide > strong { color: #92400e; }
+.score-guide p, .score-guide small { color: #64748b; font-size: 12px; }
+.score-guide > div { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 10px 0; }
+.score-guide span { display: flex; justify-content: space-between; gap: 8px; padding: 5px 7px; border-radius: 6px; background: #fff; font-size: 11px; }
 .loading-state,
 .empty-state {
   display: grid;
@@ -697,6 +1100,8 @@ onBeforeUnmount(() => {
   .overview-grid {
     grid-template-columns: 1fr;
   }
+  .kpi-overview { grid-template-columns: 1fr 1fr; }
+  .my-kpi-panel { grid-template-columns: 1fr; }
   .pending-order {
     grid-template-columns: 1fr;
     gap: 12px;

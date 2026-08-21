@@ -6,6 +6,7 @@ import lombok.Getter;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -26,6 +27,14 @@ public class OrderAssignmentDashboardResponse {
         private final boolean acceptingOrders;
         private final int maxActiveOrders;
         private final boolean eligibleForAssignment;
+        private final Map<String, Long> workloadBreakdown;
+        private final long selfAssignedCount;
+        private final long autoAssignedCount;
+        private final long manualAssignedCount;
+        private final long totalAssignedCount;
+        private final double selfAssignmentRate;
+        private final long completedInPeriodCount;
+        private final double periodCompletionRate;
     }
 
     @Getter

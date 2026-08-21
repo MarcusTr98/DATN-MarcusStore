@@ -15,4 +15,11 @@ public class StaffAssignmentStatusResponse {
     private final boolean canClaim;
     private final LocalDateTime lastAssignedAt;
     private final String unavailableReason;
+    private final long pendingOrderCount;
+    private final long cooldownRemainingSeconds;
+    private final long assignedInPeriodCount;
+    private final long selfAssignedInPeriodCount;
+    private final double selfAssignmentRate;
+    private final long completedInPeriodCount;
+    private final double periodCompletionRate;
 }
