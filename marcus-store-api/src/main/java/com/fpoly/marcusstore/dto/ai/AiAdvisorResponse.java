@@ -18,6 +18,17 @@ public class AiAdvisorResponse {
     private String source;
     private AiAdvisorContext context;
     private AdviceSections sections;
+    private ProductComparison comparison;
+
+    public record ProductComparison(
+            List<Integer> productIds,
+            List<String> productNames,
+            List<ComparisonRow> rows,
+            Integer bestProductId) {
+    }
+
+    public record ComparisonRow(String label, List<String> values) {
+    }
 
     @Data
     @Builder

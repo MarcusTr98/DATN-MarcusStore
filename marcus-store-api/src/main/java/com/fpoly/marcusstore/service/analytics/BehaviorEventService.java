@@ -12,11 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Set;
 import java.time.LocalDate;
 import com.fpoly.marcusstore.dto.analytics.BehaviorFunnelResponse;
+import java.util.List;
+import com.fpoly.marcusstore.repository.analytics.BehaviorEventRepository.TopAiProductClick;
 
 @Service
 @RequiredArgsConstructor
 public class BehaviorEventService {
-    private static final Set<String> CLIENT_EVENTS = Set.of("PRODUCT_VIEW", "CHECKOUT_STARTED");
+    private static final Set<String> CLIENT_EVENTS = Set.of("PRODUCT_VIEW", "CART_ADDED", "CHECKOUT_STARTED");
     private final BehaviorEventRepository repository;
     private final ProductRepository productRepository;
 
@@ -84,6 +86,11 @@ public class BehaviorEventService {
         long[] v = repository.funnel(safeFrom.atStartOfDay(), safeTo.plusDays(1).atStartOfDay());
         return new BehaviorFunnelResponse(v[0], v[1], v[2], v[3], v[4], v[5],
                 rate(v[1], v[0]), rate(v[2], v[1]), rate(v[3], v[2]), rate(v[5], v[4]));
+    }
+
+    @Transactional(readOnly = true)
+    public List<TopAiProductClick> topAiProductClicks() {
+        return repository.findTopAiProductClicks();
     }
 
     private double rate(long value, long base) {

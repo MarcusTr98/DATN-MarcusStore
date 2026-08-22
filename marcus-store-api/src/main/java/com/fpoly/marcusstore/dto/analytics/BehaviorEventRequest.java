@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class BehaviorEventRequest {
     @NotBlank
-    @Pattern(regexp = "^(PRODUCT_VIEW|CHECKOUT_STARTED)$")
+    @Pattern(regexp = "^(PRODUCT_VIEW|CART_ADDED|CHECKOUT_STARTED)$")
     private String eventType;
     @Pattern(regexp = "^[0-9a-fA-F-]{36}$")
     private String sessionId;

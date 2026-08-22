@@ -72,6 +72,7 @@ public class AiAdvisorService {
     private final AiStoreKnowledgeService storeKnowledgeService;
     private final GeminiClient geminiClient;
     private final AdvisorProductScorer productScorer;
+    private final ProductComparisonBuilder comparisonBuilder;
 
     @Autowired
     public AiAdvisorService(HomeProductRepository homeProductRepository,
@@ -85,6 +86,7 @@ public class AiAdvisorService {
         this.storeKnowledgeService = storeKnowledgeService;
         this.geminiClient = geminiClient;
         this.productScorer = new AdvisorProductScorer();
+        this.comparisonBuilder = new ProductComparisonBuilder();
     }
 
     // Marcus thêm: constructor hẹp phục vụ regression test, không gọi mạng.
@@ -119,8 +121,7 @@ public class AiAdvisorService {
             return brandAnswer;
         }
 
-        List<AiCatalogLexiconProjection> catalogLexicon =
-                homeProductRepository.findAvailablePhoneLexiconForAiAdvisor();
+        List<AiCatalogLexiconProjection> catalogLexicon = homeProductRepository.findAvailablePhoneLexiconForAiAdvisor();
         AiAdvisorContext advisorContext = mergeAdvisorContext(request, catalogLexicon);
         if (shouldAskUsageQuestion(request, intent, advisorContext, catalogLexicon)) {
             return attachContext(usageClarification(), advisorContext);
@@ -157,6 +158,7 @@ public class AiAdvisorService {
         if (geminiClient == null || !geminiClient.isConfigured()) {
             AiAdvisorResponse fallback = deterministicFallback(products, criteria);
             enrichCompatibility(fallback, products, productSpecs, advisorContext);
+            enrichComparison(fallback, request.getMessage(), productSpecs);
             return attachContext(fallback, advisorContext);
         }
 
@@ -166,14 +168,33 @@ public class AiAdvisorService {
 
             AiAdvisorResponse result = buildAdvisorResponse(response, products, productSpecs, advisorContext);
             enrichCompatibility(result, products, productSpecs, advisorContext);
+            enrichComparison(result, request.getMessage(), productSpecs);
             result.setSource("GEMINI");
             result.setFallbackUsed(false);
             return attachContext(result, advisorContext);
         } catch (GeminiClient.GeminiClientException exception) {
             AiAdvisorResponse fallback = deterministicFallback(products, criteria);
             enrichCompatibility(fallback, products, productSpecs, advisorContext);
+            enrichComparison(fallback, request.getMessage(), productSpecs);
             return attachContext(fallback, advisorContext);
         }
+    }
+
+    private void enrichComparison(
+            AiAdvisorResponse response,
+            String message,
+            Map<Integer, String> productSpecs) {
+        if (!isComparisonRequest(message) || response.getProducts() == null || response.getProducts().size() < 2) {
+            return;
+        }
+        response.setComparison(comparisonBuilder.build(response.getProducts(), productSpecs));
+    }
+
+    private boolean isComparisonRequest(String message) {
+        if (message == null)
+            return false;
+        String normalized = normalizeLookup(message);
+        return normalized.matches(".*(so sanh|doi chieu|khac nhau|nen chon .* hay ).*");
     }
 
     private void enrichCompatibility(
@@ -181,12 +202,14 @@ public class AiAdvisorService {
             List<AiProductProjection> rankedProducts,
             Map<Integer, String> productSpecs,
             AiAdvisorContext context) {
-        if (response.getProducts() == null) return;
+        if (response.getProducts() == null)
+            return;
         Map<Integer, AiProductProjection> productsById = rankedProducts.stream()
                 .collect(Collectors.toMap(AiProductProjection::getProductId, product -> product));
         response.getProducts().forEach(suggestion -> {
             AiProductProjection product = productsById.get(suggestion.getProductId());
-            if (product == null) return;
+            if (product == null)
+                return;
             AdvisorProductScorer.ScoreResult result = productScorer.score(
                     product, productSpecs.get(product.getProductId()), context);
             suggestion.setCompatibilityScore(result.score());
@@ -346,7 +369,7 @@ public class AiAdvisorService {
             priorities.add("DURABILITY");
         if (message.matches(".*(kết nối|wifi|bluetooth|5g|cổng kết nối|thunderbolt).*"))
             priorities.add("CONNECTIVITY");
-        if (message.matches(".*(bố mẹ|cha mẹ|người lớn tuổi|dễ dùng|cơ bản|nghe gọi).*") )
+        if (message.matches(".*(bố mẹ|cha mẹ|người lớn tuổi|dễ dùng|cơ bản|nghe gọi).*"))
             priorities.add("EASY_TO_USE");
         context.setPriorities(priorities.stream().limit(6).toList());
         return context;
@@ -516,7 +539,7 @@ public class AiAdvisorService {
                 ".*(giá|bao nhiêu tiền|bao nhiêu|tầm giá|khoảng giá).*");
         return containsPriceQuestion
                 && (!extractBrands(message, catalogLexicon).isEmpty()
-                    || !extractSearchKeywords(message, catalogLexicon).isEmpty());
+                        || !extractSearchKeywords(message, catalogLexicon).isEmpty());
     }
 
     private AiAdvisorResponse catalogPriceAnswer(List<AiProductProjection> products, String rawMessage) {
@@ -1047,7 +1070,8 @@ public class AiAdvisorService {
     }
 
     private String normalizeLookup(String value) {
-        if (value == null) return "";
+        if (value == null)
+            return "";
         String withoutMarks = Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}+", "");
         return withoutMarks.toLowerCase(Locale.ROOT)
@@ -1056,7 +1080,8 @@ public class AiAdvisorService {
     }
 
     private boolean containsLookupTerm(String normalizedMessage, String normalizedTerm) {
-        if (normalizedTerm == null || normalizedTerm.isBlank()) return false;
+        if (normalizedTerm == null || normalizedTerm.isBlank())
+            return false;
         return (" " + normalizedMessage + " ").contains(" " + normalizedTerm + " ");
     }
 

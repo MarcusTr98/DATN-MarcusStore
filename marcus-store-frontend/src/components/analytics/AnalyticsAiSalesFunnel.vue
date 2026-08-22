@@ -47,9 +47,14 @@ const steps = computed(() => [
     rate: `${props.data?.clickRate || 0}% phiên hỏi`,
   },
   {
+    label: 'Thêm vào giỏ',
+    value: props.data?.cartSessions,
+    rate: `${props.data?.cartRate || 0}% sau khi xem`,
+  },
+  {
     label: 'Vào Checkout',
     value: props.data?.checkoutSessions,
-    rate: `${props.data?.checkoutRate || 0}% sau khi xem`,
+    rate: `${props.data?.checkoutRate || 0}% sau khi thêm giỏ`,
   },
   {
     label: 'Đặt hàng',

@@ -51,7 +51,11 @@
           :loading="aiLoading"
           :report="aiReport"
           :usage="aiUsage"
+          :tracked-actions="analyticsActions"
           @generate="generateAiReport"
+          @drill-down="drillDownEvidence"
+          @accept-action="acceptAnalyticsAction"
+          @update-action="updateAnalyticsAction"
         />
       </div>
 
@@ -84,11 +88,13 @@
         <i class="bi bi-database-check"></i>
       </div>
 
-      <AnalyticsKpiGrid :overview="overview" />
+      <div id="evidence-kpi"><AnalyticsKpiGrid :overview="overview" /></div>
 
-      <AnalyticsSalesChart :monthly="numberOfDays > 120" :trend="trend" />
+      <div id="evidence-sales">
+        <AnalyticsSalesChart :monthly="numberOfDays > 120" :trend="trend" />
+      </div>
 
-      <AnalyticsProductTable :products="products" />
+      <div id="evidence-products"><AnalyticsProductTable :products="products" /></div>
 
       <div id="product-quality" class="analytics-anchor-section">
         <AnalyticsCancellationReasons :reasons="cancellationReasons" />
@@ -142,6 +148,7 @@ const {
   aiReport,
   aiUsage,
   aiSalesFunnel,
+  analyticsActions,
   cancellationReasons,
   errorMessage,
   fromDate,
@@ -161,7 +168,22 @@ const {
   applyPreset,
   generateAiReport,
   loadAnalytics,
+  acceptAnalyticsAction,
+  updateAnalyticsAction,
 } = useBusinessAnalytics()
+
+const drillDownEvidence = (signal) => {
+  const content =
+    `${signal?.title || ''} ${signal?.evidence || ''} ${signal?.interpretation || ''}`.toLowerCase()
+  const target = content.match(/hủy|bảo hành|lỗi|đổi trả/)
+    ? 'product-quality'
+    : content.match(/sản phẩm|mẫu|sku/)
+      ? 'evidence-products'
+      : content.match(/doanh thu|đơn hàng|tăng trưởng|giao dịch/)
+        ? 'evidence-sales'
+        : 'evidence-kpi'
+  document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 </script>
 
 <style src="@/assets/css/BusinessAnalytics.css"></style>

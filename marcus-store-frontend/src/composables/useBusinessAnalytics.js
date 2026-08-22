@@ -36,6 +36,7 @@ export function useBusinessAnalytics() {
   const aiReport = ref(null)
   const aiUsage = ref(null)
   const aiSalesFunnel = ref(null)
+  const analyticsActions = ref([])
   const aiLoading = ref(false)
   const aiError = ref('')
   let requestVersion = 0
@@ -329,12 +330,35 @@ export function useBusinessAnalytics() {
     }
   }
 
+  async function loadAnalyticsActions() {
+    try {
+      analyticsActions.value = unwrap(await analyticsApi.getActions()) || []
+    } catch {
+      analyticsActions.value = []
+    }
+  }
+
+  async function acceptAnalyticsAction(action) {
+    const created = unwrap(await analyticsApi.acceptAction(action))
+    if (created) analyticsActions.value = [created, ...analyticsActions.value]
+  }
+
+  async function updateAnalyticsAction(actionId, status) {
+    const updated = unwrap(await analyticsApi.updateActionStatus(actionId, status))
+    analyticsActions.value = analyticsActions.value.map((item) =>
+      item.actionId === actionId ? updated : item,
+    )
+  }
+
   function formatDate(value) {
     if (!value) return '—'
     return new Intl.DateTimeFormat('vi-VN').format(new Date(`${value}T00:00:00`))
   }
 
-  onMounted(loadAnalytics)
+  onMounted(() => {
+    loadAnalytics()
+    loadAnalyticsActions()
+  })
 
   return {
     activePreset,
@@ -344,6 +368,7 @@ export function useBusinessAnalytics() {
     aiReport,
     aiUsage,
     aiSalesFunnel,
+    analyticsActions,
     cancellationReasons,
     errorMessage,
     fromDate,
@@ -363,6 +388,8 @@ export function useBusinessAnalytics() {
     applyPreset,
     generateAiReport,
     loadAnalytics,
+    acceptAnalyticsAction,
+    updateAnalyticsAction,
   }
 }
 

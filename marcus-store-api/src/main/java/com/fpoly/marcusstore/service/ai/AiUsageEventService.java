@@ -27,7 +27,8 @@ public class AiUsageEventService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordProductClick(String sessionId, String adviceId, Integer productId) {
-        if (!repository.existsChatResponse(sessionId, adviceId)) return;
+        if (!repository.existsChatResponse(sessionId, adviceId))
+            return;
         save(sessionId, adviceId, "PRODUCT_CLICK", productId, null);
     }
 
@@ -89,11 +90,12 @@ public class AiUsageEventService {
                 safeFrom.atStartOfDay(), safeTo.plusDays(1).atStartOfDay());
         return new AiSalesFunnelResponse(
                 row.questions(), row.responses(), row.helpful(), row.clicks(),
-                row.checkouts(), row.orders(), row.paid(),
+                row.carts(), row.checkouts(), row.orders(), row.paid(),
                 rate(row.responses(), row.questions()),
                 rate(row.helpful(), row.responses()),
                 rate(row.clicks(), row.questions()),
-                rate(row.checkouts(), row.clicks()),
+                rate(row.carts(), row.clicks()),
+                rate(row.checkouts(), row.carts()),
                 rate(row.orders(), row.checkouts()),
                 rate(row.paid(), row.orders()));
     }

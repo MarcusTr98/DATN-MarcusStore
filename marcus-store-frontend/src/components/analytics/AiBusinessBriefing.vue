@@ -80,8 +80,12 @@
             <small><i class="bi bi-graph-down-arrow"></i> Xu hướng cần chú ý</small>
             <strong>{{ report.headline }}</strong>
             <p>
-              <template v-for="(part, index) in emphasizedParts(conciseText(report.executiveSummary, 210))" :key="index">
-                <strong v-if="part.emphasis" class="ai-metric">{{ part.text }}</strong><template v-else>{{ part.text }}</template>
+              <template
+                v-for="(part, index) in emphasizedParts(conciseText(report.executiveSummary, 210))"
+                :key="index"
+              >
+                <strong v-if="part.emphasis" class="ai-metric">{{ part.text }}</strong
+                ><template v-else>{{ part.text }}</template>
               </template>
             </p>
           </article>
@@ -89,8 +93,17 @@
             <small><i class="bi bi-bar-chart-line"></i> Căn cứ chính</small>
             <strong>{{ report.signals?.[0]?.title || 'Chưa đủ tín hiệu nổi bật' }}</strong>
             <p>
-              <template v-for="(part, index) in emphasizedParts(conciseText(report.signals?.[0]?.evidence || 'Cần thêm dữ liệu ở kỳ tiếp theo.', 160))" :key="index">
-                <strong v-if="part.emphasis" class="ai-metric">{{ part.text }}</strong><template v-else>{{ part.text }}</template>
+              <template
+                v-for="(part, index) in emphasizedParts(
+                  conciseText(
+                    report.signals?.[0]?.evidence || 'Cần thêm dữ liệu ở kỳ tiếp theo.',
+                    160,
+                  ),
+                )"
+                :key="index"
+              >
+                <strong v-if="part.emphasis" class="ai-metric">{{ part.text }}</strong
+                ><template v-else>{{ part.text }}</template>
               </template>
             </p>
           </article>
@@ -98,8 +111,17 @@
             <small><i class="bi bi-lightning-charge-fill"></i> Hành động ưu tiên</small>
             <strong>{{ report.actions?.[0]?.title || 'Tiếp tục theo dõi' }}</strong>
             <p>
-              <template v-for="(part, index) in emphasizedParts(conciseText(report.actions?.[0]?.reason || 'Kiểm chứng lại số liệu trong kỳ tiếp theo.', 160))" :key="index">
-                <strong v-if="part.emphasis" class="ai-metric">{{ part.text }}</strong><template v-else>{{ part.text }}</template>
+              <template
+                v-for="(part, index) in emphasizedParts(
+                  conciseText(
+                    report.actions?.[0]?.reason || 'Kiểm chứng lại số liệu trong kỳ tiếp theo.',
+                    160,
+                  ),
+                )"
+                :key="index"
+              >
+                <strong v-if="part.emphasis" class="ai-metric">{{ part.text }}</strong
+                ><template v-else>{{ part.text }}</template>
               </template>
             </p>
           </article>
@@ -134,6 +156,10 @@
             :key="signal.evidenceId || `${signal.title}-${signal.evidence}`"
             class="ai-signal"
             :class="`ai-signal--${signal.severity.toLowerCase()}`"
+            role="button"
+            tabindex="0"
+            @click="$emit('drill-down', signal)"
+            @keydown.enter="$emit('drill-down', signal)"
           >
             <span><i :class="signalIcon(signal.severity)"></i></span>
             <div>
@@ -144,6 +170,13 @@
               <small v-if="signal.verification"
                 ><strong>Kiểm chứng:</strong> {{ signal.verification }}</small
               >
+              <button
+                type="button"
+                class="ai-evidence-link"
+                @click.stop="$emit('drill-down', signal)"
+              >
+                <i class="bi bi-box-arrow-down"></i> Xem dữ liệu bằng chứng
+              </button>
             </div>
           </article>
         </div>
@@ -163,9 +196,36 @@
             <em :class="`priority-${action.priority.toLowerCase()}`">
               {{ priorityLabel(action.priority) }}
             </em>
+            <button
+              type="button"
+              class="ai-action-accept"
+              :disabled="isTracked(action.title)"
+              @click="$emit('accept-action', action)"
+            >
+              {{ isTracked(action.title) ? 'Đang theo dõi' : 'Tiếp nhận' }}
+            </button>
           </article>
         </div>
       </div>
+
+      <section v-if="trackedActions.length" class="ai-action-workflow">
+        <h3><i class="bi bi-kanban"></i> Hành động đang theo dõi</h3>
+        <article v-for="action in trackedActions" :key="action.actionId">
+          <div>
+            <strong>{{ action.title }}</strong
+            ><small>{{ action.ownerUsername }}</small>
+          </div>
+          <select
+            :value="action.status"
+            @change="$emit('update-action', action.actionId, $event.target.value)"
+          >
+            <option value="ACCEPTED">Đã tiếp nhận</option>
+            <option value="IN_PROGRESS">Đang thực hiện</option>
+            <option value="DONE">Hoàn tất</option>
+            <option value="REJECTED">Từ chối</option>
+          </select>
+        </article>
+      </section>
 
       <footer class="ai-briefing__footer">
         <i class="bi bi-shield-lock"></i>
@@ -211,14 +271,20 @@
 <script setup>
 import AnalysisSourceBadge from '@/components/analytics/AnalysisSourceBadge.vue'
 
-defineProps({
+const props = defineProps({
   error: { type: String, default: '' },
   loading: { type: Boolean, default: false },
   report: { type: Object, default: null },
   usage: { type: Object, default: null },
+  trackedActions: { type: Array, default: () => [] },
 })
 
-defineEmits(['generate'])
+defineEmits(['generate', 'drill-down', 'accept-action', 'update-action'])
+
+const isTracked = (title) =>
+  props.trackedActions.some(
+    (item) => item.title === title && ['ACCEPTED', 'IN_PROGRESS'].includes(item.status),
+  )
 
 const labels = {
   outlook: {
@@ -306,14 +372,64 @@ function conciseText(value, maxLength = 200) {
 // Marcus thêm: nhấn số liệu an toàn bằng text node, không render HTML do AI sinh ra.
 function emphasizedParts(value) {
   const metricPattern = /(\d+(?:[.,]\d+)*(?:\s*(?:%|VNĐ|tỷ đồng|triệu đồng))?)/gi
-  return String(value || '').split(metricPattern).filter(Boolean).map((text) => ({
-    text,
-    emphasis: /\d/.test(text),
-  }))
+  return String(value || '')
+    .split(metricPattern)
+    .filter(Boolean)
+    .map((text) => ({
+      text,
+      emphasis: /\d/.test(text),
+    }))
 }
 </script>
 
 <style scoped>
+.ai-signal[role='button'] {
+  cursor: pointer;
+}
+
+.ai-evidence-link {
+  margin-top: 8px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-action-accept {
+  border: 1px solid #c4b5fd;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #fff;
+  color: #6d28d9;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-action-workflow {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #ddd6fe;
+  border-radius: 14px;
+  background: #faf7ff;
+}
+
+.ai-action-workflow article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #ede9fe;
+}
+
+.ai-action-workflow small {
+  display: block;
+  color: #64748b;
+}
 .ai-briefing__usage {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
