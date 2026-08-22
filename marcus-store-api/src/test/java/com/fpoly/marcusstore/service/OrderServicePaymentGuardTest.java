@@ -50,7 +50,8 @@ class OrderServicePaymentGuardTest {
                                 mock(EmailService.class),
                                 mock(CommentEvaluationRepository.class),
                                 mock(AdminNotificationService.class),
-                                mock(UserNotificationService.class));
+                                mock(UserNotificationService.class),
+                                mock(OrderAssignmentService.class));
 
                 UpdateOrderStatusRequest request = new UpdateOrderStatusRequest();
                 request.setStatus("CONFIRMED");
@@ -89,7 +90,8 @@ class OrderServicePaymentGuardTest {
                                 mock(EmailService.class),
                                 mock(CommentEvaluationRepository.class),
                                 mock(AdminNotificationService.class),
-                                mock(UserNotificationService.class));
+                                mock(UserNotificationService.class),
+                                mock(OrderAssignmentService.class));
 
                 UpdateOrderStatusRequest request = new UpdateOrderStatusRequest();
                 request.setStatus("CANCELLED");
@@ -125,7 +127,7 @@ class OrderServicePaymentGuardTest {
                                 mock(OrderShippingService.class), mock(OrderPaymentService.class),
                                 mock(OrderCancellationService.class), mock(EmailService.class),
                                 mock(CommentEvaluationRepository.class), mock(AdminNotificationService.class),
-                                mock(UserNotificationService.class));
+                                mock(UserNotificationService.class), mock(OrderAssignmentService.class));
 
                 var preview = service.getImeiPreview("ORD-MIXED");
 

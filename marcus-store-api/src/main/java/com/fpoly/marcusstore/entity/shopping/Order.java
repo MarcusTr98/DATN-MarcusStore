@@ -82,6 +82,9 @@ public class Order {
     @Column(name = "payment_date")
     private LocalDateTime paymentDate;
 
+    @Column(name = "auto_assign_at")
+    private LocalDateTime autoAssignAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     @JsonIgnore

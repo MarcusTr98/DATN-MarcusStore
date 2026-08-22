@@ -52,6 +52,10 @@
           <span class="summary-label">Ngày tạo</span>
           <strong class="summary-value">{{ formatDateTime(orderDetail.createdAt) }}</strong>
         </div>
+        <div class="summary-item">
+          <span class="summary-label">Nhân viên phụ trách</span>
+          <strong class="summary-value">{{ orderDetail.assignment?.staffName || 'Chưa phân công' }}</strong>
+        </div>
       </div>
 
       <div class="detail-layout">

@@ -4,6 +4,7 @@ import com.fpoly.marcusstore.dto.response.UserNotificationResponse;
 import com.fpoly.marcusstore.entity.auth.User;
 import com.fpoly.marcusstore.entity.contact.UserNotification;
 import com.fpoly.marcusstore.entity.shopping.Order;
+import com.fpoly.marcusstore.entity.shopping.OrderAssignment;
 import com.fpoly.marcusstore.entity.shopping.WarrantyReturn;
 import com.fpoly.marcusstore.entity.shopping.WarrantyReturn.WarrantyStatus;
 import com.fpoly.marcusstore.repository.contact.UserNotificationRepository;
@@ -59,10 +60,34 @@ public class UserNotificationService {
 
     @Transactional
     public void create(User user, String type, String title, String message, String referenceId) {
+        create(user, type, title, message, referenceId, title);
+    }
+
+    @Transactional
+    public void notifyOrderAssigned(OrderAssignment assignment) {
+        if (assignment == null || assignment.getOrder() == null || assignment.getStaff() == null)
+            return;
+        Order order = assignment.getOrder();
+        String mode = switch (String.valueOf(assignment.getAssignmentType()).toUpperCase(Locale.ROOT)) {
+            case "AUTO" -> "tự động";
+            case "SELF" -> "do bạn chủ động nhận";
+            default -> "thủ công";
+        };
+        create(
+                assignment.getStaff(),
+                "STAFF_ORDER_ASSIGNED",
+                "Bạn được giao đơn mới",
+                "Đơn " + order.getOrderCode() + " vừa được phân công " + mode + " cho bạn.",
+                order.getOrderCode(),
+                String.valueOf(assignment.getAssignmentId()));
+    }
+
+    private void create(User user, String type, String title, String message, String referenceId,
+            String discriminator) {
         if (user == null || user.getUserId() == null)
             return;
         String eventKey = NotificationRegistry.eventKey(
-                "USER_" + user.getUserId(), type, referenceId, title);
+                "USER_" + user.getUserId(), type, referenceId, discriminator);
         java.util.Optional<UserNotification> existing = repository.findByEventKey(eventKey);
         if (existing != null && existing.isPresent())
             return;

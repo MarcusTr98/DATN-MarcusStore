@@ -56,4 +56,5 @@ public class OrderDetailResponse {
     // marcus thêm
     private BigDecimal shippingSubsidy;
     private String deliveryNote;
+    private OrderAssignmentResponse assignment;
 }

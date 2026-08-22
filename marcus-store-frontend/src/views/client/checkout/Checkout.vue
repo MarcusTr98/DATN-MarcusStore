@@ -97,13 +97,25 @@
           <div class="fulfillment-selector" role="radiogroup" aria-label="Cách thức nhận hàng">
             <label
               class="fulfillment-option"
-              :class="{ 'fulfillment-option--active': !isStorePickup }"
+              :class="{
+                'fulfillment-option--active': !isStorePickup,
+                'fulfillment-option--disabled': requiresStorePickup,
+              }"
             >
-              <input v-model="fulfillmentMethod" type="radio" value="DELIVERY" />
+              <input
+                v-model="fulfillmentMethod"
+                type="radio"
+                value="DELIVERY"
+                :disabled="requiresStorePickup"
+              />
               <span class="fulfillment-option__icon"><i class="fas fa-truck-fast"></i></span>
               <span class="fulfillment-option__content">
                 <strong>Giao tận nơi</strong>
-                <small>Nhận hàng tại địa chỉ của bạn</small>
+                <small>{{
+                  requiresStorePickup
+                    ? 'Không áp dụng cho đơn trên 50 triệu'
+                    : 'Nhận hàng tại địa chỉ của bạn'
+                }}</small>
               </span>
               <span class="fulfillment-option__meta">Tính phí GHN</span>
               <i class="fas fa-circle-check fulfillment-option__check"></i>
@@ -121,6 +133,26 @@
               <span class="fulfillment-option__meta fulfillment-option__meta--free">Miễn phí</span>
               <i class="fas fa-circle-check fulfillment-option__check"></i>
             </label>
+          </div>
+          <div
+            class="ghn-policy-notice"
+            :class="{ 'ghn-policy-notice--required': requiresStorePickup }"
+          >
+            <i :class="requiresStorePickup ? 'fas fa-store' : 'fas fa-circle-info'"></i>
+            <div v-if="requiresStorePickup">
+              <strong>Đơn hàng trên 50 triệu cần nhận tại cửa hàng</strong>
+              <span
+                >Để tránh đơn GHN bị từ chối và bảo đảm an toàn cho sản phẩm giá trị cao, hệ thống
+                đã chuyển sang nhận tại {{ siteName }}.</span
+              >
+            </div>
+            <div v-else>
+              <strong>Điều kiện giao hàng GHN</strong>
+              <span
+                >COD: GHN thu tiền khi giao. VNPAY: bạn trả trước, GHN chỉ vận chuyển và không thu
+                thêm tiền hàng. GHN chỉ bảo hiểm tối đa 5 triệu cho kiện hàng.</span
+              >
+            </div>
           </div>
         </div>
 
@@ -447,6 +479,7 @@
             </span>
             <button
               type="button"
+              :disabled="requiresStorePickup"
               @click="fulfillmentMethod = isStorePickup ? 'DELIVERY' : 'STORE_PICKUP'"
             >
               Đổi
@@ -645,7 +678,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watchEffect } from 'vue'
 import BaseModal from '@/components/BaseModal.vue'
 import CancelledFlashSaleModal from '@/components/CancelledFlashSaleModal.vue'
 import CheckoutPaymentMethods from '@/components/client/checkout/CheckoutPaymentMethods.vue'
@@ -716,6 +749,17 @@ const {
   isProcessing,
   handleCheckout,
 } = useCheckoutPage()
+
+const GHN_MAX_DELIVERY_ORDER_VALUE = 50_000_000
+const requiresStorePickup = computed(
+  () => Number(cartData.value?.totalAmount ?? 0) > GHN_MAX_DELIVERY_ORDER_VALUE,
+)
+
+watchEffect(() => {
+  if (requiresStorePickup.value && fulfillmentMethod.value !== 'STORE_PICKUP') {
+    fulfillmentMethod.value = 'STORE_PICKUP'
+  }
+})
 
 // Marcus thêm: ghi chú mẫu giúp khách chọn nhanh nhưng vẫn cho phép nhập nội dung riêng.
 const deliveryNoteSuggestions = [

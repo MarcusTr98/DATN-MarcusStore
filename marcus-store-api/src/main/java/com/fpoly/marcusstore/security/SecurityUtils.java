@@ -2,6 +2,7 @@ package com.fpoly.marcusstore.security;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.Arrays;
 
 public class SecurityUtils {
 
@@ -30,5 +31,17 @@ public class SecurityUtils {
             return authentication.getName();
         }
         return "SYSTEM";
+    }
+
+    public static boolean hasAnyRole(String... roles) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> Arrays.stream(roles)
+                        .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+                        .anyMatch(authority::equals));
     }
 }

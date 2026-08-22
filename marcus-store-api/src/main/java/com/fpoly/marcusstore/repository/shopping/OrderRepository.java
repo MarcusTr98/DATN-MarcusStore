@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import jakarta.persistence.LockModeType;
@@ -26,6 +27,50 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("SELECT o FROM Order o WHERE o.orderCode = :orderCode")
   Optional<Order> findByOrderCodeForUpdate(@Param("orderCode") String orderCode);
+
+  @Query("""
+      SELECT o FROM Order o
+      WHERE o.orderStatus = 'PENDING'
+        AND o.autoAssignAt IS NOT NULL AND o.autoAssignAt <= :now
+        AND (UPPER(o.paymentMethod) <> 'VNPAY' OR UPPER(o.paymentStatus) = 'PAID')
+        AND NOT EXISTS (SELECT 1 FROM OrderAssignment assignment
+                        WHERE assignment.order = o AND assignment.isCurrent = true)
+      ORDER BY o.autoAssignAt ASC
+      """)
+  List<Order> findOrdersDueForAutoAssignment(@Param("now") LocalDateTime now, Pageable pageable);
+
+  @Query("""
+      SELECT o FROM Order o
+      WHERE o.orderStatus = 'PENDING'
+        AND o.autoAssignAt IS NOT NULL
+        AND (UPPER(o.paymentMethod) <> 'VNPAY' OR UPPER(o.paymentStatus) = 'PAID')
+        AND NOT EXISTS (SELECT 1 FROM OrderAssignment assignment
+                        WHERE assignment.order = o AND assignment.isCurrent = true)
+      ORDER BY o.autoAssignAt ASC
+      """)
+  Page<Order> findPendingUnassignedOrders(Pageable pageable);
+
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("""
+      SELECT o FROM Order o
+      WHERE o.orderStatus = 'PENDING'
+        AND o.autoAssignAt IS NOT NULL
+        AND (UPPER(o.paymentMethod) <> 'VNPAY' OR UPPER(o.paymentStatus) = 'PAID')
+        AND NOT EXISTS (SELECT 1 FROM OrderAssignment assignment
+                        WHERE assignment.order = o AND assignment.isCurrent = true)
+      ORDER BY o.createdAt ASC, o.orderId ASC
+      """)
+  List<Order> findNextClaimableOrderForUpdate(Pageable pageable);
+
+  @Query("""
+      SELECT COUNT(o) FROM Order o
+      WHERE o.orderStatus = 'PENDING'
+        AND o.autoAssignAt IS NOT NULL
+        AND (UPPER(o.paymentMethod) <> 'VNPAY' OR UPPER(o.paymentStatus) = 'PAID')
+        AND NOT EXISTS (SELECT 1 FROM OrderAssignment assignment
+                        WHERE assignment.order = o AND assignment.isCurrent = true)
+      """)
+  long countClaimableOrders();
 
   // Marcus thêm: khóa đơn đồng thời kiểm tra chủ sở hữu để khách hủy đơn không
   // chạy song song với VNPAY IPN, scheduler hết hạn hoặc thao tác của Admin.
@@ -117,6 +162,51 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
       @Param("fromDate") LocalDate fromDate,
       @Param("toDate") LocalDate toDate,
       Pageable pageable);
+
+  @Query("""
+      SELECT o FROM Order o
+      JOIN OrderAssignment assignment ON assignment.order = o
+      WHERE assignment.staff.userId = :staffId
+        AND assignment.isCurrent = true
+        AND o.isHidden = false
+        AND (:keyword IS NULL
+          OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+        AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+        AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+        AND (:fromDate IS NULL OR CAST(o.createdAt AS LocalDate) >= :fromDate)
+        AND (:toDate IS NULL OR CAST(o.createdAt AS LocalDate) <= :toDate)
+      ORDER BY o.createdAt DESC, o.orderId DESC
+      """)
+  Page<Order> searchAssignedOrders(
+      @Param("staffId") Integer staffId,
+      @Param("keyword") String keyword,
+      @Param("paymentMethod") String paymentMethod,
+      @Param("orderStatus") String orderStatus,
+      @Param("fromDate") LocalDate fromDate,
+      @Param("toDate") LocalDate toDate,
+      Pageable pageable);
+
+  @Query("""
+      SELECT o.orderStatus, COUNT(o) FROM Order o
+      JOIN OrderAssignment assignment ON assignment.order = o
+      WHERE assignment.staff.userId = :staffId
+        AND assignment.isCurrent = true
+        AND o.isHidden = false
+        AND (:keyword IS NULL
+          OR LOWER(o.orderCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          OR LOWER(o.recipientName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+          OR o.recipientPhone LIKE CONCAT('%', :keyword, '%'))
+        AND (:paymentMethod IS NULL OR o.paymentMethod = :paymentMethod)
+        AND (:orderStatus IS NULL OR o.orderStatus = :orderStatus)
+      GROUP BY o.orderStatus
+      """)
+  List<Object[]> countAssignedOrdersByStatus(
+      @Param("staffId") Integer staffId,
+      @Param("keyword") String keyword,
+      @Param("paymentMethod") String paymentMethod,
+      @Param("orderStatus") String orderStatus);
 
   @Query("""
       SELECT COUNT(o) FROM Order o

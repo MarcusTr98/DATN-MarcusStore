@@ -45,4 +45,6 @@ public interface OrderService {
     OrderDetailResponse assignOrderImeis(String orderCode, List<UpdateOrderImeiRequest> requests);
 
     OrderDetailResponse startProcessingWithImei(String orderCode, List<UpdateOrderImeiRequest> requests);
+
+    OrderDetailResponse assignOrderToStaff(String orderCode, Integer staffId, String reason);
 }

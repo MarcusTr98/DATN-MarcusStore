@@ -43,6 +43,15 @@ public class User {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
+    @Column(name = "accepting_orders", nullable = false)
+    private Boolean acceptingOrders = true;
+
+    @Column(name = "max_active_orders", nullable = false)
+    private Integer maxActiveOrders = 5;
+
+    @Column(name = "last_assigned_at")
+    private LocalDateTime lastAssignedAt;
+
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

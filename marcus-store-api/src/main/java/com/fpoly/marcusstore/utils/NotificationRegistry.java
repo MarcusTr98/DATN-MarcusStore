@@ -3,8 +3,10 @@ package com.fpoly.marcusstore.utils;
 import java.util.Locale;
 
 /**
- * Marcus thêm: registry duy nhất quyết định mức độ, icon và deep link của chuông.
- * Frontend chỉ render metadata backend trả về nên Admin/Client không tự đoán loại.
+ * Marcus thêm: registry duy nhất quyết định mức độ, icon và deep link của
+ * chuông.
+ * Frontend chỉ render metadata backend trả về nên Admin/Client không tự đoán
+ * loại.
  */
 public final class NotificationRegistry {
 
@@ -39,6 +41,9 @@ public final class NotificationRegistry {
 
     public static Metadata forUser(String rawType, String referenceId) {
         String type = normalize(rawType);
+        if (type.startsWith("STAFF_ORDER_")) {
+            return new Metadata(ACTION_REQUIRED, "fas fa-clipboard-check", orderAdminLink(referenceId));
+        }
         String orderLink = referenceId == null ? null : "/profile/orders/" + referenceId;
         if (type.startsWith("WARRANTY_")) {
             return new Metadata(INFO, "fas fa-shield-halved", orderLink);
@@ -80,7 +85,8 @@ public final class NotificationRegistry {
     }
 
     private static String safe(String value) {
-        if (value == null || value.isBlank()) return "NONE";
+        if (value == null || value.isBlank())
+            return "NONE";
         return value.trim().replace(':', '_').substring(0, Math.min(value.trim().length(), 80));
     }
 

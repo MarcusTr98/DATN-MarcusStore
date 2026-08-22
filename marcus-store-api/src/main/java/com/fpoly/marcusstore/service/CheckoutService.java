@@ -50,6 +50,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CheckoutService {
 
+        private static final BigDecimal GHN_MAX_DELIVERY_ORDER_VALUE = new BigDecimal("50000000");
+
         // Marcus sửa: dùng constructor injection để dependency bắt buộc, bất biến và dễ
         // kiểm thử hơn; không thay đổi nghiệp vụ Cart/Voucher/Flash Sale của thành
         // viên.
@@ -404,6 +406,14 @@ public class CheckoutService {
                         totalWeightGram += itemWeight;
                 }
 
+                // GHN chỉ nhận giá trị thu hộ tối đa 50 triệu. Áp dụng cùng một ngưỡng
+                // cho cả COD và đơn trả trước để khách chọn đúng phương thức ngay từ checkout,
+                // đồng thời tránh tạo đơn rồi mới bị hủy ở bước vận chuyển.
+                if (!isStorePickup && totalAmount.compareTo(GHN_MAX_DELIVERY_ORDER_VALUE) > 0) {
+                        throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                        "Đơn hàng trên 50 triệu chỉ hỗ trợ nhận tại cửa hàng.|STORE_PICKUP_REQUIRED");
+                }
+
                 // Marcus thêm: nhận tại cửa hàng không gọi GHN và không phát sinh phí/trợ giá
                 // ship.
                 BigDecimal ghnStandardFee = BigDecimal.ZERO;
@@ -468,6 +478,7 @@ public class CheckoutService {
 
                 order.setFinalAmount(finalAmount.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : finalAmount);
 
+                order.setAutoAssignAt(LocalDateTime.now().plusMinutes(5));
                 Order savedOrder = orderRepository.save(order);
                 // Marcus thêm: chỉ lưu mốc funnel và order_id, không lưu thông tin khách.
                 try {

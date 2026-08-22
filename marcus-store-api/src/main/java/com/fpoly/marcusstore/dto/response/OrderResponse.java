@@ -23,6 +23,7 @@ public class OrderResponse {
     private String orderStatus;
     // Marcus thêm: hiển thị badge nhận tại cửa hàng trong danh sách đơn.
     private String fulfillmentMethod;
+    private OrderAssignmentResponse assignment;
     private Integer itemCount;
 
     // Marcus bổ sung

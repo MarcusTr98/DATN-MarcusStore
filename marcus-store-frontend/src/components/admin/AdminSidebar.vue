@@ -36,6 +36,15 @@
         <img :src="cartIcon" class="menu-icon" alt="" />
         <span>Đơn hàng</span>
       </router-link>
+      <router-link
+        v-if="canAccessRoute('/admin/order-assignment')"
+        to="/admin/order-assignment"
+        class="menu-item"
+        active-class="active"
+      >
+        <i class="bi bi-diagram-3 menu-icon"></i>
+        <span>Chia đơn hàng</span>
+      </router-link>
       <!-- Marcus giữ nguyên module thành viên: chỉ ghép route bảo hành vào
            cấu trúc Sidebar mới, không thay đổi quyền hay nghiệp vụ bảo hành. -->
       <router-link
@@ -383,7 +392,11 @@ const showSanPhamKho = computed(() => {
 // Marcus thêm: nhóm Bán hàng hiển thị nếu người dùng được xem đơn hàng hoặc
 // module đổi trả/bảo hành vừa được tích hợp từ nhánh thành viên.
 const showSales = computed(() => {
-  return canAccessRoute('/admin/order') || canAccessRoute('/admin/warranty')
+  return (
+    canAccessRoute('/admin/order') ||
+    canAccessRoute('/admin/order-assignment') ||
+    canAccessRoute('/admin/warranty')
+  )
 })
 
 const showMarketing = computed(() => {
