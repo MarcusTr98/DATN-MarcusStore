@@ -128,6 +128,16 @@
                     <!-- Marcus sửa: hiển thị khoảng giá SKU còn hàng, tránh hiểu
                     nhầm giá thấp nhất là giá của mọi phiên bản. -->
                     <span class="product-price">{{ formatProductPrice(product) }}</span>
+                    <span v-if="product.compatibilityScore != null" class="match-score">
+                      Phù hợp {{ product.compatibilityScore }}%
+                    </span>
+                    <span
+                      v-if="product.matchReasons?.length"
+                      class="match-reason"
+                      :title="product.matchReasons.join(' · ')"
+                    >
+                      {{ product.matchReasons.join(' · ') }}
+                    </span>
                     <small :class="{ 'out-of-stock': !product.inStock }">
                       {{ product.inStock ? 'Còn hàng' : 'Tạm hết hàng' }}
                     </small>
@@ -972,6 +982,26 @@ onBeforeUnmount(() => {
   color: #dc2626;
   font-size: 11px;
   font-weight: 700;
+}
+
+.ai-product .match-score {
+  width: fit-content;
+  margin-top: 2px;
+  border-radius: 999px;
+  padding: 1px 5px;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.ai-product .match-reason {
+  overflow: hidden;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-product small {

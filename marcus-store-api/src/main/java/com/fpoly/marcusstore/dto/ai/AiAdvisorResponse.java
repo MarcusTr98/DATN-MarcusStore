@@ -40,6 +40,8 @@ public class AiAdvisorResponse {
         private BigDecimal price;
         private BigDecimal maxPrice;
         private boolean inStock;
+        private Integer compatibilityScore;
+        private List<String> matchReasons;
         private List<SkuSuggestion> skuOptions;
         private Integer matchedSkuId;
     }

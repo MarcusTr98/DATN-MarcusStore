@@ -71,6 +71,7 @@ public class AiAdvisorService {
     private final AiAdvisorIntentRouter intentRouter;
     private final AiStoreKnowledgeService storeKnowledgeService;
     private final GeminiClient geminiClient;
+    private final AdvisorProductScorer productScorer;
 
     @Autowired
     public AiAdvisorService(HomeProductRepository homeProductRepository,
@@ -83,6 +84,7 @@ public class AiAdvisorService {
         this.intentRouter = intentRouter;
         this.storeKnowledgeService = storeKnowledgeService;
         this.geminiClient = geminiClient;
+        this.productScorer = new AdvisorProductScorer();
     }
 
     // Marcus thêm: constructor hẹp phục vụ regression test, không gọi mạng.
@@ -153,7 +155,9 @@ public class AiAdvisorService {
 
         // Marcus thêm: hết quota/mất key vẫn tư vấn được bằng dữ liệu catalog thật.
         if (geminiClient == null || !geminiClient.isConfigured()) {
-            return attachContext(deterministicFallback(products, criteria), advisorContext);
+            AiAdvisorResponse fallback = deterministicFallback(products, criteria);
+            enrichCompatibility(fallback, products, productSpecs, advisorContext);
+            return attachContext(fallback, advisorContext);
         }
 
         try {
@@ -161,12 +165,33 @@ public class AiAdvisorService {
                     systemInstructions(), input, advisorResponseSchema(), 1_000);
 
             AiAdvisorResponse result = buildAdvisorResponse(response, products, productSpecs, advisorContext);
+            enrichCompatibility(result, products, productSpecs, advisorContext);
             result.setSource("GEMINI");
             result.setFallbackUsed(false);
             return attachContext(result, advisorContext);
         } catch (GeminiClient.GeminiClientException exception) {
-            return attachContext(deterministicFallback(products, criteria), advisorContext);
+            AiAdvisorResponse fallback = deterministicFallback(products, criteria);
+            enrichCompatibility(fallback, products, productSpecs, advisorContext);
+            return attachContext(fallback, advisorContext);
         }
+    }
+
+    private void enrichCompatibility(
+            AiAdvisorResponse response,
+            List<AiProductProjection> rankedProducts,
+            Map<Integer, String> productSpecs,
+            AiAdvisorContext context) {
+        if (response.getProducts() == null) return;
+        Map<Integer, AiProductProjection> productsById = rankedProducts.stream()
+                .collect(Collectors.toMap(AiProductProjection::getProductId, product -> product));
+        response.getProducts().forEach(suggestion -> {
+            AiProductProjection product = productsById.get(suggestion.getProductId());
+            if (product == null) return;
+            AdvisorProductScorer.ScoreResult result = productScorer.score(
+                    product, productSpecs.get(product.getProductId()), context);
+            suggestion.setCompatibilityScore(result.score());
+            suggestion.setMatchReasons(result.reasons());
+        });
     }
 
     private AiAdvisorResponse attachContext(AiAdvisorResponse response, AiAdvisorContext context) {
@@ -834,8 +859,8 @@ public class AiAdvisorService {
             AiAdvisorContext context) {
         return products.stream()
                 .sorted(java.util.Comparator
-                        .comparingInt((AiProductProjection product) -> evidenceScore(
-                                productSpecs.get(product.getProductId()), context.getPriorities()))
+                        .comparingInt((AiProductProjection product) -> productScorer.score(
+                                product, productSpecs.get(product.getProductId()), context).score())
                         .reversed()
                         .thenComparing(product -> product.getPrice() == null
                                 ? BigDecimal.valueOf(Long.MAX_VALUE)
