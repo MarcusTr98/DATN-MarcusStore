@@ -14,7 +14,7 @@ public interface OrderAssignmentService {
 
     void assignDueOrders();
 
-    OrderAssignmentDashboardResponse getDashboard();
+    OrderAssignmentDashboardResponse getDashboard(int pendingPage, int pendingSize);
 
     void assertCurrentStaffCanAccess(Integer orderId);
 

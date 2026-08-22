@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -11,7 +12,8 @@ public class StaffAssignmentStatusResponse {
     private final boolean acceptingOrders;
     private final int maxActiveOrders;
     private final long activeOrderCount;
-    private final double workloadScore;
+    private final long workloadScore;
+    private final Map<String, Long> workloadBreakdown;
     private final boolean canClaim;
     private final LocalDateTime lastAssignedAt;
     private final String unavailableReason;

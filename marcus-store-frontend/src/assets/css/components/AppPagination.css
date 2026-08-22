@@ -1,0 +1,31 @@
+.app-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-top: 1px solid #dbeafe;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+.app-pagination div {
+  display: flex;
+  gap: 7px;
+}
+.app-pagination button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d4ed8;
+}
+.app-pagination button:hover:not(:disabled) {
+  background: #eff6ff;
+}
+.app-pagination button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

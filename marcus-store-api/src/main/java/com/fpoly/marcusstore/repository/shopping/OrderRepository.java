@@ -48,7 +48,7 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
                         WHERE assignment.order = o AND assignment.isCurrent = true)
       ORDER BY o.autoAssignAt ASC
       """)
-  List<Order> findPendingUnassignedOrders(Pageable pageable);
+  Page<Order> findPendingUnassignedOrders(Pageable pageable);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("""

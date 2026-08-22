@@ -372,5 +372,3 @@ const resetFilters = () => {
   showToast('Đã làm mới bộ lọc.')
 }
 </script>
-
-<style scoped></style>

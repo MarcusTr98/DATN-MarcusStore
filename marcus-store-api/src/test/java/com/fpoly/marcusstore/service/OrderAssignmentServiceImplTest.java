@@ -8,6 +8,7 @@ import com.fpoly.marcusstore.repository.shopping.OrderAssignmentRepository;
 import com.fpoly.marcusstore.repository.shopping.OrderRepository;
 import com.fpoly.marcusstore.service.impl.OrderAssignmentServiceImpl;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -85,17 +86,20 @@ class OrderAssignmentServiceImplTest {
         User staffOne = staff(1, "Staff 1");
         User staffTwo = staff(2, "Staff 2");
         when(userRepository.findActiveStaffWithOrderUpdatePermission()).thenReturn(List.of(staffOne, staffTwo));
-        when(orderRepository.findPendingUnassignedOrders(any())).thenReturn(List.of(
-                pendingOrder("ORD-1"), pendingOrder("ORD-2"), pendingOrder("ORD-3")));
+        when(assignmentRepository.findCurrentActiveStatuses(eq(1), any())).thenReturn(List.of("PROCESSING"));
+        when(assignmentRepository.findCurrentActiveStatuses(eq(2), any())).thenReturn(List.of("SHIPPING"));
+        when(orderRepository.findPendingUnassignedOrders(any())).thenReturn(new PageImpl<>(List.of(
+                pendingOrder("ORD-1"), pendingOrder("ORD-2"), pendingOrder("ORD-3"))));
 
         OrderAssignmentServiceImpl service = new OrderAssignmentServiceImpl(
                 assignmentRepository, orderRepository, userRepository, mock(UserNotificationService.class));
 
-        var dashboard = service.getDashboard();
+        var dashboard = service.getDashboard(0, 5);
 
         assertThat(dashboard.getPendingOrders())
                 .extracting("plannedStaffId")
-                .containsExactly(1, 2, 1);
+                .containsExactly(2, 2, 1);
+        assertThat(dashboard.getPendingTotalElements()).isEqualTo(3);
     }
 
     @Test

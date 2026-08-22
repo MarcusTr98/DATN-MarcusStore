@@ -24,8 +24,11 @@ public class AdminOrderAssignmentController {
     private final OrderService orderService;
 
     @GetMapping("/dashboard")
-    public OrderAssignmentDashboardResponse getDashboard() {
-        return orderAssignmentService.getDashboard();
+    public OrderAssignmentDashboardResponse getDashboard(
+            @RequestParam(defaultValue = "0") int pendingPage,
+            @RequestParam(defaultValue = "5") int pendingSize) {
+        return orderAssignmentService.getDashboard(
+                Math.max(0, pendingPage), Math.max(1, Math.min(pendingSize, 50)));
     }
 
     @PutMapping("/{orderCode}")
