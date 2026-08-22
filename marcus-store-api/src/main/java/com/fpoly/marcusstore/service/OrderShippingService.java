@@ -19,6 +19,8 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class OrderShippingService {
+        private static final BigDecimal GHN_MAX_DELIVERY_ORDER_VALUE = new BigDecimal("50000000");
+
         private final GhnService ghnService;
         private final OrderRepository orderRepository;
         private final ShippingConfigRepository shippingConfigRepository;
@@ -59,6 +61,11 @@ public class OrderShippingService {
                         order.setGhnIntegrationStatus("NOT_REQUIRED");
                         orderRepository.save(order);
                         return null;
+                }
+                if (order.getTotalAmount() != null
+                                && order.getTotalAmount().compareTo(GHN_MAX_DELIVERY_ORDER_VALUE) > 0) {
+                        throw new IllegalStateException(
+                                        "Đơn hàng trên 50 triệu không hỗ trợ giao GHN, vui lòng nhận tại cửa hàng");
                 }
                 if (!"PACKED".equalsIgnoreCase(order.getOrderStatus())) {
                         throw new IllegalStateException("Chỉ tạo vận đơn khi đơn đã đóng gói");

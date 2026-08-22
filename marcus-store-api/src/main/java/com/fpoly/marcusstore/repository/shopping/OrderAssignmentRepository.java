@@ -69,6 +69,7 @@ public interface OrderAssignmentRepository extends JpaRepository<OrderAssignment
   @Query("""
       SELECT COUNT(DISTINCT assignment.order.orderId) FROM OrderAssignment assignment
       WHERE assignment.staff.userId = :staffId
+        AND assignment.isCurrent = true
         AND assignment.assignedAt >= :since
         AND assignment.order.orderStatus = 'COMPLETED'
       """)

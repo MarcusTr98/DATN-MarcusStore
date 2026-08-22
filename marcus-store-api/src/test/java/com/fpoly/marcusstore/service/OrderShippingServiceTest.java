@@ -28,12 +28,18 @@ import static org.mockito.Mockito.*;
 // lần tạo lỗi phải lưu FAILED; retry thành công phải chốt đúng một tracking code.
 @ExtendWith(MockitoExtension.class)
 class OrderShippingServiceTest {
-    @Mock GhnService ghnService;
-    @Mock OrderRepository orderRepository;
-    @Mock ShippingConfigRepository shippingConfigRepository;
-    @Mock OrderStatusHistoryRepository historyRepository;
-    @Mock TransactionTemplate transactionTemplate;
-    @Mock TransactionStatus transactionStatus;
+    @Mock
+    GhnService ghnService;
+    @Mock
+    OrderRepository orderRepository;
+    @Mock
+    ShippingConfigRepository shippingConfigRepository;
+    @Mock
+    OrderStatusHistoryRepository historyRepository;
+    @Mock
+    TransactionTemplate transactionTemplate;
+    @Mock
+    TransactionStatus transactionStatus;
 
     private OrderShippingService service;
     private Order order;
@@ -61,13 +67,14 @@ class OrderShippingServiceTest {
         order.setGhnRetryCount(0);
 
         when(orderRepository.findByIdForUpdate(10)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(shippingConfigRepository.findFirstByIsActiveTrueOrderByCreatedAtDesc()).thenReturn(Optional.empty());
+        lenient().when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(shippingConfigRepository.findFirstByIsActiveTrueOrderByCreatedAtDesc())
+                .thenReturn(Optional.empty());
         when(transactionTemplate.execute(any())).thenAnswer(invocation -> {
             TransactionCallback<?> callback = invocation.getArgument(0);
             return callback.doInTransaction(transactionStatus);
         });
-        doAnswer(invocation -> {
+        lenient().doAnswer(invocation -> {
             Consumer<TransactionStatus> callback = invocation.getArgument(0);
             callback.accept(transactionStatus);
             return null;
@@ -90,5 +97,18 @@ class OrderShippingServiceTest {
         assertThat(retried.getTrackingCode()).isEqualTo("GHN-TRACK-001");
         assertThat(retried.getGhnRetryCount()).isEqualTo(2);
         verify(ghnService, times(2)).createOrderOnGhn(any(GhnCreateOrderRequest.class));
+    }
+
+    @Test
+    void deliveryOverFiftyMillionIsRejectedBeforeCallingGhn() {
+        order.setTotalAmount(new BigDecimal("50000001"));
+        order.setFinalAmount(new BigDecimal("50000001"));
+
+        assertThatThrownBy(() -> service.createOrRetryGhnOrder(10))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("trên 50 triệu")
+                .hasMessageContaining("nhận tại cửa hàng");
+
+        verifyNoInteractions(ghnService);
     }
 }

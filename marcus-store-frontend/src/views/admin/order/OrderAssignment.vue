@@ -57,7 +57,7 @@
       <div class="claim-card">
         <span class="queue-number">{{ staffStatus.pendingOrderCount }}</span>
         <h2>{{ staffStatus.pendingOrderCount ? 'đơn đang chờ nhận' : 'Hiện chưa có đơn chờ' }}</h2>
-        <p>Hệ thống sẽ giao đơn cũ nhất; thông tin đơn chỉ hiện sau khi nhận thành công.</p>
+        <p>Hệ thống sẽ giao đơn cũ nhất, thông tin đơn chỉ hiện sau khi nhận thành công.</p>
         <button
           type="button"
           :disabled="staffLoading || !staffStatus.canClaim || staffStatus.pendingOrderCount === 0"
@@ -184,7 +184,7 @@
             <p>Tỷ lệ tự nhận và hoàn thành trong 30 ngày gần nhất.</p>
           </div>
         </div>
-        <apexchart height="320" type="bar" :options="kpiChartOptions" :series="kpiChartSeries" />
+        <apexchart height="340" type="bar" :options="kpiChartOptions" :series="kpiChartSeries" />
       </article>
       <div class="panel kpi-table-wrap">
         <table class="kpi-table">
@@ -485,14 +485,50 @@ const kpiChartSeries = computed(() => [
   },
 ])
 const kpiChartOptions = computed(() => ({
-  chart: { toolbar: { show: false }, fontFamily: 'inherit' },
+  chart: {
+    type: 'bar',
+    toolbar: { show: false },
+    fontFamily: 'inherit',
+    animations: { enabled: true, easing: 'easeinout', speed: 500 },
+  },
   colors: ['#2563eb', '#16a34a'],
-  plotOptions: { bar: { borderRadius: 5, columnWidth: '55%' } },
-  dataLabels: { enabled: false },
-  xaxis: { categories: dashboard.staffLoads.map((staff) => staff.staffName) },
-  yaxis: { min: 0, max: 100, labels: { formatter: (value) => `${Math.round(value)}%` } },
-  tooltip: { y: { formatter: (value) => `${value}%` } },
-  legend: { position: 'top', horizontalAlign: 'right' },
+  plotOptions: {
+    bar: {
+      borderRadius: 6,
+      borderRadiusApplication: 'end',
+      columnWidth: dashboard.staffLoads.length > 8 ? '70%' : '52%',
+    },
+  },
+  dataLabels: {
+    enabled: true,
+    formatter: (value) => (value > 0 ? `${Math.round(value)}%` : ''),
+    offsetY: -8,
+    style: { fontSize: '11px', fontWeight: 700, colors: ['#334155'] },
+    background: { enabled: false },
+  },
+  grid: { borderColor: '#dbeafe', strokeDashArray: 4, padding: { top: 16, right: 10 } },
+  xaxis: {
+    categories: dashboard.staffLoads.map((staff) => staff.staffName),
+    labels: {
+      trim: true,
+      rotate: dashboard.staffLoads.length > 6 ? -25 : 0,
+      hideOverlappingLabels: true,
+      formatter: (value) => (value?.length > 16 ? `${value.slice(0, 15)}…` : value),
+    },
+  },
+  yaxis: {
+    min: 0,
+    max: 100,
+    tickAmount: 5,
+    title: { text: 'Tỷ lệ (%)' },
+    labels: { formatter: (value) => `${Math.round(value)}%` },
+  },
+  tooltip: {
+    shared: true,
+    intersect: false,
+    y: { formatter: (value) => `${Math.round(value)}%` },
+  },
+  legend: { position: 'top', horizontalAlign: 'center', markers: { size: 6 } },
   noData: { text: 'Chưa có dữ liệu KPI' },
 }))
 let timer

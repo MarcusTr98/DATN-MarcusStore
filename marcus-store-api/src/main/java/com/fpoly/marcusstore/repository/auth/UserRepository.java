@@ -105,50 +105,58 @@ public interface UserRepository extends JpaRepository<User, Integer> {
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("""
-                              SELECT DISTINCT u
-                              FROM User u
+      SELECT DISTINCT u
+      FROM User u
       JOIN u.role r
       LEFT JOIN u.permissions userPermission
-                              WHERE r.roleName = 'STAFF'
-                                AND u.isActive = true
-                                AND userPermission.permissionName = 'ORDER_UPDATE'
-                              ORDER BY u.userId
-                              """)
+      LEFT JOIN r.permissions rolePermission
+      WHERE r.roleName = 'STAFF'
+        AND u.isActive = true
+        AND (userPermission.permissionName = 'ORDER_UPDATE'
+             OR rolePermission.permissionName = 'ORDER_UPDATE')
+      ORDER BY u.userId
+      """)
   List<User> findActiveStaffWithOrderUpdatePermissionForAssignment();
 
   @Query("""
-                              SELECT DISTINCT u
-                              FROM User u
+      SELECT DISTINCT u
+      FROM User u
       JOIN u.role r
       LEFT JOIN u.permissions userPermission
-                              WHERE r.roleName = 'STAFF'
-                                AND u.isActive = true
-                                AND userPermission.permissionName = 'ORDER_UPDATE'
-                              ORDER BY u.userId
-                              """)
+      LEFT JOIN r.permissions rolePermission
+      WHERE r.roleName = 'STAFF'
+        AND u.isActive = true
+        AND (userPermission.permissionName = 'ORDER_UPDATE'
+             OR rolePermission.permissionName = 'ORDER_UPDATE')
+      ORDER BY u.userId
+      """)
   List<User> findActiveStaffWithOrderUpdatePermission();
 
   @Query("""
-                              SELECT DISTINCT u
-                              FROM User u
+      SELECT DISTINCT u
+      FROM User u
       JOIN u.role r
       LEFT JOIN u.permissions userPermission
-                              WHERE u.userId = :staffId
-                                AND r.roleName = 'STAFF'
-                                AND u.isActive = true
-                                AND userPermission.permissionName = 'ORDER_UPDATE'
-                              """)
+      LEFT JOIN r.permissions rolePermission
+      WHERE u.userId = :staffId
+        AND r.roleName = 'STAFF'
+        AND u.isActive = true
+        AND (userPermission.permissionName = 'ORDER_UPDATE'
+             OR rolePermission.permissionName = 'ORDER_UPDATE')
+      """)
   Optional<User> findActiveStaffWithOrderUpdatePermissionById(@Param("staffId") Integer staffId);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("""
       SELECT DISTINCT u FROM User u
       JOIN u.role r
-      LEFT JOIN u.permissions permission
+      LEFT JOIN u.permissions userPermission
+      LEFT JOIN r.permissions rolePermission
       WHERE u.userId = :staffId
         AND r.roleName = 'STAFF'
         AND u.isActive = true
-        AND permission.permissionName = 'ORDER_UPDATE'
+        AND (userPermission.permissionName = 'ORDER_UPDATE'
+             OR rolePermission.permissionName = 'ORDER_UPDATE')
       """)
   Optional<User> findEligibleStaffByIdForAssignment(@Param("staffId") Integer staffId);
 
