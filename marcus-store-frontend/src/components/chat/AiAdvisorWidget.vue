@@ -318,6 +318,10 @@ const contextChips = computed(() => {
     PERFORMANCE: 'Hiệu năng',
     BATTERY: 'Pin/sạc',
     DISPLAY: 'Màn hình',
+    STORAGE: 'Lưu trữ',
+    DURABILITY: 'Độ bền',
+    CONNECTIVITY: 'Kết nối',
+    EASY_TO_USE: 'Dễ sử dụng',
     BRAND: 'Thương hiệu',
   }
   const priorities = context.priorities || []
