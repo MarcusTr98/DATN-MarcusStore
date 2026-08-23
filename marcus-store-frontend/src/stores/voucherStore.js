@@ -236,9 +236,9 @@ export const useVoucherStore = defineStore('voucher', {
         this.error = null
         this.fieldErrors = {}
 
-        const response = await voucherApi.createVoucher(payload)
-        this.vouchers.unshift(mapVoucher(response.data))
-        this.stats = buildFallbackStats(this.vouchers)
+        await voucherApi.createVoucher(payload)
+        // Reload danh sách để giữ đúng thứ tự sort từ BE
+        await this.fetchVouchers()
 
         return true
       } catch (error) {

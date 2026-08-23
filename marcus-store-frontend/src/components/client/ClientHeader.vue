@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
 import { useSearchBox } from '@/composables/useSearchBox'
 import BaseModal from '../BaseModal.vue'
+import CategoryMegaMenu from '@/components/client/CategoryMegaMenu.vue'
 import wishlist from '@/composables/useWishlistShared'
 import { useUserNotifications } from '@/composables/useUserNotifications'
 
@@ -35,6 +36,7 @@ const showNotifications = ref(false)
 const showAccountMenu = ref(false)
 const showCategoryMenu = ref(false)
 let notificationCloseTimer = null
+let categoryCloseTimer = null
 const {
   notifications,
   displayUnreadCount,
@@ -138,6 +140,29 @@ const scheduleCloseNotifications = () => {
   }, 180)
 }
 
+// ---- Category mega menu: cần grace period để chuột "đi từ <li> xuống <nav>" ----
+const toggleCategoryMenu = () => {
+  showCategoryMenu.value = !showCategoryMenu.value
+  if (showCategoryMenu.value) window.clearTimeout(categoryCloseTimer)
+}
+
+const closeCategoryMenu = () => {
+  window.clearTimeout(categoryCloseTimer)
+  showCategoryMenu.value = false
+}
+
+const cancelCloseCategoryMenu = () => {
+  window.clearTimeout(categoryCloseTimer)
+}
+
+const scheduleCloseCategoryMenu = () => {
+  // Lùi 1 nhịp ngắn để chuột kịp rời <li> xuống vùng mega menu
+  window.clearTimeout(categoryCloseTimer)
+  categoryCloseTimer = window.setTimeout(() => {
+    showCategoryMenu.value = false
+  }, 150)
+}
+
 const openNotification = async (item) => {
   const target = await markRead(item)
   showNotifications.value = false
@@ -200,13 +225,14 @@ onUnmounted(() => {
   detachAuthListener?.()
   window.removeEventListener('mousedown', handleClickOutside)
   window.clearTimeout(notificationCloseTimer)
+  window.clearTimeout(categoryCloseTimer)
 })
 
 function handleClickOutside(e) {
   const wrapper = document.querySelector('.search-bar-wrapper')
   if (wrapper && !wrapper.contains(e.target)) closePanel()
   if (!e.target.closest('.account-dropdown')) showAccountMenu.value = false
-  if (!e.target.closest('.category-dropdown')) showCategoryMenu.value = false
+  // category-dropdown đã dùng hover state trong template, không cần click-outside ở đây
 }
 </script>
 
@@ -522,56 +548,21 @@ function handleClickOutside(e) {
             </router-link>
           </li>
 
-          <!-- 2. Danh mục (Dropdown Hover) -->
+          <!-- 2. Danh mục (Mega Menu Hover) -->
           <li
             class="nav-item dropdown dropdown-hover category-dropdown"
             :class="{ show: showCategoryMenu }"
+            @mouseenter="showCategoryMenu = true"
+            @mouseleave="scheduleCloseCategoryMenu"
           >
             <a
               href="#"
               class="nav-link fw-semibold text-dark px-1 py-2 rounded d-flex align-items-center"
-              @click.prevent="showCategoryMenu = !showCategoryMenu"
+              @click.prevent="toggleCategoryMenu"
             >
               <i class="fas fa-bars me-2"></i> Danh mục
               <i class="fas fa-chevron-down ms-2" style="font-size: 10px"></i>
             </a>
-
-            <!-- Menu xổ xuống -->
-            <ul
-              class="dropdown-menu border-0 shadow-lg mt-0 rounded-3 p-2"
-              :class="{ show: showCategoryMenu }"
-            >
-              <li>
-                <router-link to="/category/dien-thoai" class="dropdown-item rounded py-2">
-                  <i class="fas fa-mobile-alt fa-fw text-danger me-2"></i> Điện thoại
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/may-tinh-bang" class="dropdown-item rounded py-2">
-                  <i class="fas fa-tablet-alt fa-fw text-danger me-2"></i> Máy tính bảng
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/am-thanh" class="dropdown-item rounded py-2">
-                  <i class="fas fa-headphones-alt fa-fw text-danger me-2"></i> Âm thanh
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/dong-ho-thong-minh" class="dropdown-item rounded py-2">
-                  <i class="fas fa-clock fa-fw text-danger me-2"></i> Đồng hồ thông minh
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/sac-pin" class="dropdown-item rounded py-2">
-                  <i class="fas fa-battery-full fa-fw text-danger me-2"></i> Sạc & Pin
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/op-lung" class="dropdown-item rounded py-2">
-                  <i class="fas fa-shield-alt fa-fw text-danger me-2"></i> Ốp lưng & Bảo vệ
-                </router-link>
-              </li>
-            </ul>
           </li>
 
           <!-- 3. Flash Sale -->
@@ -595,7 +586,15 @@ function handleClickOutside(e) {
             </router-link>
           </li>
         </ul>
+
+        <!-- Mega menu: full-width dưới nav. Đặt ngoài .container để span ngang màn hình. -->
       </div>
+      <CategoryMegaMenu
+        :is-open="showCategoryMenu"
+        @navigate="closeCategoryMenu"
+        @mouseenter="cancelCloseCategoryMenu"
+        @mouseleave="scheduleCloseCategoryMenu"
+      />
     </nav>
   </header>
 

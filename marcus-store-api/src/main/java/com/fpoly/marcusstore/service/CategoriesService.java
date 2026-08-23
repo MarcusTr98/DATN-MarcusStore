@@ -26,5 +26,7 @@ public interface CategoriesService {
 
     List<CategoryResponse> getActiveChildrenBySlug(String parentSlug);
 
+    Optional<CategoryResponse> getCategoryBySlug(String slug);
+
     List<CategoryResponse> getMainCategoriesWithProducts();
 }

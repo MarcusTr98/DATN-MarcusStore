@@ -16,6 +16,7 @@ public class OrderAutoCompletionScheduler {
 
     private final OrderRepository orderRepository;
     private final OrderAutoCompletionService autoCompletionService;
+    private final VoucherService voucherService;
 
     @Value("${order.auto-complete.delivered-after-hours:72}")
     private long deliveredAfterHours;
@@ -33,6 +34,19 @@ public class OrderAutoCompletionScheduler {
                 // thông tin khách hàng hay dữ liệu thanh toán.
                 log.warn("Không thể tự hoàn thành orderId={}: {}", orderId, exception.getMessage());
             }
+        }
+    }
+
+    // Marcus thêm: deactivate voucher hết hạn hoặc hết quantity mỗi 5 phút
+    @Scheduled(initialDelayString = "${voucher.expire.initial-delay-ms:60000}", fixedDelayString = "${voucher.expire.scan-delay-ms:300000}")
+    public void deactivateExpiredVouchers() {
+        try {
+            int count = voucherService.deactivateExpiredVouchers();
+            if (count > 0) {
+                log.info("Da deactivate {} voucher het han/het so luong", count);
+            }
+        } catch (RuntimeException exception) {
+            log.warn("Loi khi deactivate voucher het han: {}", exception.getMessage());
         }
     }
 }

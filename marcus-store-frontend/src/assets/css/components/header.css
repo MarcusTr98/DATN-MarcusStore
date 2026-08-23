@@ -900,6 +900,18 @@
   }
 }
 
+/* Category Mega Menu: giữ nút Danh mục active khi đang hover trong vùng mega menu */
+.category-dropdown:hover > .nav-link {
+  background-color: #d70018 !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 15px rgba(215, 0, 24, 0.35);
+  transform: translateY(-2px);
+}
+
+.category-dropdown:hover > .nav-link i {
+  color: #ffffff !important;
+}
+
 @media (max-width: 575px) {
   .topbar {
     padding: 5px 0;

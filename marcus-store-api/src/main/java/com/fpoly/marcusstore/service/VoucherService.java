@@ -36,4 +36,6 @@ public interface VoucherService {
     List<VoucherUsageResponse> getUserVoucherUsageHistory(Integer userId);
     // đếm số lần voucher được dừng
     long getVoucherUsedCount(Integer voucherId);
+    // Marcus thêm: deactivate tất cả voucher hết hạn hoặc hết quantity
+    int deactivateExpiredVouchers();
 }

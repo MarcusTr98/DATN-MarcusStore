@@ -34,6 +34,7 @@ public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
                                  AND v.endDate >= CURRENT_TIMESTAMP
                                 THEN 0 ELSE 1
                             END,
+                            v.startDate DESC,
                             v.endDate ASC
                         """)
         Page<Voucher> searchVouchers(
@@ -100,7 +101,23 @@ public interface VoucherRepository extends JpaRepository<Voucher, Integer> {
                               AND v.startDate <= CURRENT_TIMESTAMP
                               AND v.endDate >= CURRENT_TIMESTAMP
                               AND v.targetType = 'ALL'
-                            ORDER BY v.endDate ASC
+                            ORDER BY v.startDate DESC, v.endDate ASC
                         """)
         List<Voucher> findAvailableVouchers();
+
+        // Marcus thêm: tìm voucher đã hết hạn và đang active
+        @Query("""
+                        SELECT v FROM Voucher v
+                        WHERE v.isActive = true
+                          AND v.endDate < :now
+                        """)
+        List<Voucher> findExpiredAndActive(@Param("now") java.time.LocalDateTime now);
+
+        // Marcus thêm: tìm voucher đã hết quantity và đang active
+        @Query("""
+                        SELECT v FROM Voucher v
+                        WHERE v.isActive = true
+                          AND v.quantity <= 0
+                        """)
+        List<Voucher> findOutOfStockAndActive();
 }

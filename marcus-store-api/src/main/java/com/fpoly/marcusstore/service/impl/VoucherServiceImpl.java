@@ -734,4 +734,30 @@ public class VoucherServiceImpl implements VoucherService {
     public long getVoucherUsedCount(Integer voucherId) {
         return userVoucherRepository.countUsedByVoucherId(voucherId);
     }
+
+    // Marcus thêm: deactivate tất cả voucher hết hạn hoặc hết quantity
+    // Gọi bởi VoucherScheduler (tái sử dụng OrderAutoCompletionScheduler)
+    @Transactional
+    public int deactivateExpiredVouchers() {
+        LocalDateTime now = LocalDateTime.now();
+        int count = 0;
+
+        // 1. Deactivate voucher hết hạn (endDate < now) và đang active
+        List<Voucher> expiredVouchers = voucherRepository.findExpiredAndActive(now);
+        for (Voucher v : expiredVouchers) {
+            v.setIsActive(false);
+            voucherRepository.save(v);
+            count++;
+        }
+
+        // 2. Deactivate voucher hết quantity và đang active
+        List<Voucher> outOfStockVouchers = voucherRepository.findOutOfStockAndActive();
+        for (Voucher v : outOfStockVouchers) {
+            v.setIsActive(false);
+            voucherRepository.save(v);
+            count++;
+        }
+
+        return count;
+    }
 }

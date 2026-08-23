@@ -191,6 +191,14 @@ public class CategoriesServiceImpl implements CategoriesService {
 
     @Override
     @Transactional(readOnly = true)
+    public Optional<CategoryResponse> getCategoryBySlug(String slug) {
+        return categoryRepository.findBySlug(slug)
+                .filter(Category::getStatus)
+                .map(this::toCateResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<CategoryResponse> getMainCategoriesWithProducts() {
         return categoryRepository.findMainCategoriesWithProducts()
                 .stream()
