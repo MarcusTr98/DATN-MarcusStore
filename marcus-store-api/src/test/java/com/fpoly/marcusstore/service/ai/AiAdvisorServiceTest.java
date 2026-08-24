@@ -173,7 +173,7 @@ class AiAdvisorServiceTest {
         }
 
         @Test
-        void keepsAndroidPlatformWhenFollowUpOnlyChangesBudget() {
+        void keepsAndroidAndBudgetButAsksUsageBeforeSearching() {
                 AiAdvisorRequest request = new AiAdvisorRequest();
                 request.setMessage("Tầm 20 triệu");
                 AiAdvisorRequest.ConversationTurn previous = new AiAdvisorRequest.ConversationTurn();
@@ -183,19 +183,14 @@ class AiAdvisorServiceTest {
 
                 AiAdvisorResponse response = service.advise(request);
 
-                assertTrue(response.isFallbackUsed());
-                verify(repository).findProductsForAiAdvisor(
-                                eq("samsung"), eq("điện thoại"), isNull(), eq(new BigDecimal("20000000")),
-                                eq(new BigDecimal("20000000")));
-                verify(repository).findProductsForAiAdvisor(
-                                eq("xiaomi"), eq("điện thoại"), isNull(), eq(new BigDecimal("20000000")),
-                                eq(new BigDecimal("20000000")));
+                assertEquals("CLARIFICATION", response.getSource());
+                assertEquals("ANDROID", response.getContext().getPlatform());
+                assertEquals(new BigDecimal("20000000"), response.getContext().getMaxBudget());
+                verify(repository).findAvailablePhoneLexiconForAiAdvisor();
                 verify(repository, org.mockito.Mockito.never()).findProductsForAiAdvisor(
-                                eq("iphone"), eq("điện thoại"), isNull(), eq(new BigDecimal("20000000")),
-                                eq(new BigDecimal("20000000")));
-                verify(repository, org.mockito.Mockito.never()).findProductsForAiAdvisor(
-                                eq(""), eq("điện thoại"), isNull(), eq(new BigDecimal("20000000")),
-                                eq(new BigDecimal("20000000")));
+                                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any());
         }
 
         @Test
@@ -219,6 +214,93 @@ class AiAdvisorServiceTest {
                 verify(repository).findProductsForAiAdvisor(
                                 eq("samsung"), eq("điện thoại"), isNull(), eq(new BigDecimal("20000000")),
                                 eq(new BigDecimal("20000000")));
+        }
+
+        @Test
+        void asksUsageBeforeSearchingCatalogForGenericPhoneAdvice() {
+                AiAdvisorRequest request = new AiAdvisorRequest();
+                request.setMessage("Tư vấn cho tôi một chiếc điện thoại tầm 20 triệu");
+
+                AiAdvisorResponse response = service.advise(request);
+
+                assertEquals("CLARIFICATION", response.getSource());
+                assertEquals("PHONE", response.getContext().getCategory());
+                assertEquals(new BigDecimal("20000000"), response.getContext().getMaxBudget());
+                assertTrue(response.getSections().getFollowUpQuestion().contains("dùng điện thoại chủ yếu"));
+                assertTrue(response.getProducts().isEmpty());
+                verify(repository).findAvailablePhoneLexiconForAiAdvisor();
+                verify(repository, org.mockito.Mockito.never()).findProductsForAiAdvisor(
+                                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any());
+        }
+
+        @Test
+        void adviceWithClearGamingNeedSearchesCatalogImmediately() {
+                AiAdvisorRequest request = new AiAdvisorRequest();
+                request.setMessage("Tư vấn điện thoại chơi game tầm 20 triệu");
+
+                AiAdvisorResponse response = service.advise(request);
+
+                assertEquals("PHONE", response.getContext().getCategory());
+                assertTrue(response.getContext().getPriorities().contains("PERFORMANCE"));
+                verify(repository).findProductsForAiAdvisor(
+                                eq(""), eq("điện thoại"), isNull(), eq(new BigDecimal("20000000")),
+                                eq(new BigDecimal("20000000")));
+        }
+
+        @Test
+        void recognizesNewBrandAndModelFromLiveCatalogWithoutCodeChange() {
+                HomeProductRepository.AiCatalogLexiconProjection lexicon = mock(
+                                HomeProductRepository.AiCatalogLexiconProjection.class);
+                when(lexicon.getBrand()).thenReturn("Tecno");
+                when(lexicon.getProductName()).thenReturn("Tecno Camon 40");
+                when(repository.findAvailablePhoneLexiconForAiAdvisor()).thenReturn(List.of(lexicon));
+
+                AiAdvisorRequest request = new AiAdvisorRequest();
+                request.setMessage("Camon 40 giá bao nhiêu?");
+
+                AiAdvisorResponse response = service.advise(request);
+
+                assertEquals("CATALOG_PRICE", response.getSource());
+                assertEquals(List.of("tecno"), response.getContext().getBrands());
+                assertEquals("ANDROID", response.getContext().getPlatform());
+                verify(repository).findProductsForAiAdvisor(
+                                eq("Tecno Camon 40"), eq("điện thoại"), isNull(), isNull(), isNull());
+        }
+
+        @Test
+        void newBrandAloneStillRequiresUsageBeforeRecommendation() {
+                HomeProductRepository.AiCatalogLexiconProjection lexicon = mock(
+                                HomeProductRepository.AiCatalogLexiconProjection.class);
+                when(lexicon.getBrand()).thenReturn("Tecno");
+                when(lexicon.getProductName()).thenReturn("Tecno Camon 40");
+                when(repository.findAvailablePhoneLexiconForAiAdvisor()).thenReturn(List.of(lexicon));
+
+                AiAdvisorRequest request = new AiAdvisorRequest();
+                request.setMessage("Tư vấn điện thoại Tecno nào tốt");
+
+                AiAdvisorResponse response = service.advise(request);
+
+                assertEquals("CLARIFICATION", response.getSource());
+                assertEquals(List.of("tecno"), response.getContext().getBrands());
+                verify(repository, org.mockito.Mockito.never()).findProductsForAiAdvisor(
+                                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any());
+        }
+
+        @Test
+        void parentUseCaseIsTreatedAsClearNeed() {
+                AiAdvisorRequest request = new AiAdvisorRequest();
+                request.setMessage("Tư vấn điện thoại dễ dùng cho bố mẹ tầm 8 triệu");
+
+                AiAdvisorResponse response = service.advise(request);
+
+                assertTrue(response.getContext().getPriorities().contains("EASY_TO_USE"));
+                verify(repository).findProductsForAiAdvisor(
+                                eq(""), eq("điện thoại"), isNull(), eq(new BigDecimal("8000000")),
+                                eq(new BigDecimal("8000000")));
         }
 
         @Test
@@ -400,8 +482,12 @@ class AiAdvisorServiceTest {
                 assertEquals("IOS", response.getContext().getPlatform());
                 assertEquals(List.of("apple"), response.getContext().getBrands());
                 assertEquals(null, response.getContext().getMaxBudget());
-                verify(repository).findProductsForAiAdvisor(
-                                eq("apple"), eq("điện thoại"), isNull(), isNull(), isNull());
+                assertEquals("CLARIFICATION", response.getSource());
+                verify(repository).findAvailablePhoneLexiconForAiAdvisor();
+                verify(repository, org.mockito.Mockito.never()).findProductsForAiAdvisor(
+                                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                                org.mockito.ArgumentMatchers.any());
         }
 
         @Test

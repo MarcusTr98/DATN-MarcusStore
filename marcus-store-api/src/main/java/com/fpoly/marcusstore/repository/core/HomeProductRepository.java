@@ -305,6 +305,22 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
             @Param("maxPrice") BigDecimal maxPrice,
             @Param("targetPrice") BigDecimal targetPrice);
 
+    // Marcus thêm: từ điển catalog động giúp AI nhận hãng/model mới ngay sau khi
+    // Admin thêm sản phẩm, không phải sửa danh sách hard-code hoặc huấn luyện lại.
+    @Query(value = """
+            SELECT DISTINCT p.product_name AS productName, p.brand AS brand
+            FROM Products p
+            INNER JOIN Product_Skus s ON s.product_id = p.product_id
+            INNER JOIN Categories c ON c.category_id = p.category_id
+            LEFT JOIN Categories parent ON parent.category_id = c.parent_id
+            WHERE p.status = 1
+              AND s.is_active = 1
+              AND COALESCE(s.stock_quantity, 0) > 0
+              AND (LOWER(c.category_name) LIKE N'%điện thoại%'
+                   OR LOWER(COALESCE(parent.category_name, '')) LIKE N'%điện thoại%')
+            """, nativeQuery = true)
+    List<AiCatalogLexiconProjection> findAvailablePhoneLexiconForAiAdvisor();
+
     // Marcus thêm: câu “máy này/con này” đọc đúng sản phẩm khách đã click, không
     // chạy lại xếp hạng rồi tự chuyển sang model khác.
     @Query(value = """
@@ -461,6 +477,12 @@ public interface HomeProductRepository extends JpaRepository<Product, Integer> {
         String getSpecValue();
 
         String getUnit();
+    }
+
+    interface AiCatalogLexiconProjection {
+        String getProductName();
+
+        String getBrand();
     }
 
     interface AiSkuProjection {

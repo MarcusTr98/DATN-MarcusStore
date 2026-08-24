@@ -53,6 +53,19 @@ const analyticsApi = {
   getAiSalesFunnel(params) {
     return get('/admin/ai-advisor/sales-funnel', params)
   },
+  getActions() {
+    return get('/admin/analytics/actions')
+  },
+  acceptAction(action) {
+    return api.post('/admin/analytics/actions', action, { skipGlobalLoading: true })
+  },
+  updateActionStatus(actionId, status) {
+    return api.patch(
+      `/admin/analytics/actions/${actionId}/status`,
+      { status },
+      { skipGlobalLoading: true },
+    )
+  },
 
   generateAiReport(params) {
     const query = queryString(params)

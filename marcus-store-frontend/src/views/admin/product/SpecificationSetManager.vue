@@ -12,7 +12,7 @@
         :disabled="!selectedCategory"
         @click="openForm()"
       >
-        <i class="bi bi-plus-lg me-2"></i>Thêm thông số riêng
+        <i class="bi bi-plus-lg me-2"></i>{{ addButtonLabel }}
       </button>
     </section>
 
@@ -69,7 +69,10 @@
             @click="selectCategory(category.categoryId)"
           >
             <i :class="category.level ? 'bi bi-folder2' : 'bi bi-folder2-open'"></i>
-            <span class="category-name">{{ category.categoryName }}</span>
+            <span class="category-name">
+              {{ category.categoryName }}
+              <small>{{ category.level ? 'Bộ riêng' : 'Bộ chung' }}</small>
+            </span>
             <span class="category-count">{{ category.effectiveAttributeCount }}</span>
           </button>
           <div v-if="!filteredCategoryTree.length" class="panel-empty">
@@ -124,6 +127,30 @@
             </div>
           </div>
 
+          <div class="scope-guide" :class="{ 'is-shared': isSharedScope }">
+            <div class="scope-guide-icon">
+              <i :class="isSharedScope ? 'bi bi-diagram-3-fill' : 'bi bi-folder-check'"></i>
+            </div>
+            <div>
+              <strong>{{ scopeTitle }}</strong>
+              <p>{{ scopeDescription }}</p>
+            </div>
+            <span>{{ selectedCategory.parentName ? 'DANH MỤC CON' : 'DANH MỤC GỐC' }}</span>
+          </div>
+
+          <div v-if="duplicateAttributes.length" class="duplicate-warning">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+              <strong
+                >Phát hiện {{ duplicateAttributes.length }} thông số trùng với bộ chung</strong
+              >
+              <p>
+                {{ duplicateAttributeNames }}. Hãy chạy lại file seed đã sửa để chuyển giá trị về
+                danh mục cha và dọn cấu trúc trùng.
+              </p>
+            </div>
+          </div>
+
           <div v-if="loadingAttributes" class="detail-loading">
             <span class="spinner-border"></span>
             <p>Đang tải bộ thông số...</p>
@@ -164,10 +191,9 @@
             <section class="attribute-section">
               <div class="section-title">
                 <div>
-                  <i class="bi bi-pencil-square"></i
-                  ><span>Thông số riêng của {{ selectedCategory.categoryName }}</span>
+                  <i class="bi bi-pencil-square"></i><span>{{ directSectionTitle }}</span>
                 </div>
-                <small>Có thể thêm, sửa, xóa và đổi thứ tự</small>
+                <small>{{ directSectionHint }}</small>
               </div>
               <div v-if="directAttributes.length" class="attribute-list">
                 <article
@@ -216,8 +242,8 @@
                 </article>
               </div>
               <div v-else class="section-empty">
-                <i class="bi bi-plus-circle"></i><strong>Danh mục chưa có thông số riêng</strong>
-                <p>Có thể chỉ dùng phần kế thừa hoặc bổ sung trường đặc trưng cho danh mục này.</p>
+                <i class="bi bi-plus-circle"></i><strong>{{ emptyDirectTitle }}</strong>
+                <p>{{ emptyDirectDescription }}</p>
                 <button class="btn btn-primary" @click="openForm()">Thêm thông số đầu tiên</button>
               </div>
             </section>
@@ -272,10 +298,7 @@
             <button class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body pt-1">
-            <div class="form-note">
-              <i class="bi bi-info-circle"></i>Trường này sẽ áp dụng cho danh mục đã chọn và toàn bộ
-              danh mục con.
-            </div>
+            <div class="form-note"><i class="bi bi-info-circle"></i>{{ formScopeNote }}</div>
             <label class="form-label">Tên thông số <span>*</span></label
             ><input
               v-model="form.name"
@@ -347,6 +370,45 @@ const baseModal = ref({ visible: false, type: 'error', title: '', message: '', c
 const selectedCategory = computed(
   () => categories.value.find((item) => item.categoryId === selectedCategoryId.value) || null,
 )
+const isSharedScope = computed(() =>
+  Boolean(selectedCategory.value && !selectedCategory.value.parentId),
+)
+const addButtonLabel = computed(() =>
+  isSharedScope.value ? 'Thêm thông số chung' : 'Thêm thông số riêng',
+)
+const scopeTitle = computed(() =>
+  isSharedScope.value
+    ? `Bộ thông số chung của ${selectedCategory.value?.categoryName || 'danh mục'}`
+    : `Bộ thông số riêng của ${selectedCategory.value?.categoryName || 'danh mục'}`,
+)
+const scopeDescription = computed(() =>
+  isSharedScope.value
+    ? 'Mọi danh mục con sẽ tự động kế thừa các trường được cấu hình tại đây.'
+    : `Chỉ thêm trường đặc trưng chưa có trong bộ chung ${selectedCategory.value?.parentName || ''}.`,
+)
+const directSectionTitle = computed(() =>
+  isSharedScope.value
+    ? `Thông số chung của ${selectedCategory.value?.categoryName || ''}`
+    : `Thông số riêng của ${selectedCategory.value?.categoryName || ''}`,
+)
+const directSectionHint = computed(() =>
+  isSharedScope.value
+    ? 'Áp dụng cho toàn bộ cây danh mục bên dưới'
+    : 'Không lặp lại trường đã được kế thừa từ danh mục cha',
+)
+const emptyDirectTitle = computed(() =>
+  isSharedScope.value ? 'Bộ thông số chung đang trống' : 'Danh mục chưa có thông số riêng',
+)
+const emptyDirectDescription = computed(() =>
+  isSharedScope.value
+    ? 'Thêm các trường nền tảng mà mọi danh mục con đều sử dụng.'
+    : 'Danh mục có thể chỉ dùng bộ chung hoặc bổ sung trường thật sự đặc trưng tại đây.',
+)
+const formScopeNote = computed(() =>
+  isSharedScope.value
+    ? 'Đây là thông số chung: trường sẽ áp dụng cho danh mục này và toàn bộ danh mục con.'
+    : `Đây là thông số riêng: chỉ tạo khi bộ chung ${selectedCategory.value?.parentName || ''} chưa có trường tương đương.`,
+)
 const totalDirectAttributes = computed(() =>
   categories.value.reduce((sum, item) => sum + Number(item.directAttributeCount || 0), 0),
 )
@@ -409,8 +471,32 @@ const directAttributes = computed(() =>
     .filter((item) => item.categoryId === selectedCategoryId.value)
     .sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)),
 )
-// Backend đã sắp theo phạm vi danh mục cha → con rồi mới tới thứ tự từng bộ.
-const effectiveAttributes = computed(() => filteredAttributes.value)
+const duplicateAttributes = computed(() => {
+  const inheritedNames = new Set(
+    attributes.value
+      .filter((item) => item.categoryId !== selectedCategoryId.value)
+      .map((item) => normalizeAttributeName(item.name)),
+  )
+  return attributes.value.filter(
+    (item) =>
+      item.categoryId === selectedCategoryId.value &&
+      inheritedNames.has(normalizeAttributeName(item.name)),
+  )
+})
+const duplicateAttributeNames = computed(() =>
+  duplicateAttributes.value.map((item) => `“${item.name}”`).join(', '),
+)
+// Backend sắp cha → con. Xem trước chỉ giữ dòng đầu tiên theo tên để dữ liệu cũ
+// bị trùng không xuất hiện hai lần trong lúc chờ chạy script chuẩn hóa.
+const effectiveAttributes = computed(() => {
+  const seen = new Set()
+  return filteredAttributes.value.filter((item) => {
+    const key = normalizeAttributeName(item.name)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+})
 
 async function loadOverview(preserveSelection = true) {
   loadingOverview.value = true
@@ -491,6 +577,19 @@ function payloadFor(attribute) {
 async function saveAttribute() {
   if (!form.value.name?.trim())
     return showModal('error', 'Thiếu tên thông số', 'Vui lòng nhập tên thông số.')
+  const normalizedName = normalizeAttributeName(form.value.name)
+  const inheritedDuplicate = attributes.value.find(
+    (item) =>
+      item.categoryId !== selectedCategoryId.value &&
+      normalizeAttributeName(item.name) === normalizedName,
+  )
+  if (inheritedDuplicate) {
+    return showModal(
+      'error',
+      'Thông số đã có trong bộ chung',
+      `“${inheritedDuplicate.name}” đang được kế thừa từ ${inheritedDuplicate.categoryName}. Không cần tạo lại trong bộ riêng.`,
+    )
+  }
   saving.value = true
   try {
     const payload = payloadFor(form.value)
@@ -564,6 +663,11 @@ function runModalConfirm() {
 }
 function typeLabel(type) {
   return { number: 'Dạng số', boolean: 'Có / Không', text: 'Văn bản' }[type] || 'Văn bản'
+}
+function normalizeAttributeName(value) {
+  return String(value || '')
+    .trim()
+    .toLocaleLowerCase('vi-VN')
 }
 function previewValue(attribute) {
   if (attribute.dataType === 'boolean') return 'Có / Không'
@@ -741,6 +845,16 @@ onMounted(async () => {
 .category-name {
   flex: 1;
 }
+.category-name small {
+  display: block;
+  margin-top: 1px;
+  color: #91a0b2;
+  font-size: 10px;
+  font-weight: 650;
+}
+.category-item.active .category-name small {
+  color: #4e81ba;
+}
 .category-count {
   min-width: 27px;
   padding: 3px 7px;
@@ -796,6 +910,82 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 15px;
   margin: 18px 0;
+}
+.scope-guide {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #f0d8e3;
+  border-radius: 14px;
+  background: #fff7fa;
+}
+.scope-guide.is-shared {
+  border-color: #cfe1f8;
+  background: #f2f8ff;
+}
+.scope-guide-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  color: #c52367;
+  background: #ffe4ef;
+  font-size: 18px;
+}
+.scope-guide.is-shared .scope-guide-icon {
+  color: #1762b7;
+  background: #dfeeff;
+}
+.scope-guide strong,
+.scope-guide p {
+  display: block;
+  margin: 0;
+}
+.scope-guide p {
+  margin-top: 2px;
+  color: #718198;
+  font-size: 12px;
+}
+.scope-guide > span {
+  padding: 6px 9px;
+  border-radius: 8px;
+  color: #a3265c;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+}
+.scope-guide.is-shared > span {
+  color: #1762b7;
+}
+.duplicate-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  margin-bottom: 16px;
+  padding: 13px 15px;
+  border: 1px solid #f3c879;
+  border-radius: 13px;
+  color: #714a08;
+  background: #fff9e9;
+}
+.duplicate-warning > i {
+  margin-top: 2px;
+  color: #e69a12;
+}
+.duplicate-warning strong,
+.duplicate-warning p {
+  display: block;
+  margin: 0;
+}
+.duplicate-warning p {
+  margin-top: 3px;
+  color: #806329;
+  font-size: 12px;
 }
 .attribute-search {
   flex: 1;
@@ -1071,6 +1261,13 @@ onMounted(async () => {
   .detail-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+  .scope-guide {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+  .scope-guide > span {
+    grid-column: 2;
+    justify-self: start;
   }
   .attribute-search {
     max-width: none;

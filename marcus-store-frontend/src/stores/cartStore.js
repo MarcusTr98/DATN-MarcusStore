@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import cartApi from '@/api/cartApi'
+import { trackBehavior } from '@/api/behaviorApi'
 
 // Convert dữ liệu backend trả về sang dữ liệu mà Cart.vue đang dùng
 function mapCartItem(item) {
@@ -103,6 +104,7 @@ export const useCartStore = defineStore('cart', {
 
         this.cart = res.data
         this.items = (res.data.items || []).map(mapCartItem)
+        trackBehavior('CART_ADDED').catch(() => {})
 
         return true
       } catch (error) {
@@ -133,6 +135,7 @@ export const useCartStore = defineStore('cart', {
 
         this.cart = res.data
         this.items = (res.data.items || []).map(mapCartItem)
+        trackBehavior('CART_ADDED').catch(() => {})
 
         return true
       } catch (error) {

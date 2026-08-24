@@ -28,7 +28,7 @@ public class AiAdvisorContext {
 
         @Size(max = 4)
         @Builder.Default
-        private List<@Pattern(regexp = "apple|samsung|xiaomi|oppo|vivo|realme|honor|nokia") String> brands = new ArrayList<>();
+        private List<@Pattern(regexp = "[\\p{L}\\p{N} .&+_-]{1,50}", message = "Tên hãng tư vấn không hợp lệ.") String> brands = new ArrayList<>();
 
         @DecimalMin(value = "0")
         @DecimalMax(value = "1000000000")
@@ -38,9 +38,9 @@ public class AiAdvisorContext {
         @DecimalMax(value = "1000000000")
         private BigDecimal maxBudget;
 
-        @Size(max = 4)
+        @Size(max = 6)
         @Builder.Default
-        private List<@Pattern(regexp = "CAMERA|PERFORMANCE|BATTERY|DISPLAY|BRAND") String> priorities = new ArrayList<>();
+        private List<@Pattern(regexp = "CAMERA|PERFORMANCE|BATTERY|DISPLAY|STORAGE|DURABILITY|CONNECTIVITY|EASY_TO_USE|BRAND") String> priorities = new ArrayList<>();
 
         @Size(max = 3)
         @Builder.Default

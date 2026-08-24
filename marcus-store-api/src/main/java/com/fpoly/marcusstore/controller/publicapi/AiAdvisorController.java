@@ -6,7 +6,6 @@ import com.fpoly.marcusstore.dto.ai.AiProductClickRequest;
 import com.fpoly.marcusstore.dto.ai.AiAdvisorFeedbackRequest;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.service.ai.AiAdvisorService;
-import com.fpoly.marcusstore.service.ai.AiProductClickService;
 import com.fpoly.marcusstore.service.ai.AiUsageEventService;
 import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,7 +45,6 @@ public class AiAdvisorController {
     // context/hội thoại thuộc phiên server cũ.
     private static final String SERVER_SESSION_ID = UUID.randomUUID().toString();
     private final AiAdvisorService aiAdvisorService;
-    private final AiProductClickService aiProductClickService;
     private final AiUsageEventService usageEventService;
     private final BehaviorEventService behaviorEventService;
     private final @Qualifier("geminiExecutor") Executor geminiExecutor;
@@ -119,7 +117,6 @@ public class AiAdvisorController {
     @PostMapping("/product-click")
     public ResponseEntity<ApiResponse<String>> trackProductClick(
             @Valid @RequestBody AiProductClickRequest request) {
-        aiProductClickService.track(request);
         recordProductClickUsage(request);
         recordBehavior("AI_PRODUCT_CLICK", request.getSessionId(), request.getProductId());
         return ResponseEntity.ok(ApiResponse.success("Đã ghi nhận."));

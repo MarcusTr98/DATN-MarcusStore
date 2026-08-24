@@ -18,6 +18,17 @@ public class AiAdvisorResponse {
     private String source;
     private AiAdvisorContext context;
     private AdviceSections sections;
+    private ProductComparison comparison;
+
+    public record ProductComparison(
+            List<Integer> productIds,
+            List<String> productNames,
+            List<ComparisonRow> rows,
+            Integer bestProductId) {
+    }
+
+    public record ComparisonRow(String label, List<String> values) {
+    }
 
     @Data
     @Builder
@@ -40,6 +51,8 @@ public class AiAdvisorResponse {
         private BigDecimal price;
         private BigDecimal maxPrice;
         private boolean inStock;
+        private Integer compatibilityScore;
+        private List<String> matchReasons;
         private List<SkuSuggestion> skuOptions;
         private Integer matchedSkuId;
     }

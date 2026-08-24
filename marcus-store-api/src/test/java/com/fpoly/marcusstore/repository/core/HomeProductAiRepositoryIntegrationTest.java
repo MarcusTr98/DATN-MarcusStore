@@ -30,4 +30,12 @@ class HomeProductAiRepositoryIntegrationTest {
         assertTrue(repository.findFocusedProductForAiAdvisor(productId).isPresent());
         assertDoesNotThrow(() -> repository.findAvailableSkusForAiAdvisor(List.of(productId)));
     }
+
+    @Test
+    void aiCatalogLexiconReadsAvailablePhoneBrandsAndModels() {
+        var lexicon = assertDoesNotThrow(repository::findAvailablePhoneLexiconForAiAdvisor);
+        assertTrue(lexicon.stream().allMatch(row ->
+                row.getProductName() != null && !row.getProductName().isBlank()
+                        && row.getBrand() != null && !row.getBrand().isBlank()));
+    }
 }

@@ -7,6 +7,7 @@ import com.fpoly.marcusstore.dto.ai.AiAdvisorResponse;
 import com.fpoly.marcusstore.dto.ai.AiAdvisorContext;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiProductProjection;
+import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiCatalogLexiconProjection;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiProductSpecProjection;
 import com.fpoly.marcusstore.repository.core.HomeProductRepository.AiSkuProjection;
 import com.fpoly.marcusstore.service.SystemSettingService;
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.text.Normalizer;
 import java.util.stream.Collectors;
 
 @Service
@@ -69,6 +71,8 @@ public class AiAdvisorService {
     private final AiAdvisorIntentRouter intentRouter;
     private final AiStoreKnowledgeService storeKnowledgeService;
     private final GeminiClient geminiClient;
+    private final AdvisorProductScorer productScorer;
+    private final ProductComparisonBuilder comparisonBuilder;
 
     @Autowired
     public AiAdvisorService(HomeProductRepository homeProductRepository,
@@ -81,6 +85,8 @@ public class AiAdvisorService {
         this.intentRouter = intentRouter;
         this.storeKnowledgeService = storeKnowledgeService;
         this.geminiClient = geminiClient;
+        this.productScorer = new AdvisorProductScorer();
+        this.comparisonBuilder = new ProductComparisonBuilder();
     }
 
     // Marcus thêm: constructor hẹp phục vụ regression test, không gọi mạng.
@@ -115,8 +121,16 @@ public class AiAdvisorService {
             return brandAnswer;
         }
 
-        AiAdvisorContext advisorContext = mergeAdvisorContext(request);
-        ProductSearchCriteria criteria = criteriaFromContext(request.getMessage(), advisorContext);
+        List<AiCatalogLexiconProjection> catalogLexicon = homeProductRepository.findAvailablePhoneLexiconForAiAdvisor();
+        AiAdvisorContext advisorContext = mergeAdvisorContext(request, catalogLexicon);
+        if (shouldAskUsageQuestion(request, intent, advisorContext, catalogLexicon)) {
+            return attachContext(usageClarification(), advisorContext);
+        }
+        if (isPriceInquiry(request.getMessage(), catalogLexicon)) {
+            intent = AiAdvisorIntent.PRICE_LOOKUP;
+        }
+        ProductSearchCriteria criteria = criteriaFromContext(
+                request.getMessage(), advisorContext, catalogLexicon);
         boolean useFocusedProduct = shouldUseFocusedProduct(
                 request.getMessage(), intent, advisorContext.getFocusedProductId());
         List<AiProductProjection> products = useFocusedProduct
@@ -142,7 +156,10 @@ public class AiAdvisorService {
 
         // Marcus thêm: hết quota/mất key vẫn tư vấn được bằng dữ liệu catalog thật.
         if (geminiClient == null || !geminiClient.isConfigured()) {
-            return attachContext(deterministicFallback(products, criteria), advisorContext);
+            AiAdvisorResponse fallback = deterministicFallback(products, criteria);
+            enrichCompatibility(fallback, products, productSpecs, advisorContext);
+            enrichComparison(fallback, request.getMessage(), productSpecs);
+            return attachContext(fallback, advisorContext);
         }
 
         try {
@@ -150,12 +167,54 @@ public class AiAdvisorService {
                     systemInstructions(), input, advisorResponseSchema(), 1_000);
 
             AiAdvisorResponse result = buildAdvisorResponse(response, products, productSpecs, advisorContext);
+            enrichCompatibility(result, products, productSpecs, advisorContext);
+            enrichComparison(result, request.getMessage(), productSpecs);
             result.setSource("GEMINI");
             result.setFallbackUsed(false);
             return attachContext(result, advisorContext);
         } catch (GeminiClient.GeminiClientException exception) {
-            return attachContext(deterministicFallback(products, criteria), advisorContext);
+            AiAdvisorResponse fallback = deterministicFallback(products, criteria);
+            enrichCompatibility(fallback, products, productSpecs, advisorContext);
+            enrichComparison(fallback, request.getMessage(), productSpecs);
+            return attachContext(fallback, advisorContext);
         }
+    }
+
+    private void enrichComparison(
+            AiAdvisorResponse response,
+            String message,
+            Map<Integer, String> productSpecs) {
+        if (!isComparisonRequest(message) || response.getProducts() == null || response.getProducts().size() < 2) {
+            return;
+        }
+        response.setComparison(comparisonBuilder.build(response.getProducts(), productSpecs));
+    }
+
+    private boolean isComparisonRequest(String message) {
+        if (message == null)
+            return false;
+        String normalized = normalizeLookup(message);
+        return normalized.matches(".*(so sanh|doi chieu|khac nhau|nen chon .* hay ).*");
+    }
+
+    private void enrichCompatibility(
+            AiAdvisorResponse response,
+            List<AiProductProjection> rankedProducts,
+            Map<Integer, String> productSpecs,
+            AiAdvisorContext context) {
+        if (response.getProducts() == null)
+            return;
+        Map<Integer, AiProductProjection> productsById = rankedProducts.stream()
+                .collect(Collectors.toMap(AiProductProjection::getProductId, product -> product));
+        response.getProducts().forEach(suggestion -> {
+            AiProductProjection product = productsById.get(suggestion.getProductId());
+            if (product == null)
+                return;
+            AdvisorProductScorer.ScoreResult result = productScorer.score(
+                    product, productSpecs.get(product.getProductId()), context);
+            suggestion.setCompatibilityScore(result.score());
+            suggestion.setMatchReasons(result.reasons());
+        });
     }
 
     private AiAdvisorResponse attachContext(AiAdvisorResponse response, AiAdvisorContext context) {
@@ -202,7 +261,8 @@ public class AiAdvisorService {
 
     // Marcus thêm: hợp nhất điều kiện hiện tại vào context cũ theo từng trường;
     // câu rút gọn chỉ đổi ngân sách sẽ không làm mất Android/camera/hãng.
-    private AiAdvisorContext mergeAdvisorContext(AiAdvisorRequest request) {
+    private AiAdvisorContext mergeAdvisorContext(
+            AiAdvisorRequest request, List<AiCatalogLexiconProjection> catalogLexicon) {
         AiAdvisorContext previous = request.getContext();
         AiAdvisorContext context = AiAdvisorContext.builder()
                 .category(previous == null ? null : previous.getCategory())
@@ -240,7 +300,7 @@ public class AiAdvisorService {
         if (context.getPlatform() == null)
             context.setPlatform("ANY");
 
-        List<String> explicitBrands = extractBrands(message);
+        List<String> explicitBrands = extractBrands(message, catalogLexicon);
         if (!explicitBrands.isEmpty()) {
             boolean switchedBrand = previous != null && previous.getBrands() != null
                     && !previous.getBrands().isEmpty()
@@ -289,8 +349,8 @@ public class AiAdvisorService {
         }
         // Marcus sửa: hỏi giá model/hãng cụ thể phải tra giá thực, không để ngân
         // sách của lượt trước loại mất sản phẩm đang được hỏi.
-        if (isPriceInquiry(message) && !hasBudgetInCurrentMessage
-                && (!explicitBrands.isEmpty() || !extractSearchKeywords(message).isEmpty())) {
+        if (isPriceInquiry(message, catalogLexicon) && !hasBudgetInCurrentMessage
+                && (!explicitBrands.isEmpty() || !extractSearchKeywords(message, catalogLexicon).isEmpty())) {
             context.setMinBudget(null);
             context.setMaxBudget(null);
         }
@@ -303,8 +363,61 @@ public class AiAdvisorService {
             priorities.add("BATTERY");
         if (message.matches(".*(màn hình|oled|amoled|ltpo|tần số quét).*"))
             priorities.add("DISPLAY");
-        context.setPriorities(priorities.stream().limit(4).toList());
+        if (message.matches(".*(bộ nhớ|dung lượng|ổ cứng|ssd|lưu trữ).*"))
+            priorities.add("STORAGE");
+        if (message.matches(".*(bền|chống nước|chống bụi|va đập).*"))
+            priorities.add("DURABILITY");
+        if (message.matches(".*(kết nối|wifi|bluetooth|5g|cổng kết nối|thunderbolt).*"))
+            priorities.add("CONNECTIVITY");
+        if (message.matches(".*(bố mẹ|cha mẹ|người lớn tuổi|dễ dùng|cơ bản|nghe gọi).*"))
+            priorities.add("EASY_TO_USE");
+        context.setPriorities(priorities.stream().limit(6).toList());
         return context;
+    }
+
+    private boolean shouldAskUsageQuestion(
+            AiAdvisorRequest request, AiAdvisorIntent intent, AiAdvisorContext context,
+            List<AiCatalogLexiconProjection> catalogLexicon) {
+        if (intent != AiAdvisorIntent.PRODUCT_ADVICE
+                || !"PHONE".equals(context.getCategory())
+                || context.getFocusedProductId() != null
+                || (context.getPriorities() != null && !context.getPriorities().isEmpty())) {
+            return false;
+        }
+        String message = request.getMessage().toLowerCase(Locale.forLanguageTag("vi-VN"));
+        Set<String> mentionedBrands = extractBrands(message, catalogLexicon).stream()
+                .map(brand -> brand.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        boolean exactModel = extractSearchKeywords(message, catalogLexicon).stream()
+                .map(keyword -> keyword.toLowerCase(Locale.ROOT))
+                .anyMatch(keyword -> !PHONE_BRANDS.contains(keyword)
+                        && !mentionedBrands.contains(keyword));
+        return !exactModel && !hasExplicitUsageNeed(message);
+    }
+
+    private boolean hasExplicitUsageNeed(String message) {
+        return message.matches(".*(chơi game|gaming|chụp ảnh|quay phim|quay video|công việc|làm việc|"
+                + "học tập|học online|mạng xã hội|facebook|tiktok|youtube|xem phim|bố mẹ|cha mẹ|"
+                + "người lớn tuổi|nghe gọi|dùng cơ bản).*");
+    }
+
+    private AiAdvisorResponse usageClarification() {
+        String question = "Bạn dự định dùng điện thoại chủ yếu để chơi game, chụp ảnh/quay video, "
+                + "học tập–công việc, mạng xã hội hay nhu cầu cơ bản cho bố mẹ?";
+        return AiAdvisorResponse.builder()
+                .answer("**Nhu cầu:** Mình cần biết mục đích sử dụng chính để không gợi ý sai máy.\n"
+                        + "*Hỏi thêm:* " + question)
+                .products(List.of())
+                .fallbackUsed(false)
+                .source("CLARIFICATION")
+                .sections(AiAdvisorResponse.AdviceSections.builder()
+                        .needSummary("Chưa xác định mục đích sử dụng chính.")
+                        .suggestions(List.of())
+                        .considerations(List.of("Chưa truy vấn catalog để tránh đưa ra lựa chọn quá chung chung."))
+                        .bestReason("Trả lời một nhu cầu chính, Marcus AI sẽ tư vấn nhanh theo thông số phù hợp.")
+                        .followUpQuestion(question)
+                        .build())
+                .build();
     }
 
     private boolean shouldUseFocusedProduct(
@@ -317,9 +430,11 @@ public class AiAdvisorService {
                 (intent == AiAdvisorIntent.PRICE_LOOKUP && genericReference);
     }
 
-    private ProductSearchCriteria criteriaFromContext(String rawMessage, AiAdvisorContext context) {
+    private ProductSearchCriteria criteriaFromContext(
+            String rawMessage, AiAdvisorContext context,
+            List<AiCatalogLexiconProjection> catalogLexicon) {
         String message = rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
-        List<String> modelKeywords = extractSearchKeywords(message).stream()
+        List<String> modelKeywords = extractSearchKeywords(message, catalogLexicon).stream()
                 .filter(keyword -> !PHONE_BRANDS.contains(keyword))
                 .toList();
         List<String> keywords;
@@ -344,13 +459,35 @@ public class AiAdvisorService {
                 !context.getBrands().isEmpty() || !"ANY".equals(context.getPlatform()));
     }
 
-    private List<String> extractBrands(String message) {
+    private List<String> extractBrands(
+            String message, List<AiCatalogLexiconProjection> catalogLexicon) {
         LinkedHashSet<String> brands = new LinkedHashSet<>();
         if (message.contains("iphone") || message.contains("apple") || message.contains("ios"))
             brands.add("apple");
         for (String brand : List.of("samsung", "xiaomi", "oppo", "vivo", "realme", "honor", "nokia")) {
             if (message.contains(brand))
                 brands.add(brand);
+        }
+        String normalizedMessage = normalizeLookup(message);
+        if (catalogLexicon != null) {
+            catalogLexicon.stream()
+                    .filter(row -> {
+                        String brand = normalizeLookup(row.getBrand());
+                        String product = normalizeLookup(row.getProductName());
+                        String model = !brand.isBlank() && product.startsWith(brand + " ")
+                                ? product.substring(brand.length()).trim()
+                                : product;
+                        return containsLookupTerm(normalizedMessage, brand)
+                                || containsLookupTerm(normalizedMessage, product)
+                                || (model.length() >= 3 && containsLookupTerm(normalizedMessage, model));
+                    })
+                    .map(AiCatalogLexiconProjection::getBrand)
+                    .filter(java.util.Objects::nonNull)
+                    .map(String::trim)
+                    .filter(brand -> !brand.isEmpty())
+                    .map(brand -> brand.toLowerCase(Locale.ROOT))
+                    .limit(4)
+                    .forEach(brands::add);
         }
         return brands.stream().limit(4).toList();
     }
@@ -389,6 +526,20 @@ public class AiAdvisorService {
                 ".*(iphone|ipad|airpods|galaxy|redmi|samsung|xiaomi|oppo|vivo|realme|honor|nokia|"
                         + "điện thoại|smartphone|phụ kiện|sản phẩm|model|mẫu|máy|con này|cái này).*");
         return containsPriceQuestion && containsProductReference;
+    }
+
+    private boolean isPriceInquiry(
+            String rawMessage, List<AiCatalogLexiconProjection> catalogLexicon) {
+        if (isPriceInquiry(rawMessage)) {
+            return true;
+        }
+        String message = rawMessage == null ? ""
+                : rawMessage.toLowerCase(Locale.forLanguageTag("vi-VN"));
+        boolean containsPriceQuestion = message.matches(
+                ".*(giá|bao nhiêu tiền|bao nhiêu|tầm giá|khoảng giá).*");
+        return containsPriceQuestion
+                && (!extractBrands(message, catalogLexicon).isEmpty()
+                        || !extractSearchKeywords(message, catalogLexicon).isEmpty());
     }
 
     private AiAdvisorResponse catalogPriceAnswer(List<AiProductProjection> products, String rawMessage) {
@@ -731,8 +882,8 @@ public class AiAdvisorService {
             AiAdvisorContext context) {
         return products.stream()
                 .sorted(java.util.Comparator
-                        .comparingInt((AiProductProjection product) -> evidenceScore(
-                                productSpecs.get(product.getProductId()), context.getPriorities()))
+                        .comparingInt((AiProductProjection product) -> productScorer.score(
+                                product, productSpecs.get(product.getProductId()), context).score())
                         .reversed()
                         .thenComparing(product -> product.getPrice() == null
                                 ? BigDecimal.valueOf(Long.MAX_VALUE)
@@ -889,6 +1040,49 @@ public class AiAdvisorService {
                 .limit(4)
                 .forEach(keywords::add);
         return List.copyOf(keywords);
+    }
+
+    private List<String> extractSearchKeywords(
+            String message, List<AiCatalogLexiconProjection> catalogLexicon) {
+        LinkedHashSet<String> keywords = new LinkedHashSet<>();
+        String normalizedMessage = normalizeLookup(message);
+        if (catalogLexicon != null) {
+            catalogLexicon.stream()
+                    .filter(row -> row.getProductName() != null && !row.getProductName().isBlank())
+                    .sorted(java.util.Comparator.comparingInt(
+                            (AiCatalogLexiconProjection row) -> row.getProductName().length()).reversed())
+                    .filter(row -> {
+                        String product = normalizeLookup(row.getProductName());
+                        String brand = normalizeLookup(row.getBrand());
+                        String model = !brand.isBlank() && product.startsWith(brand + " ")
+                                ? product.substring(brand.length()).trim()
+                                : product;
+                        return containsLookupTerm(normalizedMessage, product)
+                                || (model.length() >= 3 && containsLookupTerm(normalizedMessage, model));
+                    })
+                    .limit(3)
+                    .map(AiCatalogLexiconProjection::getProductName)
+                    .forEach(keywords::add);
+        }
+        extractSearchKeywords(message).forEach(keywords::add);
+        extractBrands(message, catalogLexicon).forEach(keywords::add);
+        return keywords.stream().limit(4).toList();
+    }
+
+    private String normalizeLookup(String value) {
+        if (value == null)
+            return "";
+        String withoutMarks = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        return withoutMarks.toLowerCase(Locale.ROOT)
+                .replaceAll("[^\\p{L}\\p{N}+&]+", " ")
+                .trim().replaceAll("\\s+", " ");
+    }
+
+    private boolean containsLookupTerm(String normalizedMessage, String normalizedTerm) {
+        if (normalizedTerm == null || normalizedTerm.isBlank())
+            return false;
+        return (" " + normalizedMessage + " ").contains(" " + normalizedTerm + " ");
     }
 
     private AiAdvisorResponse buildAdvisorResponse(

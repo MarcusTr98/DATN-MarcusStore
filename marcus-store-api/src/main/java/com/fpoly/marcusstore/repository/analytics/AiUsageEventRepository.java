@@ -85,6 +85,7 @@ public class AiUsageEventRepository {
                     COUNT_BIG(response_event.reached_at),
                     COUNT_BIG(helpful_event.reached_at),
                     COUNT_BIG(click_event.reached_at),
+                    COUNT_BIG(cart_event.reached_at),
                     COUNT_BIG(checkout_event.reached_at),
                     COUNT_BIG(order_event.reached_at),
                     COUNT_BIG(payment_event.reached_at)
@@ -108,9 +109,15 @@ public class AiUsageEventRepository {
                 ) click_event
                 OUTER APPLY (
                     SELECT TOP 1 e.created_at AS reached_at FROM Customer_Behavior_Events e
-                        WHERE e.session_id = j.session_id AND e.event_type = 'CHECKOUT_STARTED'
+                        WHERE e.session_id = j.session_id AND e.event_type = 'CART_ADDED'
                           AND click_event.reached_at IS NOT NULL
                           AND e.created_at >= click_event.reached_at AND e.created_at < ?
+                ) cart_event
+                OUTER APPLY (
+                    SELECT TOP 1 e.created_at AS reached_at FROM Customer_Behavior_Events e
+                        WHERE e.session_id = j.session_id AND e.event_type = 'CHECKOUT_STARTED'
+                          AND cart_event.reached_at IS NOT NULL
+                          AND e.created_at >= cart_event.reached_at AND e.created_at < ?
                 ) checkout_event
                 OUTER APPLY (
                     SELECT TOP 1 e.created_at AS reached_at FROM Customer_Behavior_Events e
@@ -126,8 +133,8 @@ public class AiUsageEventRepository {
                 ) payment_event
                 """, (rs, rowNum) -> new AiSalesFunnelRow(
                 rs.getLong(1), rs.getLong(2), rs.getLong(3), rs.getLong(4),
-                rs.getLong(5), rs.getLong(6), rs.getLong(7)),
-                fromDate, toDate, toDate, toDate, toDate, toDate, toDate, toDate);
+                rs.getLong(5), rs.getLong(6), rs.getLong(7), rs.getLong(8)),
+                fromDate, toDate, toDate, toDate, toDate, toDate, toDate, toDate, toDate);
     }
 
     public record AiUsageSummaryRow(
@@ -144,6 +151,7 @@ public class AiUsageEventRepository {
             long responses,
             long helpful,
             long clicks,
+            long carts,
             long checkouts,
             long orders,
             long paid) {

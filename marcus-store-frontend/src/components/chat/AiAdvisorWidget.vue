@@ -128,6 +128,16 @@
                     <!-- Marcus sửa: hiển thị khoảng giá SKU còn hàng, tránh hiểu
                     nhầm giá thấp nhất là giá của mọi phiên bản. -->
                     <span class="product-price">{{ formatProductPrice(product) }}</span>
+                    <span v-if="product.compatibilityScore != null" class="match-score">
+                      Phù hợp {{ product.compatibilityScore }}%
+                    </span>
+                    <span
+                      v-if="product.matchReasons?.length"
+                      class="match-reason"
+                      :title="product.matchReasons.join(' · ')"
+                    >
+                      {{ product.matchReasons.join(' · ') }}
+                    </span>
                     <small :class="{ 'out-of-stock': !product.inStock }">
                       {{ product.inStock ? 'Còn hàng' : 'Tạm hết hàng' }}
                     </small>
@@ -137,6 +147,24 @@
                   </div>
                   <i class="fas fa-chevron-right"></i>
                 </router-link>
+              </div>
+              <div v-if="message.comparison?.rows?.length" class="comparison-table-wrap">
+                <table class="comparison-table">
+                  <thead>
+                    <tr>
+                      <th>Tiêu chí</th>
+                      <th v-for="(name, index) in message.comparison.productNames" :key="index">
+                        {{ name }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in message.comparison.rows" :key="row.label">
+                      <th>{{ row.label }}</th>
+                      <td v-for="(value, index) in row.values" :key="index">{{ value }}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
               <div
                 v-if="message.role === 'assistant' && message.adviceId && !message.isError"
@@ -255,6 +283,7 @@ const persistConversation = () => {
       isError: Boolean(message.isError),
       feedback: message.feedback,
       sections: message.sections,
+      comparison: message.comparison,
     }))
     sessionStorage.setItem(
       AI_HISTORY_STORAGE_KEY,
@@ -318,6 +347,10 @@ const contextChips = computed(() => {
     PERFORMANCE: 'Hiệu năng',
     BATTERY: 'Pin/sạc',
     DISPLAY: 'Màn hình',
+    STORAGE: 'Lưu trữ',
+    DURABILITY: 'Độ bền',
+    CONNECTIVITY: 'Kết nối',
+    EASY_TO_USE: 'Dễ sử dụng',
     BRAND: 'Thương hiệu',
   }
   const priorities = context.priorities || []
@@ -476,6 +509,7 @@ const sendMessage = async () => {
         assistantMessage.content =
           data?.answer || assistantMessage.content || 'Mình chưa tìm được câu trả lời phù hợp.'
         assistantMessage.products = data?.products ?? []
+        assistantMessage.comparison = data?.comparison ?? null
         assistantMessage.adviceId = data?.adviceId
         assistantMessage.fallbackUsed = Boolean(data?.fallbackUsed)
         assistantMessage.sections = data?.sections || null
@@ -895,6 +929,36 @@ onBeforeUnmount(() => {
   margin-top: 9px;
 }
 
+.comparison-table-wrap {
+  overflow-x: auto;
+  margin-top: 9px;
+  border: 1px solid #e6dcff;
+  border-radius: 10px;
+}
+
+.comparison-table {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 9px;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 6px;
+  border-right: 1px solid #f0ebff;
+  border-bottom: 1px solid #f0ebff;
+  text-align: left;
+  vertical-align: top;
+}
+
+.comparison-table thead th,
+.comparison-table tbody th {
+  color: #5b21b6;
+  font-weight: 700;
+}
+
 .ai-feedback {
   display: flex;
   flex-wrap: wrap;
@@ -968,6 +1032,26 @@ onBeforeUnmount(() => {
   color: #dc2626;
   font-size: 11px;
   font-weight: 700;
+}
+
+.ai-product .match-score {
+  width: fit-content;
+  margin-top: 2px;
+  border-radius: 999px;
+  padding: 1px 5px;
+  background: #ede9fe;
+  color: #6d28d9;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.ai-product .match-reason {
+  overflow: hidden;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ai-product small {

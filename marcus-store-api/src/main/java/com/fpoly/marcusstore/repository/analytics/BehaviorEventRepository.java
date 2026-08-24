@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Repository
 @RequiredArgsConstructor
@@ -61,4 +62,17 @@ public class BehaviorEventRepository {
                         rs.getLong(4), rs.getLong(5), rs.getLong(6)
                 }, from, to);
     }
+
+    public List<TopAiProductClick> findTopAiProductClicks() {
+        return jdbcTemplate.query("""
+                SELECT TOP 10 e.product_id, p.product_name, COUNT_BIG(*)
+                FROM Customer_Behavior_Events e
+                INNER JOIN Products p ON p.product_id = e.product_id
+                WHERE e.event_type = 'AI_PRODUCT_CLICK' AND e.product_id IS NOT NULL
+                GROUP BY e.product_id, p.product_name
+                ORDER BY COUNT_BIG(*) DESC
+                """, (rs, row) -> new TopAiProductClick(rs.getInt(1), rs.getString(2), rs.getLong(3)));
+    }
+
+    public record TopAiProductClick(Integer productId, String productName, Long clickCount) {}
 }

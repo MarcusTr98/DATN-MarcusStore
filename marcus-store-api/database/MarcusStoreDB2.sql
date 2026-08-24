@@ -847,21 +847,6 @@ CREATE TABLE Product_Spec_Values (
     CONSTRAINT UQ_ProductSpec UNIQUE (product_id, spec_attribute_id)
 );
 
--- Marcus thêm AI 2707
-    CREATE TABLE AI_Product_Clicks (
-        click_id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-        product_id INT NOT NULL,
-        session_id VARCHAR(36) NOT NULL,
-        clicked_at DATETIME2 NOT NULL CONSTRAINT DF_AI_Product_Clicks_ClickedAt DEFAULT SYSDATETIME(),
-        CONSTRAINT FK_AI_Product_Clicks_Product FOREIGN KEY (product_id) REFERENCES dbo.Products(product_id)
-    );
-
-    CREATE INDEX IX_AI_Product_Clicks_Product_ClickedAt
-        ON dbo.AI_Product_Clicks(product_id, clicked_at DESC);
-
-    CREATE INDEX IX_AI_Product_Clicks_Session
-        ON dbo.AI_Product_Clicks(session_id, product_id, clicked_at DESC);
-
 -- Marcus thêm: lưu bản phân tích AI để lần sau mở lại không tốn quota Gemini.
 CREATE TABLE AI_Analytics_Reports (
     report_id BIGINT IDENTITY(1,1) NOT NULL
@@ -933,12 +918,27 @@ CREATE TABLE Customer_Behavior_Events (
     order_id INT NULL,
     created_at DATETIME2 NOT NULL DEFAULT SYSDATETIME(),
     CONSTRAINT CK_CustomerBehaviorEvents_Type CHECK (
-        event_type IN ('PRODUCT_VIEW','CHECKOUT_STARTED','ORDER_CREATED','PAYMENT_SUCCESS','AI_QUESTION','AI_PRODUCT_CLICK')
+        event_type IN ('PRODUCT_VIEW','CART_ADDED','CHECKOUT_STARTED','ORDER_CREATED','PAYMENT_SUCCESS','AI_QUESTION','AI_PRODUCT_CLICK')
     )
 );
 CREATE INDEX IX_CustomerBehaviorEvents_CreatedType ON Customer_Behavior_Events(created_at DESC, event_type);
 CREATE INDEX IX_CustomerBehaviorEvents_Session ON Customer_Behavior_Events(session_id, created_at DESC) WHERE session_id IS NOT NULL;
 CREATE INDEX IX_CustomerBehaviorEvents_Order ON Customer_Behavior_Events(order_id, created_at DESC) WHERE order_id IS NOT NULL;
+
+-- Workflow human-in-the-loop cho đề xuất từ AI Analytics.
+CREATE TABLE Analytics_Actions (
+    action_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    title NVARCHAR(180) NOT NULL,
+    reason NVARCHAR(300) NOT NULL,
+    priority VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL CONSTRAINT DF_AnalyticsActions_Status DEFAULT 'ACCEPTED',
+    owner_username VARCHAR(100) NOT NULL,
+    created_at DATETIME2 NOT NULL CONSTRAINT DF_AnalyticsActions_Created DEFAULT SYSDATETIME(),
+    updated_at DATETIME2 NOT NULL CONSTRAINT DF_AnalyticsActions_Updated DEFAULT SYSDATETIME(),
+    CONSTRAINT CK_AnalyticsActions_Priority CHECK (priority IN ('HIGH','MEDIUM','LOW')),
+    CONSTRAINT CK_AnalyticsActions_Status CHECK (status IN ('ACCEPTED','IN_PROGRESS','DONE','REJECTED'))
+);
+CREATE INDEX IX_AnalyticsActions_StatusUpdated ON Analytics_Actions(status, updated_at DESC);
 
 -- Đạt/Marcus đồng bộ 14/08/2026: yêu cầu đổi trả, bảo hành và tệp minh chứng.
 -- Hai bảng này là bảng nghiệp vụ chính thức; bảng kỹ thuật dọn dữ liệu cũ
@@ -1024,9 +1024,10 @@ IF OBJECT_ID('dbo.Orders', 'U') IS NULL
     OR OBJECT_ID('dbo.Order_Transactions', 'U') IS NULL
     OR OBJECT_ID('dbo.Refund_Requests', 'U') IS NULL
     OR OBJECT_ID('dbo.User_Notifications', 'U') IS NULL
-    OR OBJECT_ID('dbo.AI_Product_Clicks', 'U') IS NULL
     OR OBJECT_ID('dbo.AI_Analytics_Reports', 'U') IS NULL
     OR OBJECT_ID('dbo.AI_Usage_Events', 'U') IS NULL
+    OR OBJECT_ID('dbo.Customer_Behavior_Events', 'U') IS NULL
+    OR OBJECT_ID('dbo.Analytics_Actions', 'U') IS NULL
     OR OBJECT_ID('dbo.Warranty_Returns', 'U') IS NULL
     OR OBJECT_ID('dbo.Warranty_Attachments', 'U') IS NULL
 BEGIN

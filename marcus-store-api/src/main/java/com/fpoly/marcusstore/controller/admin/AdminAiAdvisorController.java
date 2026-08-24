@@ -3,8 +3,8 @@ package com.fpoly.marcusstore.controller.admin;
 import com.fpoly.marcusstore.dto.response.ApiResponse;
 import com.fpoly.marcusstore.dto.ai.AiUsageSummaryResponse;
 import com.fpoly.marcusstore.dto.ai.AiSalesFunnelResponse;
-import com.fpoly.marcusstore.repository.analytics.AiProductClickRepository.AiProductClickStatProjection;
-import com.fpoly.marcusstore.service.ai.AiProductClickService;
+import com.fpoly.marcusstore.repository.analytics.BehaviorEventRepository.TopAiProductClick;
+import com.fpoly.marcusstore.service.analytics.BehaviorEventService;
 import com.fpoly.marcusstore.service.ai.AiUsageEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -23,12 +23,12 @@ import java.util.List;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminAiAdvisorController {
 
-    private final AiProductClickService clickService;
+    private final BehaviorEventService behaviorEventService;
     private final AiUsageEventService usageEventService;
 
     @GetMapping("/top-clicked-products")
-    public ApiResponse<List<AiProductClickStatProjection>> topClickedProducts() {
-        return ApiResponse.success(clickService.topProducts());
+    public ApiResponse<List<TopAiProductClick>> topClickedProducts() {
+        return ApiResponse.success(behaviorEventService.topAiProductClicks());
     }
 
     @GetMapping("/usage-summary")
