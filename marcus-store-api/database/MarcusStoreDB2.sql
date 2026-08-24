@@ -925,6 +925,21 @@ CREATE INDEX IX_CustomerBehaviorEvents_CreatedType ON Customer_Behavior_Events(c
 CREATE INDEX IX_CustomerBehaviorEvents_Session ON Customer_Behavior_Events(session_id, created_at DESC) WHERE session_id IS NOT NULL;
 CREATE INDEX IX_CustomerBehaviorEvents_Order ON Customer_Behavior_Events(order_id, created_at DESC) WHERE order_id IS NOT NULL;
 
+-- Workflow human-in-the-loop cho đề xuất từ AI Analytics.
+CREATE TABLE Analytics_Actions (
+    action_id BIGINT IDENTITY(1,1) PRIMARY KEY,
+    title NVARCHAR(180) NOT NULL,
+    reason NVARCHAR(300) NOT NULL,
+    priority VARCHAR(20) NOT NULL,
+    status VARCHAR(20) NOT NULL CONSTRAINT DF_AnalyticsActions_Status DEFAULT 'ACCEPTED',
+    owner_username VARCHAR(100) NOT NULL,
+    created_at DATETIME2 NOT NULL CONSTRAINT DF_AnalyticsActions_Created DEFAULT SYSDATETIME(),
+    updated_at DATETIME2 NOT NULL CONSTRAINT DF_AnalyticsActions_Updated DEFAULT SYSDATETIME(),
+    CONSTRAINT CK_AnalyticsActions_Priority CHECK (priority IN ('HIGH','MEDIUM','LOW')),
+    CONSTRAINT CK_AnalyticsActions_Status CHECK (status IN ('ACCEPTED','IN_PROGRESS','DONE','REJECTED'))
+);
+CREATE INDEX IX_AnalyticsActions_StatusUpdated ON Analytics_Actions(status, updated_at DESC);
+
 -- Đạt/Marcus đồng bộ 14/08/2026: yêu cầu đổi trả, bảo hành và tệp minh chứng.
 -- Hai bảng này là bảng nghiệp vụ chính thức; bảng kỹ thuật dọn dữ liệu cũ
 -- không được tạo lại trong schema chuẩn 52 bảng.
@@ -1011,6 +1026,8 @@ IF OBJECT_ID('dbo.Orders', 'U') IS NULL
     OR OBJECT_ID('dbo.User_Notifications', 'U') IS NULL
     OR OBJECT_ID('dbo.AI_Analytics_Reports', 'U') IS NULL
     OR OBJECT_ID('dbo.AI_Usage_Events', 'U') IS NULL
+    OR OBJECT_ID('dbo.Customer_Behavior_Events', 'U') IS NULL
+    OR OBJECT_ID('dbo.Analytics_Actions', 'U') IS NULL
     OR OBJECT_ID('dbo.Warranty_Returns', 'U') IS NULL
     OR OBJECT_ID('dbo.Warranty_Attachments', 'U') IS NULL
 BEGIN
