@@ -76,6 +76,8 @@
               v-for="(row, idx) in tableRows"
               v-else
               :key="row.id ?? row.orderCode ?? row.skuCode ?? row.email"
+              :style="['recentOrders','pendingOrders'].includes(currentTab) ? 'cursor:pointer' : ''"
+              @click="['recentOrders','pendingOrders'].includes(currentTab) ? goToOrder(row) : null"
             >
               <td class="text-center stt-cell">{{ (currentPage - 1) * pageSize + idx + 1 }}</td>
               <td v-for="col in activeColumns" :key="col.key" :class="alignClass(col.align)">
@@ -114,14 +116,18 @@
             <option :value="50">50 / trang</option>
           </select>
         </div>
-      </template>
+      
+</template>
     </div>
   </section>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import statisticsApi from '@/api/statisticsApi'
+
+const router = useRouter()
 
 const props = defineProps({
   selectedTime:    { type: String, default: 'today' },
@@ -187,7 +193,8 @@ const pageSize      = ref(10)
 const totalElements = ref(0)
 const totalPages    = ref(1)
 
-const filters = reactive({ search: '', status: '', brand: '' })
+const filters   = reactive({ search: '', status: '', brand: '' })
+
 
 const visiblePages = computed(() => {
   const pages = []
@@ -345,6 +352,12 @@ function formatCurrency(value) {
   }).format(value || 0)
 }
 
+function goToOrder(row) {
+  if (!row.orderCode) return
+  // Navigate thẳng sang trang chi tiết đơn hàng
+  router.push(`/admin/order/${row.orderCode}`)
+}
+
 defineExpose({
   fetchTableData,
   switchToLowStock()      { switchTab('lowStock')      },
@@ -439,4 +452,6 @@ fetchPendingCount()
   .table-wrap   { overflow-x: auto; }
   .pagination-bar { flex-direction: column; align-items: flex-start; }
 }
+
+
 </style>
