@@ -168,8 +168,8 @@ public class AuthRegisterService {
             voucher.setStartDate(LocalDateTime.now());
             voucher.setEndDate(LocalDateTime.now().plusYears(1));
             voucher.setQuantity(1);
-            voucher.setIsActive(true);
-            voucher.setTargetType("PERSONAL");
+            voucher.setStatus(Voucher.STATUS_ACTIVE);
+            voucher.setTargetType("SPECIFIC");
 
             voucher = voucherRepository.save(voucher);
 

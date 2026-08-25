@@ -19,6 +19,10 @@ import java.time.LocalDateTime;
 @Builder
 public class Voucher {
 
+    public static final String STATUS_ACTIVE = "ACTIVE";
+    public static final String STATUS_INACTIVE = "INACTIVE";
+    public static final String STATUS_SCHEDULED = "SCHEDULED";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "voucher_id")
@@ -48,9 +52,9 @@ public class Voucher {
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
 
-    @Column(name = "is_active")
-    private Boolean isActive = true;
-
+    // Trạng thái: ACTIVE = đang sử dụng, INACTIVE = ngừng sử dụng, SCHEDULED = đã lên lịch (chưa đến ngày)
+    @Column(name = "status", length = 20)
+    private String status = STATUS_ACTIVE;
 
     // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     @Column(name = "target_type", length = 20)

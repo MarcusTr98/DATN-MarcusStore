@@ -38,7 +38,7 @@ public interface UserVoucherRepository extends JpaRepository<UserVoucher, Intege
        @Query("SELECT uv FROM UserVoucher uv JOIN FETCH uv.voucher v " +
                      "WHERE uv.user.userId = :userId " +
                      "AND uv.isUsed = false " +
-                     "AND v.isActive = true " +
+                     "AND v.status = 'ACTIVE' " +
                      "AND v.startDate <= :now " +
                      "AND v.endDate >= :now")
        List<UserVoucher> findAvailableVouchersByUserId(@Param("userId") Integer userId,

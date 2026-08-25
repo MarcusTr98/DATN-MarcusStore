@@ -13,10 +13,10 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface VoucherService {
-    // lấy danh sách voucher phân trang theo lại keyword, loại giảm giá, đang sử dụng
-    Page<VoucherResponse> getVouchersPage(String keyword, String discountType, Boolean isActive, Pageable pageable);
-    // lấy danh sách thoogns kê theo loại keyword, loại giảm giá, đang sử dụng
-    VoucherStatsResponse getVoucherStats(String keyword, String discountType, Boolean isActive);
+    // lấy danh sách voucher phân trang theo lại keyword, loại giảm giá, trạng thái
+    Page<VoucherResponse> getVouchersPage(String keyword, String discountType, String status, Pageable pageable);
+    // lấy danh sách thoogns kê theo loại keyword, loại giảm giá, trạng thái
+    VoucherStatsResponse getVoucherStats(String keyword, String discountType, String status);
     // lấy chi tiết 1 voucher theo Id
     VoucherResponse getVoucherById(Integer voucherId);
     // taoj mới voucher

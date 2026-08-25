@@ -36,7 +36,6 @@ const showNotifications = ref(false)
 const showAccountMenu = ref(false)
 const showCategoryMenu = ref(false)
 let notificationCloseTimer = null
-let categoryCloseTimer = null
 const {
   notifications,
   displayUnreadCount,
@@ -140,27 +139,13 @@ const scheduleCloseNotifications = () => {
   }, 180)
 }
 
-// ---- Category mega menu: cần grace period để chuột "đi từ <li> xuống <nav>" ----
+// ---- Category mega menu: toggle on click ----
 const toggleCategoryMenu = () => {
   showCategoryMenu.value = !showCategoryMenu.value
-  if (showCategoryMenu.value) window.clearTimeout(categoryCloseTimer)
 }
 
 const closeCategoryMenu = () => {
-  window.clearTimeout(categoryCloseTimer)
   showCategoryMenu.value = false
-}
-
-const cancelCloseCategoryMenu = () => {
-  window.clearTimeout(categoryCloseTimer)
-}
-
-const scheduleCloseCategoryMenu = () => {
-  // Lùi 1 nhịp ngắn để chuột kịp rời <li> xuống vùng mega menu
-  window.clearTimeout(categoryCloseTimer)
-  categoryCloseTimer = window.setTimeout(() => {
-    showCategoryMenu.value = false
-  }, 150)
 }
 
 const openNotification = async (item) => {
@@ -225,14 +210,15 @@ onUnmounted(() => {
   detachAuthListener?.()
   window.removeEventListener('mousedown', handleClickOutside)
   window.clearTimeout(notificationCloseTimer)
-  window.clearTimeout(categoryCloseTimer)
 })
 
 function handleClickOutside(e) {
   const wrapper = document.querySelector('.search-bar-wrapper')
   if (wrapper && !wrapper.contains(e.target)) closePanel()
   if (!e.target.closest('.account-dropdown')) showAccountMenu.value = false
-  // category-dropdown đã dùng hover state trong template, không cần click-outside ở đây
+  if (!e.target.closest('.category-dropdown') && !e.target.closest('.mega-menu')) {
+    showCategoryMenu.value = false
+  }
 }
 </script>
 
@@ -548,12 +534,10 @@ function handleClickOutside(e) {
             </router-link>
           </li>
 
-          <!-- 2. Danh mục (Mega Menu Hover) -->
+          <!-- 2. Danh mục (Dropdown nhỏ gọn) -->
           <li
             class="nav-item dropdown dropdown-hover category-dropdown"
             :class="{ show: showCategoryMenu }"
-            @mouseenter="showCategoryMenu = true"
-            @mouseleave="scheduleCloseCategoryMenu"
           >
             <a
               href="#"
@@ -563,6 +547,10 @@ function handleClickOutside(e) {
               <i class="fas fa-bars me-2"></i> Danh mục
               <i class="fas fa-chevron-down ms-2" style="font-size: 10px"></i>
             </a>
+            <CategoryMegaMenu
+              :is-open="showCategoryMenu"
+              @navigate="closeCategoryMenu"
+            />
           </li>
 
           <!-- 3. Flash Sale -->
@@ -586,15 +574,7 @@ function handleClickOutside(e) {
             </router-link>
           </li>
         </ul>
-
-        <!-- Mega menu: full-width dưới nav. Đặt ngoài .container để span ngang màn hình. -->
       </div>
-      <CategoryMegaMenu
-        :is-open="showCategoryMenu"
-        @navigate="closeCategoryMenu"
-        @mouseenter="cancelCloseCategoryMenu"
-        @mouseleave="scheduleCloseCategoryMenu"
-      />
     </nav>
   </header>
 

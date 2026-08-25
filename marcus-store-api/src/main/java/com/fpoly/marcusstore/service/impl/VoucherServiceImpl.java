@@ -62,7 +62,7 @@ public class VoucherServiceImpl implements VoucherService {
                 .startDate(voucher.getStartDate())
                 .endDate(voucher.getEndDate())
                 .quantity(voucher.getQuantity())
-                .isActive(voucher.getIsActive())
+                .status(voucher.getStatus())
                 .targetType(voucher.getTargetType())
                 .targetUserIds(targetUserIds)
                 .targetUserCount(targetUserCount)
@@ -70,30 +70,28 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
     @Override
-    public Page<VoucherResponse> getVouchersPage(String keyword, String discountType, Boolean isActive,
+    public Page<VoucherResponse> getVouchersPage(String keyword, String discountType, String status,
             Pageable pageable) {
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedDiscountType = normalizeDiscountType(discountType);
 
         Page<Voucher> pageResult = voucherRepository
-                .searchVouchers(normalizedKeyword, normalizedDiscountType, isActive, pageable);
+                .searchVouchers(normalizedKeyword, normalizedDiscountType, status, pageable);
 
-        // FE sẽ tự xử lý logic lùi trang khi currentPage vượt quá totalPages
-        // (không fallback ở BE nữa để tránh nhầm lẫn giữa 2 tầng xử lý)
         return pageResult.map(this::toResponse);
     }
 
     // lấy danh sách thống kê voucher
     @Override
-    public VoucherStatsResponse getVoucherStats(String keyword, String discountType, Boolean isActive) {
+    public VoucherStatsResponse getVoucherStats(String keyword, String discountType, String status) {
         String normalizedKeyword = normalizeKeyword(keyword);
         String normalizedDiscountType = normalizeDiscountType(discountType);
 
         return new VoucherStatsResponse(
-                voucherRepository.countVouchers(normalizedKeyword, normalizedDiscountType, isActive),
-                voucherRepository.countActiveVouchers(normalizedKeyword, normalizedDiscountType, isActive),
-                voucherRepository.countPercentVouchers(normalizedKeyword, normalizedDiscountType, isActive),
-                voucherRepository.countAmountVouchers(normalizedKeyword, normalizedDiscountType, isActive));
+                voucherRepository.countVouchers(normalizedKeyword, normalizedDiscountType, status),
+                voucherRepository.countActiveVouchers(normalizedKeyword, normalizedDiscountType, status),
+                voucherRepository.countPercentVouchers(normalizedKeyword, normalizedDiscountType, status),
+                voucherRepository.countAmountVouchers(normalizedKeyword, normalizedDiscountType, status));
     }
 
     private String normalizeKeyword(String keyword) {
@@ -140,7 +138,7 @@ public class VoucherServiceImpl implements VoucherService {
                     "Mã voucher đã tồn tại");
         }
 
-        validateDateRange(request.getStartDate(), request.getEndDate());
+        validateDateRange(request.getStartDate(), request.getEndDate(), request.getStatus());
 
         validateMinOrderValue(request.getMinOrderValue());
 
@@ -212,21 +210,21 @@ public class VoucherServiceImpl implements VoucherService {
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(request.getMaxDiscountAmount());
                 voucher.setQuantity(resolvedQuantity);
-                voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
+                voucher.setStatus(request.getStatus() != null ? request.getStatus() : Voucher.STATUS_ACTIVE);
                 break;
 
             case "AMOUNT":
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(null);
                 voucher.setQuantity(resolvedQuantity);
-                voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
+                voucher.setStatus(request.getStatus() != null ? request.getStatus() : Voucher.STATUS_ACTIVE);
                 break;
 
             case "FREESHIP":
                 voucher.setDiscountValue(request.getDiscountValue());
                 voucher.setMaxDiscountAmount(null);
                 voucher.setQuantity(resolvedQuantity);
-                voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
+                voucher.setStatus(request.getStatus() != null ? request.getStatus() : Voucher.STATUS_ACTIVE);
                 break;
 
             default:
@@ -282,23 +280,35 @@ public class VoucherServiceImpl implements VoucherService {
     }
 
     // validate ngày khi nhập voucher
-    private void validateDateRange(LocalDateTime startDate, LocalDateTime endDate) {
+    private void validateDateRange(LocalDateTime startDate, LocalDateTime endDate, String status) {
         if (startDate == null || endDate == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Ngày bắt đầu và ngày kết thúc không được để trống");
         }
 
-        if (startDate.isBefore(LocalDateTime.now())) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Ngày bắt đầu không được ở trong quá khứ");
-        }
-
         if (!endDate.isAfter(startDate)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Ngày kết thúc phải lớn hơn ngày bắt đầu");
+        }
+
+        // Validate startDate theo status:
+        // - ACTIVE: startDate phải <= thời điểm hiện tại (có thể là hiện tại hoặc quá khứ)
+        // - SCHEDULED: startDate phải > thời điểm hiện tại (tương lai)
+        LocalDateTime now = LocalDateTime.now();
+        if (Voucher.STATUS_ACTIVE.equals(status)) {
+            if (startDate.isAfter(now)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Voucher đang hoạt động không thể có ngày bắt đầu trong tương lai");
+            }
+        } else if (Voucher.STATUS_SCHEDULED.equals(status)) {
+            if (!startDate.isAfter(now)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Voucher lên lịch phải có ngày bắt đầu trong tương lai");
+            }
         }
     }
 
@@ -339,7 +349,7 @@ public class VoucherServiceImpl implements VoucherService {
                     "Mã voucher đã tồn tại");
         }
 
-        validateDateRange(request.getStartDate(), request.getEndDate());
+        validateDateRange(request.getStartDate(), request.getEndDate(), request.getStatus());
 
         validateMinOrderValue(request.getMinOrderValue());
 
@@ -359,7 +369,7 @@ public class VoucherServiceImpl implements VoucherService {
         voucher.setEndDate(request.getEndDate());
 
         voucher.setTargetType(targetType);
-        voucher.setIsActive(Boolean.TRUE.equals(request.getIsActive()));
+        voucher.setStatus(request.getStatus() != null ? request.getStatus() : Voucher.STATUS_ACTIVE);
 
         // Xử lý UserVoucher khi thay đổi targetType hoặc targetUserIds
         String oldTargetType = voucher.getTargetType();
@@ -425,7 +435,7 @@ public class VoucherServiceImpl implements VoucherService {
                         HttpStatus.NOT_FOUND,
                         "Không tìm thấy voucher"));
 
-        voucher.setIsActive(false);
+        voucher.setStatus(Voucher.STATUS_INACTIVE);
         voucherRepository.save(voucher);
     }
 
@@ -434,18 +444,18 @@ public class VoucherServiceImpl implements VoucherService {
         LocalDateTime now = LocalDateTime.now();
         boolean changed = false;
 
-        // 1. Hết quantity → tắt
+        // 1. Hết quantity → chuyển sang INACTIVE
         if (voucher.getQuantity() != null && voucher.getQuantity() <= 0
-                && Boolean.TRUE.equals(voucher.getIsActive())) {
-            voucher.setIsActive(false);
+                && Voucher.STATUS_ACTIVE.equals(voucher.getStatus())) {
+            voucher.setStatus(Voucher.STATUS_INACTIVE);
             changed = true;
         }
 
-        // 2. Quá hạn endDate → tắt
+        // 2. Quá hạn endDate → chuyển sang INACTIVE
         if (voucher.getEndDate() != null
                 && voucher.getEndDate().isBefore(now)
-                && Boolean.TRUE.equals(voucher.getIsActive())) {
-            voucher.setIsActive(false);
+                && Voucher.STATUS_ACTIVE.equals(voucher.getStatus())) {
+            voucher.setStatus(Voucher.STATUS_INACTIVE);
             changed = true;
         }
 
@@ -474,8 +484,8 @@ public class VoucherServiceImpl implements VoucherService {
         // 2. Auto deactivate nếu quá hạn hoặc hết quantity (lazy deactivate)
         deactivateIfExpired(voucher);
 
-        // 3. Validate isActive
-        if (Boolean.FALSE.equals(voucher.getIsActive())) {
+        // 3. Validate status
+        if (Voucher.STATUS_INACTIVE.equals(voucher.getStatus())) {
             return VoucherApplyResult.builder()
                     .applied(false)
                     .message("Voucher đã hết hạn hoặc hết lượt sử dụng, vui lòng chọn voucher khác.")
@@ -616,7 +626,7 @@ public class VoucherServiceImpl implements VoucherService {
 
         // 2. Nếu voucher đã bị deactivate trước đó → throw lỗi thân thiện
         // (admin có thể đã khóa voucher giữa lúc user apply và lúc thanh toán)
-        if (Boolean.FALSE.equals(voucher.getIsActive())) {
+        if (Voucher.STATUS_INACTIVE.equals(voucher.getStatus())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Voucher đã ngừng hoạt động. Vui lòng chọn voucher khác.|VOUCHER_INACTIVE");
@@ -624,7 +634,7 @@ public class VoucherServiceImpl implements VoucherService {
 
         // 3. Nếu endDate đã qua → auto deactivate + throw lỗi
         if (voucher.getEndDate() != null && voucher.getEndDate().isBefore(now)) {
-            voucher.setIsActive(false);
+            voucher.setStatus(Voucher.STATUS_INACTIVE);
             voucherRepository.save(voucher);
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -645,7 +655,7 @@ public class VoucherServiceImpl implements VoucherService {
 
         // 4. Nếu hết quantity → auto deactivate + throw lỗi (race condition guard)
         if (voucher.getQuantity() == null || voucher.getQuantity() <= 0) {
-            voucher.setIsActive(false);
+            voucher.setStatus(Voucher.STATUS_INACTIVE);
             voucherRepository.save(voucher);
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -657,7 +667,7 @@ public class VoucherServiceImpl implements VoucherService {
 
         // 6. chuyển trạng thái của voucher nểu số lượng <= 0
         if (voucher.getQuantity() <= 0) {
-            voucher.setIsActive(false);
+            voucher.setStatus(Voucher.STATUS_INACTIVE);
         }
         voucherRepository.save(voucher);
 
@@ -742,10 +752,10 @@ public class VoucherServiceImpl implements VoucherService {
         LocalDateTime now = LocalDateTime.now();
         int count = 0;
 
-        // 1. Deactivate voucher hết hạn (endDate < now) và đang active
+        // 1. Deactivate voucher hết hạn (endDate < now) và đang active hoặc scheduled
         List<Voucher> expiredVouchers = voucherRepository.findExpiredAndActive(now);
         for (Voucher v : expiredVouchers) {
-            v.setIsActive(false);
+            v.setStatus(Voucher.STATUS_INACTIVE);
             voucherRepository.save(v);
             count++;
         }
@@ -753,7 +763,15 @@ public class VoucherServiceImpl implements VoucherService {
         // 2. Deactivate voucher hết quantity và đang active
         List<Voucher> outOfStockVouchers = voucherRepository.findOutOfStockAndActive();
         for (Voucher v : outOfStockVouchers) {
-            v.setIsActive(false);
+            v.setStatus(Voucher.STATUS_INACTIVE);
+            voucherRepository.save(v);
+            count++;
+        }
+
+        // 3. Kích hoạt voucher đã đến ngày bắt đầu (từ SCHEDULED -> ACTIVE)
+        List<Voucher> scheduledToActivate = voucherRepository.findScheduledToActivate(now);
+        for (Voucher v : scheduledToActivate) {
+            v.setStatus(Voucher.STATUS_ACTIVE);
             voucherRepository.save(v);
             count++;
         }

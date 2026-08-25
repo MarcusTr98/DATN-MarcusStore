@@ -20,7 +20,7 @@ function mapVoucher(voucher) {
     startDate: voucher.startDate || null,
     endDate: voucher.endDate || null,
     quantity: Number(voucher.quantity || 0),
-    isActive: Boolean(voucher.isActive),
+    status: voucher.status || 'ACTIVE', // 'ACTIVE', 'INACTIVE', 'SCHEDULED'
     // Đối tượng sử dụng
     targetType: voucher.targetType || 'ALL',
     targetUserIds: voucher.targetUserIds || [],
@@ -93,7 +93,7 @@ function getErrorMessage(error) {
 function buildFallbackStats(vouchers = [], totalElements = 0) {
   return {
     total: totalElements,
-    active: vouchers.filter((voucher) => voucher.isActive).length,
+    active: vouchers.filter((voucher) => voucher.status === 'ACTIVE').length,
     percent: vouchers.filter((voucher) => voucher.discountType === 'PERCENT').length,
     amount: vouchers.filter((voucher) => voucher.discountType === 'AMOUNT').length,
     freeship: vouchers.filter((voucher) => voucher.discountType === 'FREESHIP').length,
@@ -193,9 +193,9 @@ export const useVoucherStore = defineStore('voucher', {
         // → Tránh được lỗi validation @NotNull khi DB có field null
         await voucherApi.deleteVoucherById(voucherId)
 
-        // Ghi nhớ trạng thái isActive trước khi xóa để tính totalElements đúng
+        // Ghi nhận trạng thái status trước khi xóa để tính totalElements đúng
         const deletedVoucher = this.vouchers.find((v) => v.voucherId === voucherId)
-        const wasActive = deletedVoucher ? deletedVoucher.isActive !== false : true
+        const wasActive = deletedVoucher ? deletedVoucher.status === 'ACTIVE' : true
 
         // Cập nhật local state - loại bỏ voucher khỏi danh sách hiển thị
         this.vouchers = this.vouchers.filter(

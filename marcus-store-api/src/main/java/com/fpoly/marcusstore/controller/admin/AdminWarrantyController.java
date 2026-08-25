@@ -82,7 +82,7 @@ public class AdminWarrantyController {
     }
 
     @PutMapping("/{warrantyId}/status")
-    @PreAuthorize("hasAuthority('WARRANTY_PROCESS')")
+      @PreAuthorize("hasAuthority('WARRANTY_PROCESS')")
     public ResponseEntity<ApiResponse<WarrantyResponse>> updateStatus(
             @PathVariable Integer warrantyId,
             @RequestHeader("Authorization") String authHeader,

@@ -749,6 +749,12 @@
   z-index: 1030;
 }
 
+/* Category dropdown trong nav cần position để dropdown định vị đúng */
+.main-nav .category-dropdown {
+  position: relative;
+  z-index: 1030;
+}
+
 /* Desktop Dropdown Hover Logic */
 @media (min-width: 992px) {
   .dropdown-hover {
