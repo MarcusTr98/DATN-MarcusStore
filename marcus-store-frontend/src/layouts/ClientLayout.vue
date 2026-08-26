@@ -9,6 +9,7 @@
     <ClientFooter />
     <ChatWidgetRouter />
     <WelcomeVoucherModal />
+    <CompareBar />
   </div>
 </template>
 
@@ -18,6 +19,7 @@ import ClientFooter from '@/components/client/ClientFooter.vue'
 import FaqOffcanvas from '@/components/client/FaqOffcanvas.vue'
 import ChatWidgetRouter from '@/components/chat/ChatWidgetRouter.vue'
 import WelcomeVoucherModal from '@/components/WelcomeVoucherModal.vue'
+import CompareBar from '@/components/client/CompareBar.vue'
 </script>
 
 <style>

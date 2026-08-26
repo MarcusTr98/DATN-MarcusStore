@@ -96,9 +96,7 @@
                     type="button"
                     class="demand-chip"
                     :class="{ active: localSelectedValues.includes(opt.valueId) }"
-                    @click="toggleValue(opt.valueId)"
-                  >
-                    <span class="demand-chip-icon">?</span>
+                    @click="toggleValue(opt.valueId)">
                     <span class="demand-chip-name">{{ opt.label }}</span>
                   </button>
                 </div>
