@@ -28,6 +28,7 @@ public class ProductComparisonResponse {
         private String slug;
         private BigDecimal price;
         private BigDecimal originalPrice;
+        private Integer defaultSkuId;
         private List<SpecItem> specs;
     }
 

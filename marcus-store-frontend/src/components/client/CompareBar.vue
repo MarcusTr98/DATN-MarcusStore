@@ -28,7 +28,7 @@
             </div>
 
             <div
-              v-for="n in Math.max(0, 2 - state.items.length)"
+              v-for="n in Math.max(0, MAX_ITEMS - state.items.length)"
               :key="`empty-${n}`"
               class="compare-bar-item compare-bar-item--empty"
             >
@@ -47,7 +47,7 @@
             >
               Hủy so sánh
             </button>
-            
+
             <button
               type="button"
               class="btn-compare"
@@ -82,7 +82,13 @@
             </button>
           </header>
 
-          <div class="compare-modal-body" v-if="state.resultProducts?.length">
+          <!-- Gắn biến CSS --cmp-cols theo đúng số sản phẩm đang so (2 hoặc 3)
+               để bảng overview + bảng specs luôn chia cột đều nhau. -->
+          <div
+            class="compare-modal-body"
+            v-if="state.resultProducts?.length"
+            :style="{ '--cmp-cols': state.resultProducts.length }"
+          >
             <!-- Tổng quan -->
             <section class="cmp-section cmp-overview">
               <div class="cmp-overview-grid">
@@ -105,6 +111,29 @@
                   </router-link>
                   <div class="cmp-overview-name">{{ p.productName }}</div>
                   <div class="cmp-overview-price">{{ formatPrice(p.price) }}</div>
+
+                  <!-- MỚI: nút thêm giỏ + mua ngay ngay trong bảng so sánh,
+                       giúp kích cầu mua ngay sau khi khách xem xong so sánh -->
+                  <div class="cmp-overview-cta">
+                    <button
+                      type="button"
+                      class="cmp-btn cmp-btn--cart"
+                      :disabled="ctaLoadingId === p.productId"
+                      @click="onAddToCartFromCompare(p)"
+                    >
+                      <i class="fa-solid fa-cart-plus"></i>
+                      Thêm giỏ
+                    </button>
+                    <button
+                      type="button"
+                      class="cmp-btn cmp-btn--buy"
+                      :disabled="ctaLoadingId === p.productId"
+                      @click="onBuyNowFromCompare(p)"
+                    >
+                      <i class="fa-solid fa-bolt"></i>
+                      Mua ngay
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -215,13 +244,34 @@
         </div>
       </div>
     </Transition>
+
+    <!-- Notification Modal (kết quả thêm giỏ / mua ngay) -->
+    <BaseModal
+      :visible="notifyModal.visible"
+      :type="notifyModal.type"
+      :title="notifyModal.title"
+      :message="notifyModal.message"
+      @close="notifyModal.visible = false"
+    />
+
+    <!-- Login Required Modal -->
+    <LoginRequiredModal
+      :visible="loginModal.visible"
+      :title="loginModal.title"
+      :message="loginModal.message"
+      @close="loginModal.visible = false"
+    />
   </Teleport>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, reactive, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useCompareBar } from '@/composables/useCompareBar'
+import { useCartStore } from '@/stores/cartStore'
 import api from '@/utils/api'
+import BaseModal from '@/components/BaseModal.vue'
+import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 
 const {
   state,
@@ -231,16 +281,129 @@ const {
   MAX_ITEMS,
 } = useCompareBar()
 
+const router = useRouter()
+const cartStore = useCartStore()
+
 const visible = computed(() => state.items.length > 0 || loading.value)
 const loading = ref(false)
 const resultVisible = ref(false)
+
+// ----- MỚI: thêm giỏ hàng / mua ngay ngay trong modal so sánh -----
+const ctaLoadingId = ref(null)
+
+const notifyModal = reactive({
+  visible: false,
+  type: 'info', // 'success' | 'error' | 'info'
+  title: 'Thông báo',
+  message: '',
+})
+
+const loginModal = reactive({
+  visible: false,
+  title: '',
+  message: '',
+})
+
+function isLoggedIn() {
+  return !!localStorage.getItem('ACCESS_TOKEN')
+}
+
+function openLoginModal(title, message) {
+  loginModal.title = title
+  loginModal.message = message
+  loginModal.visible = true
+}
+
+function showNotify(type, title, message) {
+  notifyModal.type = type
+  notifyModal.title = title
+  notifyModal.message = message
+  notifyModal.visible = true
+}
+
+async function onAddToCartFromCompare(product) {
+  if (!isLoggedIn()) {
+    openLoginModal(
+      'Thêm vào giỏ hàng',
+      'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng và tiến hành thanh toán.',
+    )
+    return
+  }
+  // Response /client/compare trả defaultSkuId (BE mới thêm). Nếu vì lý do gì
+  // đó không có (sản phẩm hết hàng mọi SKU / dữ liệu cũ chưa migrate) thì
+  // điều hướng sang trang chi tiết để khách tự chọn variant, thay vì im lặng.
+  if (!product.defaultSkuId) {
+    if (product.slug) {
+      router.push(`/product/${product.slug}`)
+    } else {
+      showNotify('info', 'Sản phẩm tạm hết hàng', 'Vui lòng chọn sản phẩm khác.')
+    }
+    return
+  }
+
+  ctaLoadingId.value = product.productId
+  try {
+    const ok = await cartStore.addToCart(product.defaultSkuId, 1)
+    if (ok) {
+      showNotify('success', 'Thêm vào giỏ hàng', `Đã thêm "${product.productName}" vào giỏ hàng`)
+    } else {
+      showNotify('error', 'Thêm thất bại', cartStore.error || 'Thêm vào giỏ hàng thất bại')
+    }
+  } finally {
+    ctaLoadingId.value = null
+  }
+}
+
+async function onBuyNowFromCompare(product) {
+  if (!isLoggedIn()) {
+    openLoginModal(
+      'Mua ngay',
+      'Vui lòng đăng nhập để mua sản phẩm này.',
+    )
+    return
+  }
+  if (!product.defaultSkuId) {
+    if (product.slug) {
+      router.push(`/product/${product.slug}`)
+    } else {
+      showNotify('info', 'Sản phẩm tạm hết hàng', 'Vui lòng chọn sản phẩm khác.')
+    }
+    return
+  }
+
+  ctaLoadingId.value = product.productId
+  try {
+    const ok = await cartStore.addToCart(product.defaultSkuId, 1)
+    if (!ok) {
+      showNotify('error', 'Mua thất bại', cartStore.error || 'Không thể tiến hành mua ngay.')
+      return
+    }
+    // Giống logic Buy Now ở trang chi tiết sản phẩm: chốt đúng cartItemId + quantity
+    // vừa thêm để checkout không lấy nhầm số lượng có sẵn trong giỏ.
+    const addedItem = cartStore.items.find((i) => i.skuId === product.defaultSkuId)
+    const cartItemId = addedItem?.cartItemId
+    if (cartItemId) {
+      sessionStorage.setItem('buyNowCartItemIds', JSON.stringify([cartItemId]))
+      sessionStorage.setItem(
+        'buyNowCartItemQuantities',
+        JSON.stringify({ [cartItemId]: 1 }),
+      )
+    }
+    closeResult()
+    router.push('/checkout')
+  } finally {
+    ctaLoadingId.value = null
+  }
+}
 
 // ----- Build bảng thông số: mỗi specName là 1 hàng, mỗi sản phẩm là 1 cột -----
 const specRows = computed(() => {
   if (!state.resultProducts?.length) return []
   const products = state.resultProducts
 
-  // Map specName -> winnerProductId từ AI
+  // Map specName -> winnerProductId do AI (Gemini) xác định.
+  // Ưu tiên dùng cái này thay vì tự đoán bằng số, vì AI hiểu đúng chiều
+  // tốt/xấu của từng loại spec (VD: trọng lượng thấp hơn mới tốt).
   const aiWinnerMap = new Map()
   for (const sw of state.result?.specWinners || []) {
     aiWinnerMap.set(sw.specName, sw.winnerProductId)
@@ -255,7 +418,6 @@ const specRows = computed(() => {
       allSpecs.get(spec.specName)[p.productId] = spec
     }
   }
-
   const rows = []
   for (const [specName, byProduct] of allSpecs.entries()) {
     const values = products.map((p) => {
@@ -277,13 +439,11 @@ const specRows = computed(() => {
 
     if (isDifferent) {
       if (aiWinnerMap.has(specName)) {
-        // Ưu tiên AI: chấm đúng 1 sản phẩm AI xác định thắng
         const winnerId = aiWinnerMap.get(specName)
         cells.forEach((c) => {
           if (c.productId === winnerId) c.isBetter = true
         })
       } else {
-        // Fallback: AI không chấm (không tự tin / Gemini lỗi) -> đoán theo số như cũ
         const numeric = values.map((v) => parseNumeric(v.value))
         if (numeric.every((n) => n != null)) {
           const max = Math.max(...numeric)
@@ -601,7 +761,7 @@ function resetAll() {
 }
 .cmp-overview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(var(--cmp-cols, 2), 1fr);
   gap: 12px;
   margin-bottom: 14px;
 }
@@ -610,6 +770,8 @@ function resetAll() {
   padding: 12px;
   background: #f8f8f8;
   border-radius: 10px;
+  display: flex;
+  flex-direction: column;
 }
 .cmp-overview-link {
   display: block;
@@ -630,6 +792,48 @@ function resetAll() {
   color: #d70018;
   font-weight: 700;
   font-size: 16px;
+  margin-bottom: 10px;
+}
+
+/* MỚI: nút thêm giỏ / mua ngay trong overview */
+.cmp-overview-cta {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cmp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+.cmp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cmp-btn--cart {
+  background: #fff;
+  border-color: #d70018;
+  color: #d70018;
+}
+.cmp-btn--cart:hover:not(:disabled) {
+  background: #fff0f0;
+}
+.cmp-btn--buy {
+  background: #d70018;
+  border-color: #d70018;
+  color: #fff;
+}
+.cmp-btn--buy:hover:not(:disabled) {
+  background: #b80015;
 }
 
 .cmp-overall-winner {
@@ -700,7 +904,7 @@ function resetAll() {
 }
 .cmp-specs-row {
   display: grid;
-  grid-template-columns: 160px 1fr 1fr;
+  grid-template-columns: 160px repeat(var(--cmp-cols, 2), 1fr);
   gap: 0;
   border-bottom: 1px solid #f1f1f1;
 }
@@ -757,10 +961,12 @@ function resetAll() {
   font-size: 11px;
 }
 
-/* ========== USE CASE ========== */
+/* ========== USE CASE ==========
+   Luôn có đúng 4 mục (Gaming / Camera / Pin / Giá trị) -> fix cứng 4 cột
+   1 hàng cho khoa học, thay vì auto-fit dễ vỡ dòng khi label dài. */
 .cmp-usecase-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 .cmp-usecase-card {
@@ -768,6 +974,8 @@ function resetAll() {
   background: #f8f8f8;
   border-radius: 10px;
   border: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
 }
 .cmp-usecase-head {
   display: flex;
@@ -784,10 +992,11 @@ function resetAll() {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .cmp-usecase-name {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13px;
   color: #333;
 }
 .cmp-usecase-winner {
@@ -823,14 +1032,15 @@ function resetAll() {
     justify-content: center;
   }
   .cmp-specs-row {
-    grid-template-columns: 110px 1fr 1fr;
+    grid-template-columns: 110px repeat(var(--cmp-cols, 2), 1fr);
     font-size: 12px;
-  }
-  .cmp-specs-row[style*="auto-fit"] {
-    grid-template-columns: 100px 1fr 1fr;
   }
   .cmp-overview-grid {
     grid-template-columns: 1fr;
+  }
+  /* Màn nhỏ: 4 cột use-case không đủ chỗ -> xuống 2 cột x 2 hàng cho dễ đọc */
+  .cmp-usecase-list {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>

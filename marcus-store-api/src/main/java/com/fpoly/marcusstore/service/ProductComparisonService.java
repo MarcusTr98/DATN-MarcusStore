@@ -167,6 +167,7 @@ public class ProductComparisonService {
                             .slug(p != null ? p.getSlug() : null)
                             .price(p != null ? p.getPrice() : null)
                             .originalPrice(p != null ? p.getOriginalPrice() : null)
+                            .defaultSkuId(p != null ? p.getSkuId() : null)
                             .specs(specs)
                             .build();
                 })
