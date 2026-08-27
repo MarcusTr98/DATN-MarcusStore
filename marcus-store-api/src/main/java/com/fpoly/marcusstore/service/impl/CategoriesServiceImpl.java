@@ -48,6 +48,7 @@ public class CategoriesServiceImpl implements CategoriesService {
                 .categoryName(p.getCategoryName())
                 .categoryImg(p.getCategoryImg())
                 .status(p.getStatus())
+                .slug(p.getSlug())
                 .parentId(null)
                 .parentName(null)
                 .build();

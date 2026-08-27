@@ -16,7 +16,7 @@
           :key="parent.categoryId"
           class="category-dropdown-item"
         >
-          <!-- Danh mục cha -->
+          <!-- Danh mục cha: click vào text/icon sẽ expand children -->
           <div
             class="category-dropdown-parent"
             :class="{ expanded: expandedId === parent.categoryId }"
@@ -25,20 +25,13 @@
             <i class="fas fa-folder-open category-icon"></i>
             <span class="category-dropdown-name">{{ parent.categoryName }}</span>
             <button
-              v-if="parent.hasChildren"
               class="category-dropdown-toggle"
               type="button"
+              aria-label="Mở rộng danh mục con"
+              @click.stop="toggleExpand(parent)"
             >
               <i :class="expandedId === parent.categoryId ? 'fas fa-chevron-up' : 'fas fa-chevron-down'"></i>
             </button>
-            <router-link
-              v-else
-              :to="`/category/${parent.slug}`"
-              class="category-dropdown-link"
-              @click.stop="$emit('navigate')"
-            >
-              <i class="fas fa-arrow-right"></i>
-            </router-link>
           </div>
 
           <!-- Danh mục con - hiện khi expand -->
@@ -54,7 +47,7 @@
                 <router-link
                   :to="`/category/${child.slug}`"
                   class="category-dropdown-child"
-                  @click="$emit('navigate')"
+                  @click.stop="closeMenu"
                 >
                   <i class="fas fa-chevron-right child-icon"></i>
                   <span>{{ child.categoryName }}</span>
@@ -123,6 +116,10 @@ async function toggleExpand(parent) {
 }
 
 onMounted(fetchParents)
+
+function closeMenu() {
+  emit('navigate')
+}
 </script>
 
 <style scoped>
@@ -204,17 +201,6 @@ onMounted(fetchParents)
 
 .category-dropdown-toggle:hover {
   color: #666;
-}
-
-.category-dropdown-link {
-  color: #999;
-  font-size: 12px;
-  padding: 2px 4px;
-  transition: color 0.15s;
-}
-
-.category-dropdown-link:hover {
-  color: #d70018;
 }
 
 /* ---- Children ---- */

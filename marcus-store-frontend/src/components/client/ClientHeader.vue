@@ -113,12 +113,13 @@ const closeGuestModal = () => {
   showGuestModal.value = false
 }
 
-// Marcus thêm: đóng các lớp nổi khi chuyển trang để header không giữ trạng thái cũ.
+// Marcus sửa: KHÔNG đóng showCategoryMenu khi route đổi - vì khi click child <router-link>
+// vẫn cần menu đóng (emit navigate) - việc này do child xử lý qua @click.stop="closeMenu".
+// Trước đây route watcher set false gây race condition với click event của child.
 watch(
   () => route.fullPath,
   () => {
     showAccountMenu.value = false
-    showCategoryMenu.value = false
     showNotifications.value = false
     closePanel()
   },
