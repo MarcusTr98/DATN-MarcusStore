@@ -7,7 +7,7 @@
             <i class="bi bi-arrow-repeat"></i>
           </div>
           <div>
-            <h1>Đổi trả / Bảo hành</h1>
+            <h1>Bảo hành</h1>
             <p>Theo dõi và xử lý các yêu cầu đổi trả, bảo hành từ khách hàng.</p>
           </div>
         </div>
@@ -123,7 +123,7 @@
             <tbody>
               <tr v-for="(w, index) in warranties" :key="w.warrantyId">
                 <td class="fw-bold">#{{ currentPage * pageSize + index + 1 }}</td>
-                
+
                 <td>
                   <router-link :to="`/admin/order/${w.orderCode}`" class="warranty-link">
                     {{ w.orderCode }}

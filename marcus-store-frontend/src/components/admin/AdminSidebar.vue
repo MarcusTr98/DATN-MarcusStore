@@ -54,7 +54,7 @@
         active-class="active"
       >
         <i class="bi bi-arrow-repeat menu-icon"></i>
-        <span>Đổi trả & Bảo hành</span>
+        <span>Bảo hành</span>
       </router-link>
     </section>
 
