@@ -35,6 +35,20 @@
 
               <button
                 type="button"
+                class="icon-btn compare-btn"
+                :class="{ active: compareBar.isInCompare(product.productId) }"
+                :disabled="!compareBar.isInCompare(product.productId) && !compareBar.canAddMore"
+                title="So sánh"
+                @click.stop.prevent="onToggleCompare(product)"
+              >
+                <svg viewBox="0 0 24 24" class="action-icon compare-icon">
+                  <path d="M9 3v18M15 3v18" />
+                  <path d="M3 9h6M15 9h6M3 15h6M15 15h6" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
                 class="icon-btn cart-btn"
                 title="Thêm vào giỏ hàng"
                 @click.stop.prevent="addToCart(product)"
@@ -221,6 +235,20 @@
 
                 <button
                   type="button"
+                  class="icon-btn compare-btn"
+                  :class="{ active: compareBar.isInCompare(product.productId) }"
+                  :disabled="!compareBar.isInCompare(product.productId) && !compareBar.canAddMore"
+                  title="So sánh"
+                  @click.stop.prevent="onToggleCompare(product)"
+                >
+                  <svg viewBox="0 0 24 24" class="action-icon compare-icon">
+                    <path d="M9 3v18M15 3v18" />
+                    <path d="M3 9h6M15 9h6M3 15h6M15 15h6" />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
                   class="icon-btn cart-btn"
                   title="Thêm vào giỏ hàng"
                   @click.stop.prevent="addToCart(product)"
@@ -333,6 +361,7 @@ import BaseModal from '@/components/BaseModal.vue'
 import wishlist from '@/composables/useWishlistShared'
 import { searchApi } from '@/composables/useSearchBox'
 import LoginRequiredModal from '../LoginRequiredModal.vue'
+import { useCompareBar } from '@/composables/useCompareBar'
 const loginModal = reactive({
   visible: false,
   title: '',
@@ -750,6 +779,14 @@ if (!isLoggedIn()) {
 const cartStore = useCartStore()
 const router = useRouter()
 
+// ---- COMPARE BAR (so sánh sản phẩm) ----
+const compareBar = useCompareBar()
+compareBar.canAddMore = computed(() => compareBar.state.items.length < compareBar.MAX_ITEMS)
+
+function onToggleCompare(product) {
+  compareBar.toggleCompare(product)
+}
+
 const notifyModal = reactive({
   visible: false,
   type: 'info', // 'success' | 'error' | 'info'
@@ -1018,6 +1055,23 @@ function formatPrice(value) {
 }
 .cart-btn:hover .cart-icon {
   stroke: #1e3a8a;
+}
+
+.compare-btn .compare-icon {
+  stroke: #6b7280;
+}
+.compare-btn:hover .compare-icon {
+  stroke: #d70018;
+}
+.compare-btn.active {
+  background: #d70018;
+}
+.compare-btn.active .compare-icon {
+  stroke: #fff;
+}
+.compare-btn:disabled:not(.active) {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .card-thumbnail {

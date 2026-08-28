@@ -105,6 +105,7 @@ public class SecurityConfig {
                         // dưới /api/client nhưng vẫn phải có JWT hợp lệ.
                         .requestMatchers(HttpMethod.GET, "/api/client/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/client/categories/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/client/compare/**").permitAll()
                         .requestMatchers("/api/client/**").authenticated()
                         .requestMatchers("/api/home/**").permitAll()
                         .requestMatchers("/api/admin/user/verify-email").permitAll() // Khách hàng nhập OTP xác thực
