@@ -3,6 +3,7 @@
     <ul
       v-if="isOpen"
       class="dropdown-menu ms-dropdown category-dropdown-menu show"
+      @mousedown.stop
     >
       <!-- Loading -->
       <li v-if="loadingParents" class="dropdown-loading">
@@ -83,7 +84,10 @@ const expandedId = ref(null)
 async function fetchParents() {
   loadingParents.value = true
   try {
-    const res = await api.get('/client/categories/main')
+    // Marcus sửa: skipGlobalLoading để tránh overlay toàn màn hình che dropdown,
+    // gây handleClickOutside ở Header.vue hiểu nhầm là click ra ngoài và tự đóng menu.
+    // Dropdown đã tự có loadingParents riêng nên không cần overlay global.
+    const res = await api.get('/client/categories/main', { skipGlobalLoading: true })
     parentCategories.value = res.data?.data ?? []
   } catch (err) {
     console.error('[CategoryDropdown] Lỗi khi tải danh mục cha:', err)
@@ -105,7 +109,11 @@ async function toggleExpand(parent) {
 
   loadingChildrenSet.value.add(parent.categoryId)
   try {
-    const res = await api.get(`/client/categories/${parent.categoryId}/children`)
+    // Marcus sửa: cùng lý do như fetchParents - dùng loadingChildrenSet cục bộ,
+    // không cần/không nên bật global loading overlay cho request này.
+    const res = await api.get(`/client/categories/${parent.categoryId}/children`, {
+      skipGlobalLoading: true,
+    })
     childrenMap.value[parent.categoryId] = res.data?.data ?? []
   } catch (err) {
     console.error(`[CategoryDropdown] Lỗi khi tải danh mục con của "${parent.categoryName}":`, err)
