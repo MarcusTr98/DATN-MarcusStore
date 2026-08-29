@@ -130,7 +130,7 @@
     </template>
   </div>
 
-<<<<<<< HEAD
+
   <!-- ============ MODE: filter / standalone (giữ nguyên logic cũ) ============ -->
   <div v-else class="category-blocks-wrapper">
     <div v-if="loadingCategories" class="text-center py-5 text-muted">Đang tải danh mục...</div>
@@ -356,9 +356,7 @@
   />
 
   <!-- Notification Modal -->
-=======
-  <!-- Notification Modal (mode list) -->
->>>>>>> cade390c (hoan than task demo-13 va task hien thi danh muc san pham)
+
   <BaseModal
     :visible="notifyModal.visible"
     :type="notifyModal.type"
@@ -395,14 +393,6 @@ const loginModal = reactive({
   message: '',
 })
 
-function isLoggedIn() {
-    return !!localStorage.getItem("ACCESS_TOKEN")
-}
-function openLoginModal(title, message) {
-  loginModal.title = title
-  loginModal.message = message
-  loginModal.visible = true
-}
 onMounted(() => {
   wishlist.fetchIds()
 })
