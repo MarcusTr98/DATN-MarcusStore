@@ -921,13 +921,13 @@ const v2Vouchers = computed(() => {
 // Kiểm tra voucher có thể dùng không
 function isVoucherActive(voucher) {
   const cartTotal = subtotal.value
-  return voucher.isActive && !voucher.isUsed && cartTotal >= (voucher.minOrderValue || 0)
+  return (voucher.status === 'ACTIVE' || voucher.status === 'SCHEDULED') && !voucher.isUsed && cartTotal >= (voucher.minOrderValue || 0)
 }
 
 // Lý do voucher bị disable
 function getDisabledReason(voucher) {
   const cartTotal = subtotal.value
-  if (!voucher.isActive) return 'Voucher không còn hoạt động'
+  if (voucher.status !== 'ACTIVE' && voucher.status !== 'SCHEDULED') return 'Voucher không còn hoạt động'
   if (voucher.isUsed) return 'Voucher đã được sử dụng'
   if (cartTotal < (voucher.minOrderValue || 0)) {
     const needed = (voucher.minOrderValue || 0) - cartTotal

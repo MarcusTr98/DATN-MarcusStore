@@ -31,14 +31,14 @@ public class VoucherController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String discountType,
-            @RequestParam(required = false) Boolean isActive
+            @RequestParam(required = false) String status
     ) {
         Pageable pageable = PageRequest.of(
                 Math.max(page, 0),
                 Math.max(size, 1)
         );
 
-        return voucherService.getVouchersPage(keyword, discountType, isActive, pageable);
+        return voucherService.getVouchersPage(keyword, discountType, status, pageable);
     }
 
     // lấy danh sách thống kê theo tổng số, đang sử dụng, thoe loại
@@ -46,9 +46,9 @@ public class VoucherController {
     public VoucherStatsResponse getVoucherStats(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String discountType,
-            @RequestParam(required = false) Boolean isActive
+            @RequestParam(required = false) String status
     ) {
-        return voucherService.getVoucherStats(keyword, discountType, isActive);
+        return voucherService.getVoucherStats(keyword, discountType, status);
     }
 
     // lấy chi tiết 1 voucher theo voucherID

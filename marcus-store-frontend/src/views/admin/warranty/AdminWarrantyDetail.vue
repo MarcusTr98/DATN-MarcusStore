@@ -194,6 +194,7 @@
                     v-for="item in nextStatuses"
                     :key="item.value"
                     :value="item.value"
+                    :disabled="item.disabled"
                   >
                     {{ item.label }}
                   </option>
@@ -342,14 +343,20 @@ const isLocked = computed(() => {
 
 const nextStatuses = computed(() => {
   if (!warranty.value || !warranty.value.status) return []
-  return allowedTransitions[warranty.value.status] || []
+  const current = warranty.value.status
+  const transitions = allowedTransitions[current] || []
+  const currentLabel = warrantyStatusMap[current]?.label || current
+  return [
+    { value: current, label: `${currentLabel} (hiện tại)`, disabled: true },
+    ...transitions,
+  ]
 })
 
 watch(
   () => warranty.value?.status,
   () => {
-    const first = nextStatuses.value[0]?.value
-    newStatus.value = first || warranty.value?.status || 'PENDING'
+    const next = nextStatuses.value.find((item) => !item.disabled)
+    newStatus.value = next?.value || warranty.value?.status || 'PENDING'
   },
   { immediate: true },
 )
@@ -359,8 +366,8 @@ async function fetchWarranty() {
     loading.value = true
     const res = await AdminWarrantyApi.getWarrantyDetail(warrantyId.value)
     warranty.value = res.data?.data || res.data || {}
-    newStatus.value =
-      allowedTransitions[warranty.value.status]?.[0]?.value || warranty.value.status || 'PENDING'
+    const next = nextStatuses.value.find((item) => !item.disabled)
+    newStatus.value = next?.value || warranty.value.status || 'PENDING'
     adminNote.value = warranty.value.adminNote || ''
   } catch (err) {
     console.error('Lỗi tải chi tiết bảo hành:', err)

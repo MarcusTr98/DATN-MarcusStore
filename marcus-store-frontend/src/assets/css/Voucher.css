@@ -577,6 +577,115 @@
   color: #64748b;
 }
 
+.status-badge.scheduled {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+/* ========================================
+   TIME MODE SELECTOR - Chế độ thời gian
+   ======================================== */
+.time-mode-selector {
+  display: flex;
+  gap: 10px;
+  padding: 4px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  width: fit-content;
+}
+
+.time-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #6b7280;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.time-mode-btn i {
+  font-size: 1rem;
+}
+
+.time-mode-btn:hover:not(.active) {
+  background: #ffffff;
+  color: #f55d9b;
+}
+
+.time-mode-btn.active {
+  background: #f55d9b;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(245, 93, 155, 0.3);
+}
+
+.current-time-info {
+  margin-bottom: 8px;
+}
+
+.current-time-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
+  border-radius: 8px;
+  color: #0369a1;
+}
+
+.current-time-display i {
+  font-size: 1.1rem;
+}
+
+.current-time-display span {
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.current-time-display small {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.status-auto-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  color: #15803d;
+  font-size: 0.86rem;
+}
+
+.status-auto-info i {
+  font-size: 1rem;
+  color: #22c55e;
+}
+
+.status-auto-info strong {
+  color: #166534;
+}
+
+@media (max-width: 576px) {
+  .time-mode-selector {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .time-mode-btn {
+    justify-content: center;
+  }
+}
+
 .icon-button {
   display: inline-grid;
   width: 36px;

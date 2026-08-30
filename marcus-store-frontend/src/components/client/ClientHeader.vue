@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSettings } from '@/composables/useSettings'
 import { useSearchBox } from '@/composables/useSearchBox'
 import BaseModal from '../BaseModal.vue'
+import CategoryMegaMenu from '@/components/client/CategoryMegaMenu.vue'
 import wishlist from '@/composables/useWishlistShared'
 import { useUserNotifications } from '@/composables/useUserNotifications'
 
@@ -112,12 +113,13 @@ const closeGuestModal = () => {
   showGuestModal.value = false
 }
 
-// Marcus thêm: đóng các lớp nổi khi chuyển trang để header không giữ trạng thái cũ.
+// Marcus sửa: KHÔNG đóng showCategoryMenu khi route đổi - vì khi click child <router-link>
+// vẫn cần menu đóng (emit navigate) - việc này do child xử lý qua @click.stop="closeMenu".
+// Trước đây route watcher set false gây race condition với click event của child.
 watch(
   () => route.fullPath,
   () => {
     showAccountMenu.value = false
-    showCategoryMenu.value = false
     showNotifications.value = false
     closePanel()
   },
@@ -136,6 +138,15 @@ const scheduleCloseNotifications = () => {
   notificationCloseTimer = window.setTimeout(() => {
     showNotifications.value = false
   }, 180)
+}
+
+// ---- Category mega menu: toggle on click ----
+const toggleCategoryMenu = () => {
+  showCategoryMenu.value = !showCategoryMenu.value
+}
+
+const closeCategoryMenu = () => {
+  showCategoryMenu.value = false
 }
 
 const openNotification = async (item) => {
@@ -206,7 +217,9 @@ function handleClickOutside(e) {
   const wrapper = document.querySelector('.search-bar-wrapper')
   if (wrapper && !wrapper.contains(e.target)) closePanel()
   if (!e.target.closest('.account-dropdown')) showAccountMenu.value = false
-  if (!e.target.closest('.category-dropdown')) showCategoryMenu.value = false
+  if (!e.target.closest('.category-dropdown') && !e.target.closest('.mega-menu')) {
+    showCategoryMenu.value = false
+  }
 }
 </script>
 
@@ -522,7 +535,7 @@ function handleClickOutside(e) {
             </router-link>
           </li>
 
-          <!-- 2. Danh mục (Dropdown Hover) -->
+          <!-- 2. Danh mục (Dropdown nhỏ gọn) -->
           <li
             class="nav-item dropdown dropdown-hover category-dropdown"
             :class="{ show: showCategoryMenu }"
@@ -530,48 +543,15 @@ function handleClickOutside(e) {
             <a
               href="#"
               class="nav-link fw-semibold text-dark px-1 py-2 rounded d-flex align-items-center"
-              @click.prevent="showCategoryMenu = !showCategoryMenu"
+              @click.prevent="toggleCategoryMenu"
             >
               <i class="fas fa-bars me-2"></i> Danh mục
               <i class="fas fa-chevron-down ms-2" style="font-size: 10px"></i>
             </a>
-
-            <!-- Menu xổ xuống -->
-            <ul
-              class="dropdown-menu border-0 shadow-lg mt-0 rounded-3 p-2"
-              :class="{ show: showCategoryMenu }"
-            >
-              <li>
-                <router-link to="/category/dien-thoai" class="dropdown-item rounded py-2">
-                  <i class="fas fa-mobile-alt fa-fw text-danger me-2"></i> Điện thoại
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/may-tinh-bang" class="dropdown-item rounded py-2">
-                  <i class="fas fa-tablet-alt fa-fw text-danger me-2"></i> Máy tính bảng
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/am-thanh" class="dropdown-item rounded py-2">
-                  <i class="fas fa-headphones-alt fa-fw text-danger me-2"></i> Âm thanh
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/dong-ho-thong-minh" class="dropdown-item rounded py-2">
-                  <i class="fas fa-clock fa-fw text-danger me-2"></i> Đồng hồ thông minh
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/sac-pin" class="dropdown-item rounded py-2">
-                  <i class="fas fa-battery-full fa-fw text-danger me-2"></i> Sạc & Pin
-                </router-link>
-              </li>
-              <li>
-                <router-link to="/category/op-lung" class="dropdown-item rounded py-2">
-                  <i class="fas fa-shield-alt fa-fw text-danger me-2"></i> Ốp lưng & Bảo vệ
-                </router-link>
-              </li>
-            </ul>
+            <CategoryMegaMenu
+              :is-open="showCategoryMenu"
+              @navigate="closeCategoryMenu"
+            />
           </li>
 
           <!-- 3. Flash Sale -->

@@ -312,7 +312,7 @@ public class OrderCancellationService {
         boolean isWithinUsagePeriod = (voucher.getStartDate() == null || !voucher.getStartDate().isAfter(now))
                 && (voucher.getEndDate() == null || !voucher.getEndDate().isBefore(now));
         if (previousQuantity <= 0 && isWithinUsagePeriod) {
-            voucher.setIsActive(true);
+            voucher.setStatus(Voucher.STATUS_ACTIVE);
         }
         voucherRepository.save(voucher);
 

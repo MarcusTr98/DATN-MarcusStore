@@ -6,22 +6,17 @@
       Chưa có danh mục nào có sản phẩm.
     </div>
 
-    <!-- Mỗi category cha là 1 block độc lập: tự có BrandFilterBar + ProductListSection riêng -->
+    <!-- Mỗi category cha là 1 block độc lập -->
     <div
       v-for="cate in mainCategories"
       :key="cate.categoryId"
-      class="category-block mb-5"
+      class="category-block"
     >
-      <BrandFilterBar
+      <ProductBlockSection
         :parent-category-id="cate.categoryId"
         :parent-category-name="cate.categoryName"
-        @select="(brand) => onBrandSelect(cate.categoryId, brand)"
-      />
-
-      <ProductListSection
-        :ref="(el) => setProductListRef(cate.categoryId, el)"
-        :parent-category-name="cate.categoryName"
-        :fixed-category-id="cate.categoryId"
+        :parent-category-slug="cate.slug"
+        mode="standalone"
       />
     </div>
   </div>
@@ -30,16 +25,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import api from '@/utils/api'
-import BrandFilterBar from '@/layouts/home/BrandFilterBar.vue'
-import ProductListSection from '@/components/client/ProductCard.vue'
+import ProductBlockSection from '@/components/client/ProductBlockSection.vue'
 
 const mainCategories = ref([])
 const loading = ref(false)
-const productListRefs = ref({})
-
-function setProductListRef(categoryId, el) {
-  if (el) productListRefs.value[categoryId] = el
-}
 
 async function fetchMainCategories() {
   loading.value = true
@@ -52,11 +41,6 @@ async function fetchMainCategories() {
   } finally {
     loading.value = false
   }
-}
-
-function onBrandSelect(parentCategoryId, brand) {
-  const listRef = productListRefs.value[parentCategoryId]
-  if (listRef) listRef.filterByCategory(brand)
 }
 
 onMounted(fetchMainCategories)

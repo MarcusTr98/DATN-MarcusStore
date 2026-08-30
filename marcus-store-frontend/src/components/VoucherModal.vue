@@ -192,9 +192,9 @@ const processedVouchers = computed(() => {
       discountValue = v.discountValue
     }
 
-    const active = v.isActive && !v.isUsed && total >= (v.minOrderValue || 0)
+    const active = (v.status === 'ACTIVE' || v.status === 'SCHEDULED') && !v.isUsed && total >= (v.minOrderValue || 0)
     let disabledReason = ''
-    if (!v.isActive) disabledReason = 'Voucher không còn hoạt động'
+    if (v.status !== 'ACTIVE' && v.status !== 'SCHEDULED') disabledReason = 'Voucher không còn hoạt động'
     else if (v.isUsed) disabledReason = 'Voucher đã được sử dụng'
     else if (total < (v.minOrderValue || 0)) {
       const needed = (v.minOrderValue || 0) - total

@@ -78,6 +78,7 @@
             <select v-model="filters.status" class="form-select">
               <option value="ALL">Tất cả</option>
               <option value="ACTIVE">Đang sử dụng</option>
+              <option value="SCHEDULED">Đã lên lịch</option>
               <option value="INACTIVE">Ngừng sử dụng</option>
             </select>
           </div>
@@ -135,8 +136,8 @@
                 </span>
               </td>
               <td>
-                <span class="status-badge" :class="{ inactive: !voucher.isActive }">
-                  {{ voucher.isActive ? 'Đang sử dụng' : 'Ngừng sử dụng' }}
+                <span class="status-badge" :class="getStatusClass(voucher.status)">
+                  {{ formatStatus(voucher.status) }}
                 </span>
               </td>
               <td>
@@ -208,15 +209,17 @@
       <div class="voucher-modal">
         <div class="modal-head">
           <div>
-            <h2>{{ isEditing ? 'Sửa Voucher' : 'Thêm Voucher' }}</h2>
-            <p>Voucher mới mặc định ở trạng thái đang sử dụng. Mỗi tài khoản chỉ dùng được 1 lần.</p>
+            <h2>{{ isReadOnly ? 'Chi tiết Voucher' : (isEditing ? 'Sửa Voucher' : 'Thêm Voucher') }}</h2>
+            <p v-if="isReadOnly">Voucher đang diễn ra hoặc đã kết thúc, chỉ có thể xem chi tiết.</p>
+            <p v-else-if="!isEditing">Voucher mới mặc định ở trạng thái đang sử dụng. Mỗi tài khoản chỉ dùng được 1 lần.</p>
+            <p v-else>Voucher mới mặc định ở trạng thái đang sử dụng. Mỗi tài khoản chỉ dùng được 1 lần.</p>
           </div>
           <button type="button" class="icon-button" title="Đóng" @click="closeModal">
             <i class="bi bi-x-lg"></i>
           </button>
         </div>
 
-        <form class="voucher-form" novalidate @submit.prevent="saveVoucher">
+        <form class="voucher-form" :class="{ 'is-readonly': isReadOnly }" novalidate @submit.prevent="saveVoucher">
           <!-- Segmented Control chọn loại voucher -->
           <div class="voucher-type-selector">
             <label
@@ -228,6 +231,7 @@
                 type="radio"
                 value="DISCOUNT"
                 name="voucher_type"
+                :disabled="isReadOnly"
               />
               <i class="bi bi-percent"></i>
               <span>Voucher thường</span>
@@ -242,6 +246,7 @@
                 type="radio"
                 value="FREESHIP"
                 name="voucher_type"
+                :disabled="isReadOnly"
               />
               <i class="bi bi-truck"></i>
               <span>Free Ship</span>
@@ -269,8 +274,9 @@
                       :class="{ 'is-invalid': isSubmitted && errors.voucher_code }"
                       placeholder="VD: SUMMER2026"
                       maxlength="12"
+                      :disabled="isReadOnly"
                     />
-                    <button type="button" class="generate-code-btn" @click="generateVoucherCode">
+                    <button type="button" class="generate-code-btn" @click="generateVoucherCode" :disabled="isReadOnly">
                       <i class="bi bi-stars"></i>
                       Tạo mã tự động
                     </button>
@@ -284,9 +290,10 @@
 
                 <div>
                   <label class="form-label">Trạng thái</label>
-                  <select v-model="form.is_active" class="form-select">
-                    <option :value="true">Đang sử dụng</option>
-                    <option :value="false">Ngừng sử dụng</option>
+                  <select v-model="form.status" class="form-select" :disabled="isReadOnly">
+                    <option value="ACTIVE">Đang sử dụng</option>
+                    <option value="SCHEDULED">Đã lên lịch</option>
+                    <option value="INACTIVE">Ngừng sử dụng</option>
                   </select>
                 </div>
 
@@ -307,14 +314,14 @@
                 <div class="discount-choice-grid">
                   <label class="discount-choice"
                          :class="{ active: form.discount_type === 'PERCENT' }">
-                    <input v-model="form.discount_type" type="radio" value="PERCENT"/>
+                    <input v-model="form.discount_type" type="radio" value="PERCENT" :disabled="isReadOnly"/>
                     <span class="discount-choice-text">
                     <strong>Giảm theo phần trăm</strong>
                   </span>
                   </label>
 
                   <label class="discount-choice" :class="{ active: form.discount_type === 'AMOUNT' }">
-                    <input v-model="form.discount_type" type="radio" value="AMOUNT"/>
+                    <input v-model="form.discount_type" type="radio" value="AMOUNT" :disabled="isReadOnly"/>
                     <span class="discount-choice-text">
                     <strong>Giảm tiền trực tiếp</strong>
                   </span>
@@ -334,6 +341,7 @@
                     :value="formatNumberInput(form.discount_value)"
                     @input="form.discount_value = parseNumberInput($event.target.value)"
                     type="text"
+                    :disabled="isReadOnly"
                     inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.discount_value }"
@@ -355,6 +363,7 @@
                     :value="formatNumberInput(form.max_discount_amount)"
                     @input="form.max_discount_amount = parseNumberInput($event.target.value)"
                     type="text"
+                    :disabled="isReadOnly"
                     inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.max_discount_amount }"
@@ -378,6 +387,7 @@
                     :value="formatNumberInput(form.min_order_value)"
                     @input="form.min_order_value = parseNumberInput($event.target.value)"
                     type="text"
+                    :disabled="isReadOnly"
                     inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.min_order_value }"
@@ -396,6 +406,7 @@
                   <input
                     v-model.number="form.quantity"
                     type="number"
+                    :disabled="isReadOnly"
                     min="1"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.quantity }"
@@ -423,7 +434,7 @@
                   <label class="form-label">Áp dụng cho <span>*</span></label>
                   <div class="target-choice-grid">
                     <label class="target-choice" :class="{ active: form.target_type === 'ALL' }">
-                      <input v-model="form.target_type" type="radio" value="ALL"/>
+                      <input v-model="form.target_type" type="radio" value="ALL" :disabled="isReadOnly"/>
                       <span class="target-choice-icon">
                         <i class="bi bi-globe"></i>
                       </span>
@@ -434,7 +445,7 @@
                     </label>
 
                     <label class="target-choice" :class="{ active: form.target_type === 'SPECIFIC' }">
-                      <input v-model="form.target_type" type="radio" value="SPECIFIC"/>
+                      <input v-model="form.target_type" type="radio" value="SPECIFIC" :disabled="isReadOnly"/>
                       <span class="target-choice-icon specific">
                         <i class="bi bi-people"></i>
                       </span>
@@ -516,23 +527,55 @@
                 <span>4</span>
                 <div>
                   <h3>Thời gian Sử dụng</h3>
-                  <p>Ngày kết thúc phải lớn hơn ngày bắt đầu.</p>
+                  <p>Chọn thời gian bắt đầu và kết thúc voucher.</p>
                 </div>
               </div>
 
+              <!-- Chế độ thời gian: Bắt đầu ngay / Đặt trước -->
+              <div class="time-mode-selector mb-3">
+                <button
+                  type="button"
+                  class="time-mode-btn"
+                  :class="{ active: timeMode === 'NOW' }"
+                  @click="selectTimeMode('NOW')"
+                >
+                  <i class="bi bi-play-circle"></i> Bắt đầu ngay
+                </button>
+                <button
+                  type="button"
+                  class="time-mode-btn"
+                  :class="{ active: timeMode === 'SCHEDULED' }"
+                  @click="selectTimeMode('SCHEDULED')"
+                >
+                  <i class="bi bi-calendar-event"></i> Đặt trước
+                </button>
+              </div>
+
               <div class="modal-body-grid compact">
-                <div>
+                <!-- Ngày bắt đầu: chỉ hiện khi chế độ Đặt trước -->
+                <div v-if="timeMode === 'SCHEDULED'">
                   <label class="form-label">Ngày bắt đầu <span>*</span></label>
                   <input
                     v-model="form.start_date"
                     type="datetime-local"
+                    :disabled="isReadOnly"
                     class="form-control"
                     :min="todayDate"
                     :class="{ 'is-invalid': isSubmitted && errors.start_date }"
                   />
-                  <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
+                  <small class="form-help">Chọn ngày bắt đầu áp dụng voucher.</small>
                   <div v-if="errors.start_date" class="invalid-feedback">
                     {{ errors.start_date }}
+                  </div>
+                </div>
+
+                <!-- Khi bắt đầu ngay, hiện thời điểm hiện tại -->
+                <div v-if="timeMode === 'NOW'" class="current-time-info">
+                  <label class="form-label">Ngày bắt đầu</label>
+                  <div class="current-time-display">
+                    <i class="bi bi-clock"></i>
+                    <span>Thời điểm hiện tại</span>
+                    <small>({{ currentTimeDisplay }})</small>
                   </div>
                 </div>
 
@@ -541,6 +584,7 @@
                   <input
                     v-model="form.end_date"
                     type="datetime-local"
+                    :disabled="isReadOnly"
                     class="form-control"
                     :min="form.start_date || todayDate"
                     :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
@@ -553,6 +597,12 @@
                     {{ errors.time }}
                   </div>
                 </div>
+              </div>
+
+              <!-- Trạng thái: tự động theo timeMode -->
+              <div class="status-auto-info">
+                <i class="bi bi-info-circle"></i>
+                <span>Trạng thái: <strong>{{ timeMode === 'NOW' ? 'Đang sử dụng' : 'Đã lên lịch' }}</strong></span>
               </div>
             </section>
           </template>
@@ -600,9 +650,10 @@
 
                 <div>
                   <label class="form-label">Trạng thái</label>
-                  <select v-model="form.is_active" class="form-select">
-                    <option :value="true">Đang sử dụng</option>
-                    <option :value="false">Ngừng sử dụng</option>
+                  <select v-model="form.status" class="form-select" :disabled="isReadOnly">
+                    <option value="ACTIVE">Đang sử dụng</option>
+                    <option value="SCHEDULED">Đã lên lịch</option>
+                    <option value="INACTIVE">Ngừng sử dụng</option>
                   </select>
                 </div>
 
@@ -625,6 +676,7 @@
                     :value="formatNumberInput(form.freeship_value)"
                     @input="form.freeship_value = parseNumberInput($event.target.value)"
                     type="text"
+                    :disabled="isReadOnly"
                     inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.freeship_value }"
@@ -651,6 +703,7 @@
                     :value="formatNumberInput(form.min_order_value)"
                     @input="form.min_order_value = parseNumberInput($event.target.value)"
                     type="text"
+                    :disabled="isReadOnly"
                     inputmode="numeric"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.min_order_value }"
@@ -669,6 +722,7 @@
                   <input
                     v-model.number="form.quantity"
                     type="number"
+                    :disabled="isReadOnly"
                     min="1"
                     class="form-control"
                     :class="{ 'is-invalid': isSubmitted && errors.quantity }"
@@ -696,7 +750,7 @@
                   <label class="form-label">Áp dụng cho <span>*</span></label>
                   <div class="target-choice-grid">
                     <label class="target-choice" :class="{ active: form.target_type === 'ALL' }">
-                      <input v-model="form.target_type" type="radio" value="ALL"/>
+                      <input v-model="form.target_type" type="radio" value="ALL" :disabled="isReadOnly"/>
                       <span class="target-choice-icon">
                         <i class="bi bi-globe"></i>
                       </span>
@@ -707,7 +761,7 @@
                     </label>
 
                     <label class="target-choice" :class="{ active: form.target_type === 'SPECIFIC' }">
-                      <input v-model="form.target_type" type="radio" value="SPECIFIC"/>
+                      <input v-model="form.target_type" type="radio" value="SPECIFIC" :disabled="isReadOnly"/>
                       <span class="target-choice-icon specific">
                         <i class="bi bi-people"></i>
                       </span>
@@ -789,23 +843,55 @@
                 <span>4</span>
                 <div>
                   <h3>Thời gian Sử dụng</h3>
-                  <p>Ngày kết thúc phải lớn hơn ngày bắt đầu.</p>
+                  <p>Chọn thời gian bắt đầu và kết thúc voucher.</p>
                 </div>
               </div>
 
+              <!-- Chế độ thời gian: Bắt đầu ngay / Đặt trước -->
+              <div class="time-mode-selector mb-3">
+                <button
+                  type="button"
+                  class="time-mode-btn"
+                  :class="{ active: timeMode === 'NOW' }"
+                  @click="selectTimeMode('NOW')"
+                >
+                  <i class="bi bi-play-circle"></i> Bắt đầu ngay
+                </button>
+                <button
+                  type="button"
+                  class="time-mode-btn"
+                  :class="{ active: timeMode === 'SCHEDULED' }"
+                  @click="selectTimeMode('SCHEDULED')"
+                >
+                  <i class="bi bi-calendar-event"></i> Đặt trước
+                </button>
+              </div>
+
               <div class="modal-body-grid compact">
-                <div>
+                <!-- Ngày bắt đầu: chỉ hiện khi chế độ Đặt trước -->
+                <div v-if="timeMode === 'SCHEDULED'">
                   <label class="form-label">Ngày bắt đầu <span>*</span></label>
                   <input
                     v-model="form.start_date"
                     type="datetime-local"
+                    :disabled="isReadOnly"
                     class="form-control"
                     :min="todayDate"
                     :class="{ 'is-invalid': isSubmitted && errors.start_date }"
                   />
-                  <small class="form-help">Gợi ý: chọn từ hôm nay.</small>
+                  <small class="form-help">Chọn ngày bắt đầu áp dụng voucher.</small>
                   <div v-if="errors.start_date" class="invalid-feedback">
                     {{ errors.start_date }}
+                  </div>
+                </div>
+
+                <!-- Khi bắt đầu ngay, hiện thời điểm hiện tại -->
+                <div v-if="timeMode === 'NOW'" class="current-time-info">
+                  <label class="form-label">Ngày bắt đầu</label>
+                  <div class="current-time-display">
+                    <i class="bi bi-clock"></i>
+                    <span>Thời điểm hiện tại</span>
+                    <small>({{ currentTimeDisplay }})</small>
                   </div>
                 </div>
 
@@ -814,6 +900,7 @@
                   <input
                     v-model="form.end_date"
                     type="datetime-local"
+                    :disabled="isReadOnly"
                     class="form-control"
                     :min="form.start_date || todayDate"
                     :class="{ 'is-invalid': isSubmitted && (errors.end_date || errors.time) }"
@@ -826,6 +913,12 @@
                     {{ errors.time }}
                   </div>
                 </div>
+              </div>
+
+              <!-- Trạng thái: tự động theo timeMode -->
+              <div class="status-auto-info">
+                <i class="bi bi-info-circle"></i>
+                <span>Trạng thái: <strong>{{ timeMode === 'NOW' ? 'Đang sử dụng' : 'Đã lên lịch' }}</strong></span>
               </div>
             </section>
           </template>
@@ -841,22 +934,23 @@
           </section>
 
           <div class="form-actions">
-            <button type="button" class="btn btn-soft" @click="resetForm">
+            <button type="button" class="btn btn-soft" @click="resetForm" :disabled="isReadOnly">
               Làm mới
             </button>
             <button
               type="button"
               class="btn btn-preview"
               @click="isPreviewVisible = !isPreviewVisible"
+              :disabled="isReadOnly"
             >
               Xem trước
             </button>
             <button
               type="submit"
               class="btn btn-primary-action"
-              :disabled="loading"
+              :disabled="loading || isReadOnly"
             >
-              {{ loading ? 'Đang lưu...' : 'Lưu Voucher' }}
+              {{ isReadOnly ? 'Đóng' : (loading ? 'Đang lưu...' : 'Lưu Voucher') }}
             </button>
           </div>
         </form>
@@ -924,6 +1018,7 @@ function handleClickOutside(event) {
 
 const isModalOpen = ref(false)
 const isEditing = ref(false)
+const isReadOnly = ref(false)
 const isSubmitted = ref(false)
 const isPreviewVisible = ref(false)
 
@@ -963,7 +1058,7 @@ const defaultForm = {
   quantity: 100,
   start_date: '',
   end_date: '',
-  is_active: true,
+  status: 'ACTIVE', // 'ACTIVE', 'INACTIVE', 'SCHEDULED'
   freeship_value: null,
   // Đối tượng sử dụng
   target_type: 'ALL', // 'ALL' hoặc 'SPECIFIC'
@@ -972,6 +1067,33 @@ const defaultForm = {
 
 const form = reactive({...defaultForm})
 const codeLength = computed(() => (form.voucher_code || '').length)
+
+// Chế độ thời gian: 'NOW' = Bắt đầu ngay, 'SCHEDULED' = Đặt trước
+const timeMode = ref('NOW')
+
+const currentTimeDisplay = computed(() => {
+  return new Intl.DateTimeFormat('vi-VN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(new Date())
+})
+
+function selectTimeMode(mode) {
+  timeMode.value = mode
+  if (mode === 'NOW') {
+    // Auto set start_date = now
+    const now = new Date()
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+    form.start_date = now.toISOString().slice(0, 16)
+    // Auto set status = ACTIVE
+    form.status = 'ACTIVE'
+  } else {
+    // Reset start_date để user chọn
+    form.start_date = ''
+    // Auto set status = SCHEDULED
+    form.status = 'SCHEDULED'
+  }
+}
 
 const todayDate = computed(() => {
   const now = new Date()
@@ -1010,7 +1132,10 @@ const filteredVouchers = computed(() => {
     return vouchers.value.filter((voucher) => voucher.isActive === true)
   }
   if (filters.status === 'INACTIVE') {
-    return vouchers.value.filter((voucher) => voucher.isActive === false)
+    return vouchers.value.filter((voucher) => voucher.status === 'INACTIVE')
+  }
+  if (filters.status === 'SCHEDULED') {
+    return vouchers.value.filter((voucher) => voucher.status === 'SCHEDULED')
   }
   // ALL: hiển thị tất cả
   return vouchers.value
@@ -1092,14 +1217,26 @@ const errors = computed(() => {
     result.min_order_value = 'Đơn tối thiểu không được âm'
   }
 
-  if (!form.start_date) {
-    result.start_date = 'Vui lòng chọn ngày bắt đầu'
-  } else {
-    const start = new Date(form.start_date)
-    const now = new Date()
-    // Ngày bắt đầu không được vượt quá hiện tại quá 1 phút (tránh lệch múi giờ/khách mở modal muộn)
-    if (start.getTime() - now.getTime() > 60_000) {
-      result.start_date = 'Ngày bắt đầu không được là ngày trong tương lai'
+  // Validation start_date: chỉ kiểm tra khi mode SCHEDULED
+  if (timeMode.value === 'SCHEDULED') {
+    if (!form.start_date) {
+      result.start_date = 'Vui lòng chọn ngày bắt đầu'
+    } else {
+      const start = new Date(form.start_date)
+      const now = new Date()
+      // SCHEDULED: startDate phải LỚN HƠN thời điểm hiện tại (tương lai)
+      if (start.getTime() <= now.getTime()) {
+        result.start_date = 'Ngày bắt đầu phải là ngày trong tương lai'
+      }
+    }
+  } else if (timeMode.value === 'NOW') {
+    // NOW: startDate phải <= thời điểm hiện tại (không được là tương lai)
+    if (form.start_date) {
+      const start = new Date(form.start_date)
+      const now = new Date()
+      if (start.getTime() > now.getTime() + 60_000) {
+        result.start_date = 'Ngày bắt đầu không thể là tương lai khi chọn "Bắt đầu ngay"'
+      }
     }
   }
 
@@ -1154,6 +1291,32 @@ function formatTargetType(voucher) {
     return `${voucher.targetUserCount} khách`
   }
   return 'Cụ thể'
+}
+
+function formatStatus(status) {
+  switch (status) {
+    case 'ACTIVE':
+      return 'Đang sử dụng'
+    case 'SCHEDULED':
+      return 'Đã lên lịch'
+    case 'INACTIVE':
+      return 'Ngừng sử dụng'
+    default:
+      return status || '-'
+  }
+}
+
+function getStatusClass(status) {
+  switch (status) {
+    case 'ACTIVE':
+      return 'active'
+    case 'SCHEDULED':
+      return 'scheduled'
+    case 'INACTIVE':
+      return 'inactive'
+    default:
+      return ''
+  }
 }
 
 watch(
@@ -1241,10 +1404,7 @@ function buildVoucherQuery() {
     size: pageSize.value,
     keyword: filters.keyword || undefined,
     discountType: filters.discountType === 'ALL' ? undefined : filters.discountType,
-    isActive:
-      filters.status === 'ALL'
-        ? undefined
-        : filters.status === 'ACTIVE',
+    status: filters.status === 'ALL' ? undefined : filters.status,
   }
 }
 
@@ -1267,8 +1427,14 @@ function resetForm() {
   voucherStore.fieldErrors = {}
   Object.assign(form, {...defaultForm})
   isEditing.value = false
+  isReadOnly.value = false
   userSearchQuery.value = ''
   showUserDropdown.value = false
+  timeMode.value = 'NOW'
+  // Auto set start_date = now khi tạo mới
+  const now = new Date()
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  form.start_date = now.toISOString().slice(0, 16)
 }
 
 function openCreateModal() {
@@ -1280,20 +1446,42 @@ function openEditModal(voucher) {
   isSubmitted.value = false
   voucherStore.fieldErrors = {}
 
+  // Voucher đang diễn ra (ACTIVE) hoặc đã kết thúc (INACTIVE) -> chỉ xem, không sửa
+  const currentDate = new Date()
+  const endDate = voucher.endDate ? new Date(voucher.endDate) : null
+  const isExpired = endDate && endDate.getTime() < currentDate.getTime()
+  isReadOnly.value = voucher.status === 'ACTIVE' || isExpired
+
   let voucherType = 'DISCOUNT'
   if (voucher.discountType === 'FREESHIP') {
     voucherType = 'FREESHIP'
   }
 
-  // Khi sửa: nếu ngày bắt đầu cũ đã ở quá khứ thì tự động đặt lại về thời điểm hiện tại
-  // (định dạng lại thành "YYYY-MM-DDTHH:mm" theo local time cho input datetime-local).
-  // Nếu ngày bắt đầu còn hợp lệ (chưa tới hoặc đang diễn ra) thì giữ nguyên.
-  const now = new Date()
+  // Khi sửa: xác định timeMode dựa trên status
+  const voucherStatus = voucher.status || 'ACTIVE'
+  let editTimeMode = 'NOW'
+  let editStartDate = ''
   const startRaw = voucher.startDate ? new Date(voucher.startDate) : null
-  let startForForm = voucher.startDate
-  if (startRaw && startRaw.getTime() < now.getTime()) {
-    const tzOffset = now.getTimezoneOffset() * 60_000
-    startForForm = new Date(now.getTime() - tzOffset).toISOString().slice(0, 16)
+
+  if (voucherStatus === 'SCHEDULED') {
+    // Nếu là SCHEDULED, hiện form đặt trước
+    editTimeMode = 'SCHEDULED'
+    editStartDate = voucher.startDate
+  } else {
+    // ACTIVE hoặc INACTIVE: kiểm tra startDate đã qua chưa
+    editTimeMode = 'NOW'
+    if (startRaw && startRaw.getTime() < currentDate.getTime()) {
+      // startDate đã qua -> dùng thời điểm hiện tại
+      const tzOffset = currentDate.getTimezoneOffset() * 60_000
+      editStartDate = new Date(currentDate.getTime() - tzOffset).toISOString().slice(0, 16)
+    } else if (startRaw) {
+      // startDate còn trong tương lai -> vẫn cho sửa
+      editTimeMode = 'SCHEDULED'
+      editStartDate = voucher.startDate
+    } else {
+      const tzOffset = currentDate.getTimezoneOffset() * 60_000
+      editStartDate = new Date(currentDate.getTime() - tzOffset).toISOString().slice(0, 16)
+    }
   }
 
   Object.assign(form, {
@@ -1305,14 +1493,17 @@ function openEditModal(voucher) {
     max_discount_amount: voucher.maxDiscountAmount,
     min_order_value: voucher.minOrderValue,
     quantity: voucher.quantity || 1,
-    start_date: startForForm,
+    start_date: editStartDate,
     end_date: voucher.endDate,
-    is_active: voucher.isActive,
+    status: voucherStatus,
     freeship_value: voucher.freeshipValue || null,
     // Đối tượng sử dụng
     target_type: voucher.targetType || 'ALL',
     selected_user_ids: voucher.targetUserIds || [],
   })
+
+  // Set timeMode sau khi gán form
+  timeMode.value = editTimeMode
 
   isEditing.value = true
   isModalOpen.value = true
@@ -1321,6 +1512,7 @@ function openEditModal(voucher) {
 
 function closeModal() {
   isModalOpen.value = false
+  isReadOnly.value = false
 }
 
 function buildPayload() {
@@ -1329,7 +1521,7 @@ function buildPayload() {
     minOrderValue: Number(form.min_order_value || 0),
     startDate: form.start_date,
     endDate: form.end_date,
-    isActive: Boolean(form.is_active),
+    status: form.status,
     targetType: form.target_type,
     quantity: Number(form.quantity),
   }
@@ -1536,5 +1728,7 @@ function formatDateTime(value) {
 </script>
 
 <style scoped>
-
+.voucher-form.is-readonly {
+  opacity: 0.85;
+}
 </style>

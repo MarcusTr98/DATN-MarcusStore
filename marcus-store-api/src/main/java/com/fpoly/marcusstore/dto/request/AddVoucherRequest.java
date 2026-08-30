@@ -27,7 +27,7 @@ public class AddVoucherRequest {
     private LocalDateTime startDate;
     @NotNull(message = "Ngày kết thúc không đuợc bỏ trống")
     private LocalDateTime endDate;
-    private Boolean isActive;
+    private String status; // 'ACTIVE', 'INACTIVE', 'SCHEDULED'
     // Đối tượng sử dụng
     @NotBlank(message = "Hãy chọn đối tượng sử dụng")
     private String targetType; // 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể

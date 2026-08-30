@@ -48,6 +48,7 @@ public class CategoriesServiceImpl implements CategoriesService {
                 .categoryName(p.getCategoryName())
                 .categoryImg(p.getCategoryImg())
                 .status(p.getStatus())
+                .slug(p.getSlug())
                 .parentId(null)
                 .parentName(null)
                 .build();
@@ -187,6 +188,14 @@ public class CategoriesServiceImpl implements CategoriesService {
                 .map(parent -> categoryRepository.findByParent_CategoryIdAndStatusTrue(parent.getCategoryId()))
                 .map(list -> list.stream().map(this::toCateResponse).toList())
                 .orElse(List.of());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<CategoryResponse> getCategoryBySlug(String slug) {
+        return categoryRepository.findBySlug(slug)
+                .filter(Category::getStatus)
+                .map(this::toCateResponse);
     }
 
     @Override

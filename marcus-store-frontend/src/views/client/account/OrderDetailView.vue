@@ -534,7 +534,7 @@
               </template>
               <!-- CREATE mode: Tạo mới -->
               <template v-else-if="warrantyModal.mode === 'create'">
-                Yêu cầu đổi trả bảo hành
+                Yêu cầu bảo hành
               </template>
               <!-- LOADING mode -->
               <template v-else>
@@ -658,56 +658,7 @@
 
             <!-- ===== CREATE MODE: Form nhập liệu ===== -->
             <template v-else-if="warrantyModal.mode === 'create'">
-              <!-- Loại yêu cầu -->
-              <div class="warranty-form-group">
-                <label class="warranty-label">
-                  Loại yêu cầu <span class="required">*</span>
-                </label>
-                <div class="warranty-type-options">
-                  <label
-                    class="warranty-type-option"
-                    :class="{ active: warrantyForm.type === 'EXCHANGE' }"
-                  >
-                    <input
-                      v-model="warrantyForm.type"
-                      type="radio"
-                      value="EXCHANGE"
-                      class="warranty-type-radio"
-                    />
-                    <div class="warranty-type-content">
-                      <div class="warranty-type-icon">
-                        <i class="fa-solid fa-repeat"></i>
-                      </div>
-                      <span class="warranty-type-title">Đổi sản phẩm mới</span>
-                      <span class="warranty-type-desc">Nhận sản phẩm thay thế</span>
-                      <div v-if="warrantyForm.type === 'EXCHANGE'" class="warranty-type-check">
-                        <i class="fa-solid fa-check"></i>
-                      </div>
-                    </div>
-                  </label>
-                  <label
-                    class="warranty-type-option"
-                    :class="{ active: warrantyForm.type === 'REFUND' }"
-                  >
-                    <input
-                      v-model="warrantyForm.type"
-                      type="radio"
-                      value="REFUND"
-                      class="warranty-type-radio"
-                    />
-                    <div class="warranty-type-content">
-                      <div class="warranty-type-icon">
-                        <i class="fa-solid fa-coins"></i>
-                      </div>
-                      <span class="warranty-type-title">Bảo hành</span>
-                      <span class="warranty-type-desc">Gửi yêu cầu bảo hành sản phẩm</span>
-                      <div v-if="warrantyForm.type === 'REFUND'" class="warranty-type-check">
-                        <i class="fa-solid fa-check"></i>
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              </div>
+
 
               <!-- Lý do -->
               <div class="warranty-form-group">
@@ -796,7 +747,7 @@
                   <i class="fa-solid fa-circle-info"></i>
                 </div>
                 <div class="warranty-notice-text">
-                  <strong>Lưu ý:</strong> Chúng tôi chỉ chấp nhận đổi trả bảo hành cho các sản phẩm còn trong thời gian bảo hành và lỗi phải thuộc về nhà sản xuất. Chúng tôi không chịu trách nhiệm nếu lỗi sản phẩm do người dùng gây ra.
+                  <strong>Lưu ý:</strong> Chúng tôi chỉ chấp nhận bảo hành cho các sản phẩm còn trong thời gian bảo hành và lỗi phải thuộc về nhà sản xuất. Chúng tôi không chịu trách nhiệm nếu lỗi sản phẩm do người dùng gây ra.
                 </div>
               </div>
             </template>
@@ -948,20 +899,20 @@ function showWarrantyToast(message) {
 function canRequestWarranty(item) {
   const order = selectedOrder.value
   if (!order) return false
-  
+
   // Chỉ đơn COMPLETED mới được yêu cầu bảo hành
   if (order.orderStatus !== 'COMPLETED') return false
-  
+
   // Kiểm tra trong thời hạn bảo hành (6 tháng)
   const warrantyPeriodMonths = 6
   const orderDate = new Date(order.createdAt)
   const expiryDate = new Date()
   expiryDate.setMonth(expiryDate.getMonth() - warrantyPeriodMonths)
   if (orderDate < expiryDate) return false
-  
+
   // Kiểm tra sản phẩm chưa có yêu cầu BH đang xử lý
   if (item.hasActiveWarrantyRequest) return false
-  
+
   return true
 }
 
@@ -1034,14 +985,14 @@ async function openWarrantyModal(item) {
     description: '',
     attachments: [],
   }
-  
+
   // Kiểm tra xem đã có yêu cầu BH chưa
   try {
     const orderItemId = item.orderItemId || item.skuId
     const response = await WarrantyApi.getWarrantyByOrderItem(orderItemId)
     existingWarranty.value = response.data.data
     warrantyModal.value.mode = 'view'
-    
+
     // Điền thông tin đã gửi vào form (chỉ để hiển thị, không cho sửa)
     warrantyForm.value.reason = existingWarranty.value.reason
     warrantyForm.value.description = existingWarranty.value.description
@@ -1077,42 +1028,42 @@ function triggerFileInput() {
 function handleFileSelect(event) {
   // Reset feedback cũ trước khi validate file mới
   warrantyModal.value.feedback = { type: '', message: '' }
-  
+
   const files = Array.from(event.target.files)
-  
+
   // Tính tổng dung lượng hiện tại
   const currentTotalSize = warrantyForm.value.attachments.reduce(
     (sum, att) => sum + (att.file?.size || 0), 0
   )
-  
+
   files.forEach((file) => {
     // 1. Kiểm tra số lượng file
     if (warrantyForm.value.attachments.length >= MAX_FILE_COUNT) {
       showWarrantyToast(`Chỉ được đính kèm tối đa ${MAX_FILE_COUNT} file.`)
       return
     }
-    
+
     // 2. Kiểm tra định dạng file (image/* hoặc video/*)
     const isImage = file.type.startsWith('image/')
     const isVideo = file.type.startsWith('video/')
-    
+
     if (!isImage && !isVideo) {
       showWarrantyToast(`"${file.name}" không phải là ảnh hoặc video.`)
       return
     }
-    
+
     // 3. Kiểm tra dung lượng từng file
     const maxSize = isImage ? MAX_IMAGE_SIZE : MAX_VIDEO_SIZE
     if (file.size > maxSize) {
-      const limitMB = isImage 
-        ? (MAX_IMAGE_SIZE / 1024 / 1024).toFixed(0) 
+      const limitMB = isImage
+        ? (MAX_IMAGE_SIZE / 1024 / 1024).toFixed(0)
         : (MAX_VIDEO_SIZE / 1024 / 1024).toFixed(0)
       showWarrantyToast(
         `"${file.name}" vượt quá ${limitMB}MB (file: ${formatFileSize(file.size)})`
       )
       return
     }
-    
+
     // 4. Kiểm tra tổng dung lượng
     if (currentTotalSize + file.size > MAX_TOTAL_SIZE) {
       const currentMB = (currentTotalSize / 1024 / 1024).toFixed(1)
@@ -1123,7 +1074,7 @@ function handleFileSelect(event) {
       )
       return
     }
-    
+
     // 5. File hợp lệ → đọc preview và thêm vào danh sách
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -1137,7 +1088,7 @@ function handleFileSelect(event) {
     }
     reader.readAsDataURL(file)
   })
-  
+
   // Reset input
   event.target.value = ''
 }
@@ -1158,10 +1109,10 @@ const canSubmitWarranty = computed(() => {
 // Submit yêu cầu bảo hành
 async function submitWarranty() {
   if (!canSubmitWarranty.value || warrantySubmitting.value) return
-  
+
   warrantySubmitting.value = true
   warrantyModal.value.feedback = { type: '', message: '' }
-  
+
   try {
     // 1. Upload ảnh/video lên Cloudinary trước
     const attachmentUrls = []
@@ -1176,7 +1127,7 @@ async function submitWarranty() {
         }
       }
     }
-    
+
     // 2. Gửi request tạo bảo hành với URLs đã upload
     const payload = {
       orderItemId: warrantyModal.value.selectedItem.orderItemId || warrantyModal.value.selectedItem.skuId,
@@ -1184,14 +1135,14 @@ async function submitWarranty() {
       description: warrantyForm.value.description,
       attachmentUrls: attachmentUrls,
     }
-    
+
     const response = await WarrantyApi.createWarranty(payload)
-    
+
     warrantyModal.value.feedback = {
       type: 'success',
       message: 'Yêu cầu bảo hành đã được gửi thành công! Chúng tôi sẽ phản hồi trong thời gian sớm nhất.',
     }
-    
+
     // Đóng modal sau 2 giây
     setTimeout(() => {
       closeWarrantyModal()
@@ -2766,21 +2717,21 @@ function getVariantText(item) {
   .warranty-reason-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .warranty-product-card {
     flex-direction: column;
     align-items: center;
     text-align: center;
   }
-  
+
   .warranty-product-specs {
     justify-content: center;
   }
-  
+
   .warranty-product-price-row {
     justify-content: center;
   }
-  
+
   .warranty-textarea-footer {
     flex-direction: column;
     gap: 8px;

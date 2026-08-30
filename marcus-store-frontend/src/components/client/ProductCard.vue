@@ -283,7 +283,7 @@
                   {{ spec }}
                 </span>
               </div>
-                           
+
               <!-- Khuyến mãi / ưu đãi (sửa nội dung trong PromotionCard.vue) -->
               <VoucherCard />
 
@@ -342,12 +342,12 @@
     @close="notifyModal.visible = false"
   />
 
-<LoginRequiredModal
+  <LoginRequiredModal
     :visible="loginModal.visible"
     :title="loginModal.title"
     :message="loginModal.message"
     @close="loginModal.visible = false"
-/>
+  />
 </template>
 
 <script setup>
@@ -369,7 +369,7 @@ const loginModal = reactive({
 })
 
 function isLoggedIn() {
-    return !!localStorage.getItem("ACCESS_TOKEN")
+  return !!localStorage.getItem("ACCESS_TOKEN")
 }
 function openLoginModal(title, message) {
   loginModal.title = title
@@ -756,13 +756,13 @@ function isWished(productId) {
 const togglingIds = ref(new Set())
 
 async function toggleWishlist(productId) {
-if (!isLoggedIn()) {
-  openLoginModal(
-    'Lưu sản phẩm yêu thích',
-    'Vui lòng đăng nhập để lưu và quản lý các sản phẩm yêu thích của bạn.',
-  )
-  return
-}
+  if (!isLoggedIn()) {
+    openLoginModal(
+      'Lưu sản phẩm yêu thích',
+      'Vui lòng đăng nhập để lưu và quản lý các sản phẩm yêu thích của bạn.',
+    )
+    return
+  }
   if (togglingIds.value.has(productId)) return
   togglingIds.value.add(productId)
   try {
@@ -802,13 +802,13 @@ function showNotify(type, title, message) {
 }
 
 async function addToCart(product) {
-if (!isLoggedIn()) {
-  openLoginModal(
-    'Thêm vào giỏ hàng',
-    'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng và tiến hành thanh toán.',
-  )
-  return
-}
+  if (!isLoggedIn()) {
+    openLoginModal(
+      'Thêm vào giỏ hàng',
+      'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng và tiến hành thanh toán.',
+    )
+    return
+  }
   // Backend trả về defaultSkuId (SKU active + còn hàng + giá thấp nhất).
   // Nếu không có (hết hàng mọi SKU / sản phẩm mới chưa tạo SKU) → điều hướng
   // sang trang chi tiết để user chọn variant hoặc xem thông báo hết hàng,

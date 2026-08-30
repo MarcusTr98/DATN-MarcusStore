@@ -22,7 +22,7 @@ public class VoucherResponse {
     private LocalDateTime startDate;
     private LocalDateTime endDate;
     private Integer quantity;
-    private Boolean isActive;
+    private String status; // 'ACTIVE', 'INACTIVE', 'SCHEDULED'
 
     // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     private String targetType;
