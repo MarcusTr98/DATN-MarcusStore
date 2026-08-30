@@ -25,6 +25,7 @@ public class FlashSaleSlotRequest {
     private LocalDateTime startDate;
     @NotNull(message = "Ngày kết thúc không được để trống")
     private LocalDateTime endDate;
+    @Builder.Default
     private Short status = 1;
     // FE đã upload ảnh lên Cloudinary rồi, chỉ gửi URL về đây
     @Pattern(

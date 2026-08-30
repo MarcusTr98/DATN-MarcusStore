@@ -7,7 +7,7 @@ spring.application.name=MarcusStore
 # CẤU HÌNH KẾT NỐI SQL SERVER
 spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=MarcusStoreDB;encrypt=true;trustServerCertificate=true;
 spring.datasource.username=sa
-spring.datasource.password=your_password_here
+spring.datasource.password=${DB_PASSWORD:your_password_here}
 spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
 
 # Cấu hình Pool kết nối (HikariCP) để tối ưu hiệu năng chịu tải
@@ -35,7 +35,7 @@ spring.jackson.date-format=yyyy-MM-dd HH:mm:ss
 # CẤU HÌNH BẢO MẬT JWT (JSON WEB TOKEN)
 
 # Chuỗi khóa bí mật dùng để ký token (Yêu cầu chuỗi Base64 ngẫu nhiên, dài, bảo mật)
-marcusstore.app.jwtSecret=MarcusStoreSecretKey2026DATNSuperSecureKeyDoNotSharePleaseMakeItLongerThan64Chars
+marcusstore.app.jwtSecret=${JWT_SECRET:replace_with_a_base64_secret_of_at_least_64_characters}
 # Thời gian sống của Access Token (Ví dụ: 86400000 ms = 24 giờ)
 marcusstore.app.jwtExpirationMs=86400000
 
@@ -46,8 +46,8 @@ spring.servlet.multipart.max-file-size=5MB
 spring.servlet.multipart.max-request-size=20MB
 
 # CẤU HÌNH VNPAY SANDBOX
-vnpay.tmnCode=35MNCPPT
-vnpay.hashSecret=PL1CWRM8WRSLHCA0LCIOECIR08Z87TBV
+vnpay.tmnCode=${VNPAY_TMN_CODE:your_vnpay_tmn_code}
+vnpay.hashSecret=${VNPAY_HASH_SECRET:your_vnpay_hash_secret}
 vnpay.payUrl=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
 vnpay.returnUrl=http://localhost:5173/order-success
 # Marcus thêm: VNPAY hết hạn 15 phút; chờ thêm 5 phút cho IPN đến chậm rồi mới tự hủy.
@@ -74,13 +74,13 @@ checkout.cod.expiry-initial-delay-ms=60000
 checkout.cod.expiry-scan-delay-ms=300000
 
 # CẤU HÌNH CLOUDINARY
-cloudinary.cloud-name=dyeb3lju6
-cloudinary.api-key=336949236443174
-cloudinary.api-secret=IiIrPDrALvo70daj_FVpCciOuWM
+cloudinary.cloud-name=${CLOUDINARY_CLOUD_NAME:your_cloud_name}
+cloudinary.api-key=${CLOUDINARY_API_KEY:your_api_key}
+cloudinary.api-secret=${CLOUDINARY_API_SECRET:your_api_secret}
 
 # GIAO HANG NHANH (GHN) - MOI TRUONG TEST
-ghn.api.token=a5435b66-68cc-11f1-a973-aee5264794df
-ghn.api.shop-id=200703
+ghn.api.token=${GHN_API_TOKEN:your_ghn_token}
+ghn.api.shop-id=${GHN_SHOP_ID:your_ghn_shop_id}
 ghn.api.url.fee=https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/fee
 ghn.api.url.create=https://dev-online-gateway.ghn.vn/shiip/public-api/v2/shipping-order/create
 ghn.store.district-id=1526
@@ -88,11 +88,11 @@ ghn.store.ward-code=20310
 
 # Marcus sửa: token xác thực webhook GHN là bắt buộc, kể cả khi demo bằng
 # Postman/ngrok. Request phải gửi cùng giá trị trong header X-Verification-Token.
-ghn.webhook.token=MARCUS_GHN_TEST_2026_SECRET
+ghn.webhook.token=${GHN_WEBHOOK_TOKEN:your_private_webhook_token}
 
 # cấu hình đăng nhập đăng ký GG
-google.oauth2.client-id=YOUR_GOOGLE_CLIENT_ID
-google.oauth2.client-secret=YOUR_GOOGLE_CLIENT_SECRET
+google.oauth2.client-id=${GOOGLE_CLIENT_ID:your_google_client_id}
+google.oauth2.client-secret=${GOOGLE_CLIENT_SECRET:your_google_client_secret}
 spring.security.oauth2.client.registration.google.scope=email,profile
 frontend.url=http://localhost:5173
 
@@ -105,7 +105,7 @@ backup.storage-warning-free-mb=1024
 analytics.behavior.retention-days=365
 
 # Marcus AI - Gemini Free Tier
-gemini.api-key=
+gemini.api-key=${GEMINI_API_KEY:}
 gemini.model=gemini-3.5-flash-lite
 gemini.base-url=https://generativelanguage.googleapis.com
 
@@ -115,6 +115,3 @@ spring.jpa.show-sql=false
 spring.jpa.properties.hibernate.format_sql=false
 logging.level.org.springframework.security=WARN
 logging.level.org.springframework.security.web.authentication=WARN
-
-gemini.api-key=AQ.YOUR_GCP_API_KEY_HERE
-gemini.model=gemini-3.5-flash-lite
