@@ -1,29 +1,6 @@
 <template>
-  <!-- ============ MODE: standalone (trang chủ - điều phối nhiều block) ============ -->
-  <div v-if="mode === 'standalone'" class="category-blocks-wrapper">
-    <div v-if="loadingCategories" class="text-center py-5 text-muted">
-      Đang tải danh mục...
-    </div>
-
-    <div v-else-if="mainCategories.length === 0" class="text-center py-5 text-muted">
-      Chưa có danh mục nào có sản phẩm.
-    </div>
-
-    <template v-else>
-      <ProductBlockSection
-        v-for="cate in mainCategories"
-        :key="cate.categoryId"
-        :ref="(el) => setBlockRef(cate.categoryId, el)"
-        :parent-category-id="cate.categoryId"
-        :parent-category-name="cate.categoryName"
-        :parent-category-slug="cate.slug"
-        mode="standalone"
-      />
-    </template>
-  </div>
-
   <!-- ============ MODE: list (trang /search?q=...) ============ -->
-  <div v-else-if="mode === 'list'" class="product-list-wrapper">
+  <div v-if="mode === 'list'" class="product-list-wrapper">
     <div v-if="loading" class="text-center py-5 text-muted">Đang tải...</div>
     <div v-else-if="error" class="text-center py-5 text-danger">{{ error }}</div>
     <div v-else-if="!products.length" class="text-center py-5 text-muted">
@@ -115,6 +92,8 @@
         </div>
       </div>
 
+      <!-- Pagination được render bên ngoài (Search.vue) qua prop page,
+           nhưng giữ fallback này khi dùng mode list độc lập (không có parent điều khiển) -->
       <nav v-if="totalPages > 1 && !externalPage" class="d-flex justify-content-center mt-4">
         <ul class="pagination">
           <li
@@ -130,6 +109,230 @@
     </template>
   </div>
 
+  <!-- ============ MODE: filter / standalone (giữ nguyên logic cũ) ============ -->
+  <div v-else class="category-blocks-wrapper">
+    <div v-if="loadingCategories" class="text-center py-5 text-muted">Đang tải danh mục...</div>
+
+    <div v-else-if="mainCategories.length === 0" class="text-center py-5 text-muted">
+      Chưa có danh mục nào có sản phẩm.
+    </div>
+
+    <!-- Mỗi category cha (Điện thoại, Phụ kiện...) là 1 block độc lập, tự quản lý state riêng -->
+    <div v-for="block in blocks" :key="block.categoryId" class="product-block mb-5">
+      <!-- Header: tiêu đề (đổi theo brand đang chọn) + Sắp xếp theo -->
+      <div class="block-header d-flex align-items-center justify-content-between mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <h4 class="block-title mb-0">{{ block.sectionTitle }}</h4>
+          <button
+            v-if="block.selectedBrandName"
+            type="button"
+            class="reset-btn"
+            title="Bỏ chọn hãng, xem tất cả"
+            @click="resetBrand(block)"
+          >
+            ✕
+          </button>
+          <!-- Nút x reset filter: chỉ hiện khi đang áp dụng filter (giữ nguyên brand) -->
+          <button
+            v-if="getActiveFilterCount(block) > 0"
+            type="button"
+            class="reset-btn"
+            title="Xóa hết lọc, về danh sách ban đầu"
+            @click="resetFilterAndBrand(block)"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div class="sort-options">
+          <button
+            v-for="opt in sortOptions"
+            :key="opt.value"
+            type="button"
+            class="sort-btn"
+            :class="{ active: block.sortBy === opt.value }"
+            @click="onSortChange(block, opt.value)"
+          >
+            <span class="sort-icon">{{ opt.icon }}</span>
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Brand bar: ẩn logo brand khi filter active (vẫn hiện nút Lọc); ẩn nút Lọc khi đang chọn brand -->
+      <div class="brand-grid mb-3">
+        <!-- Nút Lọc: chỉ ẩn khi đang chọn brand để tránh lọc đè brand -->
+        <button
+          v-if="block.selectedBrandId == null"
+          type="button"
+          class="filter-btn"
+          @click="openFilter(block)"
+        >
+          <i class="fa-solid fa-sliders"></i>
+          Lọc
+          <span v-if="getActiveFilterCount(block) > 0" class="filter-badge">
+            {{ getActiveFilterCount(block) }}
+          </span>
+        </button>
+
+        <!-- Logo các hãng con: ẩn khi filter active -->
+        <template v-if="getActiveFilterCount(block) === 0">
+          <button
+            v-for="brand in block.brands"
+            :key="brand.categoryId"
+            type="button"
+            class="brand-item"
+            :class="{ active: block.selectedBrandId === brand.categoryId }"
+            @click="onBrandClick(block, brand)"
+          >
+            <img :src="brand.categoryImg" :alt="brand.categoryName" class="brand-logo" />
+          </button>
+        </template>
+      </div>
+
+      <!-- Loading state -->
+      <div v-if="block.loadingProducts" class="text-center py-5 text-muted">
+        Đang tải sản phẩm...
+      </div>
+
+      <!-- Error state -->
+      <div v-else-if="block.productError" class="text-center py-5 text-danger">
+        {{ block.productError }}
+      </div>
+
+      <!-- Empty state -->
+      <div v-else-if="block.products.length === 0" class="text-center py-5 text-muted">
+        Chưa có sản phẩm nào.
+      </div>
+
+      <!-- Grid sản phẩm -->
+      <template v-else>
+        <div class="row g-3">
+          <div
+            v-for="product in block.products"
+            :key="product.productId"
+            class="col-6 col-md-3 col-lg-3 col-xl-3"
+          >
+            <router-link :to="`/product/${product.slug}`" class="product-card">
+              <div v-if="product.discountPercent > 0" class="badge-discount">
+                Giảm {{ product.discountPercent }}%
+              </div>
+
+              <div class="card-actions">
+                <button
+                  type="button"
+                  class="icon-btn wishlist-btn"
+                  :class="{ active: isWished(product.productId), loading: togglingIds.has(product.productId) }"
+                  title="Yêu thích"
+                  @click.stop.prevent="toggleWishlist(product.productId)"
+                >
+                  <svg viewBox="0 0 24 24" class="action-icon heart-icon">
+                    <path
+                      d="M12 21s-6.7-4.35-9.3-8.1C0.9 9.9 1.6 6.4 4.6 4.9c2-1 4.4-0.5 5.9 1.2L12 7.6l1.5-1.5c1.5-1.7 3.9-2.2 5.9-1.2 3 1.5 3.7 5 1.9 8-2.6 3.75-9.3 8.1-9.3 8.1z"
+                    />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  class="icon-btn compare-btn"
+                  :class="{ active: compareBar.isInCompare(product.productId) }"
+                  :disabled="!compareBar.isInCompare(product.productId) && !compareBar.canAddMore"
+                  title="So sánh"
+                  @click.stop.prevent="onToggleCompare(product)"
+                >
+                  <svg viewBox="0 0 24 24" class="action-icon compare-icon">
+                    <path d="M9 3v18M15 3v18" />
+                    <path d="M3 9h6M15 9h6M3 15h6M15 15h6" />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  class="icon-btn cart-btn"
+                  title="Thêm vào giỏ hàng"
+                  @click.stop.prevent="addToCart(product)"
+                >
+                  <svg viewBox="0 0 24 24" class="action-icon cart-icon">
+                    <circle cx="9" cy="21" r="1" />
+                    <circle cx="19" cy="21" r="1" />
+                    <path d="M2.5 3h2l2.6 12.4a2 2 0 0 0 2 1.6h8.4a2 2 0 0 0 2-1.6L21.5 7H6" />
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Ảnh -->
+              <div class="card-thumbnail">
+                <img :src="product.thumbnailUrl" :alt="product.productName" loading="lazy" />
+              </div>
+
+              <!-- Tên sản phẩm -->
+              <h3 class="card-title">{{ product.productName }}</h3>
+
+              <!-- Giá -->
+              <div class="card-price">
+                <span class="price-sale">{{ formatPrice(product.price) }}</span>
+                <span v-if="product.originalPrice" class="price-original">
+                  {{ formatPrice(product.originalPrice) }}
+                </span>
+              </div>
+
+              <!-- Chip specs -->
+              <div v-if="product.specs?.length" class="card-specs">
+                <span v-for="(spec, idx) in product.specs" :key="idx" class="spec-chip">
+                  {{ spec }}
+                </span>
+              </div>
+
+              <!-- Khuyến mãi / ưu đãi (sửa nội dung trong PromotionCard.vue) -->
+              <VoucherCard />
+
+              <!-- Rating -->
+              <div class="card-footer-row">
+                <div class="card-rating">
+                  <span class="star">★</span>
+                  <span>{{ product.rating }}</span>
+                </div>
+              </div>
+            </router-link>
+          </div>
+        </div>
+
+        <div v-if="block.totalElements > 0" class="load-more-wrap">
+          <router-link
+            v-if="props.mode === 'standalone'"
+            :to="viewMoreLink(block)"
+            class="load-more-link"
+          >
+            Xem thêm {{ block.categoryName }}
+            <i class="fa-solid fa-arrow-right"></i>
+          </router-link>
+          <button
+            v-else-if="!block.loadingMore"
+            type="button"
+            class="load-more-btn"
+            :disabled="block.products.length >= block.totalElements"
+            @click="loadMore(block)"
+          >
+            Xem thêm {{ remainingCount(block) }} sản phẩm
+          </button>
+          <span v-else class="load-more-loading">
+            <i class="fa-solid fa-spinner fa-spin-pulse"></i>
+            Đang tải...
+          </span>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Filter Modal -->
+  <FilterModal
+    :visible="filterModal.visible"
+    :categoryId="filterModal.categoryId"
+    @close="filterModal.visible = false"
+    @apply="onFilterApply"
+  />
+
   <!-- Notification Modal -->
   <BaseModal
     :visible="notifyModal.visible"
@@ -139,7 +342,6 @@
     @close="notifyModal.visible = false"
   />
 
-  <!-- Login Required Modal (mode list) -->
   <LoginRequiredModal
     :visible="loginModal.visible"
     :title="loginModal.title"
@@ -152,21 +354,38 @@
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/utils/api'
+import FilterModal from '@/layouts/home/FilterModal.vue'
 import VoucherCard from '@/layouts/home/VoucherCard.vue'
-import ProductBlockSection from '@/components/client/ProductBlockSection.vue'
 import { useCartStore } from '@/stores/cartStore'
 import BaseModal from '@/components/BaseModal.vue'
 import wishlist from '@/composables/useWishlistShared'
 import { searchApi } from '@/composables/useSearchBox'
 import LoginRequiredModal from '../LoginRequiredModal.vue'
 import { useCompareBar } from '@/composables/useCompareBar'
+const loginModal = reactive({
+  visible: false,
+  title: '',
+  message: '',
+})
+
+function isLoggedIn() {
+  return !!localStorage.getItem("ACCESS_TOKEN")
+}
+function openLoginModal(title, message) {
+  loginModal.title = title
+  loginModal.message = message
+  loginModal.visible = true
+}
+onMounted(() => {
+  wishlist.fetchIds()
+})
 
 const props = defineProps({
   mode: {
     type: String,
-    default: 'standalone', // 'standalone' | 'list'
+    default: 'standalone', // 'filter' | 'standalone' | 'list'
   },
-  // Props cho mode 'list'
+  // Props cho mode 'list' — Marcus: dùng slug thay id để URL đẹp và đồng nhất.
   keyword: { type: String, default: '' },
   size: { type: Number, default: 12 },
   parentCategorySlug: { type: String, default: null },
@@ -183,6 +402,7 @@ const listTotalPages = ref(0)
 const listTotalElements = ref(0)
 const listPage = ref(0)
 
+// expose cho Search.vue đọc tổng số sp
 defineExpose({
   totalElements: listTotalElements,
   totalPages: listTotalPages,
@@ -190,6 +410,7 @@ defineExpose({
 
 async function fetchList() {
   const kw = (props.keyword || '').trim()
+  // Nhánh "Phụ kiện" cho phép trống keyword (BE tự lấy tất cả PK active)
   const isAccessoryFilter = props.parentCategorySlug === 'phu-kien'
   if (!kw && !isAccessoryFilter) {
     listProducts.value = []
@@ -255,24 +476,91 @@ watch(
   },
 )
 
+// Alias cho template (giữ nguyên tên ngắn gọn)
 const products = listProducts
 const loading = listLoading
 const error = listError
 const totalPages = listTotalPages
 const totalElements = listTotalElements
 const page = listPage
+// Khi Search.vue đẩy page xuống, ẩn pagination nội bộ của ProductCard (Search.vue tự render)
+// Cách đơn giản: nếu prop page > 0 nghĩa là cha đang điều khiển, fallback là để user click vào chip page
 const externalPage = computed(() => props.page > 0)
 function goPage(n) {
   goListPage(n)
 }
 
-// ---- STATE cho mode 'standalone' ----
+// ---- VIEW MORE LINK (standalone mode) ----
+function viewMoreLink(block) {
+  return `/category/${block.categorySlug}`
+}
+
+// ---- SORT OPTIONS (chung cho mọi block) ----
+const sortOptions = [
+  { value: 'popular', label: 'Phổ biến', icon: '★' },
+  { value: 'discount', label: 'Khuyến mãi HOT', icon: '⊗' },
+  { value: 'price_asc', label: 'Giá Thấp - Cao', icon: '↑' },
+  { value: 'price_desc', label: 'Giá Cao - Thấp', icon: '↓' },
+]
+
+// ---- DANH SÁCH CATEGORY CHA (chỉ cate có sản phẩm) ----
 const mainCategories = ref([])
 const loadingCategories = ref(false)
-const blockRefs = ref({})
 
-function setBlockRef(categoryId, el) {
-  if (el) blockRefs.value[categoryId] = el
+const blocks = ref([])
+
+// ---- FILTER MODAL STATE ----
+const filterModal = reactive({
+  visible: false,
+  categoryId: null,
+})
+
+function openFilter(block) {
+  filterModal.categoryId = block.categoryId
+  filterModal.visible = true
+}
+
+function getActiveFilterCount(block) {
+  return (block.selectedMinPrice != null || block.selectedMaxPrice != null ? 1 : 0)
+    + (block.selectedValueIds?.length ?? 0)
+    + (block.selectedBrandIds?.length ?? 0)
+}
+
+function onFilterApply({ brandIds, minPrice, maxPrice, valueIds }) {
+  const block = blocks.value.find((b) => b.categoryId === filterModal.categoryId)
+  if (!block) return
+  block.selectedBrandIds = brandIds
+  block.selectedMinPrice = minPrice
+  block.selectedMaxPrice = maxPrice
+  block.selectedValueIds = valueIds
+  block.page = 0
+  fetchProducts(block)
+}
+
+function createBlock(cate) {
+  return reactive({
+    categoryId: cate.categoryId,
+    categoryName: cate.categoryName,
+    categorySlug: cate.slug,
+    brands: [],
+    selectedBrandId: null,
+    selectedBrandName: null,
+    sectionTitle: 'Sắp xếp theo',
+    sortBy: 'popular',
+    page: 0,
+    size: 8,
+    totalPages: 0,
+    totalElements: 0,
+    products: [],
+    loadingProducts: false,
+    productError: null,
+    // Filter fields
+    selectedMinPrice: null,
+    selectedMaxPrice: null,
+    selectedValueIds: [],
+    selectedBrandIds: [],
+    loadingMore: false,
+  })
 }
 
 async function fetchMainCategories() {
@@ -280,48 +568,199 @@ async function fetchMainCategories() {
   try {
     const res = await api.get('/client/categories/main')
     mainCategories.value = res.data?.data ?? []
+    blocks.value = mainCategories.value.map(createBlock)
+
+    // Fetch song song: brand bar + sản phẩm mặc định cho từng block
+    await Promise.all(
+      blocks.value.map((block) => Promise.all([fetchBrands(block), fetchProducts(block)])),
+    )
   } catch (err) {
     console.error('Lỗi khi tải danh mục chính trang Home:', err)
     mainCategories.value = []
+    blocks.value = []
+  } finally {
+    loadingCategories.value = false
+  }
+}
+
+// ---- BRAND BAR ----
+async function fetchBrands(block) {
+  try {
+    const res = await api.get(`/client/categories/${block.categoryId}/children`)
+    block.brands = res.data?.data ?? []
+    console.log(`[brand] cate=${block.categoryName} (id=${block.categoryId}) -> ${block.brands.length} brands`, block.brands)
+  } catch (err) {
+    console.error('Lỗi khi tải danh sách hãng:', err)
+    block.brands = []
+  }
+}
+
+function onBrandClick(block, brand) {
+  // Bấm lại đúng logo đang chọn -> bỏ chọn, về lại tất cả sản phẩm của category cha
+  if (block.selectedBrandId === brand.categoryId) {
+    resetBrand(block)
+    return
+  }
+  block.selectedBrandId = brand.categoryId
+  block.selectedBrandName = brand.categoryName
+  block.sectionTitle = `${block.categoryName}: ${brand.categoryName}`
+  block.page = 0
+  fetchProducts(block)
+}
+
+function resetBrand(block) {
+  block.selectedBrandId = null
+  block.selectedBrandName = null
+  block.sectionTitle = 'Sắp xếp theo'
+  block.page = 0
+  fetchProducts(block)
+}
+
+// Reset cả filter lẫn brand: về trạng thái mặc định (danh sách SP ban đầu)
+function resetFilterAndBrand(block) {
+  block.selectedBrandIds = []
+  block.selectedMinPrice = null
+  block.selectedMaxPrice = null
+  block.selectedValueIds = []
+  block.selectedBrandId = null
+  block.selectedBrandName = null
+  block.sectionTitle = 'Sắp xếp theo'
+  block.page = 0
+  fetchProducts(block)
+}
+
+// ---- FETCH PRODUCTS (theo từng block) ----
+// Hàm chung: append=false để ghi đè (lần đầu / đổi filter / sort),
+//            append=true  để nối thêm (loadMore).
+function fetchProducts(block, { append = false } = {}) {
+  block.loadingProducts = !append
+  block.loadingMore = append
+  block.productError = null
+  return api
+    .get('/home', {
+      params: buildHomeParams(block),
+    })
+    .then((res) => {
+      const pageData = res.data?.data
+      const list = pageData?.content ?? []
+      if (append) {
+        block.products.push(...list)
+      } else {
+        block.products = list
+      }
+      block.totalPages = pageData?.totalPages ?? 0
+      block.totalElements = pageData?.totalElements ?? 0
+    })
+    .catch((err) => {
+      console.error(
+        append ? 'Lỗi khi tải thêm sản phẩm:' : 'Lỗi khi tải sản phẩm trang home:',
+        err,
+      )
+      block.productError = 'Không thể tải sản phẩm, vui lòng thử lại.'
+      if (append) block.page -= 1
+    })
+    .finally(() => {
+      block.loadingProducts = false
+      block.loadingMore = false
+    })
+}
+
+// Gộp brand click trực tiếp (single) + brand chọn trong filter modal (multi)
+function buildHomeParams(block) {
+  const allBrandIds = [
+    ...(block.selectedBrandId != null ? [block.selectedBrandId] : []),
+    ...(block.selectedBrandIds ?? []),
+  ]
+  const uniqueBrandIds = [...new Set(allBrandIds)]
+  return {
+    sortBy: block.sortBy,
+    categoryId: block.selectedBrandId,
+    parentCategoryId: block.categoryId,
+    page: block.page,
+    size: block.size,
+    minPrice: block.selectedMinPrice,
+    maxPrice: block.selectedMaxPrice,
+    valueIds: block.selectedValueIds?.length ? block.selectedValueIds.join(',') : null,
+    brandIds: uniqueBrandIds.length ? uniqueBrandIds.join(',') : null,
+  }
+}
+
+function onSortChange(block, newSortBy) {
+  block.sortBy = newSortBy
+  block.page = 0
+  fetchProducts(block)
+}
+
+function loadMore(block) {
+  if (block.loadingMore) return
+  block.loadingMore = true
+  block.page += 1
+  fetchProducts(block, { append: true })
+}
+
+function remainingCount(block) {
+  const remain = (block.totalElements ?? 0) - (block.products?.length ?? 0)
+  return remain > 0 ? remain : 0
+}
+
+// ---- FETCH CATEGORY BY ID (filter mode - CategoryProducts page) ----
+async function fetchCategoryById(categoryId) {
+  loadingCategories.value = true
+  try {
+    const res = await api.get(`/client/categories/${categoryId}`)
+    const cate = res.data?.data
+    if (cate) {
+      const block = createBlock(cate)
+      blocks.value = [block]
+      await Promise.all([fetchBrands(block), fetchProducts(block)])
+    }
+  } catch (err) {
+    console.error('Lỗi khi tải danh mục:', err)
+    blocks.value = []
   } finally {
     loadingCategories.value = false
   }
 }
 
 onMounted(() => {
-  wishlist.fetchIds()
-  if (props.mode === 'standalone') {
+  if (props.mode === 'filter') {
+    fetchCategoryById(props.categoryId)
+  } else if (props.mode === 'list') {
+    // mode 'list' được xử lý bởi watch bên dưới, không cần fetch main categories
+    return
+  } else {
     fetchMainCategories()
   }
 })
 
 watch(
-  () => props.mode,
-  (newMode) => {
-    if (newMode === 'standalone') {
+  () => [props.categoryId, props.mode],
+  ([newId, newMode]) => {
+    if (newMode === 'filter') {
+      fetchCategoryById(newId)
+    } else if (newMode === 'list') {
+      // mode 'list' được xử lý bởi watch trên keyword
+      return
+    } else {
       fetchMainCategories()
     }
   },
 )
 
-// ---- WISHLIST ----
+wishlist.fetchIds()
+
 function isWished(productId) {
   return wishlist.isWished(productId)
 }
 
 const togglingIds = ref(new Set())
 
-const loginModal = reactive({ visible: false, title: '', message: '' })
-
-function isLoggedIn() {
-  return !!localStorage.getItem('ACCESS_TOKEN')
-}
-
 async function toggleWishlist(productId) {
   if (!isLoggedIn()) {
-    loginModal.title = 'Lưu sản phẩm yêu thích'
-    loginModal.message = 'Vui lòng đăng nhập để lưu và quản lý các sản phẩm yêu thích của bạn.'
-    loginModal.visible = true
+    openLoginModal(
+      'Lưu sản phẩm yêu thích',
+      'Vui lòng đăng nhập để lưu và quản lý các sản phẩm yêu thích của bạn.',
+    )
     return
   }
   if (togglingIds.value.has(productId)) return
@@ -336,7 +775,7 @@ async function toggleWishlist(productId) {
   }
 }
 
-// ---- ADD TO CART ----
+// ---- ADD TO CART (gọi cartStore + cartApi, backend đã sẵn sàng) ----
 const cartStore = useCartStore()
 const router = useRouter()
 
@@ -350,7 +789,7 @@ function onToggleCompare(product) {
 
 const notifyModal = reactive({
   visible: false,
-  type: 'info',
+  type: 'info', // 'success' | 'error' | 'info'
   title: 'Thông báo',
   message: '',
 })
@@ -364,20 +803,31 @@ function showNotify(type, title, message) {
 
 async function addToCart(product) {
   if (!isLoggedIn()) {
-    loginModal.title = 'Thêm vào giỏ hàng'
-    loginModal.message = 'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng và tiến hành thanh toán.'
-    loginModal.visible = true
+    openLoginModal(
+      'Thêm vào giỏ hàng',
+      'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng và tiến hành thanh toán.',
+    )
     return
   }
+  // Backend trả về defaultSkuId (SKU active + còn hàng + giá thấp nhất).
+  // Nếu không có (hết hàng mọi SKU / sản phẩm mới chưa tạo SKU) → điều hướng
+  // sang trang chi tiết để user chọn variant hoặc xem thông báo hết hàng,
+  // thay vì "im lặng" khiến nút bấm tưởng như bị hỏng.
+  // Support both APIs: /home returns skuId, /search returns defaultSkuId
   const skuId = product?.defaultSkuId ?? product?.skuId
   if (!skuId) {
     if (product?.slug) {
       router.push(`/product/${product.slug}`)
     } else {
-      showNotify('info', 'Sản phẩm tạm hết hàng', 'Phiên bản này hiện không còn hàng. Vui lòng chọn sản phẩm khác.')
+      showNotify(
+        'info',
+        'Sản phẩm tạm hết hàng',
+        'Phiên bản này hiện không còn hàng. Vui lòng chọn sản phẩm khác.',
+      )
     }
     return
   }
+
   const ok = await cartStore.addToCart(skuId, 1)
   if (ok) {
     showNotify('success', 'Thêm vào giỏ hàng', `Đã thêm "${product.productName}" vào giỏ hàng`)
@@ -394,14 +844,121 @@ function formatPrice(value) {
 </script>
 
 <style scoped>
-.category-blocks-wrapper {
-  width: 100%;
+/* ===== Sort bar header ===== */
+.block-header {
+  border-bottom: 2px solid var(--cps-red);
+  padding-bottom: 10px;
 }
-.product-list-wrapper {
-  width: 100%;
+.block-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  font-family: var(--font-display);
+  color: var(--cps-dark);
+  letter-spacing: -0.2px;
 }
 
-/* Reuse styles for product-card (mode list) */
+.reset-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f1f1;
+  color: #777;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.reset-btn:hover {
+  background: #ffe0e0;
+  color: #d70018;
+}
+
+.sort-options {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sort-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #444;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.sort-btn:hover {
+  border-color: #bbb;
+}
+.sort-btn.active {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #eaf1ff;
+}
+.sort-icon {
+  font-size: 12px;
+}
+
+@media (min-width: 1200px) {
+  .col-xl-2-4 {
+    flex: 0 0 auto;
+    width: 20%;
+  }
+}
+@media (max-width: 768px) {
+  .block-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+}
+
+/* ===== Brand bar ===== */
+.brand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.brand-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 46px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.brand-item:hover {
+  border-color: #bbb;
+}
+.brand-item.active {
+  border-color: #d70018;
+  box-shadow: 0 0 0 1px #d70018 inset;
+}
+
+.brand-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* ===== Product card ===== */
 .product-card {
   position: relative;
   display: flex;
@@ -431,6 +988,8 @@ function formatPrice(value) {
   border-radius: 4px;
   z-index: 1;
 }
+
+/* ===== Action icons: wishlist + cart, góc phải trên ===== */
 .card-actions {
   position: absolute;
   top: 8px;
@@ -440,6 +999,7 @@ function formatPrice(value) {
   gap: 6px;
   z-index: 2;
 }
+
 .icon-btn {
   display: flex;
   align-items: center;
@@ -452,12 +1012,15 @@ function formatPrice(value) {
   cursor: pointer;
   padding: 0;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .icon-btn:hover {
   transform: scale(1.08);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
 }
+
 .action-icon {
   width: 16px;
   height: 16px;
@@ -467,24 +1030,32 @@ function formatPrice(value) {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+
 .wishlist-btn .heart-icon {
-  transition: fill 0.15s ease, stroke 0.15s ease;
+  transition:
+    fill 0.15s ease,
+    stroke 0.15s ease;
 }
 .wishlist-btn.active .heart-icon {
   fill: #d70018;
   stroke: #d70018;
 }
+
 .wishlist-btn.loading {
   pointer-events: none;
   opacity: 0.6;
 }
+.wishlist-btn.loading {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
 .cart-btn .cart-icon {
   stroke: #3b5ba9;
 }
 .cart-btn:hover .cart-icon {
   stroke: #1e3a8a;
 }
-
 
 .compare-btn .compare-icon {
   stroke: #6b7280;
@@ -503,7 +1074,6 @@ function formatPrice(value) {
   cursor: not-allowed;
 }
 
-
 .card-thumbnail {
   display: flex;
   justify-content: center;
@@ -516,6 +1086,7 @@ function formatPrice(value) {
   max-width: 100%;
   object-fit: contain;
 }
+
 .card-title {
   font-size: 14px;
   font-weight: 500;
@@ -526,6 +1097,7 @@ function formatPrice(value) {
   -webkit-box-orient: vertical;
   margin: 0 0 8px;
 }
+
 .card-price {
   display: flex;
   align-items: baseline;
@@ -542,6 +1114,7 @@ function formatPrice(value) {
   font-size: 13px;
   text-decoration: line-through;
 }
+
 .card-specs {
   display: flex;
   flex-wrap: wrap;
@@ -555,11 +1128,13 @@ function formatPrice(value) {
   padding: 3px 8px;
   color: #333;
 }
+
 .card-footer-row {
   display: flex;
   align-items: center;
   margin-top: auto;
 }
+
 .card-rating {
   display: flex;
   align-items: center;
@@ -569,5 +1144,108 @@ function formatPrice(value) {
 }
 .star {
   color: #ffb800;
+}
+
+/* ===== Filter button (trong brand bar) ===== */
+.filter-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 46px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: #444;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    color 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.filter-btn:hover {
+  border-color: #bbb;
+  color: #d70018;
+}
+
+.filter-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #d70018;
+  color: #fff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ===== Xem thêm ===== */
+.load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 24px;
+}
+
+.load-more-btn {
+  height: 42px;
+  padding: 0 36px;
+  background: #fff;
+  border: 1px solid #d70018;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #d70018;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: #d70018;
+  color: #fff;
+}
+
+.load-more-btn:disabled {
+  border-color: #e0e0e0;
+  color: #bbb;
+  cursor: default;
+}
+
+.load-more-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #999;
+}
+
+.load-more-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 36px;
+  background: #d70018;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.load-more-link:hover {
+  background: #b80015;
+  color: #fff;
 }
 </style>
