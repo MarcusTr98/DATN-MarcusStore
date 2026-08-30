@@ -85,7 +85,7 @@
 </template>
 
 <script setup>
-const props = defineProps({
+defineProps({
   visible: { type: Boolean, default: false },
   // Danh sách cart item bị revert giá (để hiển thị lý do giá đổi)
   revertedItems: {

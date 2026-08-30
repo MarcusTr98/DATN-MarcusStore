@@ -408,7 +408,7 @@ import BaseModal from '@/components/BaseModal.vue'
 import AdminPageHeader from '@/components/admin/AdminPageHeader.vue'
 import { useSettings } from '@/composables/useSettings'
 
-const { fetchSettings: refreshPublicSettings, invalidateCache, refreshAndWait } = useSettings()
+const { invalidateCache, refreshAndWait } = useSettings()
 
 const isLoading = ref(true)
 const isSaving = ref(false)

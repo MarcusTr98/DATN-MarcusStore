@@ -1,5 +1,4 @@
-﻿import { ref, computed, onMounted, onUnmounted } from 'vue'
-import api from '@/utils/api'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { watch } from 'vue'
 import { useSettings } from '@/composables/useSettings'
 

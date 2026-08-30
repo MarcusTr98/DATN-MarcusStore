@@ -1,14 +1,6 @@
 import { defineStore } from 'pinia'
 import voucherApi from '@/api/voucherApi.js'
 
-function formatDateTimeLocal(value) {
-  if (!value) {
-    return ''
-  }
-
-  return String(value).slice(0, 16)
-}
-
 function mapVoucher(voucher) {
   return {
     voucherId: voucher.voucherId,
@@ -142,7 +134,7 @@ export const useVoucherStore = defineStore('voucher', {
         try {
           const statsRes = await voucherApi.getVoucherStats({})
           this.stats = statsRes.data || buildFallbackStats(this.vouchers, pageData.totalElements || 0)
-        } catch (statsError) {
+        } catch {
           this.stats = buildFallbackStats(this.vouchers, pageData.totalElements || 0)
         }
 

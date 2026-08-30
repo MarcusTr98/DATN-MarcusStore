@@ -409,7 +409,7 @@ const handleProductClick = (product, message) => {
   // Marcus thêm: ghi nhớ thẻ khách vừa chọn trong phiên hiện tại. Những câu hỏi
   // tiếp nối không được tự coi sản phẩm “Nên chọn” cũ là lựa chọn của khách.
   advisorContext.value = {
-    ...(advisorContext.value || {}),
+    ...advisorContext.value,
     selectedProductIds: [product.productId],
     focusedProductId: product.productId,
   }

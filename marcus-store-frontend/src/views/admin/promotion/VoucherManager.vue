@@ -986,7 +986,7 @@ import '@/assets/css/Voucher.css'
 
 const voucherStore = useVoucherStore()
 
-const {vouchers, loading, error, fieldErrors, pagination, stats} = storeToRefs(voucherStore)
+const {vouchers, loading, fieldErrors, pagination, stats} = storeToRefs(voucherStore)
 
 const currentPage = ref(0)
 const pageSize = ref(5)
@@ -1459,8 +1459,8 @@ function openEditModal(voucher) {
 
   // Khi sửa: xác định timeMode dựa trên status
   const voucherStatus = voucher.status || 'ACTIVE'
-  let editTimeMode = 'NOW'
-  let editStartDate = ''
+  let editTimeMode
+  let editStartDate
   const startRaw = voucher.startDate ? new Date(voucher.startDate) : null
 
   if (voucherStatus === 'SCHEDULED') {

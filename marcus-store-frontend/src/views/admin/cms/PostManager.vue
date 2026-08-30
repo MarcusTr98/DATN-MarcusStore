@@ -296,7 +296,7 @@ async function executeToggle(post, newVal) {
       const updated = await postApi.getById(post.id);
       posts.value[idx] = mapFromApi(updated);
     } catch {
-    
+      // Giữ trạng thái optimistic nếu API đọc lại tạm thời không khả dụng.
     }
   } catch (err) {
     posts.value[idx] = { ...posts.value[idx], isPublished: !newVal };

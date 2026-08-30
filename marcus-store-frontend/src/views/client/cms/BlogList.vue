@@ -77,7 +77,7 @@ async function loadPage(targetPage) {
     posts.value = res.content || []
     totalPages.value = res.totalPages || 1
     page.value = res.number ?? targetPage
-  } catch (err) {
+  } catch {
     posts.value = []
     totalPages.value = 1
   } finally {

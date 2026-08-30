@@ -276,7 +276,6 @@ import LoginRequiredModal from '@/components/LoginRequiredModal.vue'
 const {
   state,
   canCompare,
-  removeFromCompare,
   clearCompare,
   MAX_ITEMS,
 } = useCompareBar()

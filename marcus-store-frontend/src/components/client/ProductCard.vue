@@ -100,7 +100,7 @@
             v-for="p in totalPages"
             :key="p"
             class="page-item"
-            :class="{ active: p - 1 === page }"
+            :class="{ active: p - 1 === internalPage }"
           >
             <button class="page-link" @click="goPage(p - 1)">{{ p }}</button>
           </li>
@@ -447,7 +447,7 @@ function goListPage(n) {
 
 watch(
   () => [props.keyword, props.parentCategorySlug, props.brandSlug, props.mode],
-  ([kw, , , m]) => {
+  ([, , , m]) => {
     if (m === 'list') {
       listPage.value = 0
       fetchList()
@@ -481,8 +481,7 @@ const products = listProducts
 const loading = listLoading
 const error = listError
 const totalPages = listTotalPages
-const totalElements = listTotalElements
-const page = listPage
+const internalPage = listPage
 // Khi Search.vue đẩy page xuống, ẩn pagination nội bộ của ProductCard (Search.vue tự render)
 // Cách đơn giản: nếu prop page > 0 nghĩa là cha đang điều khiển, fallback là để user click vào chip page
 const externalPage = computed(() => props.page > 0)

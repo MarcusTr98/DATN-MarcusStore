@@ -610,7 +610,8 @@ function validate() {
 
 function onSubmit() {
   if (!validate()) return
-  isEdit.value ? doUpdate() : doCreate()
+  if (isEdit.value) doUpdate()
+  else doCreate()
 }
 
 function onReset() {

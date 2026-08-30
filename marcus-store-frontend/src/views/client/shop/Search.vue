@@ -121,7 +121,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/utils/api'
 import ProductCard from '@/components/client/ProductCard.vue'
 
 const route = useRoute()
@@ -169,12 +168,6 @@ const totalCount = computed(
 const totalPages = computed(
   () => productCardRef.value?.totalPages ?? 0,
 )
-
-async function fetchBrands() {
-  // Marcus: ẩn luôn chip Hãng khi đã chọn Loại — chỉ filter theo cây cha,
-  // không cho chọn brand riêng trên trang Search nữa.
-  availableBrands.value = []
-}
 
 function syncToUrl({ resetPage = false } = {}) {
   if (resetPage) page.value = 0

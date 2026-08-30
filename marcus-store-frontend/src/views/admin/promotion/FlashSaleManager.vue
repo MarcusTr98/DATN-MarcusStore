@@ -1118,7 +1118,7 @@ import '@/assets/css/FlashSale.css'
 
 const flashSaleStore = useFlashSaleStore()
 const {
-  slots, loading, error, fieldErrors, pagination, stats,
+  slots, loading, pagination, stats,
   cascadeTree, cascadeLoading, cascadeError,
 } = storeToRefs(flashSaleStore)
 
@@ -1427,7 +1427,7 @@ async function checkOverlap() {
       excludeSlotId: isEditing.value ? editSlotId.value : null,
     })
     overlappingSlots.value = list
-  } catch (e) {
+  } catch {
     overlappingSlots.value = []
   }
 }
@@ -1698,10 +1698,6 @@ const activeCategoryId = ref(null)
 const catOpen = ref(false)
 const lastCategoryCount = ref(0)
 
-function getProductName(skuId) {
-  return getSku(skuId)?.productName || `SKU #${skuId}`
-}
-
 function getProductPrice(skuId) {
   return getSku(skuId)?.originalPrice ?? 0
 }
@@ -1875,11 +1871,11 @@ async function openEditModal(slot) {
   resetForm(false)
 
   // Lấy chi tiết từ BE để có items đã chọn
-  let detail = null
+  let detail
   try {
     detail = await flashSaleStore.fetchOneSlot(slot.slotId)
-  } catch (e) {
-    detail = null
+  } catch {
+    // Dùng dữ liệu của danh sách làm fallback khi API chi tiết lỗi.
   }
   const data = detail || slot
 

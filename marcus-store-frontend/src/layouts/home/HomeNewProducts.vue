@@ -195,9 +195,6 @@ const wishlistToggling = ref(new Set())
 const imageLoaded = reactive({})
 const imageErrored = reactive({})
 
-const tabs = [
-  { label: '', icon: 'fas fa-rocket', active: true },
-]
 const loginModal = reactive({ visible: false, title: '', message: '' })
 const toast = reactive({ show: false, type: 'success', message: '' })
 let toastTimer = null
