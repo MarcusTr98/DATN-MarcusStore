@@ -604,7 +604,7 @@ const rawFlashSaleItems = computed(() => {
   const slot = clientSlots.value.find((s) => s.slotId === selectedSlotId.value)
   if (!slot || !Array.isArray(slot.items)) return []
   return slot.items
-    .filter((it) => !slot.isCancelled)
+    .filter(() => !slot.isCancelled)
     .map((it) => buildRawItem({ ...it, _slotId: slot.slotId, _slotName: slot.name }))
 })
 

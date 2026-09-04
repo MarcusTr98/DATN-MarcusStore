@@ -23,7 +23,6 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const props = defineProps({
@@ -36,8 +35,6 @@ const props = defineProps({
     default: false
   }
 })
-
-const emit = defineEmits(['error'])
 
 const router  = useRouter()
 const goToVerify = () => {

@@ -32,6 +32,7 @@ public class UserVoucher {
     private LocalDateTime assignedAt;
 
     @Column(name = "is_used", nullable = false)
+    @Builder.Default
     private Boolean isUsed = false;
 
     @Column(name = "used_at")

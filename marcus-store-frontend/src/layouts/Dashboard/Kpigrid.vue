@@ -54,8 +54,6 @@ const props = defineProps({
   periodLabel:        { type: String, default: 'hôm nay' },
 })
 
-const emit = defineEmits(['action'])
-
 function formatCurrency(value) {
   return new Intl.NumberFormat('vi-VN', {
     style: 'currency', currency: 'VND', maximumFractionDigits: 0,

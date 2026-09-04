@@ -534,7 +534,7 @@ const chartDays = computed(() => {
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(-14)
     .map(([key, v]) => {
-      const [y, m, d] = key.split('-');
+      const [, m, d] = key.split('-');
       return { date: `${d}/${m}`, create: v.create, update: v.update, delete: v.delete, total: v.create + v.update + v.delete };
     });
 });

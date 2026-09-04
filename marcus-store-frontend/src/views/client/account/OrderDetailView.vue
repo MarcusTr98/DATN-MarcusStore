@@ -1123,7 +1123,9 @@ async function submitWarranty() {
           attachmentUrls.push(url)
         } catch (uploadError) {
           console.error('Upload failed for:', attachment.name, uploadError)
-          throw new Error(`Không thể tải lên file ${attachment.name}. Vui lòng thử lại.`)
+          throw new Error(`Không thể tải lên file ${attachment.name}. Vui lòng thử lại.`, {
+            cause: uploadError,
+          })
         }
       }
     }
@@ -1136,7 +1138,7 @@ async function submitWarranty() {
       attachmentUrls: attachmentUrls,
     }
 
-    const response = await WarrantyApi.createWarranty(payload)
+    await WarrantyApi.createWarranty(payload)
 
     warrantyModal.value.feedback = {
       type: 'success',

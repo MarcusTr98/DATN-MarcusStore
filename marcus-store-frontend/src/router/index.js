@@ -2,7 +2,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 import ClientLayout from '@/layouts/ClientLayout.vue'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import BlankLayout from '@/layouts/BlankLayout.vue'
-import Profile from '@/views/client/account/Profile.vue'
 const routes = [
   // 1. LUỒNG XÁC THỰC
   {

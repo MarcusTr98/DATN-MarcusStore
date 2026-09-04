@@ -359,7 +359,7 @@ function buildOrderChart() {
   if (!orderChartRef.value) return
 
   const period = props.selectedTime
-  let labels = [], data = []
+  let labels, data
 
   if (period === 'week') {
     const ORDER = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']

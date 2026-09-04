@@ -174,7 +174,7 @@ const processedVouchers = computed(() => {
     const isPercent = discountType === 'PERCENT'
     const isFreeship = discountType === 'FREESHIP'
 
-    let title = ''
+    let title
     let discountValue = 0
     let discountPercent = 0
 
@@ -246,7 +246,7 @@ const activeVouchers = computed(() => {
     .map((v) => ({ ...v, _discount: estimateDiscount(v) }))
     .sort((a, b) => b._discount - a._discount)
   if (list.length > 0) list[0].isBest = true
-  return list.map(({ _discount, ...rest }) => rest)
+  return list
 })
 
 const disabledVouchers = computed(() => processedVouchers.value.filter((v) => !v.active))

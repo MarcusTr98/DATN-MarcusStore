@@ -1,4 +1,4 @@
-﻿import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import addressApi from '@/api/addressApi'
 import userApi from '@/api/userApi'

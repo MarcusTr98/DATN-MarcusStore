@@ -306,7 +306,9 @@ const loadStats = async () => {
       active: list.filter((x) => x.active).length,
       locked: list.filter((x) => !x.active).length,
     }
-  } catch {}
+  } catch {
+    stats.value = { verified: 0, active: 0, locked: 0 }
+  }
 }
 
 /* =========================

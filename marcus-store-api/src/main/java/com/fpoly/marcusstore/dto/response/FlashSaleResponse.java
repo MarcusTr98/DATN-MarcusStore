@@ -28,6 +28,7 @@ public class FlashSaleResponse {
     // Flag đánh dấu slot đã bị admin hủy (status=4). FE dựa vào đây để hiển thị modal
     // thông báo "Flash Sale đã bị admin hủy" khi khách tương tác với sản phẩm thuộc slot này.
     // BE trả kèm slot CANCELLED trong cùng response để FE biết slotId nào đã bị hủy.
+    @Builder.Default
     private Boolean isCancelled = false;
 
     private List<FlashSaleItemResponse> items;

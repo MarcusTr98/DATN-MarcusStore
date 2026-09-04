@@ -53,7 +53,7 @@ export function setupGlobalExcelImporter(opts) {
       }
 
       getFormImport().imeiText = unique.join('\n')
-      onSuccess && onSuccess(unique.length, file.name)
+      if (onSuccess) onSuccess(unique.length, file.name)
     } catch (e) {
       showToast('Không đọc được file Excel: ' + (e?.message || 'lỗi không xác định'))
     } finally {

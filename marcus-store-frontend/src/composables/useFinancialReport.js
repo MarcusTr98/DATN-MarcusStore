@@ -1,4 +1,4 @@
-﻿import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import financialApi from '@/api/financialApi'
 
 // Marcus refactor: gom toàn bộ nghiệp vụ đối soát khỏi component giao diện.

@@ -32,10 +32,12 @@ public class SpecAttributeRequest {
 
     @NotBlank(message = "Kiểu dữ liệu không được để trống")
     @Pattern(regexp = "^(text|number|boolean)$", message = "Kiểu dữ liệu phải là text, number hoặc boolean")
+    @Builder.Default
     private String dataType = "text";
 
     // Marcus sửa: giao diện dùng thứ tự 0 làm mặc định nên validation phải chấp
     // nhận 0.
     @PositiveOrZero(message = "Thứ tự hiển thị phải từ 0 trở lên")
+    @Builder.Default
     private Integer displayOrder = 0;
 }

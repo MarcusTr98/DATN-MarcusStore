@@ -41,6 +41,7 @@ public class Voucher {
     private BigDecimal maxDiscountAmount;
 
     @Column(name = "min_order_value", precision = 18, scale = 2)
+    @Builder.Default
     private BigDecimal minOrderValue = BigDecimal.ZERO;
 
     @Column(name = "start_date", nullable = false)
@@ -54,9 +55,11 @@ public class Voucher {
 
     // Trạng thái: ACTIVE = đang sử dụng, INACTIVE = ngừng sử dụng, SCHEDULED = đã lên lịch (chưa đến ngày)
     @Column(name = "status", length = 20)
+    @Builder.Default
     private String status = STATUS_ACTIVE;
 
     // Đối tượng sử dụng: 'ALL' = tất cả, 'SPECIFIC' = khách cụ thể
     @Column(name = "target_type", length = 20)
+    @Builder.Default
     private String targetType = "ALL";
 }

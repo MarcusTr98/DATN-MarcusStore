@@ -89,7 +89,7 @@ class OrderCancellationServiceTest {
                 assertThat(fixture.order().getOrderStatus()).isEqualTo("CANCELLED");
                 assertThat(fixture.sku().getStockQuantity()).isEqualTo(6);
                 assertThat(fixture.voucher().getQuantity()).isEqualTo(1);
-                assertThat(fixture.voucher().getIsActive()).isTrue();
+                assertThat(fixture.voucher().getStatus()).isEqualTo(Voucher.STATUS_ACTIVE);
                 assertThat(fixture.userVoucher().getIsUsed()).isFalse();
                 assertThat(fixture.userVoucher().getUsedAt()).isNull();
 
@@ -139,7 +139,7 @@ class OrderCancellationServiceTest {
                 Voucher voucher = new Voucher();
                 voucher.setVoucherId(3);
                 voucher.setQuantity(0);
-                voucher.setIsActive(false);
+                voucher.setStatus(Voucher.STATUS_INACTIVE);
                 voucher.setStartDate(LocalDateTime.now().minusDays(1));
                 voucher.setEndDate(LocalDateTime.now().plusDays(1));
 
